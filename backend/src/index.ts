@@ -1,0 +1,44 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { initializeDB } from './db';
+import uploadRoutes from './routes/upload';
+import attendanceRoutes from './routes/attendance';
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+// Initialize database
+initializeDB();
+
+// Middleware
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.use('/api/upload', uploadRoutes);
+app.use('/api/attendance', attendanceRoutes);
+
+// Health check
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Error handling
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+export default app;

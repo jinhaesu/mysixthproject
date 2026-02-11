@@ -1,0 +1,50 @@
+import Database, { Database as DatabaseType } from 'better-sqlite3';
+import path from 'path';
+
+const DB_PATH = path.join(__dirname, '..', 'data', 'attendance.db');
+
+const db: DatabaseType = new Database(DB_PATH);
+
+// Enable WAL mode for better concurrent performance
+db.pragma('journal_mode = WAL');
+
+export function initializeDB() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS uploads (
+      id TEXT PRIMARY KEY,
+      filename TEXT NOT NULL,
+      original_filename TEXT NOT NULL,
+      record_count INTEGER DEFAULT 0,
+      ai_analysis TEXT,
+      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS attendance_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      upload_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      name TEXT NOT NULL,
+      clock_in TEXT,
+      clock_out TEXT,
+      category TEXT,
+      department TEXT,
+      workplace TEXT,
+      total_hours REAL DEFAULT 0,
+      regular_hours REAL DEFAULT 0,
+      overtime_hours REAL DEFAULT 0,
+      break_time REAL DEFAULT 0,
+      annual_leave TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_records_date ON attendance_records(date);
+    CREATE INDEX IF NOT EXISTS idx_records_name ON attendance_records(name);
+    CREATE INDEX IF NOT EXISTS idx_records_upload ON attendance_records(upload_id);
+    CREATE INDEX IF NOT EXISTS idx_records_department ON attendance_records(department);
+    CREATE INDEX IF NOT EXISTS idx_records_workplace ON attendance_records(workplace);
+    CREATE INDEX IF NOT EXISTS idx_records_category ON attendance_records(category);
+  `);
+}
+
+export default db;

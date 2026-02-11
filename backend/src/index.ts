@@ -14,9 +14,20 @@ const PORT = process.env.PORT || 4000;
 // Initialize database
 initializeDB();
 
-// Middleware
+// Middleware - CORS
+// FRONTEND_URL can be comma-separated for multiple origins
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((s) => s.trim());
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.some((o) => origin.startsWith(o) || o === '*')) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());

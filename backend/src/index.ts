@@ -5,8 +5,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { initializeDB } from './db';
+import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import attendanceRoutes from './routes/attendance';
+import { requireAuth } from './middleware/auth';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -34,8 +36,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/upload', uploadRoutes);
-app.use('/api/attendance', attendanceRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/upload', requireAuth, uploadRoutes);
+app.use('/api/attendance', requireAuth, attendanceRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

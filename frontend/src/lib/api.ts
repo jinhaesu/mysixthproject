@@ -9,13 +9,29 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
+      ...getAuthHeaders(),
       ...options?.headers,
     },
   });
+
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
+  }
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: '요청 처리 중 오류가 발생했습니다.' }));

@@ -45,20 +45,6 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve frontend static files
-const frontendPath = path.join(__dirname, '..', 'public');
-app.use(express.static(frontendPath));
-
-// SPA fallback: serve index.html for non-API routes
-app.get('/{*splat}', (_req, res) => {
-  const indexPath = path.join(frontendPath, 'index.html');
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      res.status(404).json({ error: 'Not found' });
-    }
-  });
-});
-
 // Error handling
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);

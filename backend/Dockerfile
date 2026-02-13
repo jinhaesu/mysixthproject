@@ -1,19 +1,14 @@
-FROM node:20-bookworm-slim AS frontend-builder
+FROM node:20-bookworm-slim AS builder
 
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
-COPY frontend/ .
-RUN npm run build
-
-FROM node:20-bookworm-slim AS backend-builder
-
+# better-sqlite3 네이티브 빌드에 필요한 도구
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app/backend
-COPY backend/package*.json ./
+WORKDIR /app
+
+COPY package*.json ./
 RUN npm ci
-COPY backend/ .
+
+COPY . .
 RUN npm run build
 
 # --- Production ---
@@ -23,11 +18,10 @@ RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt
 
 WORKDIR /app
 
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY --from=backend-builder /app/backend/dist ./dist
-COPY --from=frontend-builder /app/frontend/out ./public
+COPY --from=builder /app/dist ./dist
 
 RUN mkdir -p /app/data /app/uploads
 

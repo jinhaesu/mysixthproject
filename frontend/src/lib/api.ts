@@ -7,7 +7,7 @@ import type {
   PivotData,
 } from '@/types/attendance';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};

@@ -23,17 +23,17 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .map((s) => s.trim());
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.some((o) => origin.startsWith(o) || o === '*')) {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
-  },
+  origin: true,
   credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Request logging
+app.use((req, _res, next) => {
+  console.log(`${req.method} ${req.path} [origin: ${req.headers.origin || 'none'}]`);
+  next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -42,7 +42,7 @@ app.use('/api/attendance', requireAuth, attendanceRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
 });
 
 // Error handling

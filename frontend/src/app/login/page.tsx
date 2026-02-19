@@ -48,8 +48,9 @@ export default function LoginPage() {
       setChallengeToken(data.challengeToken);
       setStep("code");
       startCountdown();
-    } catch {
-      setError("서버에 연결할 수 없습니다.");
+    } catch (err: any) {
+      console.error("Send code error:", err, "API_URL:", API_URL);
+      setError(`서버에 연결할 수 없습니다. (${err?.message || "네트워크 오류"})`);
     } finally {
       setLoading(false);
     }
@@ -77,8 +78,9 @@ export default function LoginPage() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       router.push("/");
-    } catch {
-      setError("서버에 연결할 수 없습니다.");
+    } catch (err: any) {
+      console.error("Verify error:", err, "API_URL:", API_URL);
+      setError(`서버에 연결할 수 없습니다. (${err?.message || "네트워크 오류"})`);
     } finally {
       setLoading(false);
     }
@@ -105,8 +107,9 @@ export default function LoginPage() {
 
       setChallengeToken(data.challengeToken);
       startCountdown();
-    } catch {
-      setError("서버에 연결할 수 없습니다.");
+    } catch (err: any) {
+      console.error("Resend error:", err, "API_URL:", API_URL);
+      setError(`서버에 연결할 수 없습니다. (${err?.message || "네트워크 오류"})`);
     } finally {
       setLoading(false);
     }

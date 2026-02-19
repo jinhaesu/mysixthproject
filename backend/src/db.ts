@@ -1,5 +1,4 @@
 import Database, { Database as DatabaseType } from 'better-sqlite3';
-import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
 
@@ -19,15 +18,6 @@ db.pragma('journal_mode = WAL');
 
 export function initializeDB() {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL,
-      name TEXT NOT NULL,
-      role TEXT DEFAULT 'user',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
     CREATE TABLE IF NOT EXISTS uploads (
       id TEXT PRIMARY KEY,
       filename TEXT NOT NULL,
@@ -64,18 +54,7 @@ export function initializeDB() {
     CREATE INDEX IF NOT EXISTS idx_records_category ON attendance_records(category);
   `);
 
-  // Seed default admin user if not exists
-  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get('LION9080@JOINANDJOIN.COM');
-  if (!existingUser) {
-    const hashedPassword = bcrypt.hashSync('lion9080', 10);
-    db.prepare('INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)').run(
-      'LION9080@JOINANDJOIN.COM',
-      hashedPassword,
-      '관리자',
-      'admin'
-    );
-    console.log('Default admin user created: LION9080@JOINANDJOIN.COM');
-  }
+  console.log('Database initialized successfully');
 }
 
 export default db;

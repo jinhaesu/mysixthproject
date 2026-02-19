@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, AlertCircle, KeyRound, ArrowLeft } from "lucide-react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<"email" | "code">("email");
@@ -30,7 +32,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/send-code", {
+      const res = await fetch(`${API_URL}/api/auth/send-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -59,7 +61,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/verify", {
+      const res = await fetch(`${API_URL}/api/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ challengeToken, code }),
@@ -88,7 +90,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/send-code", {
+      const res = await fetch(`${API_URL}/api/auth/send-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

@@ -55,8 +55,7 @@ export default function Sidebar() {
       {user && (
         <div className="p-4 border-t border-gray-200">
           <div className="px-4 py-2 mb-2">
-            <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-            <p className="text-xs text-gray-500 truncate">{user.email}</p>
+            <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
           </div>
           <button
             onClick={logout}

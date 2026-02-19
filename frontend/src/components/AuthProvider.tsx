@@ -4,10 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { useRouter, usePathname } from "next/navigation";
 
 interface User {
-  id: number;
   email: string;
-  name: string;
-  role: string;
 }
 
 interface AuthContextType {
@@ -39,7 +36,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     if (savedToken && savedUser) {
       setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        if (pathname !== "/login") router.push("/login");
+      }
     } else if (pathname !== "/login") {
       router.push("/login");
     }
@@ -54,13 +57,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
-  if (!checked) {
-    return null;
-  }
-
-  if (!token && pathname !== "/login") {
-    return null;
-  }
+  if (!checked) return null;
+  if (!token && pathname !== "/login") return null;
 
   return (
     <AuthContext.Provider value={{ user, token, logout }}>

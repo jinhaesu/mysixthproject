@@ -85,3 +85,12 @@ export async function getPivotData(params: Record<string, string> = {}): Promise
   const query = new URLSearchParams(params).toString();
   return fetchAPI<PivotData>(`/api/attendance/pivot?${query}`);
 }
+
+// Report
+export async function getReportSummary(year: number, month: number) {
+  return fetchAPI<any>(`/api/attendance/report/summary?year=${year}&month=${month}`);
+}
+
+export async function getReportDaily(year: number, month: number) {
+  return fetchAPI<any>(`/api/attendance/report/daily?year=${year}&month=${month}`);
+}

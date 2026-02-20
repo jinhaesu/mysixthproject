@@ -31,6 +31,7 @@ const AGG_LABELS: Record<string, string> = {
 export default function PivotPage() {
   const [pivotData, setPivotData] = useState<PivotData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [config, setConfig] = useState({
     rowField: "name",
     colField: "department",
@@ -46,6 +47,7 @@ export default function PivotPage() {
 
   async function loadPivot() {
     setLoading(true);
+    setError("");
     try {
       const params: Record<string, string> = {
         rowField: config.rowField,
@@ -57,8 +59,8 @@ export default function PivotPage() {
       if (config.endDate) params.endDate = config.endDate;
       const data = await getPivotData(params);
       setPivotData(data);
-    } catch {
-      // handle error
+    } catch (err: any) {
+      setError(err.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -147,6 +149,8 @@ export default function PivotPage() {
         </button>
       </div>
 
+      {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm mb-6">{error}</div>}
+
       {/* Pivot Table */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
@@ -189,7 +193,7 @@ export default function PivotPage() {
                       </td>
                       {pivotData.columns.map((col) => (
                         <td key={col} className="text-right px-4 py-3 text-gray-600 tabular-nums">
-                          {row[col] !== undefined ? row[col].toFixed(1) : "-"}
+                          {row[col] !== undefined && row[col] !== null ? Number(row[col]).toFixed(1) : "-"}
                         </td>
                       ))}
                       <td className="text-right px-4 py-3 font-semibold text-gray-900 bg-blue-50 tabular-nums">

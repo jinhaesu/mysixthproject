@@ -69,16 +69,16 @@ router.post('/', upload.single('file'), async (req: Request, res: Response): Pro
 
     // Save attendance records
     const insertRecord = db.prepare(`
-      INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, total_hours, regular_hours, overtime_hours, break_time, annual_leave)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, shift, total_hours, regular_hours, overtime_hours, night_hours, break_time, annual_leave)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertMany = db.transaction((recs: typeof records) => {
       for (const r of recs) {
         insertRecord.run(
           uploadId, r.date, r.name, r.clock_in, r.clock_out,
-          r.category, r.department, r.workplace,
-          r.total_hours, r.regular_hours, r.overtime_hours, r.break_time,
+          r.category, r.department, r.workplace, r.shift,
+          r.total_hours, r.regular_hours, r.overtime_hours, r.night_hours, r.break_time,
           r.annual_leave
         );
       }

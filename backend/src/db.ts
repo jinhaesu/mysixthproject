@@ -54,6 +54,10 @@ export function initializeDB() {
     CREATE INDEX IF NOT EXISTS idx_records_category ON attendance_records(category);
   `);
 
+  // Migration: add new columns for existing databases
+  try { db.exec('ALTER TABLE attendance_records ADD COLUMN shift TEXT DEFAULT ""'); } catch {}
+  try { db.exec('ALTER TABLE attendance_records ADD COLUMN night_hours REAL DEFAULT 0'); } catch {}
+
   console.log('Database initialized successfully');
 }
 

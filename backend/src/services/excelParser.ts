@@ -8,28 +8,45 @@ export interface AttendanceRecord {
   category: string;
   department: string;
   workplace: string;
+  shift: string;
   total_hours: number;
   regular_hours: number;
   overtime_hours: number;
+  night_hours: number;
   break_time: number;
   annual_leave: string;
 }
 
 // Column name mappings (Korean -> English)
 const COLUMN_MAP: Record<string, keyof AttendanceRecord> = {
+  // 날짜/이름
   '날짜': 'date',
   '이름': 'name',
+  // 출퇴근
   '출근시간': 'clock_in',
   '퇴근시간': 'clock_out',
+  // 분류
   '구분': 'category',
+  '고용형태': 'category',
   '부서': 'department',
   '근무지': 'workplace',
+  '근무층': 'workplace',
+  '근무시간대': 'shift',
+  '시간대': 'shift',
+  // 시간
   '총 근로시간': 'total_hours',
   '총근로시간': 'total_hours',
+  '총 근무시간': 'total_hours',
+  '총근무시간': 'total_hours',
   '정규시간': 'regular_hours',
   '연장 근로시간': 'overtime_hours',
   '연장근로시간': 'overtime_hours',
+  '연장시간': 'overtime_hours',
+  '야간시간': 'night_hours',
+  '야간 시간': 'night_hours',
+  '야간근로시간': 'night_hours',
   '휴게시간': 'break_time',
+  // 연차
   '연차 사용여부': 'annual_leave',
   '연차사용여부': 'annual_leave',
   '연차': 'annual_leave',
@@ -152,6 +169,7 @@ export function parseExcelFile(filePath: string): AttendanceRecord[] {
         case 'total_hours':
         case 'regular_hours':
         case 'overtime_hours':
+        case 'night_hours':
         case 'break_time':
           record[fieldName] = parseNumber(value);
           break;
@@ -161,6 +179,15 @@ export function parseExcelFile(filePath: string): AttendanceRecord[] {
     }
 
     // Set defaults for missing fields
+    // Derive shift from clock_in if not explicitly set
+    let shift = record.shift || '';
+    if (!shift && record.clock_in) {
+      const hourMatch = String(record.clock_in).match(/^(\d{1,2})/);
+      if (hourMatch) {
+        shift = parseInt(hourMatch[1]) >= 14 ? '야간' : '주간';
+      }
+    }
+
     return {
       date: record.date || '',
       name: record.name || '',
@@ -169,9 +196,11 @@ export function parseExcelFile(filePath: string): AttendanceRecord[] {
       category: record.category || '',
       department: record.department || '',
       workplace: record.workplace || '',
+      shift,
       total_hours: record.total_hours || 0,
       regular_hours: record.regular_hours || 0,
       overtime_hours: record.overtime_hours || 0,
+      night_hours: record.night_hours || 0,
       break_time: record.break_time || 0,
       annual_leave: record.annual_leave || '',
     } as AttendanceRecord;

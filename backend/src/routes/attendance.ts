@@ -268,4 +268,117 @@ router.get('/filters', (_req: Request, res: Response) => {
   }
 });
 
+// Helper: last day of month
+function getLastDayOfMonth(year: number, month: number): string {
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
+// Monthly summary report (for dashboard)
+router.get('/report/summary', (req: Request, res: Response) => {
+  try {
+    const { year, month } = req.query;
+    if (!year || !month) {
+      res.status(400).json({ error: 'year와 month 파라미터가 필요합니다.' });
+      return;
+    }
+
+    const y = Number(year);
+    const m = Number(month);
+    const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+    const endDate = getLastDayOfMonth(y, m);
+
+    const prevM = m === 1 ? 12 : m - 1;
+    const prevY = m === 1 ? y - 1 : y;
+    const prevStartDate = `${prevY}-${String(prevM).padStart(2, '0')}-01`;
+    const prevEndDate = getLastDayOfMonth(prevY, prevM);
+
+    const summaryQuery = `
+      SELECT
+        COALESCE(department, '') as department,
+        COALESCE(workplace, '') as workplace,
+        COALESCE(category, '') as category,
+        CASE
+          WHEN shift IS NOT NULL AND shift != '' THEN shift
+          WHEN clock_in IS NOT NULL AND clock_in != '' AND CAST(SUBSTR(clock_in, 1, 2) AS INTEGER) >= 14
+          THEN '야간' ELSE '주간'
+        END as shift,
+        COUNT(*) as attendance_count,
+        COUNT(DISTINCT name) as unique_workers,
+        ROUND(SUM(total_hours), 1) as total_hours,
+        ROUND(SUM(regular_hours), 1) as regular_hours,
+        ROUND(SUM(overtime_hours), 1) as overtime_hours,
+        ROUND(SUM(COALESCE(night_hours, 0)), 1) as night_hours,
+        SUM(CASE WHEN annual_leave IS NOT NULL AND annual_leave != '' AND annual_leave != '0' AND annual_leave != '미사용' THEN 1 ELSE 0 END) as annual_leave_days
+      FROM attendance_records
+      WHERE date >= ? AND date <= ?
+      GROUP BY department, workplace, category, shift
+      ORDER BY department, workplace, category, shift
+    `;
+
+    const current = db.prepare(summaryQuery).all(startDate, endDate);
+    const previous = db.prepare(summaryQuery).all(prevStartDate, prevEndDate);
+
+    res.json({ current, previous, year: y, month: m, prevYear: prevY, prevMonth: prevM });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Daily attendance report (for dashboard)
+router.get('/report/daily', (req: Request, res: Response) => {
+  try {
+    const { year, month } = req.query;
+    if (!year || !month) {
+      res.status(400).json({ error: 'year와 month 파라미터가 필요합니다.' });
+      return;
+    }
+
+    const y = Number(year);
+    const m = Number(month);
+    const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+    const endDate = getLastDayOfMonth(y, m);
+
+    const dailyQuery = `
+      SELECT
+        date,
+        COALESCE(department, '') as department,
+        COALESCE(workplace, '') as workplace,
+        COALESCE(category, '') as category,
+        COUNT(*) as count,
+        ROUND(SUM(total_hours), 1) as total_hours
+      FROM attendance_records
+      WHERE date >= ? AND date <= ?
+      GROUP BY date, department, workplace, category
+      ORDER BY date, department, workplace, category
+    `;
+
+    const data = db.prepare(dailyQuery).all(startDate, endDate);
+
+    const groups = db.prepare(`
+      SELECT DISTINCT COALESCE(department, '') as department, COALESCE(workplace, '') as workplace
+      FROM attendance_records
+      WHERE date >= ? AND date <= ?
+      ORDER BY department, workplace
+    `).all(startDate, endDate) as { department: string; workplace: string }[];
+
+    const categories = db.prepare(`
+      SELECT DISTINCT COALESCE(category, '') as category
+      FROM attendance_records
+      WHERE date >= ? AND date <= ? AND category IS NOT NULL AND category != ''
+      ORDER BY category
+    `).all(startDate, endDate) as { category: string }[];
+
+    res.json({
+      data,
+      groups,
+      categories: categories.map(c => c.category),
+      year: y,
+      month: m,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

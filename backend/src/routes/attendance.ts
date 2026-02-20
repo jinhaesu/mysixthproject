@@ -299,6 +299,7 @@ router.get('/report/summary', (req: Request, res: Response) => {
         COALESCE(workplace, '') as workplace,
         COALESCE(category, '') as category,
         CASE
+          WHEN shift IS NOT NULL AND shift != '' THEN shift
           WHEN clock_in IS NOT NULL AND clock_in != '' AND CAST(SUBSTR(clock_in, 1, 2) AS INTEGER) >= 14
           THEN '야간' ELSE '주간'
         END as shift,
@@ -307,6 +308,7 @@ router.get('/report/summary', (req: Request, res: Response) => {
         ROUND(SUM(total_hours), 1) as total_hours,
         ROUND(SUM(regular_hours), 1) as regular_hours,
         ROUND(SUM(overtime_hours), 1) as overtime_hours,
+        ROUND(SUM(COALESCE(night_hours, 0)), 1) as night_hours,
         SUM(CASE WHEN annual_leave IS NOT NULL AND annual_leave != '' AND annual_leave != '0' AND annual_leave != '미사용' THEN 1 ELSE 0 END) as annual_leave_days
       FROM attendance_records
       WHERE date >= ? AND date <= ?

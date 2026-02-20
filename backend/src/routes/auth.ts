@@ -55,7 +55,9 @@ router.post('/send-code', async (req: Request, res: Response) => {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
-    await resend.emails.send({
+    console.log(`Sending code to ${normalizedEmail} from ${fromEmail}`);
+
+    const { data, error: sendError } = await resend.emails.send({
       from: `근태관리시스템 <${fromEmail}>`,
       to: normalizedEmail,
       subject: '근태 관리 시스템 - 로그인 인증 코드',
@@ -71,6 +73,13 @@ router.post('/send-code', async (req: Request, res: Response) => {
       `,
     });
 
+    if (sendError) {
+      console.error('Resend API error:', sendError);
+      res.status(500).json({ error: `이메일 발송 실패: ${sendError.message}` });
+      return;
+    }
+
+    console.log('Email sent successfully:', data?.id);
     res.json({ challengeToken });
   } catch (error: any) {
     console.error('Send code error:', error);

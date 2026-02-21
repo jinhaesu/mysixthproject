@@ -58,6 +58,41 @@ export function initializeDB() {
   try { db.exec('ALTER TABLE attendance_records ADD COLUMN shift TEXT DEFAULT ""'); } catch {}
   try { db.exec('ALTER TABLE attendance_records ADD COLUMN night_hours REAL DEFAULT 0'); } catch {}
 
+  // Organization chart table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS org_chart_nodes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_id INTEGER,
+      node_type TEXT NOT NULL DEFAULT 'person',
+      name TEXT NOT NULL,
+      position TEXT DEFAULT '',
+      department TEXT DEFAULT '',
+      employment_type TEXT DEFAULT '',
+      phone TEXT DEFAULT '',
+      memo TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (parent_id) REFERENCES org_chart_nodes(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Workforce planning table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workforce_plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      worker_type TEXT NOT NULL,
+      planned_count INTEGER DEFAULT 0,
+      memo TEXT DEFAULT '',
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_workforce_plan_unique
+      ON workforce_plans(year, month, day, worker_type);
+  `);
+
   console.log('Database initialized successfully');
 }
 

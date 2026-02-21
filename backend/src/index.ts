@@ -8,6 +8,8 @@ import { initializeDB } from './db';
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import attendanceRoutes from './routes/attendance';
+import orgChartRoutes from './routes/orgChart';
+import workforcePlanRoutes from './routes/workforcePlan';
 import { requireAuth } from './middleware/auth';
 
 const app = express();
@@ -39,6 +41,8 @@ app.use((req, _res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', requireAuth, uploadRoutes);
 app.use('/api/attendance', requireAuth, attendanceRoutes);
+app.use('/api/org-chart', requireAuth, orgChartRoutes);
+app.use('/api/workforce-plan', requireAuth, workforcePlanRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

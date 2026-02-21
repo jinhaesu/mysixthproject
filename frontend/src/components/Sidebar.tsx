@@ -10,6 +10,8 @@ import {
   Database,
   Home,
   LogOut,
+  Network,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -19,6 +21,8 @@ const navItems = [
   { href: "/dashboard", label: "대시보드", icon: BarChart3 },
   { href: "/pivot", label: "피벗 테이블", icon: Table2 },
   { href: "/records", label: "기록 조회", icon: ClipboardList },
+  { href: "/org-chart", label: "조직도", icon: Network },
+  { href: "/workforce-plan", label: "인력 조달 계획", icon: Users },
   { href: "/manage", label: "데이터 관리", icon: Database },
 ];
 

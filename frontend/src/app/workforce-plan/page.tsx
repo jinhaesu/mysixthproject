@@ -31,9 +31,9 @@ const PRESET_SHIFTS = [
   { label: "풀타임", start: 0, dur: 24, desc: "00~24시" },
 ];
 
-const TYPE_COLORS: Record<WorkerType, { bg: string; border: string; bar: string; text: string; light: string }> = {
-  "파견": { bg: "bg-orange-50", border: "border-orange-300", bar: "bg-orange-400", text: "text-orange-700", light: "bg-orange-100" },
-  "알바(사업소득)": { bg: "bg-green-50", border: "border-green-300", bar: "bg-green-400", text: "text-green-700", light: "bg-green-100" },
+const TYPE_COLORS: Record<WorkerType, { bg: string; border: string; bar: string; barHex: string; text: string; light: string }> = {
+  "파견": { bg: "bg-orange-50", border: "border-orange-300", bar: "bg-orange-500", barHex: "#f97316", text: "text-orange-700", light: "bg-orange-100" },
+  "알바(사업소득)": { bg: "bg-emerald-50", border: "border-emerald-300", bar: "bg-emerald-500", barHex: "#10b981", text: "text-emerald-700", light: "bg-emerald-100" },
 };
 
 function getDaysInMonth(year: number, month: number) {
@@ -87,6 +87,8 @@ export default function WorkforcePlanPage() {
 
   const daysInMonth = getDaysInMonth(year, month);
 
+  const [apiReady, setApiReady] = useState(true);
+
   const fetchSlots = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -96,8 +98,15 @@ export default function WorkforcePlanPage() {
       setHasChanges(false);
       setSaved(false);
       setSelectedDay(null);
+      setApiReady(true);
     } catch (err: any) {
-      setError(err.message);
+      // If API not deployed yet (404), show empty state gracefully
+      if (err.message?.includes("404") || err.message?.includes("오류")) {
+        setSlots([]);
+        setApiReady(false);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -239,85 +248,37 @@ export default function WorkforcePlanPage() {
     });
   };
 
-  // Mini 24h timeline bar for a day
+  // Mini 24h timeline bar for a day - split top/bottom for 파견/알바
   const MiniTimeline = ({ day }: { day: number }) => {
     const daySlots = slotsByDay[day] || [];
-    if (daySlots.length === 0) return <div className="h-3 bg-gray-100 rounded-sm" />;
+    if (daySlots.length === 0) return <div className="h-4 bg-gray-100 rounded-sm" />;
+    const hasMultiTypes = new Set(daySlots.map(s => s.worker_type)).size > 1;
     return (
-      <div className="relative h-3 bg-gray-100 rounded-sm overflow-hidden">
+      <div className="relative h-4 bg-gray-100 rounded-sm overflow-hidden">
+        {/* 6h grid markers */}
+        {[6, 12, 18].map(h => (
+          <div key={h} className="absolute top-0 h-full w-px bg-gray-200" style={{ left: `${(h / 24) * 100}%` }} />
+        ))}
         {daySlots.map(s => {
           const left = (s.start_hour / 24) * 100;
           const width = Math.min((s.duration / 24) * 100, 100 - left);
           const colors = TYPE_COLORS[s.worker_type as WorkerType];
+          const isAlba = s.worker_type === "알바(사업소득)";
+          // When both types exist, split vertically: 파견=top half, 알바=bottom half
+          const topStyle = hasMultiTypes ? (isAlba ? "top-[50%] h-[50%]" : "top-0 h-[50%]") : "top-0 h-full";
           return (
             <div
               key={s._localId}
-              className={`absolute top-0 h-full ${colors.bar} opacity-80`}
-              style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
-              title={`${s.worker_type} ${s.headcount}명 ${formatTimeRange(s.start_hour, s.duration)}`}
+              className={`absolute ${topStyle} ${colors.bar} border-l border-white/40`}
+              style={{
+                left: `${left}%`,
+                width: `${Math.max(width, 1.5)}%`,
+                boxShadow: `inset 0 0 0 0.5px rgba(255,255,255,0.3)`,
+              }}
+              title={`${s.worker_type} ${s.headcount}명 ${formatTimeRange(s.start_hour, s.duration)} (${formatHours(s.duration * s.headcount)}h)`}
             />
           );
         })}
-      </div>
-    );
-  };
-
-  // Full 24h timeline for day detail
-  const FullTimeline = ({ day }: { day: number }) => {
-    const daySlots = slotsByDay[day] || [];
-    const hours = Array.from({ length: 25 }, (_, i) => i);
-    return (
-      <div className="relative">
-        {/* Hour grid */}
-        <div className="flex border-b border-gray-200">
-          {hours.map(h => (
-            <div key={h} className="flex-1 text-center text-[10px] text-gray-400 border-l border-gray-100 py-0.5" style={{ minWidth: 0 }}>
-              {h < 24 ? String(h).padStart(2, "0") : ""}
-            </div>
-          ))}
-        </div>
-        {/* Slot bars by type */}
-        {WORKER_TYPES.map(type => {
-          const typeSlots = daySlots.filter(s => s.worker_type === type);
-          if (typeSlots.length === 0) return null;
-          const colors = TYPE_COLORS[type];
-          return (
-            <div key={type} className="relative h-8 bg-gray-50 border-b border-gray-100">
-              {/* Hour grid lines */}
-              <div className="absolute inset-0 flex">
-                {Array.from({ length: 24 }, (_, i) => (
-                  <div key={i} className="flex-1 border-l border-gray-100" />
-                ))}
-              </div>
-              {/* Blocks */}
-              {typeSlots.map(s => {
-                const left = (s.start_hour / 24) * 100;
-                const width = Math.min((s.duration / 24) * 100, 100 - left);
-                const isEditing = editingSlotId === s._localId;
-                return (
-                  <div
-                    key={s._localId}
-                    className={`absolute top-0.5 h-7 ${colors.bar} rounded-sm flex items-center justify-center cursor-pointer transition-all ${
-                      isEditing ? "ring-2 ring-blue-500 ring-offset-1" : "hover:opacity-90"
-                    }`}
-                    style={{ left: `${left}%`, width: `${Math.max(width, 3)}%` }}
-                    onClick={() => setEditingSlotId(isEditing ? null : s._localId)}
-                    title={`${formatTimeRange(s.start_hour, s.duration)} ${s.headcount}명`}
-                  >
-                    <span className="text-white text-[10px] font-bold truncate px-0.5">
-                      {s.headcount}명
-                    </span>
-                  </div>
-                );
-              })}
-              <div className={`absolute left-0 top-0 h-full w-0.5 ${colors.bar}`} />
-            </div>
-          );
-        })}
-        {/* Empty state */}
-        {daySlots.length === 0 && (
-          <div className="h-10 flex items-center justify-center text-xs text-gray-400">배치된 인력이 없습니다</div>
-        )}
       </div>
     );
   };
@@ -365,6 +326,15 @@ export default function WorkforcePlanPage() {
           </div>
         </div>
 
+        {!apiReady && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-start gap-3">
+            <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-700">
+              <strong>서버 배포 대기 중</strong> - PR을 머지하면 새 기능이 활성화됩니다.
+              지금은 로컬에서 계획을 작성하고, 배포 후 저장할 수 있습니다.
+            </div>
+          </div>
+        )}
         {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm mb-4">{error}</div>}
 
         {/* Summary Cards */}
@@ -377,9 +347,9 @@ export default function WorkforcePlanPage() {
             <div className="flex items-center gap-1.5 text-xs text-orange-600 mb-1"><UserCheck size={12} /> 파견 시수</div>
             <div className="text-xl font-bold text-orange-700">{formatHours(monthlyTotals.byType["파견"] || 0)}<span className="text-xs font-normal text-orange-400 ml-0.5">h</span></div>
           </div>
-          <div className="bg-green-50 rounded-xl border border-green-200 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-green-600 mb-1"><UserCheck size={12} /> 알바 시수</div>
-            <div className="text-xl font-bold text-green-700">{formatHours(monthlyTotals.byType["알바(사업소득)"] || 0)}<span className="text-xs font-normal text-green-400 ml-0.5">h</span></div>
+          <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-3">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 mb-1"><UserCheck size={12} /> 알바 시수</div>
+            <div className="text-xl font-bold text-emerald-700">{formatHours(monthlyTotals.byType["알바(사업소득)"] || 0)}<span className="text-xs font-normal text-emerald-400 ml-0.5">h</span></div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-3">
             <div className="text-xs text-gray-500 mb-1">투입 일수</div>
@@ -414,7 +384,7 @@ export default function WorkforcePlanPage() {
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       <span className="text-orange-600 font-medium">파견: {formatHours(weeklyTotals[wi]?.byType["파견"] || 0)}h</span>
-                      <span className="text-green-600 font-medium">알바: {formatHours(weeklyTotals[wi]?.byType["알바(사업소득)"] || 0)}h</span>
+                      <span className="text-emerald-600 font-medium">알바: {formatHours(weeklyTotals[wi]?.byType["알바(사업소득)"] || 0)}h</span>
                       <span className="text-gray-700 font-semibold">합계: {formatHours(weeklyTotals[wi]?.total || 0)}h</span>
                     </div>
                   </div>
@@ -457,7 +427,7 @@ export default function WorkforcePlanPage() {
                                     </span>
                                   )}
                                   {ds.byType["알바(사업소득)"] && (
-                                    <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
                                       알바 {ds.byType["알바(사업소득)"].people}명 {formatHours(ds.byType["알바(사업소득)"].hours)}h
                                     </span>
                                   )}
@@ -524,69 +494,95 @@ export default function WorkforcePlanPage() {
 
             {/* 24h Visual Timeline */}
             <div className="px-4 py-3 border-b border-gray-200">
-              <div className="text-xs text-gray-500 mb-2 font-medium">24시간 타임라인</div>
-              {/* Hour labels */}
-              <div className="flex mb-0.5">
-                {[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => (
-                  <div
-                    key={h}
-                    className="text-[9px] text-gray-400 tabular-nums"
-                    style={{ position: "absolute" as any, left: `calc(${(h / 24) * 100}% - 6px)` }}
-                  >
-                    {/* inline positioning handled below */}
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-gray-500 font-medium">24시간 타임라인</div>
+                <div className="flex items-center gap-2">
+                  {WORKER_TYPES.map(type => {
+                    const colors = TYPE_COLORS[type];
+                    return (
+                      <div key={type} className="flex items-center gap-1">
+                        <div className={`w-2.5 h-2.5 rounded-sm ${colors.bar}`} />
+                        <span className="text-[9px] text-gray-500">{type === "알바(사업소득)" ? "알바" : type}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <div className="relative">
                 {/* Hour markers */}
-                <div className="flex h-4 border-b border-gray-200">
+                <div className="flex h-5 border-b border-gray-200">
                   {Array.from({ length: 24 }, (_, i) => (
                     <div key={i} className={`flex-1 border-l text-center ${
                       i % 6 === 0 ? "border-gray-300" : "border-gray-100"
                     }`}>
-                      {i % 3 === 0 && <span className="text-[8px] text-gray-400">{String(i).padStart(2, "0")}</span>}
+                      {i % 3 === 0 && <span className="text-[9px] text-gray-400 tabular-nums">{String(i).padStart(2, "0")}</span>}
                     </div>
                   ))}
                   <div className="border-l border-gray-300 w-0" />
                 </div>
-                {/* Timeline bars */}
+                {/* Timeline bars - one row per type */}
                 {WORKER_TYPES.map(type => {
                   const typeSlots = selectedDaySlots.filter(s => s.worker_type === type);
-                  if (typeSlots.length === 0) return null;
                   const colors = TYPE_COLORS[type];
                   return (
-                    <div key={type} className="relative h-7 mt-0.5">
-                      <div className="absolute inset-0 bg-gray-50 rounded-sm" />
+                    <div key={type} className="relative h-8 mt-px">
+                      <div className="absolute inset-0 bg-gray-50/50 rounded-sm" />
                       {/* Hour grid lines */}
                       <div className="absolute inset-0 flex">
                         {Array.from({ length: 24 }, (_, i) => (
-                          <div key={i} className={`flex-1 border-l ${i % 6 === 0 ? "border-gray-200" : "border-gray-100"}`} />
+                          <div key={i} className={`flex-1 border-l ${i % 6 === 0 ? "border-gray-200" : "border-gray-100/50"}`} />
                         ))}
                       </div>
-                      {typeSlots.map(s => {
-                        const left = (s.start_hour / 24) * 100;
-                        const width = Math.min((s.duration / 24) * 100, 100 - left);
-                        return (
-                          <div
-                            key={s._localId}
-                            className={`absolute top-0.5 h-6 ${colors.bar} rounded-sm flex items-center justify-center cursor-pointer ${
-                              editingSlotId === s._localId ? "ring-2 ring-blue-500" : "hover:brightness-110"
-                            }`}
-                            style={{ left: `${left}%`, width: `${Math.max(width, 4)}%` }}
-                            onClick={() => setEditingSlotId(editingSlotId === s._localId ? null : s._localId)}
-                          >
-                            <span className="text-white text-[9px] font-bold truncate px-0.5">{s.headcount}명</span>
-                          </div>
-                        );
-                      })}
-                      <div className={`absolute -left-3 top-0 h-full flex items-center`}>
-                        <span className={`text-[9px] font-medium ${colors.text}`}>{type === "알바(사업소득)" ? "알바" : type}</span>
+                      {/* Type label on left */}
+                      <div className="absolute -left-0 top-0 h-full flex items-center z-10">
+                        <span className={`text-[8px] font-semibold ${colors.text} bg-white/80 px-0.5 rounded`}>
+                          {type === "알바(사업소득)" ? "알바" : type}
+                        </span>
                       </div>
+                      {typeSlots.length === 0 ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-[9px] text-gray-300">-</span>
+                        </div>
+                      ) : (
+                        typeSlots.map((s, si) => {
+                          const left = (s.start_hour / 24) * 100;
+                          const width = Math.min((s.duration / 24) * 100, 100 - left);
+                          const isEditing = editingSlotId === s._localId;
+                          return (
+                            <div
+                              key={s._localId}
+                              className={`absolute top-1 h-6 rounded cursor-pointer transition-all ${
+                                isEditing ? "ring-2 ring-blue-500 ring-offset-1 z-20" : "hover:brightness-110 z-10"
+                              }`}
+                              style={{
+                                left: `${left}%`,
+                                width: `${Math.max(width, 4)}%`,
+                                backgroundColor: colors.barHex,
+                                boxShadow: "0 1px 2px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)",
+                                border: "1px solid rgba(255,255,255,0.3)",
+                              }}
+                              onClick={() => setEditingSlotId(isEditing ? null : s._localId)}
+                              title={`${formatTimeRange(s.start_hour, s.duration)} ${s.headcount}명 (${formatHours(s.duration * s.headcount)}h)`}
+                            >
+                              <div className="flex items-center justify-center h-full gap-0.5 px-1">
+                                <span className="text-white text-[9px] font-bold truncate drop-shadow-sm">
+                                  {s.headcount}명
+                                </span>
+                                {width > 12 && (
+                                  <span className="text-white/70 text-[8px] truncate">
+                                    {s.duration}h
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   );
                 })}
                 {selectedDaySlots.length === 0 && (
-                  <div className="h-8 flex items-center justify-center text-xs text-gray-400">시간 블록을 추가하세요</div>
+                  <div className="h-10 flex items-center justify-center text-xs text-gray-400">시간 블록을 추가하세요</div>
                 )}
               </div>
             </div>

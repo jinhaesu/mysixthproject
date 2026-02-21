@@ -94,3 +94,41 @@ export async function getReportSummary(year: number, month: number) {
 export async function getReportDaily(year: number, month: number) {
   return fetchAPI<any>(`/api/attendance/report/daily?year=${year}&month=${month}`);
 }
+
+// Org Chart
+export async function getOrgChartNodes() {
+  return fetchAPI<any[]>('/api/org-chart');
+}
+
+export async function createOrgChartNode(data: any) {
+  return fetchAPI<any>('/api/org-chart', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateOrgChartNode(id: number, data: any) {
+  return fetchAPI<any>(`/api/org-chart/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteOrgChartNode(id: number) {
+  return fetchAPI<any>(`/api/org-chart/${id}`, { method: 'DELETE' });
+}
+
+// Workforce Plan
+export async function getWorkforcePlans(year: number, month: number) {
+  return fetchAPI<any[]>(`/api/workforce-plan?year=${year}&month=${month}`);
+}
+
+export async function saveWorkforcePlans(year: number, month: number, plans: any[]) {
+  return fetchAPI<any[]>('/api/workforce-plan/batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ year, month, plans }),
+  });
+}

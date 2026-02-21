@@ -8,9 +8,11 @@ export interface AttendanceRecord {
   category: string;
   department: string;
   workplace: string;
+  shift: string;
   total_hours: number;
   regular_hours: number;
   overtime_hours: number;
+  night_hours: number;
   break_time: number;
   annual_leave: string;
   created_at: string;

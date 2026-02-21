@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Save, Info, Users, UserCheck, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Info, Clock, UserCheck, Plus, Minus } from "lucide-react";
 import { getWorkforcePlans, saveWorkforcePlans } from "@/lib/api";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
@@ -9,11 +9,7 @@ const WORKER_TYPES = ["파견", "알바(사업소득)"] as const;
 type WorkerType = typeof WORKER_TYPES[number];
 
 interface DayPlan {
-  [key: string]: number; // "파견" | "알바(사업소득)"
-}
-
-interface PlanMemo {
-  [key: string]: string;
+  [key: string]: number; // hours per worker type
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -34,6 +30,12 @@ function isWeekend(year: number, month: number, day: number): boolean {
   return dow === 0 || dow === 6;
 }
 
+function formatHours(h: number): string {
+  if (h === 0) return "0";
+  if (Number.isInteger(h)) return h.toString();
+  return h.toFixed(1);
+}
+
 export default function WorkforcePlanPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -44,6 +46,7 @@ export default function WorkforcePlanPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
+  const [quickHours, setQuickHours] = useState(8); // quick-add preset
 
   const daysInMonth = getDaysInMonth(year, month);
 
@@ -56,7 +59,7 @@ export default function WorkforcePlanPage() {
       const memoMap: Record<string, string> = {};
       for (const item of data) {
         if (!planMap[item.day]) planMap[item.day] = {};
-        planMap[item.day][item.worker_type] = item.planned_count;
+        planMap[item.day][item.worker_type] = item.planned_hours || item.planned_count || 0;
         if (item.memo) {
           memoMap[`${item.day}-${item.worker_type}`] = item.memo;
         }
@@ -81,13 +84,18 @@ export default function WorkforcePlanPage() {
     if (month === 12) { setYear(y => y + 1); setMonth(1); } else setMonth(m => m + 1);
   };
 
-  const updatePlan = (day: number, type: WorkerType, count: number) => {
+  const updatePlan = (day: number, type: WorkerType, hours: number) => {
     setPlans(prev => ({
       ...prev,
-      [day]: { ...prev[day], [type]: Math.max(0, count) },
+      [day]: { ...prev[day], [type]: Math.max(0, Math.round(hours * 10) / 10) },
     }));
     setHasChanges(true);
     setSaved(false);
+  };
+
+  const adjustHours = (day: number, type: WorkerType, delta: number) => {
+    const current = plans[day]?.[type] || 0;
+    updatePlan(day, type, current + delta);
   };
 
   const handleSave = async () => {
@@ -97,10 +105,10 @@ export default function WorkforcePlanPage() {
       const planItems: any[] = [];
       for (let day = 1; day <= daysInMonth; day++) {
         for (const type of WORKER_TYPES) {
-          const count = plans[day]?.[type] || 0;
+          const hours = plans[day]?.[type] || 0;
           const memo = memos[`${day}-${type}`] || "";
-          if (count > 0 || memo) {
-            planItems.push({ day, worker_type: type, planned_count: count, memo });
+          if (hours > 0 || memo) {
+            planItems.push({ day, worker_type: type, planned_hours: hours, memo });
           }
         }
       }
@@ -136,7 +144,7 @@ export default function WorkforcePlanPage() {
     return result;
   }, [year, month, daysInMonth]);
 
-  // Weekly and monthly totals
+  // Weekly and monthly totals (in hours)
   const weeklyTotals = useMemo(() => {
     return weeks.map(w => {
       const totals: Record<string, number> = {};
@@ -166,13 +174,23 @@ export default function WorkforcePlanPage() {
     return count;
   }, [year, month, daysInMonth]);
 
+  // Count active days (days with any hours planned)
+  const activeDays = useMemo(() => {
+    let count = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayTotal = WORKER_TYPES.reduce((sum, type) => sum + (plans[day]?.[type] || 0), 0);
+      if (dayTotal > 0) count++;
+    }
+    return count;
+  }, [plans, daysInMonth]);
+
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">인력 조달 계획 수립</h2>
-          <p className="text-gray-500 mt-1">월별 파견/알바 인력 투입 계획을 수립합니다.</p>
+          <p className="text-gray-500 mt-1">월별 파견/알바 투입 시수를 계획합니다.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 px-4 py-2">
@@ -202,43 +220,69 @@ export default function WorkforcePlanPage() {
         <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
         <div className="text-sm text-blue-700">
           <strong>계획 수립용</strong>이며, 실제 운영 결과는 <strong>대시보드</strong>를 참고하세요.
-          파견과 알바(사업소득) 인원을 일별로 계획하여 인력 조달에 활용합니다.
+          다양한 시간대(00시~24시)에 투입되는 인력의 <strong>총 시수</strong>를 일별로 계획합니다.
+          예: 8시간 근무자 2명 + 4시간 근무자 1명 = <strong>20h</strong>
         </div>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm mb-4">{error}</div>}
 
+      {/* Quick-add preset & legend */}
+      <div className="flex items-center gap-4 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 px-3 py-2">
+          <span className="text-xs text-gray-500">빠른 증감 단위:</span>
+          {[4, 8, 10, 12].map(h => (
+            <button
+              key={h}
+              onClick={() => setQuickHours(h)}
+              className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${
+                quickHours === h
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {h}h
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-gray-400">
+          <span className="flex items-center gap-1"><Plus size={12} /> <Minus size={12} /> 버튼으로 빠른 입력</span>
+          <span>|</span>
+          <span>직접 입력도 가능 (소수점 지원)</span>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <Users size={14} />
-            월간 총 투입 (연인원)
+            <Clock size={14} />
+            월간 총 시수
           </div>
-          <div className="text-2xl font-bold text-gray-900">{monthlyTotals.total}명</div>
+          <div className="text-2xl font-bold text-gray-900">{formatHours(monthlyTotals.total)}<span className="text-sm font-normal text-gray-400 ml-1">h</span></div>
         </div>
         <div className="bg-orange-50 rounded-xl border border-orange-200 p-4">
           <div className="flex items-center gap-2 text-sm text-orange-600 mb-1">
             <UserCheck size={14} />
-            파견 (연인원)
+            파견 시수
           </div>
-          <div className="text-2xl font-bold text-orange-700">{monthlyTotals["파견"]}명</div>
+          <div className="text-2xl font-bold text-orange-700">{formatHours(monthlyTotals["파견"])}<span className="text-sm font-normal text-orange-400 ml-1">h</span></div>
         </div>
         <div className="bg-green-50 rounded-xl border border-green-200 p-4">
           <div className="flex items-center gap-2 text-sm text-green-600 mb-1">
             <UserCheck size={14} />
-            알바 (연인원)
+            알바 시수
           </div>
-          <div className="text-2xl font-bold text-green-700">{monthlyTotals["알바(사업소득)"]}명</div>
+          <div className="text-2xl font-bold text-green-700">{formatHours(monthlyTotals["알바(사업소득)"])}<span className="text-sm font-normal text-green-400 ml-1">h</span></div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="text-sm text-gray-500 mb-1">평일 기준</div>
-          <div className="text-2xl font-bold text-gray-900">{workDays}일</div>
+          <div className="text-sm text-gray-500 mb-1">투입 일수</div>
+          <div className="text-2xl font-bold text-gray-900">{activeDays}<span className="text-sm font-normal text-gray-400 ml-1">일 / {daysInMonth}일</span></div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="text-sm text-gray-500 mb-1">일평균 투입</div>
+          <div className="text-sm text-gray-500 mb-1">일평균 시수</div>
           <div className="text-2xl font-bold text-gray-900">
-            {workDays > 0 ? (monthlyTotals.total / workDays).toFixed(1) : "0"}명
+            {activeDays > 0 ? formatHours(monthlyTotals.total / activeDays) : "0"}<span className="text-sm font-normal text-gray-400 ml-1">h</span>
           </div>
         </div>
       </div>
@@ -255,9 +299,9 @@ export default function WorkforcePlanPage() {
               <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900">{week.week}주차</h3>
                 <div className="flex items-center gap-4 text-xs">
-                  <span className="text-orange-600 font-medium">파견: {weeklyTotals[wi]?.["파견"] || 0}명</span>
-                  <span className="text-green-600 font-medium">알바: {weeklyTotals[wi]?.["알바(사업소득)"] || 0}명</span>
-                  <span className="text-gray-700 font-semibold">합계: {weeklyTotals[wi]?.total || 0}명</span>
+                  <span className="text-orange-600 font-medium">파견: {formatHours(weeklyTotals[wi]?.["파견"] || 0)}h</span>
+                  <span className="text-green-600 font-medium">알바: {formatHours(weeklyTotals[wi]?.["알바(사업소득)"] || 0)}h</span>
+                  <span className="text-gray-700 font-semibold">합계: {formatHours(weeklyTotals[wi]?.total || 0)}h</span>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -270,7 +314,7 @@ export default function WorkforcePlanPage() {
                         const dayName = DAY_NAMES[dow];
                         const weekend = dow === 0 || dow === 6;
                         return (
-                          <th key={day} className={`text-center px-1 py-2.5 font-medium min-w-[60px] ${
+                          <th key={day} className={`text-center px-1 py-2.5 font-medium min-w-[80px] ${
                             weekend ? "bg-orange-50" : ""
                           }`}>
                             <div className={`${dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-gray-700"}`}>
@@ -282,7 +326,7 @@ export default function WorkforcePlanPage() {
                           </th>
                         );
                       })}
-                      <th className="text-center px-3 py-2.5 font-semibold text-gray-700 bg-blue-50 min-w-[60px]">소계</th>
+                      <th className="text-center px-3 py-2.5 font-semibold text-gray-700 bg-blue-50 min-w-[70px]">소계</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -294,29 +338,51 @@ export default function WorkforcePlanPage() {
                             type === "파견" ? "text-orange-700" : "text-green-700"
                           }`}>{type === "알바(사업소득)" ? "알바" : type}</td>
                           {week.days.map(day => {
-                            const count = plans[day]?.[type] || 0;
+                            const hours = plans[day]?.[type] || 0;
                             const weekend = isWeekend(year, month, day);
                             return (
                               <td key={day} className={`text-center px-0.5 py-1 ${weekend ? "bg-orange-50/50" : ""}`}>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="99"
-                                  value={count || ""}
-                                  onChange={(e) => updatePlan(day, type, parseInt(e.target.value) || 0)}
-                                  className={`w-full text-center border rounded px-1 py-1.5 text-sm tabular-nums ${
-                                    count > 0
-                                      ? type === "파견" ? "border-orange-300 bg-orange-50 text-orange-800 font-medium" : "border-green-300 bg-green-50 text-green-800 font-medium"
-                                      : "border-gray-200 text-gray-400"
-                                  }`}
-                                  placeholder="0"
-                                />
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <div className="flex items-center gap-0">
+                                    <button
+                                      onClick={() => adjustHours(day, type, -quickHours)}
+                                      className="p-0.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                      title={`-${quickHours}h`}
+                                    >
+                                      <Minus size={12} />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="999"
+                                      step="0.5"
+                                      value={hours || ""}
+                                      onChange={(e) => updatePlan(day, type, parseFloat(e.target.value) || 0)}
+                                      className={`w-14 text-center border rounded px-0.5 py-1 text-sm tabular-nums ${
+                                        hours > 0
+                                          ? type === "파견" ? "border-orange-300 bg-orange-50 text-orange-800 font-medium" : "border-green-300 bg-green-50 text-green-800 font-medium"
+                                          : "border-gray-200 text-gray-400"
+                                      }`}
+                                      placeholder="0"
+                                    />
+                                    <button
+                                      onClick={() => adjustHours(day, type, quickHours)}
+                                      className="p-0.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
+                                      title={`+${quickHours}h`}
+                                    >
+                                      <Plus size={12} />
+                                    </button>
+                                  </div>
+                                  {hours > 0 && (
+                                    <span className="text-[10px] text-gray-400">{formatHours(hours)}h</span>
+                                  )}
+                                </div>
                               </td>
                             );
                           })}
                           <td className={`text-center px-3 py-1.5 font-semibold tabular-nums bg-blue-50 ${
                             type === "파견" ? "text-orange-700" : "text-green-700"
-                          }`}>{weekTotal}</td>
+                          }`}>{formatHours(weekTotal)}h</td>
                         </tr>
                       );
                     })}
@@ -328,12 +394,12 @@ export default function WorkforcePlanPage() {
                         const weekend = isWeekend(year, month, day);
                         return (
                           <td key={day} className={`text-center px-1 py-2 tabular-nums text-gray-700 ${weekend ? "bg-orange-50/50" : ""}`}>
-                            {dayTotal > 0 ? dayTotal : <span className="text-gray-300">-</span>}
+                            {dayTotal > 0 ? <span>{formatHours(dayTotal)}h</span> : <span className="text-gray-300">-</span>}
                           </td>
                         );
                       })}
                       <td className="text-center px-3 py-2 font-bold tabular-nums text-gray-900 bg-blue-100">
-                        {weeklyTotals[wi]?.total || 0}
+                        {formatHours(weeklyTotals[wi]?.total || 0)}h
                       </td>
                     </tr>
                   </tbody>
@@ -349,15 +415,15 @@ export default function WorkforcePlanPage() {
               <div className="flex items-center gap-6">
                 <div className="text-center">
                   <div className="text-blue-200 text-xs">파견</div>
-                  <div className="text-xl font-bold">{monthlyTotals["파견"]}명</div>
+                  <div className="text-xl font-bold">{formatHours(monthlyTotals["파견"])}<span className="text-sm font-normal text-blue-300 ml-0.5">h</span></div>
                 </div>
                 <div className="text-center">
                   <div className="text-blue-200 text-xs">알바(사업소득)</div>
-                  <div className="text-xl font-bold">{monthlyTotals["알바(사업소득)"]}명</div>
+                  <div className="text-xl font-bold">{formatHours(monthlyTotals["알바(사업소득)"])}<span className="text-sm font-normal text-blue-300 ml-0.5">h</span></div>
                 </div>
                 <div className="text-center border-l border-blue-700 pl-6">
-                  <div className="text-blue-200 text-xs">총 연인원</div>
-                  <div className="text-2xl font-bold">{monthlyTotals.total}명</div>
+                  <div className="text-blue-200 text-xs">총 시수</div>
+                  <div className="text-2xl font-bold">{formatHours(monthlyTotals.total)}<span className="text-sm font-normal text-blue-300 ml-0.5">h</span></div>
                 </div>
               </div>
             </div>

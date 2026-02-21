@@ -14,7 +14,14 @@ router.get('/', (req: Request, res: Response) => {
     const plans = db.prepare(
       'SELECT * FROM workforce_plans WHERE year = ? AND month = ? ORDER BY day ASC, worker_type ASC'
     ).all(Number(year), Number(month));
-    res.json(plans);
+
+    // Return planned_hours (fall back to planned_count for legacy data)
+    const mapped = (plans as any[]).map(p => ({
+      ...p,
+      planned_hours: p.planned_hours || p.planned_count || 0,
+    }));
+
+    res.json(mapped);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -30,20 +37,22 @@ router.post('/batch', (req: Request, res: Response) => {
     }
 
     const upsert = db.prepare(`
-      INSERT INTO workforce_plans (year, month, day, worker_type, planned_count, memo, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO workforce_plans (year, month, day, worker_type, planned_hours, planned_count, memo, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(year, month, day, worker_type)
-      DO UPDATE SET planned_count = excluded.planned_count, memo = excluded.memo, updated_at = CURRENT_TIMESTAMP
+      DO UPDATE SET planned_hours = excluded.planned_hours, planned_count = excluded.planned_count, memo = excluded.memo, updated_at = CURRENT_TIMESTAMP
     `);
 
     const batchUpsert = db.transaction((items: any[]) => {
       for (const item of items) {
+        const hours = item.planned_hours || 0;
         upsert.run(
           Number(year),
           Number(month),
           item.day,
           item.worker_type,
-          item.planned_count || 0,
+          hours,
+          Math.ceil(hours), // keep planned_count as rough headcount estimate
           item.memo || ''
         );
       }
@@ -55,7 +64,12 @@ router.post('/batch', (req: Request, res: Response) => {
       'SELECT * FROM workforce_plans WHERE year = ? AND month = ? ORDER BY day ASC, worker_type ASC'
     ).all(Number(year), Number(month));
 
-    res.json(updated);
+    const mapped = (updated as any[]).map(p => ({
+      ...p,
+      planned_hours: p.planned_hours || p.planned_count || 0,
+    }));
+
+    res.json(mapped);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

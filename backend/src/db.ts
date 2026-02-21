@@ -97,6 +97,9 @@ export function initializeDB() {
     // Index already exists
   }
 
+  // Migration: add planned_hours column (transition from headcount to hours-based)
+  try { db.exec('ALTER TABLE workforce_plans ADD COLUMN planned_hours REAL DEFAULT 0'); } catch {}
+
   console.log('Database initialized successfully');
 }
 

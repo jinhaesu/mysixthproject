@@ -346,29 +346,31 @@ export default function DashboardPage() {
                       {found.map(dc => {
                         const cur = dc.keys.reduce((a, k) => {
                           const t = categoryStats.current.get(k);
-                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours } : a;
-                        }, { total: 0, ot: 0 });
+                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours, night: a.night + t.night_hours } : a;
+                        }, { total: 0, ot: 0, night: 0 });
                         const prev = dc.keys.reduce((a, k) => {
                           const t = categoryStats.previous.get(k);
-                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours } : a;
-                        }, { total: 0, ot: 0 });
+                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours, night: a.night + t.night_hours } : a;
+                        }, { total: 0, ot: 0, night: 0 });
 
-                        const curRatio = cur.total > 0 ? (cur.ot / cur.total) * 100 : 0;
-                        const prevRatio = prev.total > 0 ? (prev.ot / prev.total) * 100 : 0;
+                        const curOtNight = cur.ot + cur.night;
+                        const prevOtNight = prev.ot + prev.night;
+                        const curRatio = cur.total > 0 ? (curOtNight / cur.total) * 100 : 0;
+                        const prevRatio = prev.total > 0 ? (prevOtNight / prev.total) * 100 : 0;
                         const ratioDiff = curRatio - prevRatio;
                         const over30 = curRatio > 30;
 
                         return (
                           <div key={dc.label} className={`${dc.bg} rounded-xl border ${dc.border} p-4`}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className={`text-sm font-semibold ${dc.color}`}>{dc.label} 연장근무 비율</span>
+                              <span className={`text-sm font-semibold ${dc.color}`}>{dc.label} 연장&야간 비율</span>
                               {over30 && <AlertTriangle size={16} className="text-red-500" />}
                             </div>
                             <div className="flex items-baseline gap-2">
                               <span className={`text-2xl font-bold ${over30 ? "text-red-600" : dc.color}`}>
                                 {curRatio.toFixed(1)}%
                               </span>
-                              <span className="text-xs text-gray-500">(연장 {fmt(cur.ot)}h / 총 {fmt(cur.total)}h)</span>
+                              <span className="text-xs text-gray-500">(연장+야간 {fmt(curOtNight)}h / 총 {fmt(cur.total)}h)</span>
                             </div>
                             <div className="mt-1 text-xs">
                               {prev.total > 0 ? (
@@ -388,7 +390,7 @@ export default function DashboardPage() {
                     <div className="space-y-2">
                       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                         <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-800">총 근무시간 대비 연장근무 시간은 <strong>30%를 넘기지 않는 것</strong>이 좋습니다.</p>
+                        <p className="text-sm text-amber-800">총 근무시간 대비 연장+야간 근무 시간은 <strong>30%를 넘기지 않는 것</strong>이 좋습니다.</p>
                       </div>
                       <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
                         <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />

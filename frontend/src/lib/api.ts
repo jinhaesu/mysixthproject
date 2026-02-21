@@ -132,3 +132,20 @@ export async function saveWorkforcePlans(year: number, month: number, plans: any
     body: JSON.stringify({ year, month, plans }),
   });
 }
+
+// Workforce Plan Slots (time-block based)
+export async function getWorkforcePlanSlots(year: number, month: number) {
+  return fetchAPI<any[]>(`/api/workforce-plan/slots?year=${year}&month=${month}`);
+}
+
+export async function saveWorkforcePlanSlotsBatch(year: number, month: number, slots: any[]) {
+  return fetchAPI<any[]>('/api/workforce-plan/slots/batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ year, month, slots }),
+  });
+}
+
+export async function deleteWorkforcePlanSlot(id: number) {
+  return fetchAPI<any>(`/api/workforce-plan/slots/${id}`, { method: 'DELETE' });
+}

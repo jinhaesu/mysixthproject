@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
 } from "recharts";
-import { Calendar, TrendingUp, DollarSign, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, TrendingUp, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
 import { getReportSummary, getReportDaily } from "@/lib/api";
 
 // --- Types ---
@@ -171,6 +171,41 @@ export default function DashboardPage() {
   const prevTotal = useMemo(() => sumTotals(summaryData?.previous || []), [summaryData]);
   const twoMonthsAgoTotal = useMemo(() => sumTotals(twoMonthsAgoData), [twoMonthsAgoData]);
 
+  // Category-level totals for overtime ratio cards
+  const categoryStats = useMemo(() => {
+    const calc = (rows: SummaryRow[]) => {
+      const map = new Map<string, Totals>();
+      for (const r of rows) {
+        const cat = r.category || "미분류";
+        const prev = map.get(cat) || { ...ZERO_TOTALS };
+        map.set(cat, {
+          attendance_count: prev.attendance_count + r.attendance_count,
+          unique_workers: prev.unique_workers + r.unique_workers,
+          total_hours: prev.total_hours + r.total_hours,
+          regular_hours: prev.regular_hours + r.regular_hours,
+          overtime_hours: prev.overtime_hours + r.overtime_hours,
+          night_hours: prev.night_hours + (r.night_hours || 0),
+          annual_leave_days: prev.annual_leave_days + r.annual_leave_days,
+        });
+      }
+      return map;
+    };
+    return {
+      current: calc(summaryData?.current || []),
+      previous: calc(summaryData?.previous || []),
+    };
+  }, [summaryData]);
+
+  // Previous month group-level totals for subtotal MoM comparison
+  const prevGroups = useMemo(() => summaryData ? processSummaryGroups(summaryData.previous) : [], [summaryData]);
+  const prevGroupTotalMap = useMemo(() => {
+    const map = new Map<string, Totals>();
+    for (const g of prevGroups) {
+      map.set(g.key, g.subtotal);
+    }
+    return map;
+  }, [prevGroups]);
+
   const dailyLookup = useMemo(() => {
     if (!dailyData) return new Map<string, number>();
     const m = new Map<string, number>();
@@ -294,72 +329,186 @@ export default function DashboardPage() {
         <>
           {/* ============ TAB 1: 월별 근태 요약 ============ */}
           {activeTab === "summary" && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">{year}년 {month}월 근태 요약</h3>
-              </div>
-              {groups.length === 0 ? (
-                <div className="p-12 text-center text-gray-400">데이터가 없습니다. 먼저 엑셀 파일을 업로드해주세요.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-blue-900 text-white">
-                        {["부서","근무층","고용형태","시간대"].map(h => <th key={h} className="text-left px-3 py-3 font-medium">{h}</th>)}
-                        {["출근횟수","총근로시간","정규시간","연장시간","야간시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groups.map((g, gi) => {
-                        const fragment: React.ReactNode[] = [];
-                        g.rows.forEach((r, ri) => {
+            <div className="space-y-4">
+              {/* Overtime ratio cards by employment type */}
+              {groups.length > 0 && (() => {
+                const targetCats = ["정규직", "파견", "알바(사업소득)", "알바"];
+                const displayCats: { label: string; keys: string[]; color: string; bg: string; border: string }[] = [
+                  { label: "정규직", keys: ["정규직"], color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
+                  { label: "파견", keys: ["파견"], color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
+                  { label: "알바(사업소득)", keys: ["알바(사업소득)", "알바"], color: "text-green-700", bg: "bg-green-50", border: "border-green-200" },
+                ];
+                const found = displayCats.filter(dc => dc.keys.some(k => categoryStats.current.has(k)));
+
+                return (
+                  <>
+                    <div className={`grid grid-cols-1 ${found.length >= 3 ? "md:grid-cols-3" : found.length === 2 ? "md:grid-cols-2" : ""} gap-4`}>
+                      {found.map(dc => {
+                        const cur = dc.keys.reduce((a, k) => {
+                          const t = categoryStats.current.get(k);
+                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours } : a;
+                        }, { total: 0, ot: 0 });
+                        const prev = dc.keys.reduce((a, k) => {
+                          const t = categoryStats.previous.get(k);
+                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours } : a;
+                        }, { total: 0, ot: 0 });
+
+                        const curRatio = cur.total > 0 ? (cur.ot / cur.total) * 100 : 0;
+                        const prevRatio = prev.total > 0 ? (prev.ot / prev.total) * 100 : 0;
+                        const ratioDiff = curRatio - prevRatio;
+                        const over30 = curRatio > 30;
+
+                        return (
+                          <div key={dc.label} className={`${dc.bg} rounded-xl border ${dc.border} p-4`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`text-sm font-semibold ${dc.color}`}>{dc.label} 연장근무 비율</span>
+                              {over30 && <AlertTriangle size={16} className="text-red-500" />}
+                            </div>
+                            <div className="flex items-baseline gap-2">
+                              <span className={`text-2xl font-bold ${over30 ? "text-red-600" : dc.color}`}>
+                                {curRatio.toFixed(1)}%
+                              </span>
+                              <span className="text-xs text-gray-500">(연장 {fmt(cur.ot)}h / 총 {fmt(cur.total)}h)</span>
+                            </div>
+                            <div className="mt-1 text-xs">
+                              {prev.total > 0 ? (
+                                <span className={ratioDiff > 0 ? "text-red-500" : ratioDiff < 0 ? "text-blue-500" : "text-gray-400"}>
+                                  전월 {prevRatio.toFixed(1)}% {ratioDiff !== 0 && `(${ratioDiff > 0 ? "+" : ""}${ratioDiff.toFixed(1)}%p)`}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">전월 데이터 없음</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Advisory notices */}
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                        <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-800">총 근무시간 대비 연장근무 시간은 <strong>30%를 넘기지 않는 것</strong>이 좋습니다.</p>
+                      </div>
+                      <div className="flex items-start gap-2.5 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                        <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                        <p className="text-sm text-blue-800">파견직과 알바(사업소득)는 <strong>생산성이 보장된 상황을 계산하면서</strong> 채용하셔야 합니다.</p>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Table */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
+                  <h3 className="font-semibold text-gray-900">{year}년 {month}월 근태 요약</h3>
+                </div>
+                {groups.length === 0 ? (
+                  <div className="p-12 text-center text-gray-400">데이터가 없습니다. 먼저 엑셀 파일을 업로드해주세요.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-blue-900 text-white">
+                          {["부서","근무층","고용형태","시간대"].map(h => <th key={h} className="text-left px-3 py-3 font-medium">{h}</th>)}
+                          {["출근횟수","총근로시간","정규시간","연장시간","야간시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groups.map((g, gi) => {
+                          const fragment: React.ReactNode[] = [];
+                          g.rows.forEach((r, ri) => {
+                            fragment.push(
+                              <tr key={`r-${gi}-${ri}`} className="border-b border-gray-100 hover:bg-gray-50">
+                                {ri === 0 && <td className="px-3 py-2 font-medium text-gray-900" rowSpan={g.rows.length}>{r.department || "-"}</td>}
+                                {ri === 0 && <td className="px-3 py-2 text-gray-700" rowSpan={g.rows.length}>{r.workplace || "-"}</td>}
+                                <td className="px-3 py-2 text-gray-700">{r.category || "-"}</td>
+                                <td className="px-3 py-2 text-gray-700">{r.shift}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.attendance_count}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.total_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.overtime_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.night_hours || 0)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.total_hours / r.unique_workers) : "-"}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.overtime_hours / r.unique_workers) : "-"}</td>
+                              </tr>
+                            );
+                          });
                           fragment.push(
-                            <tr key={`r-${gi}-${ri}`} className="border-b border-gray-100 hover:bg-gray-50">
-                              {ri === 0 && <td className="px-3 py-2 font-medium text-gray-900" rowSpan={g.rows.length}>{r.department || "-"}</td>}
-                              {ri === 0 && <td className="px-3 py-2 text-gray-700" rowSpan={g.rows.length}>{r.workplace || "-"}</td>}
-                              <td className="px-3 py-2 text-gray-700">{r.category || "-"}</td>
-                              <td className="px-3 py-2 text-gray-700">{r.shift}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{r.attendance_count}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{fmt(r.total_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{fmt(r.overtime_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{fmt(r.night_hours || 0)}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.total_hours / r.unique_workers) : "-"}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.overtime_hours / r.unique_workers) : "-"}</td>
+                            <tr key={`sub-${gi}`} className="bg-blue-50 border-b border-blue-200 font-semibold text-blue-900">
+                              <td className="px-3 py-2" colSpan={4}>{g.key} 소계</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.attendance_count}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.total_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.overtime_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.night_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.total_hours / g.subtotal.unique_workers) : "-"}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.overtime_hours / g.subtotal.unique_workers) : "-"}</td>
                             </tr>
                           );
-                        });
-                        fragment.push(
-                          <tr key={`sub-${gi}`} className="bg-blue-50 border-b border-blue-200 font-semibold text-blue-900">
-                            <td className="px-3 py-2" colSpan={4}>{g.key} 소계</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.attendance_count}</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.total_hours)}</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.overtime_hours)}</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.night_hours)}</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.total_hours / g.subtotal.unique_workers) : "-"}</td>
-                            <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.overtime_hours / g.subtotal.unique_workers) : "-"}</td>
-                          </tr>
-                        );
-                        return fragment;
-                      })}
-                      <tr className="bg-blue-900 text-white font-bold">
-                        <td className="px-3 py-3" colSpan={4}>전체 합계</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{grandTotal.attendance_count}</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.total_hours)}</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.regular_hours)}</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.overtime_hours)}</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.night_hours)}</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{grandTotal.annual_leave_days}</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{grandTotal.unique_workers > 0 ? fmt(grandTotal.total_hours / grandTotal.unique_workers) : "-"}</td>
-                        <td className="text-right px-3 py-3 tabular-nums">{grandTotal.unique_workers > 0 ? fmt(grandTotal.overtime_hours / grandTotal.unique_workers) : "-"}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                          return fragment;
+                        })}
+                        {/* Grand total with MoM % */}
+                        {(() => {
+                          const gt = grandTotal;
+                          const pt = prevTotal;
+                          const momBadge = (cur: number, prev: number) => {
+                            const rate = pct(cur, prev);
+                            if (rate === 0 && cur === 0 && prev === 0) return null;
+                            return (
+                              <div className={`text-[10px] leading-tight mt-0.5 ${rate > 0 ? "text-red-300" : rate < 0 ? "text-green-300" : "text-blue-200"}`}>
+                                {rate > 0 ? "+" : ""}{rate}%
+                              </div>
+                            );
+                          };
+                          const avgHoursCur = gt.unique_workers > 0 ? gt.total_hours / gt.unique_workers : 0;
+                          const avgHoursPrev = pt.unique_workers > 0 ? pt.total_hours / pt.unique_workers : 0;
+                          const avgOtCur = gt.unique_workers > 0 ? gt.overtime_hours / gt.unique_workers : 0;
+                          const avgOtPrev = pt.unique_workers > 0 ? pt.overtime_hours / pt.unique_workers : 0;
+
+                          return (
+                            <tr className="bg-blue-900 text-white font-bold">
+                              <td className="px-3 py-3" colSpan={4}>전체 합계</td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {gt.attendance_count}
+                                {momBadge(gt.attendance_count, pt.attendance_count)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {fmt(gt.total_hours)}
+                                {momBadge(gt.total_hours, pt.total_hours)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {fmt(gt.regular_hours)}
+                                {momBadge(gt.regular_hours, pt.regular_hours)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {fmt(gt.overtime_hours)}
+                                {momBadge(gt.overtime_hours, pt.overtime_hours)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {fmt(gt.night_hours)}
+                                {momBadge(gt.night_hours, pt.night_hours)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">{gt.annual_leave_days}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {gt.unique_workers > 0 ? fmt(avgHoursCur) : "-"}
+                                {gt.unique_workers > 0 && momBadge(avgHoursCur, avgHoursPrev)}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {gt.unique_workers > 0 ? fmt(avgOtCur) : "-"}
+                                {gt.unique_workers > 0 && momBadge(avgOtCur, avgOtPrev)}
+                              </td>
+                            </tr>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

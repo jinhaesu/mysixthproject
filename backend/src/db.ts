@@ -15,6 +15,7 @@ const db: DatabaseType = new Database(DB_PATH);
 
 // Enable WAL mode for better concurrent performance
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 export function initializeDB() {
   db.exec(`
@@ -89,9 +90,12 @@ export function initializeDB() {
       memo TEXT DEFAULT '',
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_workforce_plan_unique
-      ON workforce_plans(year, month, day, worker_type);
   `);
+  try {
+    db.exec('CREATE UNIQUE INDEX idx_workforce_plan_unique ON workforce_plans(year, month, day, worker_type)');
+  } catch {
+    // Index already exists
+  }
 
   console.log('Database initialized successfully');
 }

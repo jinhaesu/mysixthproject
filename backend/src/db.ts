@@ -100,6 +100,28 @@ export function initializeDB() {
   // Migration: add planned_hours column (transition from headcount to hours-based)
   try { db.exec('ALTER TABLE workforce_plans ADD COLUMN planned_hours REAL DEFAULT 0'); } catch {}
 
+  // Workforce plan time slots - detailed time block entries
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workforce_plan_slots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      worker_type TEXT NOT NULL,
+      start_hour INTEGER NOT NULL,
+      duration REAL NOT NULL,
+      headcount INTEGER NOT NULL DEFAULT 1,
+      memo TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  try {
+    db.exec('CREATE INDEX idx_wps_year_month ON workforce_plan_slots(year, month)');
+  } catch {
+    // Index already exists
+  }
+
   console.log('Database initialized successfully');
 }
 

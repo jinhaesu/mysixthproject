@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { getRecords, getFilters } from "@/lib/api";
 import type { AttendanceRecord, FilterOptions } from "@/types/attendance";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 export default function RecordsPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -11,6 +11,8 @@ export default function RecordsPage() {
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState<Record<string, string>>({});
+  const [nameSearch, setNameSearch] = useState("");
+  const nameDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadRecords = useCallback(async (params: Record<string, string>) => {
     setLoading(true);
@@ -72,16 +74,30 @@ export default function RecordsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">이름</label>
-            <select
-              onChange={(e) => handleFilterChange("name", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">전체</option>
-              {filters?.names.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
+            <label className="block text-xs font-medium text-gray-500 mb-1">이름 검색</label>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={nameSearch}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNameSearch(val);
+                  if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
+                  nameDebounceRef.current = setTimeout(() => {
+                    handleFilterChange("name", val);
+                  }, 400);
+                }}
+                placeholder="이름을 입력하세요"
+                className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm"
+                list="name-suggestions"
+              />
+              <datalist id="name-suggestions">
+                {filters?.names.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">구분</label>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line,
 } from "recharts";
 import { Calendar, TrendingUp, DollarSign, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import { getReportSummary, getReportDaily } from "@/lib/api";
@@ -18,6 +19,7 @@ interface SummaryRow {
   total_hours: number;
   regular_hours: number;
   overtime_hours: number;
+  night_hours: number;
   annual_leave_days: number;
 }
 
@@ -53,6 +55,7 @@ interface Totals {
   total_hours: number;
   regular_hours: number;
   overtime_hours: number;
+  night_hours: number;
   annual_leave_days: number;
 }
 
@@ -75,7 +78,7 @@ const TABS: { id: TabId; label: string; icon: typeof Calendar }[] = [
 ];
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
-const ZERO_TOTALS: Totals = { attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, annual_leave_days: 0 };
+const ZERO_TOTALS: Totals = { attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, annual_leave_days: 0 };
 
 // --- Utilities ---
 const fmt = (n: number) => n.toFixed(1);
@@ -92,6 +95,7 @@ function sumTotals(rows: SummaryRow[]): Totals {
     total_hours: a.total_hours + r.total_hours,
     regular_hours: a.regular_hours + r.regular_hours,
     overtime_hours: a.overtime_hours + r.overtime_hours,
+    night_hours: a.night_hours + (r.night_hours || 0),
     annual_leave_days: a.annual_leave_days + r.annual_leave_days,
   }), { ...ZERO_TOTALS });
 }
@@ -117,6 +121,10 @@ function getDatesInMonth(year: number, month: number): string[] {
   return dates;
 }
 
+function getPrevYearMonth(y: number, m: number): [number, number] {
+  return m === 1 ? [y - 1, 12] : [y, m - 1];
+}
+
 // --- Component ---
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabId>("summary");
@@ -124,6 +132,7 @@ export default function DashboardPage() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
   const [dailyData, setDailyData] = useState<DailyResponse | null>(null);
+  const [twoMonthsAgoData, setTwoMonthsAgoData] = useState<SummaryRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -135,12 +144,15 @@ export default function DashboardPage() {
     setLoading(true);
     setError("");
     try {
-      const [summary, daily] = await Promise.all([
+      const [prevY, prevM] = getPrevYearMonth(year, month);
+      const [summary, daily, twoMonthsAgoSummary] = await Promise.all([
         getReportSummary(year, month),
         getReportDaily(year, month),
+        getReportSummary(prevY, prevM),
       ]);
       setSummaryData(summary);
       setDailyData(daily);
+      setTwoMonthsAgoData(twoMonthsAgoSummary.previous || []);
     } catch (err: any) {
       setError(err.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
@@ -157,6 +169,7 @@ export default function DashboardPage() {
   const groups = useMemo(() => summaryData ? processSummaryGroups(summaryData.current) : [], [summaryData]);
   const grandTotal = useMemo(() => sumTotals(summaryData?.current || []), [summaryData]);
   const prevTotal = useMemo(() => sumTotals(summaryData?.previous || []), [summaryData]);
+  const twoMonthsAgoTotal = useMemo(() => sumTotals(twoMonthsAgoData), [twoMonthsAgoData]);
 
   const dailyLookup = useMemo(() => {
     if (!dailyData) return new Map<string, number>();
@@ -185,6 +198,7 @@ export default function DashboardPage() {
 
   const curSalary = useMemo(() => calcSalary(summaryData?.current || []), [summaryData, calcSalary]);
   const prevSalary = useMemo(() => calcSalary(summaryData?.previous || []), [summaryData, calcSalary]);
+  const twoMonthsAgoSalary = useMemo(() => calcSalary(twoMonthsAgoData), [twoMonthsAgoData, calcSalary]);
 
   const deptSalary = useMemo(() => {
     if (!summaryData) return [];
@@ -198,6 +212,41 @@ export default function DashboardPage() {
     }
     return Array.from(map.entries()).map(([dept, cost]) => ({ dept, cost }));
   }, [summaryData, baseRate]);
+
+  // 3-month trend data for chart
+  const threeMonthTrend = useMemo(() => {
+    const [prevY, prevM] = getPrevYearMonth(year, month);
+    const [twoAgoY, twoAgoM] = getPrevYearMonth(prevY, prevM);
+    return [
+      {
+        month: `${twoAgoM}월`,
+        출근횟수: twoMonthsAgoTotal.attendance_count,
+        정규시간: Math.round(twoMonthsAgoTotal.regular_hours * 10) / 10,
+        연장시간: Math.round(twoMonthsAgoTotal.overtime_hours * 10) / 10,
+        야간시간: Math.round(twoMonthsAgoTotal.night_hours * 10) / 10,
+        총근로시간: Math.round(twoMonthsAgoTotal.total_hours * 10) / 10,
+        추정급여: twoMonthsAgoSalary,
+      },
+      {
+        month: `${prevM}월`,
+        출근횟수: prevTotal.attendance_count,
+        정규시간: Math.round(prevTotal.regular_hours * 10) / 10,
+        연장시간: Math.round(prevTotal.overtime_hours * 10) / 10,
+        야간시간: Math.round(prevTotal.night_hours * 10) / 10,
+        총근로시간: Math.round(prevTotal.total_hours * 10) / 10,
+        추정급여: prevSalary,
+      },
+      {
+        month: `${month}월`,
+        출근횟수: grandTotal.attendance_count,
+        정규시간: Math.round(grandTotal.regular_hours * 10) / 10,
+        연장시간: Math.round(grandTotal.overtime_hours * 10) / 10,
+        야간시간: Math.round(grandTotal.night_hours * 10) / 10,
+        총근로시간: Math.round(grandTotal.total_hours * 10) / 10,
+        추정급여: curSalary,
+      },
+    ];
+  }, [year, month, twoMonthsAgoTotal, prevTotal, grandTotal, twoMonthsAgoSalary, prevSalary, curSalary]);
 
   // ===================== RENDER =====================
   return (
@@ -257,7 +306,7 @@ export default function DashboardPage() {
                     <thead>
                       <tr className="bg-blue-900 text-white">
                         {["부서","근무층","고용형태","시간대"].map(h => <th key={h} className="text-left px-3 py-3 font-medium">{h}</th>)}
-                        {["출근횟수","총근로시간","정규시간","연장시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
+                        {["출근횟수","총근로시간","정규시간","연장시간","야간시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>
@@ -274,6 +323,7 @@ export default function DashboardPage() {
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(r.total_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(r.overtime_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(r.night_hours || 0)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.total_hours / r.unique_workers) : "-"}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.overtime_hours / r.unique_workers) : "-"}</td>
@@ -287,6 +337,7 @@ export default function DashboardPage() {
                             <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.total_hours)}</td>
                             <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
                             <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.overtime_hours)}</td>
+                            <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.night_hours)}</td>
                             <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
                             <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.total_hours / g.subtotal.unique_workers) : "-"}</td>
                             <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.overtime_hours / g.subtotal.unique_workers) : "-"}</td>
@@ -300,6 +351,7 @@ export default function DashboardPage() {
                         <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.total_hours)}</td>
                         <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.regular_hours)}</td>
                         <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.overtime_hours)}</td>
+                        <td className="text-right px-3 py-3 tabular-nums">{fmt(grandTotal.night_hours)}</td>
                         <td className="text-right px-3 py-3 tabular-nums">{grandTotal.annual_leave_days}</td>
                         <td className="text-right px-3 py-3 tabular-nums">{grandTotal.unique_workers > 0 ? fmt(grandTotal.total_hours / grandTotal.unique_workers) : "-"}</td>
                         <td className="text-right px-3 py-3 tabular-nums">{grandTotal.unique_workers > 0 ? fmt(grandTotal.overtime_hours / grandTotal.unique_workers) : "-"}</td>
@@ -467,6 +519,7 @@ export default function DashboardPage() {
                         { label: "출근횟수", cur: grandTotal.attendance_count, prev: prevTotal.attendance_count, isInt: true },
                         { label: "정규시간", cur: grandTotal.regular_hours, prev: prevTotal.regular_hours, isInt: false },
                         { label: "연장시간", cur: grandTotal.overtime_hours, prev: prevTotal.overtime_hours, isInt: false },
+                        { label: "야간시간", cur: grandTotal.night_hours, prev: prevTotal.night_hours, isInt: false },
                         { label: "총근로시간", cur: grandTotal.total_hours, prev: prevTotal.total_hours, isInt: false },
                       ].map((item) => {
                         const diff = item.cur - item.prev;
@@ -511,6 +564,42 @@ export default function DashboardPage() {
                         전월 대비 {curSalary - prevSalary > 0 ? "+" : ""}{pct(curSalary, prevSalary)}%
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 3-month trend chart */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <h3 className="font-semibold text-gray-900 mb-4">최근 3개월 근로시간 추이</h3>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={threeMonthTrend}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(v, name) => [`${Number(v).toFixed(1)}시간`, name]} />
+                        <Legend />
+                        <Bar dataKey="정규시간" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                        <Bar dataKey="연장시간" fill="#f97316" radius={[2, 2, 0, 0]} />
+                        <Bar dataKey="야간시간" fill="#8b5cf6" radius={[2, 2, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <h3 className="font-semibold text-gray-900 mb-4">최근 3개월 추정 급여 추이</h3>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={threeMonthTrend}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(v) => [`${fmtWon(Number(v))}원`, "추정 급여"]} />
+                        <Bar dataKey="추정급여" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>

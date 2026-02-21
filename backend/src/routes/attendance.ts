@@ -24,8 +24,8 @@ router.get('/', (req: Request, res: Response) => {
       params.push(endDate);
     }
     if (name) {
-      query += ' AND name = ?';
-      params.push(name);
+      query += ' AND name LIKE ?';
+      params.push(`%${name}%`);
     }
     if (category) {
       query += ' AND category = ?';
@@ -178,8 +178,8 @@ router.get('/pivot', (req: Request, res: Response) => {
       endDate,
     } = req.query;
 
-    const allowedFields = ['name', 'category', 'department', 'workplace', 'date', 'annual_leave'];
-    const allowedValues = ['total_hours', 'regular_hours', 'overtime_hours', 'break_time'];
+    const allowedFields = ['name', 'category', 'department', 'workplace', 'date', 'annual_leave', 'shift'];
+    const allowedValues = ['total_hours', 'regular_hours', 'overtime_hours', 'night_hours', 'break_time'];
     const allowedAgg = ['sum', 'avg', 'count', 'min', 'max'];
 
     if (!allowedFields.includes(rowField as string) || !allowedFields.includes(colField as string)) {

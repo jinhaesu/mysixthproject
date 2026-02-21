@@ -4,19 +4,23 @@ import { useEffect, useState } from "react";
 import { getPivotData } from "@/lib/api";
 import type { PivotData } from "@/types/attendance";
 
+// Match Excel column names: 이름, 부서, 근무층, 고용형태, 근무시간대, 날짜, 연차 사용여부
 const FIELD_LABELS: Record<string, string> = {
   name: "이름",
-  category: "구분",
   department: "부서",
-  workplace: "근무지",
+  workplace: "근무층",
+  category: "고용형태",
+  shift: "근무시간대",
   date: "날짜",
-  annual_leave: "연차",
+  annual_leave: "연차 사용여부",
 };
 
+// Match Excel column names: 총 근무시간, 정규시간, 연장시간, 야간시간, 휴게시간
 const VALUE_LABELS: Record<string, string> = {
-  total_hours: "총 근로시간",
+  total_hours: "총 근무시간",
   regular_hours: "정규시간",
   overtime_hours: "연장시간",
+  night_hours: "야간시간",
   break_time: "휴게시간",
 };
 
@@ -160,8 +164,8 @@ export default function PivotPage() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">
-              {FIELD_LABELS[pivotData.rowField]} x {FIELD_LABELS[pivotData.colField]} |{" "}
-              {AGG_LABELS[pivotData.aggFunc]}({VALUE_LABELS[pivotData.valueField]})
+              {FIELD_LABELS[pivotData.rowField] || pivotData.rowField} x {FIELD_LABELS[pivotData.colField] || pivotData.colField} |{" "}
+              {AGG_LABELS[pivotData.aggFunc] || pivotData.aggFunc}({VALUE_LABELS[pivotData.valueField] || pivotData.valueField})
             </span>
             <span className="text-sm text-gray-500">{pivotData.data.length}행</span>
           </div>
@@ -170,7 +174,7 @@ export default function PivotPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-left px-4 py-3 font-medium text-gray-700 sticky left-0 bg-gray-50">
-                    {FIELD_LABELS[pivotData.rowField]}
+                    {FIELD_LABELS[pivotData.rowField] || pivotData.rowField}
                   </th>
                   {pivotData.columns.map((col) => (
                     <th key={col} className="text-right px-4 py-3 font-medium text-gray-700">

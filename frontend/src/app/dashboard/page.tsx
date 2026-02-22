@@ -171,21 +171,17 @@ export default function DashboardPage() {
   const prevTotal = useMemo(() => sumTotals(summaryData?.previous || []), [summaryData]);
   const twoMonthsAgoTotal = useMemo(() => sumTotals(twoMonthsAgoData), [twoMonthsAgoData]);
 
-  // Category-level totals for overtime ratio cards
+  // Category-level totals for overtime ratio cards (shift-based)
   const categoryStats = useMemo(() => {
     const calc = (rows: SummaryRow[]) => {
-      const map = new Map<string, Totals>();
+      const map = new Map<string, { total_hours: number; daytime_ot: number; night_total: number }>();
       for (const r of rows) {
         const cat = r.category || "미분류";
-        const prev = map.get(cat) || { ...ZERO_TOTALS };
+        const prev = map.get(cat) || { total_hours: 0, daytime_ot: 0, night_total: 0 };
         map.set(cat, {
-          attendance_count: prev.attendance_count + r.attendance_count,
-          unique_workers: prev.unique_workers + r.unique_workers,
           total_hours: prev.total_hours + r.total_hours,
-          regular_hours: prev.regular_hours + r.regular_hours,
-          overtime_hours: prev.overtime_hours + r.overtime_hours,
-          night_hours: prev.night_hours + (r.night_hours || 0),
-          annual_leave_days: prev.annual_leave_days + r.annual_leave_days,
+          daytime_ot: prev.daytime_ot + (r.shift !== "야간" ? r.overtime_hours : 0),
+          night_total: prev.night_total + (r.shift === "야간" ? r.total_hours : 0),
         });
       }
       return map;
@@ -346,15 +342,15 @@ export default function DashboardPage() {
                       {found.map(dc => {
                         const cur = dc.keys.reduce((a, k) => {
                           const t = categoryStats.current.get(k);
-                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours, night: a.night + t.night_hours } : a;
-                        }, { total: 0, ot: 0, night: 0 });
+                          return t ? { total: a.total + t.total_hours, dayOt: a.dayOt + t.daytime_ot, nightTotal: a.nightTotal + t.night_total } : a;
+                        }, { total: 0, dayOt: 0, nightTotal: 0 });
                         const prev = dc.keys.reduce((a, k) => {
                           const t = categoryStats.previous.get(k);
-                          return t ? { total: a.total + t.total_hours, ot: a.ot + t.overtime_hours, night: a.night + t.night_hours } : a;
-                        }, { total: 0, ot: 0, night: 0 });
+                          return t ? { total: a.total + t.total_hours, dayOt: a.dayOt + t.daytime_ot, nightTotal: a.nightTotal + t.night_total } : a;
+                        }, { total: 0, dayOt: 0, nightTotal: 0 });
 
-                        const curOtNight = cur.ot + cur.night;
-                        const prevOtNight = prev.ot + prev.night;
+                        const curOtNight = cur.dayOt + cur.nightTotal;
+                        const prevOtNight = prev.dayOt + prev.nightTotal;
                         const curRatio = cur.total > 0 ? (curOtNight / cur.total) * 100 : 0;
                         const prevRatio = prev.total > 0 ? (prevOtNight / prev.total) * 100 : 0;
                         const ratioDiff = curRatio - prevRatio;
@@ -414,7 +410,7 @@ export default function DashboardPage() {
                       <thead>
                         <tr className="bg-blue-900 text-white">
                           {["부서","근무층","고용형태","시간대"].map(h => <th key={h} className="text-left px-3 py-3 font-medium">{h}</th>)}
-                          {["출근횟수","총근로시간","정규시간","연장시간","야간시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
+                          {["출근횟수","총근로시간","정규시간","연장시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
                         </tr>
                       </thead>
                       <tbody>
@@ -431,7 +427,6 @@ export default function DashboardPage() {
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.total_hours)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.overtime_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.night_hours || 0)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.total_hours / r.unique_workers) : "-"}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.overtime_hours / r.unique_workers) : "-"}</td>
@@ -445,7 +440,6 @@ export default function DashboardPage() {
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.total_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.overtime_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.night_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.total_hours / g.subtotal.unique_workers) : "-"}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.overtime_hours / g.subtotal.unique_workers) : "-"}</td>
@@ -489,10 +483,6 @@ export default function DashboardPage() {
                               <td className="text-right px-3 py-2 tabular-nums">
                                 {fmt(gt.overtime_hours)}
                                 {momBadge(gt.overtime_hours, pt.overtime_hours)}
-                              </td>
-                              <td className="text-right px-3 py-2 tabular-nums">
-                                {fmt(gt.night_hours)}
-                                {momBadge(gt.night_hours, pt.night_hours)}
                               </td>
                               <td className="text-right px-3 py-2 tabular-nums">{gt.annual_leave_days}</td>
                               <td className="text-right px-3 py-2 tabular-nums">

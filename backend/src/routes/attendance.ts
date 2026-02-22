@@ -305,7 +305,7 @@ router.get('/report/summary', (req: Request, res: Response) => {
         END as shift,
         COUNT(*) as attendance_count,
         COUNT(DISTINCT name) as unique_workers,
-        ROUND(SUM(total_hours), 1) as total_hours,
+        ROUND(SUM(regular_hours + overtime_hours), 1) as total_hours,
         ROUND(SUM(regular_hours), 1) as regular_hours,
         ROUND(SUM(overtime_hours), 1) as overtime_hours,
         ROUND(SUM(COALESCE(night_hours, 0)), 1) as night_hours,

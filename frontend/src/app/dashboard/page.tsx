@@ -333,12 +333,13 @@ export default function DashboardPage() {
                   { label: "정규직", keys: ["정규직"], color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
                   { label: "파견", keys: ["파견"], color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-200" },
                   { label: "알바(사업소득)", keys: ["알바(사업소득)", "알바"], color: "text-green-700", bg: "bg-green-50", border: "border-green-200" },
+                  { label: "파견+알바", keys: ["파견", "알바(사업소득)", "알바"], color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-200" },
                 ];
                 const found = displayCats.filter(dc => dc.keys.some(k => categoryStats.current.has(k)));
 
                 return (
                   <>
-                    <div className={`grid grid-cols-1 ${found.length >= 3 ? "md:grid-cols-3" : found.length === 2 ? "md:grid-cols-2" : ""} gap-4`}>
+                    <div className={`grid grid-cols-1 ${found.length >= 4 ? "md:grid-cols-4" : found.length >= 3 ? "md:grid-cols-3" : found.length === 2 ? "md:grid-cols-2" : ""} gap-4`}>
                       {found.map(dc => {
                         const cur = dc.keys.reduce((a, k) => {
                           const t = categoryStats.current.get(k);

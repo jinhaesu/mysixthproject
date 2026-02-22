@@ -19,7 +19,15 @@ function isEmailAllowed(email: string): boolean {
   const allowed = process.env.ALLOWED_EMAILS;
   if (!allowed) return true;
   const list = allowed.split(',').map(e => e.trim().toLowerCase());
-  return list.includes(email.toLowerCase());
+  const normalized = email.toLowerCase();
+  return list.some(entry => {
+    // Domain pattern: "@nuldam.com" allows all emails with that domain
+    if (entry.startsWith('@')) {
+      return normalized.endsWith(entry);
+    }
+    // Exact email match
+    return normalized === entry;
+  });
 }
 
 // POST /api/auth/send-code

@@ -136,7 +136,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [baseRate, setBaseRate] = useState(9860);
+  const [rates, setRates] = useState<Record<string, number>>({ "정규직": 9860, "파견": 9860, "알바": 9860 });
   const [revenue, setRevenue] = useState(0);
   const [targetRatio, setTargetRatio] = useState(30);
 
@@ -215,17 +215,24 @@ export default function DashboardPage() {
   const getCount = (date: string, dept: string, wp: string, cat: string) =>
     dailyLookup.get(`${date}|${dept}|${wp}|${cat}`) || 0;
 
+  const getRateForCategory = useCallback((category: string) => {
+    if (category === "정규직") return rates["정규직"];
+    if (category === "파견") return rates["파견"];
+    return rates["알바"];
+  }, [rates]);
+
   const calcSalary = useCallback((rows: SummaryRow[]) => {
     let total = 0;
     for (const r of rows) {
+      const rate = getRateForCategory(r.category);
       if (r.shift === "야간") {
-        total += r.regular_hours * baseRate * 1.5 + r.overtime_hours * baseRate * 2.0;
+        total += r.regular_hours * rate * 1.5 + r.overtime_hours * rate * 2.0;
       } else {
-        total += r.regular_hours * baseRate + r.overtime_hours * baseRate * 1.5;
+        total += r.regular_hours * rate + r.overtime_hours * rate * 1.5;
       }
     }
     return total;
-  }, [baseRate]);
+  }, [getRateForCategory]);
 
   const curSalary = useMemo(() => calcSalary(summaryData?.current || []), [summaryData, calcSalary]);
   const prevSalary = useMemo(() => calcSalary(summaryData?.previous || []), [summaryData, calcSalary]);
@@ -236,13 +243,14 @@ export default function DashboardPage() {
     const map = new Map<string, number>();
     for (const r of summaryData.current) {
       const dept = r.department || "미분류";
+      const rate = getRateForCategory(r.category);
       const s = r.shift === "야간"
-        ? r.regular_hours * baseRate * 1.5 + r.overtime_hours * baseRate * 2.0
-        : r.regular_hours * baseRate + r.overtime_hours * baseRate * 1.5;
+        ? r.regular_hours * rate * 1.5 + r.overtime_hours * rate * 2.0
+        : r.regular_hours * rate + r.overtime_hours * rate * 1.5;
       map.set(dept, (map.get(dept) || 0) + s);
     }
     return Array.from(map.entries()).map(([dept, cost]) => ({ dept, cost }));
-  }, [summaryData, baseRate]);
+  }, [summaryData, getRateForCategory]);
 
   // 3-month trend data for chart
   const threeMonthTrend = useMemo(() => {
@@ -254,8 +262,7 @@ export default function DashboardPage() {
         출근횟수: twoMonthsAgoTotal.attendance_count,
         정규시간: Math.round(twoMonthsAgoTotal.regular_hours * 10) / 10,
         연장시간: Math.round(twoMonthsAgoTotal.overtime_hours * 10) / 10,
-        야간시간: Math.round(twoMonthsAgoTotal.night_hours * 10) / 10,
-        총근로시간: Math.round(twoMonthsAgoTotal.total_hours * 10) / 10,
+        총근로시간: Math.round((twoMonthsAgoTotal.regular_hours + twoMonthsAgoTotal.overtime_hours) * 10) / 10,
         추정급여: twoMonthsAgoSalary,
       },
       {
@@ -263,8 +270,7 @@ export default function DashboardPage() {
         출근횟수: prevTotal.attendance_count,
         정규시간: Math.round(prevTotal.regular_hours * 10) / 10,
         연장시간: Math.round(prevTotal.overtime_hours * 10) / 10,
-        야간시간: Math.round(prevTotal.night_hours * 10) / 10,
-        총근로시간: Math.round(prevTotal.total_hours * 10) / 10,
+        총근로시간: Math.round((prevTotal.regular_hours + prevTotal.overtime_hours) * 10) / 10,
         추정급여: prevSalary,
       },
       {
@@ -272,8 +278,7 @@ export default function DashboardPage() {
         출근횟수: grandTotal.attendance_count,
         정규시간: Math.round(grandTotal.regular_hours * 10) / 10,
         연장시간: Math.round(grandTotal.overtime_hours * 10) / 10,
-        야간시간: Math.round(grandTotal.night_hours * 10) / 10,
-        총근로시간: Math.round(grandTotal.total_hours * 10) / 10,
+        총근로시간: Math.round((grandTotal.regular_hours + grandTotal.overtime_hours) * 10) / 10,
         추정급여: curSalary,
       },
     ];
@@ -624,20 +629,37 @@ export default function DashboardPage() {
           {activeTab === "salary" && (
             <div className="space-y-6">
               <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h3 className="font-semibold text-gray-900 mb-4">단가 설정</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">정규시간 단가 (원/시간)</label>
-                    <input type="number" value={baseRate} onChange={(e) => setBaseRate(Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">연장근로</label>
-                    <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600">1.5배 ({fmtWon(baseRate * 1.5)}원)</div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">야간근로</label>
-                    <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600">1.5배 ({fmtWon(baseRate * 1.5)}원)</div>
-                  </div>
+                <h3 className="font-semibold text-gray-900 mb-4">고용형태별 단가 설정</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="px-4 py-2.5 text-left font-medium text-gray-700">고용형태</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-gray-700">정규시간 단가 (원/시간)</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-gray-700">연장근로 (1.5배)</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-gray-700">야간정규 (1.5배)</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-gray-700">야간연장 (2.0배)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(["정규직", "파견", "알바"] as const).map(cat => (
+                        <tr key={cat} className="border-b border-gray-100">
+                          <td className="px-4 py-2.5 font-medium text-gray-900">{cat === "알바" ? "알바(사업소득)" : cat}</td>
+                          <td className="px-4 py-2.5 text-right">
+                            <input
+                              type="number"
+                              value={rates[cat]}
+                              onChange={(e) => setRates(prev => ({ ...prev, [cat]: Number(e.target.value) }))}
+                              className="w-28 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-right text-gray-900"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtWon(rates[cat] * 1.5)}원</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtWon(rates[cat] * 1.5)}원</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtWon(rates[cat] * 2.0)}원</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
@@ -661,8 +683,7 @@ export default function DashboardPage() {
                         { label: "출근횟수", cur: grandTotal.attendance_count, prev: prevTotal.attendance_count, isInt: true },
                         { label: "정규시간", cur: grandTotal.regular_hours, prev: prevTotal.regular_hours, isInt: false },
                         { label: "연장시간", cur: grandTotal.overtime_hours, prev: prevTotal.overtime_hours, isInt: false },
-                        { label: "야간시간", cur: grandTotal.night_hours, prev: prevTotal.night_hours, isInt: false },
-                        { label: "총근로시간", cur: grandTotal.total_hours, prev: prevTotal.total_hours, isInt: false },
+                        { label: "총근로시간", cur: grandTotal.regular_hours + grandTotal.overtime_hours, prev: prevTotal.regular_hours + prevTotal.overtime_hours, isInt: false },
                       ].map((item) => {
                         const diff = item.cur - item.prev;
                         const rate = pct(item.cur, item.prev);
@@ -724,7 +745,6 @@ export default function DashboardPage() {
                         <Legend />
                         <Bar dataKey="정규시간" fill="#3b82f6" radius={[2, 2, 0, 0]} />
                         <Bar dataKey="연장시간" fill="#f97316" radius={[2, 2, 0, 0]} />
-                        <Bar dataKey="야간시간" fill="#8b5cf6" radius={[2, 2, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

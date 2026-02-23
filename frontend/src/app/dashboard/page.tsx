@@ -39,6 +39,10 @@ interface SummaryResponse {
   month: number;
   prevYear: number;
   prevMonth: number;
+  weeklyHolidayHours?: {
+    current: Record<string, number>;
+    previous: Record<string, number>;
+  };
 }
 
 interface DailyResponse {
@@ -133,6 +137,7 @@ export default function DashboardPage() {
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
   const [dailyData, setDailyData] = useState<DailyResponse | null>(null);
   const [twoMonthsAgoData, setTwoMonthsAgoData] = useState<SummaryRow[]>([]);
+  const [twoMonthsAgoWHH, setTwoMonthsAgoWHH] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -153,6 +158,7 @@ export default function DashboardPage() {
       setSummaryData(summary);
       setDailyData(daily);
       setTwoMonthsAgoData(twoMonthsAgoSummary.previous || []);
+      setTwoMonthsAgoWHH(twoMonthsAgoSummary.weeklyHolidayHours?.previous || {});
     } catch (err: any) {
       setError(err.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
@@ -240,9 +246,20 @@ export default function DashboardPage() {
     return total;
   }, [getRateForCategory]);
 
-  const curSalary = useMemo(() => calcSalary(summaryData?.current || []), [summaryData, calcSalary]);
-  const prevSalary = useMemo(() => calcSalary(summaryData?.previous || []), [summaryData, calcSalary]);
-  const twoMonthsAgoSalary = useMemo(() => calcSalary(twoMonthsAgoData), [twoMonthsAgoData, calcSalary]);
+  // Weekly holiday bonus (주휴수당): hours × base rate per category
+  const calcWHBonus = useCallback((whh: Record<string, number>) => {
+    return (whh["파견"] || 0) * rates["파견"] + (whh["알바"] || 0) * rates["알바"];
+  }, [rates]);
+
+  const curSalary = useMemo(() =>
+    calcSalary(summaryData?.current || []) + calcWHBonus(summaryData?.weeklyHolidayHours?.current || {}),
+    [summaryData, calcSalary, calcWHBonus]);
+  const prevSalary = useMemo(() =>
+    calcSalary(summaryData?.previous || []) + calcWHBonus(summaryData?.weeklyHolidayHours?.previous || {}),
+    [summaryData, calcSalary, calcWHBonus]);
+  const twoMonthsAgoSalary = useMemo(() =>
+    calcSalary(twoMonthsAgoData) + calcWHBonus(twoMonthsAgoWHH),
+    [twoMonthsAgoData, calcSalary, twoMonthsAgoWHH, calcWHBonus]);
 
   // Salary breakdown by category + shift for detailed comparison
   const salaryBreakdown = useMemo(() => {
@@ -728,7 +745,10 @@ export default function DashboardPage() {
                         const shifts = ["주간", "야간"] as const;
                         const z = { regular_hours: 0, overtime_hours: 0, salary: 0 };
                         const getS = (map: Map<string, typeof z>, cat: string, shift: string) => map.get(`${cat}|${shift}`) || z;
+                        const whCur = summaryData?.weeklyHolidayHours?.current || {};
+                        const whPrev = summaryData?.weeklyHolidayHours?.previous || {};
                         let grandCurSal = 0, grandPrevSal = 0;
+                        let grandCurWH = 0, grandPrevWH = 0;
 
                         return cats.flatMap((cat, ci) => {
                           let catCurReg = 0, catCurOt = 0, catCurSal = 0;
@@ -780,21 +800,55 @@ export default function DashboardPage() {
                             </tr>
                           );
 
+                          // 주휴수당 row for 파견 and 알바 only
+                          const whKey = cat === "파견" ? "파견" : cat === "알바(사업소득)" ? "알바" : null;
+                          const whRows: React.ReactNode[] = [];
+                          if (whKey) {
+                            const curWHHours = whCur[whKey] || 0;
+                            const prevWHHours = whPrev[whKey] || 0;
+                            const rateKey = whKey as "파견" | "알바";
+                            const curWHSal = curWHHours * rates[rateKey];
+                            const prevWHSal = prevWHHours * rates[rateKey];
+                            const whDiff = curWHSal - prevWHSal;
+                            grandCurSal += curWHSal; grandPrevSal += prevWHSal;
+                            grandCurWH += curWHHours; grandPrevWH += prevWHHours;
+
+                            whRows.push(
+                              <tr key={`wh-${cat}`} className="bg-orange-50 border-b border-orange-200">
+                                <td className="px-3 py-2 font-medium text-orange-800" colSpan={2}>
+                                  ↳ {cat === "알바(사업소득)" ? "알바" : cat} 주휴수당
+                                  <span className="ml-1 text-xs font-normal text-orange-500">(주5일↑ × 8h × 기본단가)</span>
+                                </td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-700 border-l border-orange-100">{fmt(curWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-400">-</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-700">{fmt(curWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums font-semibold text-orange-800">{fmtWon(curWHSal)}원</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-500 border-l border-orange-100">{fmt(prevWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-400">-</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-500">{fmt(prevWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-500">{fmtWon(prevWHSal)}원</td>
+                                <td className={`text-right px-3 py-2 tabular-nums font-medium border-l border-orange-100 ${whDiff > 0 ? "text-red-600" : whDiff < 0 ? "text-blue-600" : ""}`}>
+                                  {whDiff !== 0 ? `${whDiff > 0 ? "+" : ""}${fmtWon(whDiff)}원` : "-"}
+                                </td>
+                              </tr>
+                            );
+                          }
+
                           // Add grand total after last category
                           if (ci === cats.length - 1) {
                             const gDiff = grandCurSal - grandPrevSal;
                             const curAllReg = grandTotal.regular_hours, curAllOt = grandTotal.overtime_hours;
                             const prevAllReg = prevTotal.regular_hours, prevAllOt = prevTotal.overtime_hours;
-                            return [...shiftRows, subtotalRow, (
+                            return [...shiftRows, subtotalRow, ...whRows, (
                               <tr key="grand" className="bg-blue-900 text-white font-bold">
-                                <td className="px-3 py-3" colSpan={2}>전체 합계</td>
-                                <td className="text-right px-3 py-2 tabular-nums border-l border-blue-700">{fmt(curAllReg)}</td>
+                                <td className="px-3 py-3" colSpan={2}>전체 합계 (주휴수당 포함)</td>
+                                <td className="text-right px-3 py-2 tabular-nums border-l border-blue-700">{fmt(curAllReg + grandCurWH)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(curAllOt)}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{fmt(curAllReg + curAllOt)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(curAllReg + curAllOt + grandCurWH)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmtWon(grandCurSal)}원</td>
-                                <td className="text-right px-3 py-2 tabular-nums border-l border-blue-700">{fmt(prevAllReg)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums border-l border-blue-700">{fmt(prevAllReg + grandPrevWH)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(prevAllOt)}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{fmt(prevAllReg + prevAllOt)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(prevAllReg + prevAllOt + grandPrevWH)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmtWon(grandPrevSal)}원</td>
                                 <td className={`text-right px-3 py-2 tabular-nums border-l border-blue-700 ${gDiff > 0 ? "text-red-300" : gDiff < 0 ? "text-green-300" : ""}`}>
                                   {gDiff !== 0 ? `${gDiff > 0 ? "+" : ""}${fmtWon(gDiff)}원` : "-"}
@@ -802,7 +856,7 @@ export default function DashboardPage() {
                               </tr>
                             )];
                           }
-                          return [...shiftRows, subtotalRow];
+                          return [...shiftRows, subtotalRow, ...whRows];
                         });
                       })()}
                     </tbody>

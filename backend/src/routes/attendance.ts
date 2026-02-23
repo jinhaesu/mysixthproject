@@ -268,6 +268,62 @@ router.get('/filters', (_req: Request, res: Response) => {
   }
 });
 
+// Helper: get ISO week key (Monday date) for a date string
+function getWeekKey(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const day = d.getUTCDay(); // 0=Sun..6=Sat
+  const diff = day === 0 ? -6 : 1 - day; // offset to Monday
+  const monday = new Date(d);
+  monday.setUTCDate(monday.getUTCDate() + diff);
+  return monday.toISOString().slice(0, 10);
+}
+
+// Normalize name for grouping (handles spaces, parenthetical aliases, Korean extraction)
+function normalizeNameForGrouping(name: string): string {
+  let n = name.trim();
+  n = n.replace(/[（(][^）)]*[）)]/g, '').trim();
+  n = n.replace(/[/／:：].*$/, '').trim();
+  const korean = n.match(/[가-힣]+/g);
+  if (korean && korean.join('').length >= 2) n = korean.join('');
+  return n.replace(/\s+/g, '');
+}
+
+// Calculate weekly holiday allowance (주휴수당) hours by category
+// Rule: for 파견/알바, if a worker works 5+ days in one week → 8 hours bonus
+function calcWeeklyHolidayHours(startDate: string, endDate: string): Record<string, number> {
+  const records = db.prepare(`
+    SELECT name, category, date
+    FROM attendance_records
+    WHERE date >= ? AND date <= ?
+  `).all(startDate, endDate) as { name: string; category: string; date: string }[];
+
+  const normCat = (c: string): string => {
+    if (c.includes('파견')) return '파견';
+    if (c.includes('알바') || c.includes('사업소득')) return '알바';
+    return c;
+  };
+
+  // Group by normalized_name + week (only for 파견/알바)
+  const groups = new Map<string, { category: string; dates: Set<string> }>();
+  for (const r of records) {
+    const cat = normCat(r.category);
+    if (cat !== '파견' && cat !== '알바') continue;
+    const week = getWeekKey(r.date);
+    const key = `${normalizeNameForGrouping(r.name)}|${cat}|${week}`;
+    if (!groups.has(key)) groups.set(key, { category: cat, dates: new Set() });
+    groups.get(key)!.dates.add(r.date);
+  }
+
+  // Count qualifying weeks (5+ unique work days → 8 hours)
+  const result: Record<string, number> = {};
+  for (const [, g] of groups) {
+    if (g.dates.size >= 5) {
+      result[g.category] = (result[g.category] || 0) + 8;
+    }
+  }
+  return result;
+}
+
 // Helper: last day of month
 function getLastDayOfMonth(year: number, month: number): string {
   const lastDay = new Date(year, month, 0).getDate();
@@ -319,7 +375,13 @@ router.get('/report/summary', (req: Request, res: Response) => {
     const current = db.prepare(summaryQuery).all(startDate, endDate);
     const previous = db.prepare(summaryQuery).all(prevStartDate, prevEndDate);
 
-    res.json({ current, previous, year: y, month: m, prevYear: prevY, prevMonth: prevM });
+    // Calculate weekly holiday allowance (주휴수당) for 파견/알바
+    const weeklyHolidayHours = {
+      current: calcWeeklyHolidayHours(startDate, endDate),
+      previous: calcWeeklyHolidayHours(prevStartDate, prevEndDate),
+    };
+
+    res.json({ current, previous, year: y, month: m, prevYear: prevY, prevMonth: prevM, weeklyHolidayHours });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

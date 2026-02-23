@@ -215,10 +215,16 @@ export default function DashboardPage() {
   const getCount = (date: string, dept: string, wp: string, cat: string) =>
     dailyLookup.get(`${date}|${dept}|${wp}|${cat}`) || 0;
 
+  // Normalize category for matching: handles variants like "파견직", "정규" etc.
+  const normCat = (cat: string): "정규직" | "파견" | "알바" => {
+    const c = cat.trim();
+    if (c.includes("파견")) return "파견";
+    if (c.includes("정규")) return "정규직";
+    return "알바";
+  };
+
   const getRateForCategory = useCallback((category: string) => {
-    if (category === "정규직") return rates["정규직"];
-    if (category === "파견") return rates["파견"];
-    return rates["알바"];
+    return rates[normCat(category)];
   }, [rates]);
 
   const calcSalary = useCallback((rows: SummaryRow[]) => {
@@ -243,7 +249,8 @@ export default function DashboardPage() {
     const compute = (rows: SummaryRow[]) => {
       const map = new Map<string, { regular_hours: number; overtime_hours: number; salary: number }>();
       for (const r of rows) {
-        const catKey = r.category === "정규직" ? "정규직" : r.category === "파견" ? "파견" : "알바(사업소득)";
+        const n = normCat(r.category);
+        const catKey = n === "정규직" ? "정규직" : n === "파견" ? "파견" : "알바(사업소득)";
         const key = `${catKey}|${r.shift === "야간" ? "야간" : "주간"}`;
         const prev = map.get(key) || { regular_hours: 0, overtime_hours: 0, salary: 0 };
         const rate = getRateForCategory(r.category);

@@ -18,42 +18,72 @@ export interface AttendanceRecord {
 }
 
 // Column name mappings (Korean -> English)
+// Keys are SPACELESS (all whitespace removed) to allow flexible matching
 const COLUMN_MAP: Record<string, keyof AttendanceRecord> = {
   // 날짜/이름
   '날짜': 'date',
+  '근무일': 'date',
+  '근무일자': 'date',
+  '일자': 'date',
   '이름': 'name',
+  '성명': 'name',
+  '근무자': 'name',
   // 출퇴근
   '출근시간': 'clock_in',
+  '출근': 'clock_in',
   '퇴근시간': 'clock_out',
+  '퇴근': 'clock_out',
   // 분류
   '구분': 'category',
   '고용형태': 'category',
+  '고용구분': 'category',
+  '근무형태': 'category',
   '부서': 'department',
+  '부서명': 'department',
   '근무지': 'workplace',
   '근무층': 'workplace',
+  '사업장': 'workplace',
   '근무시간대': 'shift',
   '시간대': 'shift',
+  '주야간': 'shift',
+  '주야구분': 'shift',
   // 시간
-  '총 근로시간': 'total_hours',
   '총근로시간': 'total_hours',
-  '총 근무시간': 'total_hours',
   '총근무시간': 'total_hours',
+  '근로시간합계': 'total_hours',
   '정규시간': 'regular_hours',
-  '연장 근로시간': 'overtime_hours',
+  '정규근로시간': 'regular_hours',
+  '정규근무시간': 'regular_hours',
+  '기본시간': 'regular_hours',
+  '기본근로시간': 'regular_hours',
   '연장근로시간': 'overtime_hours',
   '연장시간': 'overtime_hours',
+  '연장근무시간': 'overtime_hours',
+  '초과근로시간': 'overtime_hours',
+  '초과근무시간': 'overtime_hours',
   '야간시간': 'night_hours',
-  '야간 시간': 'night_hours',
   '야간근로시간': 'night_hours',
+  '야간근무시간': 'night_hours',
   '휴게시간': 'break_time',
   // 연차
-  '연차 사용여부': 'annual_leave',
   '연차사용여부': 'annual_leave',
   '연차': 'annual_leave',
+  '연차사용': 'annual_leave',
 };
 
 function normalizeColumnName(name: string): string {
-  return name.replace(/\s+/g, ' ').trim();
+  // Remove ALL whitespace (spaces, tabs, NBSP, full-width spaces) for robust matching
+  return name.replace(/[\s\u00A0\u3000]+/g, '').trim();
+}
+
+// Normalize category values to standard forms: 정규직, 파견, 알바
+function normalizeCategory(value: string): string {
+  const trimmed = value.replace(/[\s\u00A0\u3000]+/g, ' ').trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('파견')) return '파견';
+  if (trimmed.includes('정규')) return '정규직';
+  if (trimmed.includes('알바') || trimmed.includes('사업소득') || trimmed.includes('일용') || trimmed.includes('단기')) return '알바';
+  return trimmed;
 }
 
 function parseExcelDate(value: any): string {
@@ -193,7 +223,7 @@ export function parseExcelFile(filePath: string): AttendanceRecord[] {
       name: record.name || '',
       clock_in: record.clock_in || '',
       clock_out: record.clock_out || '',
-      category: record.category || '',
+      category: normalizeCategory(record.category || ''),
       department: record.department || '',
       workplace: record.workplace || '',
       shift,

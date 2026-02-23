@@ -290,12 +290,20 @@ function normalizeNameForGrouping(name: string): string {
 
 // Calculate weekly holiday allowance (주휴수당) hours by category
 // Rule: for 파견/알바, if a worker works 5+ days in one week → 8 hours bonus
-function calcWeeklyHolidayHours(startDate: string, endDate: string): Record<string, number> {
+function calcWeeklyHolidayHours(monthStart: string, monthEnd: string): Record<string, number> {
+  // Expand query range by ±6 days to capture full weeks at month boundaries
+  const first = new Date(monthStart + 'T12:00:00Z');
+  const last = new Date(monthEnd + 'T12:00:00Z');
+  first.setUTCDate(first.getUTCDate() - 6);
+  last.setUTCDate(last.getUTCDate() + 6);
+  const queryStart = first.toISOString().slice(0, 10);
+  const queryEnd = last.toISOString().slice(0, 10);
+
   const records = db.prepare(`
     SELECT name, category, date
     FROM attendance_records
     WHERE date >= ? AND date <= ?
-  `).all(startDate, endDate) as { name: string; category: string; date: string }[];
+  `).all(queryStart, queryEnd) as { name: string; category: string; date: string }[];
 
   const normCat = (c: string): string => {
     if (c.includes('파견')) return '파견';
@@ -303,21 +311,21 @@ function calcWeeklyHolidayHours(startDate: string, endDate: string): Record<stri
     return c;
   };
 
-  // Group by normalized_name + week (only for 파견/알바)
-  const groups = new Map<string, { category: string; dates: Set<string> }>();
+  // Group by normalized_name + category + week (only for 파견/알바)
+  const groups = new Map<string, { category: string; weekMonday: string; dates: Set<string> }>();
   for (const r of records) {
     const cat = normCat(r.category);
     if (cat !== '파견' && cat !== '알바') continue;
-    const week = getWeekKey(r.date);
-    const key = `${normalizeNameForGrouping(r.name)}|${cat}|${week}`;
-    if (!groups.has(key)) groups.set(key, { category: cat, dates: new Set() });
+    const weekMonday = getWeekKey(r.date);
+    const key = `${normalizeNameForGrouping(r.name)}|${cat}|${weekMonday}`;
+    if (!groups.has(key)) groups.set(key, { category: cat, weekMonday, dates: new Set() });
     groups.get(key)!.dates.add(r.date);
   }
 
-  // Count qualifying weeks (5+ unique work days → 8 hours)
+  // Count qualifying weeks: 5+ unique work days AND Monday falls within the target month
   const result: Record<string, number> = {};
   for (const [, g] of groups) {
-    if (g.dates.size >= 5) {
+    if (g.dates.size >= 5 && g.weekMonday >= monthStart && g.weekMonday <= monthEnd) {
       result[g.category] = (result[g.category] || 0) + 8;
     }
   }

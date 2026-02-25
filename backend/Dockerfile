@@ -25,6 +25,9 @@ COPY --from=builder /app/dist ./dist
 
 RUN mkdir -p /app/data /app/uploads
 
+# 영구 볼륨 선언 - 컨테이너 재빌드 시에도 데이터 유지
+VOLUME ["/app/data", "/app/uploads"]
+
 ENV NODE_ENV=production
 EXPOSE 4000
 

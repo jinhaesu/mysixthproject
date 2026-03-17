@@ -82,17 +82,27 @@ router.post('/:token/clock-in', (req: Request, res: Response) => {
     return;
   }
 
-  // GPS validation
-  let gpsValid = 0;
-  let distance = null;
-  if (latitude != null && longitude != null && request.wp_lat != null) {
-    gpsValid = isWithinRadius(latitude, longitude, request.wp_lat, request.wp_lng, request.radius_meters) ? 1 : 0;
-    distance = Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng));
+  // GPS 필수 검증: 근무지가 지정된 경우 반드시 범위 내에 있어야 함
+  if (request.wp_lat != null) {
+    if (latitude == null || longitude == null) {
+      res.status(400).json({ error: 'GPS 위치를 확인할 수 없습니다. 위치 권한을 허용해주세요.' });
+      return;
+    }
+    const withinRange = isWithinRadius(latitude, longitude, request.wp_lat, request.wp_lng, request.radius_meters);
+    const dist = Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng));
+    if (!withinRange) {
+      res.status(400).json({ error: `근무지 범위를 벗어났습니다. 현재 ${dist}m 거리에 있습니다. (허용: ${request.radius_meters}m 이내)` });
+      return;
+    }
   }
+
+  const gpsValid = 1;
+  const distance = (latitude != null && longitude != null && request.wp_lat != null)
+    ? Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng))
+    : null;
 
   const clockInTime = new Date().toISOString();
 
-  // Check if response row already exists
   const existing = db.prepare('SELECT id FROM survey_responses WHERE request_id = ?').get(request.id) as any;
 
   if (existing) {
@@ -125,7 +135,7 @@ router.post('/:token/clock-in', (req: Request, res: Response) => {
   res.json({
     success: true,
     clock_in_time: clockInTime,
-    gps_valid: gpsValid === 1,
+    gps_valid: true,
     distance,
   });
 });
@@ -158,16 +168,28 @@ router.post('/:token/clock-out', (req: Request, res: Response) => {
     return;
   }
 
-  // GPS validation
-  let gpsValid = 0;
-  let distance = null;
-  if (latitude != null && longitude != null && request.wp_lat != null) {
-    gpsValid = isWithinRadius(latitude, longitude, request.wp_lat, request.wp_lng, request.radius_meters) ? 1 : 0;
-    distance = Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng));
+  // GPS 필수 검증: 근무지가 지정된 경우 반드시 범위 내에 있어야 함
+  if (request.wp_lat != null) {
+    if (latitude == null || longitude == null) {
+      res.status(400).json({ error: 'GPS 위치를 확인할 수 없습니다. 위치 권한을 허용해주세요.' });
+      return;
+    }
+    const withinRange = isWithinRadius(latitude, longitude, request.wp_lat, request.wp_lng, request.radius_meters);
+    const dist = Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng));
+    if (!withinRange) {
+      res.status(400).json({ error: `근무지 범위를 벗어났습니다. 현재 ${dist}m 거리에 있습니다. (허용: ${request.radius_meters}m 이내)` });
+      return;
+    }
   }
+
+  const gpsValid = 1;
+  const distance = (latitude != null && longitude != null && request.wp_lat != null)
+    ? Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng))
+    : null;
 
   const clockOutTime = new Date().toISOString();
 
+  // 퇴근 기록 먼저 저장
   db.prepare(`
     UPDATE survey_responses SET
       clock_out_time = ?, clock_out_lat = ?, clock_out_lng = ?, clock_out_gps_valid = ?,
@@ -175,46 +197,49 @@ router.post('/:token/clock-out', (req: Request, res: Response) => {
     WHERE request_id = ?
   `).run(clockOutTime, latitude || null, longitude || null, gpsValid, request.id);
 
+  // attendance_records 생성 시도 (실패해도 퇴근 기록은 유지)
+  const response = db.prepare('SELECT * FROM survey_responses WHERE request_id = ?').get(request.id) as any;
+  if (response && response.clock_in_time) {
+    try {
+      const clockIn = new Date(response.clock_in_time);
+      const clockOut = new Date(clockOutTime);
+      const totalMs = clockOut.getTime() - clockIn.getTime();
+      const totalHours = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100;
+      const breakTime = totalHours >= 8 ? 1 : totalHours >= 4 ? 0.5 : 0;
+      const regularHours = Math.min(Math.max(totalHours - breakTime, 0), 8);
+      const overtimeHours = Math.max(totalHours - breakTime - 8, 0);
+
+      const clockInStr = clockIn.toTimeString().slice(0, 5);
+      const clockOutStr = clockOut.toTimeString().slice(0, 5);
+
+      // uploads 테이블에 survey 용 레코드 생성 (FK 충족)
+      const uploadId = `survey-${request.date}`;
+      const existingUpload = db.prepare('SELECT id FROM uploads WHERE id = ?').get(uploadId);
+      if (!existingUpload) {
+        db.prepare('INSERT INTO uploads (id, filename, original_filename, record_count) VALUES (?, ?, ?, 0)')
+          .run(uploadId, 'survey', `설문 출퇴근 ${request.date}`);
+      }
+
+      db.prepare(`
+        INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, total_hours, regular_hours, overtime_hours, break_time)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(uploadId, request.date, response.worker_name_ko, clockInStr, clockOutStr, '파견', '', '', totalHours, regularHours, overtimeHours, breakTime);
+
+      // record_count 업데이트
+      db.prepare('UPDATE uploads SET record_count = record_count + 1 WHERE id = ?').run(uploadId);
+    } catch (err) {
+      console.error('[Survey] attendance_records 생성 실패:', err);
+    }
+  }
+
+  // 모든 처리 성공 후 상태 변경
   db.prepare('UPDATE survey_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .run('completed', request.id);
-
-  // Auto-create attendance_record from completed survey
-  const response = db.prepare('SELECT * FROM survey_responses WHERE request_id = ?').get(request.id) as any;
-  if (response && response.clock_in_time && response.clock_out_time) {
-    const clockIn = new Date(response.clock_in_time);
-    const clockOut = new Date(clockOutTime);
-    const totalMs = clockOut.getTime() - clockIn.getTime();
-    const totalHours = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100;
-    const breakTime = totalHours >= 8 ? 1 : totalHours >= 4 ? 0.5 : 0;
-    const regularHours = Math.min(Math.max(totalHours - breakTime, 0), 8);
-    const overtimeHours = Math.max(totalHours - breakTime - 8, 0);
-
-    const clockInStr = clockIn.toTimeString().slice(0, 5);
-    const clockOutStr = clockOut.toTimeString().slice(0, 5);
-
-    db.prepare(`
-      INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, total_hours, regular_hours, overtime_hours, break_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      `survey-${request.date}`,
-      request.date,
-      response.worker_name_ko,
-      clockInStr,
-      clockOutStr,
-      '파견',
-      '',
-      '',
-      totalHours,
-      regularHours,
-      overtimeHours,
-      breakTime
-    );
-  }
 
   res.json({
     success: true,
     clock_out_time: clockOutTime,
-    gps_valid: gpsValid === 1,
+    gps_valid: true,
     distance,
   });
 });

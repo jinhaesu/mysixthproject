@@ -13,6 +13,8 @@ import {
   LogIn,
   LogOut,
   Navigation,
+  ShieldAlert,
+  XCircle,
 } from "lucide-react";
 
 const BANKS = [
@@ -44,10 +46,6 @@ function SurveyContent() {
   const [idNumber, setIdNumber] = useState("");
   const [emergencyContact, setEmergencyContact] = useState("");
   const [memo, setMemo] = useState("");
-
-  // Success messages
-  const [clockInResult, setClockInResult] = useState<any>(null);
-  const [clockOutResult, setClockOutResult] = useState<any>(null);
 
   const loadSurvey = useCallback(async () => {
     if (!token) {
@@ -120,7 +118,7 @@ function SurveyContent() {
     }
     setSubmitting(true);
     try {
-      const result = await submitClockIn(token, {
+      await submitClockIn(token, {
         latitude: coords?.lat,
         longitude: coords?.lng,
         worker_name_ko: nameKo.trim(),
@@ -131,7 +129,6 @@ function SurveyContent() {
         emergency_contact: emergencyContact,
         memo,
       });
-      setClockInResult(result);
       await loadSurvey();
     } catch (err: any) {
       alert(err.message);
@@ -143,11 +140,10 @@ function SurveyContent() {
   const handleClockOut = async () => {
     setSubmitting(true);
     try {
-      const result = await submitClockOut(token, {
+      await submitClockOut(token, {
         latitude: coords?.lat,
         longitude: coords?.lng,
       });
-      setClockOutResult(result);
       await loadSurvey();
     } catch (err: any) {
       alert(err.message);
@@ -181,7 +177,13 @@ function SurveyContent() {
 
   if (!data) return null;
 
-  const isWithinRadius = data.workplace && distance !== null && distance <= data.workplace.radius_meters;
+  const hasWorkplace = !!data.workplace;
+  const isWithinRadius = hasWorkplace && distance !== null && distance <= data.workplace!.radius_meters;
+  const isOutOfRange = hasWorkplace && gpsStatus === "acquired" && !isWithinRadius;
+  const gpsReady = gpsStatus === "acquired";
+  // 근무지 지정 시: GPS 확인 + 범위 내에서만 가능. 미지정 시: 항상 가능
+  const canAct = hasWorkplace ? (gpsReady && isWithinRadius) : true;
+  const showForm = data.status === "sent" || data.status === "clock_in";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -192,49 +194,80 @@ function SurveyContent() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        {/* GPS Status */}
-        {data.status !== "completed" && data.status !== "expired" && (
-          <div className={`rounded-lg p-4 flex items-center gap-3 ${
-            gpsStatus === "acquired"
-              ? isWithinRadius ? "bg-green-50 border border-green-200" : "bg-yellow-50 border border-yellow-200"
-              : gpsStatus === "denied" ? "bg-red-50 border border-red-200"
-              : "bg-blue-50 border border-blue-200"
-          }`}>
-            <Navigation className={`w-5 h-5 ${
-              gpsStatus === "acquired"
-                ? isWithinRadius ? "text-green-600" : "text-yellow-600"
-                : gpsStatus === "denied" ? "text-red-600" : "text-blue-600 animate-pulse"
-            }`} />
-            <div className="flex-1">
-              {gpsStatus === "acquiring" && <p className="text-sm text-blue-700">GPS 위치를 확인하는 중...</p>}
-              {gpsStatus === "denied" && (
-                <div>
-                  <p className="text-sm text-red-700 font-medium">GPS 권한이 거부되었습니다</p>
-                  <p className="text-xs text-red-600 mt-0.5">브라우저 설정에서 위치 권한을 허용해주세요</p>
-                </div>
-              )}
-              {gpsStatus === "error" && <p className="text-sm text-red-700">GPS를 사용할 수 없습니다</p>}
-              {gpsStatus === "acquired" && data.workplace && (
-                <div>
-                  <p className={`text-sm font-medium ${isWithinRadius ? "text-green-700" : "text-yellow-700"}`}>
-                    {data.workplace.name}에서 {distance}m 거리
+
+        {/* GPS Status - 출퇴근 시 항상 표시 */}
+        {showForm && (
+          <>
+            {/* GPS 확인 중 */}
+            {gpsStatus === "acquiring" && (
+              <div className="rounded-lg p-5 bg-blue-50 border border-blue-200 text-center">
+                <Navigation className="w-8 h-8 text-blue-500 animate-pulse mx-auto" />
+                <p className="mt-3 text-sm font-medium text-blue-700">GPS 위치를 확인하는 중...</p>
+                <p className="text-xs text-blue-500 mt-1">위치 권한을 허용해주세요</p>
+              </div>
+            )}
+
+            {/* GPS 거부 */}
+            {(gpsStatus === "denied" || gpsStatus === "error") && (
+              <div className="rounded-lg p-5 bg-red-50 border border-red-200 text-center">
+                <ShieldAlert className="w-8 h-8 text-red-500 mx-auto" />
+                <p className="mt-3 text-sm font-medium text-red-700">
+                  {gpsStatus === "denied" ? "GPS 권한이 거부되었습니다" : "GPS를 사용할 수 없습니다"}
+                </p>
+                <p className="text-xs text-red-500 mt-1">
+                  출퇴근 기록을 위해 브라우저 설정에서 위치 권한을 허용해주세요.
+                </p>
+                {hasWorkplace && (
+                  <p className="text-xs text-red-600 mt-2 font-medium">
+                    GPS 없이는 출퇴근을 기록할 수 없습니다.
                   </p>
-                  <p className={`text-xs mt-0.5 ${isWithinRadius ? "text-green-600" : "text-yellow-600"}`}>
-                    {isWithinRadius
-                      ? "근무지 범위 내에 있습니다"
-                      : `근무지 범위(${data.workplace.radius_meters}m) 밖입니다`}
+                )}
+              </div>
+            )}
+
+            {/* GPS 확인 완료 + 범위 내 */}
+            {gpsReady && isWithinRadius && (
+              <div className="rounded-lg p-4 bg-green-50 border border-green-200 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-green-700">
+                    {data.workplace!.name} — {distance}m 거리
+                  </p>
+                  <p className="text-xs text-green-600 mt-0.5">
+                    근무지 범위 내에 있습니다. 출퇴근 기록이 가능합니다.
                   </p>
                 </div>
-              )}
-              {gpsStatus === "acquired" && !data.workplace && (
-                <p className="text-sm text-green-700">GPS 위치 확인 완료</p>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+
+            {/* GPS 확인 완료 + 범위 밖 */}
+            {isOutOfRange && (
+              <div className="rounded-lg p-5 bg-red-50 border border-red-200 text-center">
+                <XCircle className="w-8 h-8 text-red-500 mx-auto" />
+                <p className="mt-3 text-sm font-medium text-red-700">
+                  근무지 범위를 벗어났습니다
+                </p>
+                <p className="text-base font-bold text-red-800 mt-1">
+                  현재 {distance}m 거리 (허용: {data.workplace!.radius_meters}m 이내)
+                </p>
+                <p className="text-xs text-red-500 mt-2">
+                  {data.workplace!.name} 근처로 이동한 후 다시 시도해주세요.
+                </p>
+              </div>
+            )}
+
+            {/* 근무지 미지정 + GPS 확인 완료 */}
+            {gpsReady && !hasWorkplace && (
+              <div className="rounded-lg p-4 bg-green-50 border border-green-200 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                <p className="text-sm font-medium text-green-700">GPS 위치 확인 완료</p>
+              </div>
+            )}
+          </>
         )}
 
-        {/* Clock-in Form */}
-        {data.status === "sent" && (
+        {/* Clock-in Form - GPS 확인 후, 범위 내에서만 표시 */}
+        {data.status === "sent" && canAct && (
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2 text-blue-700 mb-2">
               <LogIn className="w-5 h-5" />
@@ -341,12 +374,6 @@ function SurveyContent() {
                 </>
               )}
             </button>
-
-            {gpsStatus === "denied" && (
-              <p className="text-xs text-center text-gray-500">
-                GPS 없이도 기록할 수 있으나, 위치 미확인으로 표시됩니다.
-              </p>
-            )}
           </div>
         )}
 
@@ -369,29 +396,32 @@ function SurveyContent() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-center gap-2 text-orange-700 mb-4">
-                <LogOut className="w-5 h-5" />
-                <h2 className="font-semibold">퇴근 기록</h2>
+            {/* 퇴근 버튼 - 범위 내에서만 활성화 */}
+            {canAct ? (
+              <div className="bg-white rounded-xl shadow-sm p-5">
+                <div className="flex items-center gap-2 text-orange-700 mb-4">
+                  <LogOut className="w-5 h-5" />
+                  <h2 className="font-semibold">퇴근 기록</h2>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  퇴근 시 아래 버튼을 눌러주세요. 현재 위치가 자동으로 기록됩니다.
+                </p>
+                <button
+                  onClick={handleClockOut}
+                  disabled={submitting}
+                  className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Clock className="w-5 h-5" />
+                      퇴근 기록하기
+                    </>
+                  )}
+                </button>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
-                퇴근 시 아래 버튼을 눌러주세요. 현재 위치가 자동으로 기록됩니다.
-              </p>
-              <button
-                onClick={handleClockOut}
-                disabled={submitting}
-                className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Clock className="w-5 h-5" />
-                    퇴근 기록하기
-                  </>
-                )}
-              </button>
-            </div>
+            ) : isOutOfRange ? null : null /* 범위 밖 안내는 위 GPS 섹션에서 이미 표시 */}
           </div>
         )}
 

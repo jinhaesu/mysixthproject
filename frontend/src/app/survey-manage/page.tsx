@@ -140,9 +140,13 @@ function SendTab() {
     if (!phone.trim()) return alert("전화번호를 입력해주세요.");
     setSending(true);
     try {
-      await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType });
-      alert("설문이 발송되었습니다.");
-      setPhone("");
+      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType });
+      if (result.message && !result.message.success) {
+        alert(`발송 실패: ${result.message.error || '알 수 없는 오류'}`);
+      } else {
+        alert("설문이 발송되었습니다.");
+        setPhone("");
+      }
       loadRecentSends();
     } catch (err: any) {
       alert(err.message);

@@ -65,9 +65,13 @@ async function sendSolapi(phone: string, message: string): Promise<SendResult> {
     });
 
     const data = await res.json() as Record<string, any>;
+    console.log('[Solapi] Response status:', res.status);
+    console.log('[Solapi] Response body:', JSON.stringify(data));
 
     if (!res.ok) {
-      return { success: false, error: data.errorMessage || data.message || `Solapi API 오류 (${res.status})` };
+      const errMsg = data.errorMessage || data.message || data.errorCode || `Solapi API 오류 (${res.status})`;
+      console.error('[Solapi] API error:', errMsg);
+      return { success: false, error: errMsg };
     }
 
     const groupId = data?.groupInfo?.groupId || '';
@@ -75,13 +79,14 @@ async function sendSolapi(phone: string, message: string): Promise<SendResult> {
 
     if (failCount > 0) {
       const failedList = data?.failedMessageList || [];
-      const reason = failedList[0]?.reason || '발송 실패';
+      const reason = failedList[0]?.reason || failedList[0]?.receipts?.[0]?.message || '발송 실패';
+      console.error('[Solapi] Send failed:', JSON.stringify(failedList));
       return { success: false, messageId: groupId, error: reason };
     }
 
     return { success: true, messageId: groupId };
   } catch (err: any) {
-    console.error('[Solapi] Send error:', err);
+    console.error('[Solapi] Send error:', err.message, err.stack);
     return { success: false, error: err.message || 'Solapi 발송 오류' };
   }
 }
@@ -106,6 +111,7 @@ export async function sendSurveyMessage(
     console.log('[SMS] 카카오 실패, SMS로 대체 발송');
   }
 
+  console.log(`[SMS] Provider: ${SMS_PROVIDER}, To: ${phone}`);
   switch (SMS_PROVIDER) {
     case 'solapi':
       return sendSolapi(phone, message);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   getSurveyWorkplaces,
   createSurveyWorkplace,
@@ -26,6 +26,10 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
+  MessageSquare,
+  Users,
+  ClipboardList,
+  Building2,
 } from "lucide-react";
 
 type Tab = "send" | "responses" | "workplaces";
@@ -39,37 +43,71 @@ interface Workplace {
   radius_meters: number;
 }
 
+const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  sent: { label: "발송완료", cls: "bg-blue-50 text-blue-700 border border-blue-200" },
+  clock_in: { label: "출근완료", cls: "bg-amber-50 text-amber-700 border border-amber-200" },
+  completed: { label: "퇴근완료", cls: "bg-green-50 text-green-700 border border-green-200" },
+  expired: { label: "만료", cls: "bg-gray-50 text-gray-500 border border-gray-200" },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_MAP[status] || { label: status, cls: "bg-gray-50 text-gray-600" };
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${s.cls}`}>
+      {s.label}
+    </span>
+  );
+}
+
 export default function SurveyManagePage() {
   const [tab, setTab] = useState<Tab>("send");
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">설문 출퇴근 관리</h1>
+  const tabs: { key: Tab; label: string; icon: typeof Send }[] = [
+    { key: "send", label: "설문 발송", icon: MessageSquare },
+    { key: "responses", label: "응답 조회", icon: ClipboardList },
+    { key: "workplaces", label: "근무지 관리", icon: Building2 },
+  ];
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
-        {[
-          { key: "send" as Tab, label: "설문 발송" },
-          { key: "responses" as Tab, label: "응답 조회" },
-          { key: "workplaces" as Tab, label: "근무지 관리" },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              tab === t.key
-                ? "bg-white text-blue-700 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+  return (
+    <div className="min-w-0">
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">설문 출퇴근 관리</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          단기 근무자에게 설문을 발송하고, 출퇴근 기록을 관리합니다.
+        </p>
       </div>
 
-      {tab === "send" && <SendTab />}
-      {tab === "responses" && <ResponsesTab />}
-      {tab === "workplaces" && <WorkplacesTab />}
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="flex gap-6">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex items-center gap-2 pb-3 text-sm font-medium border-b-2 transition-colors ${
+                  active
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {t.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="min-w-0">
+        {tab === "send" && <SendTab />}
+        {tab === "responses" && <ResponsesTab />}
+        {tab === "workplaces" && <WorkplacesTab />}
+      </div>
     </div>
   );
 }
@@ -84,6 +122,7 @@ function SendTab() {
   const [sending, setSending] = useState(false);
   const [bulkPhones, setBulkPhones] = useState("");
   const [recentSends, setRecentSends] = useState<any[]>([]);
+  const [mode, setMode] = useState<"single" | "batch">("single");
 
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(console.error);
@@ -128,171 +167,192 @@ function SendTab() {
     }
   };
 
-  const statusLabel = (s: string) =>
-    ({ sent: "발송완료", clock_in: "출근완료", completed: "퇴근완료", expired: "만료" }[s] || s);
-
-  const statusColor = (s: string) =>
-    ({ sent: "bg-blue-100 text-blue-800", clock_in: "bg-yellow-100 text-yellow-800", completed: "bg-green-100 text-green-800", expired: "bg-gray-100 text-gray-600" }[s] || "bg-gray-100");
+  const bulkCount = bulkPhones.split("\n").filter((l) => l.trim()).length;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Single Send */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">개별 발송</h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">전화번호</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="010-1234-5678"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">근무일</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">근무지</label>
-            <select
-              value={workplaceId ?? ""}
-              onChange={(e) => setWorkplaceId(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            >
-              <option value="">선택하세요</option>
-              {workplaces.map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">발송 방법</label>
-            <div className="flex gap-3">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  value="sms"
-                  checked={messageType === "sms"}
-                  onChange={(e) => setMessageType(e.target.value)}
-                  className="text-blue-600"
-                />
-                <span className="text-sm">SMS</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  value="kakao"
-                  checked={messageType === "kakao"}
-                  onChange={(e) => setMessageType(e.target.value)}
-                  className="text-blue-600"
-                />
-                <span className="text-sm">카카오톡</span>
-              </label>
+    <div className="space-y-6">
+      {/* Send Form Card */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Common Settings */}
+        <div className="p-5 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">발송 설정</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무일</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무지</label>
+              <select
+                value={workplaceId ?? ""}
+                onChange={(e) => setWorkplaceId(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">선택하세요</option>
+                {workplaces.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">발송 방법</label>
+              <div className="flex gap-4 pt-1.5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="sms"
+                    checked={messageType === "sms"}
+                    onChange={(e) => setMessageType(e.target.value)}
+                    className="accent-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">문자(SMS)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    value="kakao"
+                    checked={messageType === "kakao"}
+                    onChange={(e) => setMessageType(e.target.value)}
+                    className="accent-blue-600"
+                  />
+                  <span className="text-sm text-gray-700">카카오톡</span>
+                </label>
+              </div>
             </div>
           </div>
-
-          <button
-            onClick={handleSend}
-            disabled={sending}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 transition-colors flex items-center justify-center gap-2"
-          >
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            발송하기
-          </button>
         </div>
-      </div>
 
-      {/* Batch Send */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">일괄 발송</h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              전화번호 목록 <span className="text-gray-400">(줄바꿈으로 구분)</span>
-            </label>
-            <textarea
-              value={bulkPhones}
-              onChange={(e) => setBulkPhones(e.target.value)}
-              placeholder={"010-1234-5678\n010-9876-5432\n010-1111-2222"}
-              rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-            />
+        {/* Mode Toggle + Input */}
+        <div className="p-5">
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setMode("single")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                mode === "single"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              개별 발송
+            </button>
+            <button
+              onClick={() => setMode("batch")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                mode === "batch"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              일괄 발송
+            </button>
           </div>
 
-          <p className="text-sm text-gray-500">
-            위의 근무일, 근무지, 발송 방법 설정이 동일하게 적용됩니다.
-          </p>
-
-          <button
-            onClick={handleBatchSend}
-            disabled={sending}
-            className="w-full py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 transition-colors flex items-center justify-center gap-2"
-          >
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            일괄 발송하기 ({bulkPhones.split("\n").filter((l) => l.trim()).length}건)
-          </button>
+          {mode === "single" ? (
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">전화번호</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="010-1234-5678"
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <button
+                onClick={handleSend}
+                disabled={sending || !phone.trim()}
+                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2 whitespace-nowrap"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                발송
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  전화번호 목록 <span className="text-gray-400">(줄바꿈으로 구분)</span>
+                </label>
+                <textarea
+                  value={bulkPhones}
+                  onChange={(e) => setBulkPhones(e.target.value)}
+                  placeholder={"010-1234-5678\n010-9876-5432\n010-1111-2222"}
+                  rows={5}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                />
+              </div>
+              <button
+                onClick={handleBatchSend}
+                disabled={sending || bulkCount === 0}
+                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {bulkCount}건 일괄 발송
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Recent Sends */}
-      <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">최근 발송 내역</h2>
-          <button onClick={loadRecentSends} className="text-gray-500 hover:text-gray-700">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">최근 발송 내역</h2>
+          <button
+            onClick={loadRecentSends}
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+            title="새로고침"
+          >
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
 
         {recentSends.length === 0 ? (
-          <p className="text-gray-500 text-sm">발송 내역이 없습니다.</p>
+          <div className="px-5 py-10 text-center">
+            <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">발송 내역이 없습니다.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-gray-200">
-                  <th className="py-2 pr-4 font-medium text-gray-600">전화번호</th>
-                  <th className="py-2 pr-4 font-medium text-gray-600">근무일</th>
-                  <th className="py-2 pr-4 font-medium text-gray-600">근무지</th>
-                  <th className="py-2 pr-4 font-medium text-gray-600">이름</th>
-                  <th className="py-2 pr-4 font-medium text-gray-600">출근</th>
-                  <th className="py-2 pr-4 font-medium text-gray-600">퇴근</th>
-                  <th className="py-2 font-medium text-gray-600">상태</th>
+                <tr className="bg-gray-50 text-left">
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">전화번호</th>
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">근무일</th>
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">근무지</th>
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">이름</th>
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">출근</th>
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">퇴근</th>
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">상태</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100">
                 {recentSends.map((r: any) => (
-                  <tr key={r.id} className="border-b border-gray-100">
-                    <td className="py-2.5 pr-4">
-                      <div className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-gray-400" />
+                  <tr key={r.id} className="hover:bg-gray-50/50">
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <span className="flex items-center gap-1.5 text-gray-700">
+                        <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                         {r.phone}
-                      </div>
+                      </span>
                     </td>
-                    <td className="py-2.5 pr-4">{r.date}</td>
-                    <td className="py-2.5 pr-4">{r.workplace_name || "-"}</td>
-                    <td className="py-2.5 pr-4">{r.worker_name_ko || "-"}</td>
-                    <td className="py-2.5 pr-4">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.date}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-gray-900">{r.worker_name_ko || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
                       {r.clock_in_time ? new Date(r.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-"}
                     </td>
-                    <td className="py-2.5 pr-4">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
                       {r.clock_out_time ? new Date(r.clock_out_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-"}
                     </td>
-                    <td className="py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(r.status)}`}>
-                        {statusLabel(r.status)}
-                      </span>
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <StatusBadge status={r.status} />
                     </td>
                   </tr>
                 ))}
@@ -317,7 +377,7 @@ function ResponsesTab() {
     status: "",
   });
 
-  const load = async (page = 1) => {
+  const load = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params: Record<string, string> = { page: String(page), limit: "50" };
@@ -334,7 +394,7 @@ function ResponsesTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     load();
@@ -360,12 +420,6 @@ function ResponsesTab() {
     }
   };
 
-  const statusLabel = (s: string) =>
-    ({ sent: "발송완료", clock_in: "출근완료", completed: "퇴근완료", expired: "만료" }[s] || s);
-
-  const statusColor = (s: string) =>
-    ({ sent: "bg-blue-100 text-blue-800", clock_in: "bg-yellow-100 text-yellow-800", completed: "bg-green-100 text-green-800", expired: "bg-gray-100 text-gray-600" }[s] || "bg-gray-100");
-
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -377,7 +431,7 @@ function ResponsesTab() {
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -386,7 +440,7 @@ function ResponsesTab() {
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -396,7 +450,7 @@ function ResponsesTab() {
               value={filters.phone}
               onChange={(e) => setFilters({ ...filters, phone: e.target.value })}
               placeholder="검색..."
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-40"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -404,7 +458,7 @@ function ResponsesTab() {
             <select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">전체</option>
               <option value="sent">발송완료</option>
@@ -415,13 +469,13 @@ function ResponsesTab() {
           </div>
           <button
             onClick={() => load(1)}
-            className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
             조회
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1.5"
+            className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
             엑셀 다운로드
@@ -432,38 +486,42 @@ function ResponsesTab() {
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center">
+          <div className="py-16 text-center">
             <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+            <p className="mt-2 text-sm text-gray-500">불러오는 중...</p>
           </div>
         ) : responses.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">데이터가 없습니다.</div>
+          <div className="py-16 text-center">
+            <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">데이터가 없습니다.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">근무일</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">전화번호</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">한글이름</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">영문이름</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">출근시간</th>
-                  <th className="py-3 px-4 text-center font-medium text-gray-600">출근GPS</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">퇴근시간</th>
-                  <th className="py-3 px-4 text-center font-medium text-gray-600">퇴근GPS</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">근무지</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">은행</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">계좌</th>
-                  <th className="py-3 px-4 text-left font-medium text-gray-600">상태</th>
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무일</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">전화번호</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">한글이름</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">영문이름</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">출근시간</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">출근GPS</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">퇴근시간</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">퇴근GPS</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무지</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">은행</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계좌</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">상태</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100">
                 {responses.map((r: any, i: number) => (
-                  <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="py-2.5 px-4">{r.date}</td>
-                    <td className="py-2.5 px-4">{r.phone}</td>
-                    <td className="py-2.5 px-4 font-medium">{r.worker_name_ko || "-"}</td>
-                    <td className="py-2.5 px-4">{r.worker_name_en || "-"}</td>
-                    <td className="py-2.5 px-4">
+                  <tr key={i} className="hover:bg-gray-50/50">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.date}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.phone}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-gray-900">{r.worker_name_ko || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.worker_name_en || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
                       {r.clock_in_time
                         ? new Date(r.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
                         : "-"}
@@ -473,13 +531,13 @@ function ResponsesTab() {
                         r.clock_in_gps_valid ? (
                           <Check className="w-4 h-4 text-green-600 mx-auto" />
                         ) : (
-                          <X className="w-4 h-4 text-red-500 mx-auto" />
+                          <X className="w-4 h-4 text-red-400 mx-auto" />
                         )
                       ) : (
-                        "-"
+                        <span className="text-gray-300">-</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
                       {r.clock_out_time
                         ? new Date(r.clock_out_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
                         : "-"}
@@ -489,19 +547,17 @@ function ResponsesTab() {
                         r.clock_out_gps_valid ? (
                           <Check className="w-4 h-4 text-green-600 mx-auto" />
                         ) : (
-                          <X className="w-4 h-4 text-red-500 mx-auto" />
+                          <X className="w-4 h-4 text-red-400 mx-auto" />
                         )
                       ) : (
-                        "-"
+                        <span className="text-gray-300">-</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4">{r.workplace_name || "-"}</td>
-                    <td className="py-2.5 px-4">{r.bank_name || "-"}</td>
-                    <td className="py-2.5 px-4 font-mono text-xs">{r.bank_account || "-"}</td>
-                    <td className="py-2.5 px-4">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(r.status)}`}>
-                        {statusLabel(r.status)}
-                      </span>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.bank_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap font-mono text-xs text-gray-600">{r.bank_account || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <StatusBadge status={r.status} />
                     </td>
                   </tr>
                 ))}
@@ -512,26 +568,27 @@ function ResponsesTab() {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
             <p className="text-sm text-gray-600">
-              총 {pagination.total}건 중 {(pagination.page - 1) * pagination.limit + 1}-
+              총 <span className="font-medium">{pagination.total}</span>건 중{" "}
+              {(pagination.page - 1) * pagination.limit + 1}-
               {Math.min(pagination.page * pagination.limit, pagination.total)}건
             </p>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => load(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"
+                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-3 py-1.5 text-sm">
+              <span className="px-3 py-1 text-sm font-medium text-gray-700">
                 {pagination.page} / {pagination.totalPages}
               </span>
               <button
                 onClick={() => load(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
-                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"
+                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -617,7 +674,6 @@ function WorkplacesTab() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("이 근무지를 삭제하시겠습니까?")) return;
     try {
       await deleteSurveyWorkplace(id);
       load();
@@ -644,10 +700,13 @@ function WorkplacesTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">등록된 근무지</h2>
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">등록된 근무지</h2>
+          <p className="text-xs text-gray-500 mt-0.5">GPS 기반 출퇴근 위치 검증에 사용됩니다.</p>
+        </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" />
           근무지 추가
@@ -656,13 +715,13 @@ function WorkplacesTab() {
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-blue-200 p-5 shadow-sm">
           <h3 className="font-semibold text-gray-900 mb-4">
             {editing ? "근무지 수정" : "새 근무지 등록"}
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 근무지 이름 <span className="text-red-500">*</span>
               </label>
               <input
@@ -670,21 +729,21 @@ function WorkplacesTab() {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="예: 조인앤조인 본사"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">주소</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">주소</label>
               <input
                 type="text"
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 placeholder="예: 서울시 강남구 테헤란로 123"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 위도 <span className="text-red-500">*</span>
               </label>
               <input
@@ -693,11 +752,11 @@ function WorkplacesTab() {
                 value={form.latitude}
                 onChange={(e) => setForm({ ...form, latitude: e.target.value })}
                 placeholder="37.5665"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 경도 <span className="text-red-500">*</span>
               </label>
               <input
@@ -706,39 +765,39 @@ function WorkplacesTab() {
                 value={form.longitude}
                 onChange={(e) => setForm({ ...form, longitude: e.target.value })}
                 placeholder="126.9780"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">허용 반경 (m)</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">허용 반경 (m)</label>
               <input
                 type="number"
                 value={form.radius_meters}
                 onChange={(e) => setForm({ ...form, radius_meters: e.target.value })}
                 placeholder="200"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex items-end">
               <button
                 onClick={handleGetCurrentLocation}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 flex items-center gap-1.5"
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors flex items-center gap-1.5"
               >
                 <MapPin className="w-4 h-4" />
                 현재 위치 가져오기
               </button>
             </div>
           </div>
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-2 mt-5 pt-4 border-t border-gray-100">
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
             >
-              {editing ? "수정" : "등록"}
+              {editing ? "수정 완료" : "등록하기"}
             </button>
             <button
               onClick={resetForm}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200"
+              className="px-4 py-2 text-gray-600 rounded-lg text-sm hover:bg-gray-100 transition-colors"
             >
               취소
             </button>
@@ -749,56 +808,72 @@ function WorkplacesTab() {
       {/* Workplaces List */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center">
+          <div className="py-16 text-center">
             <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
           </div>
         ) : workplaces.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">등록된 근무지가 없습니다.</div>
+          <div className="py-16 text-center">
+            <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">등록된 근무지가 없습니다.</p>
+            <p className="text-xs text-gray-400 mt-1">위의 &quot;근무지 추가&quot; 버튼을 눌러 등록해주세요.</p>
+          </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="py-3 px-4 text-left font-medium text-gray-600">이름</th>
-                <th className="py-3 px-4 text-left font-medium text-gray-600">주소</th>
-                <th className="py-3 px-4 text-left font-medium text-gray-600">위도</th>
-                <th className="py-3 px-4 text-left font-medium text-gray-600">경도</th>
-                <th className="py-3 px-4 text-left font-medium text-gray-600">반경</th>
-                <th className="py-3 px-4 text-center font-medium text-gray-600">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workplaces.map((w) => (
-                <tr key={w.id} className="border-t border-gray-100 hover:bg-gray-50">
-                  <td className="py-2.5 px-4 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-blue-500" />
-                      {w.name}
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-4 text-gray-600">{w.address || "-"}</td>
-                  <td className="py-2.5 px-4 font-mono text-xs">{w.latitude}</td>
-                  <td className="py-2.5 px-4 font-mono text-xs">{w.longitude}</td>
-                  <td className="py-2.5 px-4">{w.radius_meters}m</td>
-                  <td className="py-2.5 px-4">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => handleEdit(w)}
-                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(w.id)}
-                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">이름</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">주소</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">좌표</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">반경</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">관리</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {workplaces.map((w) => (
+                  <tr key={w.id} className="hover:bg-gray-50/50">
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                          <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        </div>
+                        <span className="font-medium text-gray-900">{w.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">{w.address || "-"}</td>
+                    <td className="py-3 px-4">
+                      <span className="font-mono text-xs text-gray-500">
+                        {w.latitude.toFixed(4)}, {w.longitude.toFixed(4)}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-0.5 bg-gray-100 rounded text-xs font-medium text-gray-700">
+                        {w.radius_meters}m
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleEdit(w)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="수정"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(w.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

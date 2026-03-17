@@ -34,6 +34,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const savedToken = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
 
+    const isPublicPage = pathname === "/login" || pathname.startsWith("/s");
+
     if (savedToken && savedUser) {
       setToken(savedToken);
       try {
@@ -41,9 +43,9 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-        if (pathname !== "/login") router.push("/login");
+        if (!isPublicPage) router.push("/login");
       }
-    } else if (pathname !== "/login") {
+    } else if (!isPublicPage) {
       router.push("/login");
     }
     setChecked(true);
@@ -57,8 +59,10 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
+  const isPublicPage = pathname === "/login" || pathname.startsWith("/s");
+
   if (!checked) return null;
-  if (!token && pathname !== "/login") return null;
+  if (!token && !isPublicPage) return null;
 
   return (
     <AuthContext.Provider value={{ user, token, logout }}>

@@ -122,6 +122,69 @@ export function initializeDB() {
     // Index already exists
   }
 
+  // Survey workplaces - designated GPS locations
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS survey_workplaces (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      address TEXT DEFAULT '',
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      radius_meters INTEGER NOT NULL DEFAULT 200,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Survey requests - sent to workers via SMS/KakaoTalk
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS survey_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT NOT NULL UNIQUE,
+      phone TEXT NOT NULL,
+      workplace_id INTEGER,
+      date TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'sent',
+      message_type TEXT DEFAULT 'sms',
+      message_id TEXT DEFAULT '',
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (workplace_id) REFERENCES survey_workplaces(id)
+    );
+  `);
+  try { db.exec('CREATE INDEX idx_survey_requests_token ON survey_requests(token)'); } catch {}
+  try { db.exec('CREATE INDEX idx_survey_requests_phone ON survey_requests(phone)'); } catch {}
+  try { db.exec('CREATE INDEX idx_survey_requests_date ON survey_requests(date)'); } catch {}
+
+  // Survey responses - worker-submitted clock-in/out and personal info
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS survey_responses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_id INTEGER NOT NULL,
+      clock_in_time TEXT,
+      clock_in_lat REAL,
+      clock_in_lng REAL,
+      clock_in_gps_valid INTEGER DEFAULT 0,
+      clock_out_time TEXT,
+      clock_out_lat REAL,
+      clock_out_lng REAL,
+      clock_out_gps_valid INTEGER DEFAULT 0,
+      worker_name_ko TEXT DEFAULT '',
+      worker_name_en TEXT DEFAULT '',
+      bank_name TEXT DEFAULT '',
+      bank_account TEXT DEFAULT '',
+      id_number TEXT DEFAULT '',
+      emergency_contact TEXT DEFAULT '',
+      memo TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (request_id) REFERENCES survey_requests(id) ON DELETE CASCADE
+    );
+  `);
+  try { db.exec('CREATE INDEX idx_survey_responses_request ON survey_responses(request_id)'); } catch {}
+
   console.log('Database initialized successfully');
 }
 

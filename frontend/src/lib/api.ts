@@ -149,3 +149,103 @@ export async function saveWorkforcePlanSlotsBatch(year: number, month: number, s
 export async function deleteWorkforcePlanSlot(id: number) {
   return fetchAPI<any>(`/api/workforce-plan/slots/${id}`, { method: 'DELETE' });
 }
+
+// ===== Survey =====
+
+// Workplaces
+export async function getSurveyWorkplaces() {
+  return fetchAPI<any[]>('/api/survey/workplaces');
+}
+
+export async function createSurveyWorkplace(data: { name: string; address: string; latitude: number; longitude: number; radius_meters: number }) {
+  return fetchAPI<any>('/api/survey/workplaces', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateSurveyWorkplace(id: number, data: any) {
+  return fetchAPI<any>(`/api/survey/workplaces/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteSurveyWorkplace(id: number) {
+  return fetchAPI<any>(`/api/survey/workplaces/${id}`, { method: 'DELETE' });
+}
+
+// Send survey
+export async function sendSurvey(data: { phone: string; date: string; workplace_id: number | null; message_type: string }) {
+  return fetchAPI<any>('/api/survey/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function sendSurveyBatch(data: { phones: string[]; date: string; workplace_id: number | null; message_type: string }) {
+  return fetchAPI<any>('/api/survey/send-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+// Survey responses
+export async function getSurveyResponses(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/survey/responses?${query}`);
+}
+
+export async function getSurveyRequests(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any[]>(`/api/survey/requests?${query}`);
+}
+
+export async function exportSurveyExcel(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  const res = await fetch(`${API_URL}/api/survey/responses/export?${query}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('엑셀 다운로드 실패');
+  return res.blob();
+}
+
+// Public survey API (no auth)
+export async function fetchSurveyPublic(token: string) {
+  const res = await fetch(`${API_URL}/api/survey-public/${token}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: '설문을 불러올 수 없습니다.' }));
+    throw new Error(err.error);
+  }
+  return res.json();
+}
+
+export async function submitClockIn(token: string, data: any) {
+  const res = await fetch(`${API_URL}/api/survey-public/${token}/clock-in`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: '출근 기록 실패' }));
+    throw new Error(err.error);
+  }
+  return res.json();
+}
+
+export async function submitClockOut(token: string, data: any) {
+  const res = await fetch(`${API_URL}/api/survey-public/${token}/clock-out`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: '퇴근 기록 실패' }));
+    throw new Error(err.error);
+  }
+  return res.json();
+}

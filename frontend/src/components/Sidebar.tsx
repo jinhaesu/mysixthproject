@@ -12,6 +12,7 @@ import {
   LogOut,
   Network,
   Users,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/records", label: "기록 조회", icon: ClipboardList },
   { href: "/org-chart", label: "조직도", icon: Network },
   { href: "/workforce-plan", label: "인력 조달 계획", icon: Users },
+  { href: "/survey-manage", label: "설문 출퇴근", icon: MessageSquare },
   { href: "/manage", label: "데이터 관리", icon: Database },
 ];
 

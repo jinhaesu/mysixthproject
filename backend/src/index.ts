@@ -10,6 +10,8 @@ import uploadRoutes from './routes/upload';
 import attendanceRoutes from './routes/attendance';
 import orgChartRoutes from './routes/orgChart';
 import workforcePlanRoutes from './routes/workforcePlan';
+import surveyRoutes from './routes/survey';
+import surveyPublicRoutes from './routes/surveyPublic';
 import { requireAuth } from './middleware/auth';
 
 const app = express();
@@ -43,6 +45,8 @@ app.use('/api/upload', requireAuth, uploadRoutes);
 app.use('/api/attendance', requireAuth, attendanceRoutes);
 app.use('/api/org-chart', requireAuth, orgChartRoutes);
 app.use('/api/workforce-plan', requireAuth, workforcePlanRoutes);
+app.use('/api/survey', requireAuth, surveyRoutes);
+app.use('/api/survey-public', surveyPublicRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

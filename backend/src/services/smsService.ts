@@ -1,7 +1,10 @@
 /**
  * SMS / KakaoTalk message sending service
- * Supports: mock (development), coolsms, kakao
+ * Supports: mock (development), solapi (구 CoolSMS)
+ * Solapi docs: https://developers.solapi.dev/
  */
+
+import { SolapiMessageService } from 'solapi';
 
 interface SendResult {
   success: boolean;
@@ -11,6 +14,21 @@ interface SendResult {
 
 const SMS_PROVIDER = process.env.SMS_PROVIDER || 'mock';
 const SURVEY_BASE_URL = process.env.SURVEY_BASE_URL || 'http://localhost:3000/s';
+
+// Solapi 클라이언트 (lazy init)
+let solapiClient: SolapiMessageService | null = null;
+
+function getSolapiClient(): SolapiMessageService | null {
+  if (solapiClient) return solapiClient;
+
+  const apiKey = process.env.SOLAPI_API_KEY;
+  const apiSecret = process.env.SOLAPI_API_SECRET;
+
+  if (!apiKey || !apiSecret) return null;
+
+  solapiClient = new SolapiMessageService(apiKey, apiSecret);
+  return solapiClient;
+}
 
 function buildSurveyUrl(token: string): string {
   return `${SURVEY_BASE_URL}?token=${token}`;
@@ -22,57 +40,48 @@ function buildMessage(surveyUrl: string, date: string): string {
 
 async function sendMock(phone: string, message: string): Promise<SendResult> {
   console.log(`[SMS MOCK] To: ${phone}`);
-  console.log(`[SMS MOCK] Message: ${message}`);
+  console.log(`[SMS MOCK] Message:\n${message}`);
   return { success: true, messageId: `mock-${Date.now()}` };
 }
 
-async function sendCoolSMS(phone: string, message: string): Promise<SendResult> {
-  const apiKey = process.env.SMS_API_KEY;
-  const apiSecret = process.env.SMS_API_SECRET;
-  const senderNumber = process.env.SMS_SENDER_NUMBER;
+async function sendSolapi(phone: string, message: string): Promise<SendResult> {
+  const client = getSolapiClient();
+  const senderNumber = process.env.SOLAPI_SENDER_NUMBER;
 
-  if (!apiKey || !apiSecret || !senderNumber) {
-    return { success: false, error: 'CoolSMS credentials not configured' };
+  if (!client || !senderNumber) {
+    return { success: false, error: 'Solapi 인증 정보가 설정되지 않았습니다. SOLAPI_API_KEY, SOLAPI_API_SECRET, SOLAPI_SENDER_NUMBER를 확인하세요.' };
   }
 
   try {
-    const res = await fetch('https://api.coolsms.co.kr/messages/v4/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `HMAC-SHA256 apiKey=${apiKey}, date=${new Date().toISOString()}, salt=${Date.now()}, signature=`,
-      },
-      body: JSON.stringify({
-        message: {
-          to: phone.replace(/-/g, ''),
-          from: senderNumber.replace(/-/g, ''),
-          text: message,
-          type: message.length > 90 ? 'LMS' : 'SMS',
-        },
-      }),
+    const result = await client.send({
+      to: phone.replace(/-/g, ''),
+      from: senderNumber.replace(/-/g, ''),
+      text: message,
+      // Solapi가 글자수 기반으로 SMS/LMS 자동 판별
     });
 
-    const data = await res.json() as Record<string, any>;
-    if (res.ok) {
-      return { success: true, messageId: data.groupId || data.messageId };
+    const info = result as any;
+    const groupId = info?.groupInfo?.groupId || info?.groupId || '';
+    const failCount = info?.groupInfo?.count?.sentFailed || 0;
+
+    if (failCount > 0) {
+      const failedList = info?.failedMessageList || [];
+      const reason = failedList[0]?.reason || '발송 실패';
+      return { success: false, messageId: groupId, error: reason };
     }
-    return { success: false, error: data.errorMessage || 'CoolSMS API error' };
+
+    return { success: true, messageId: groupId };
   } catch (err: any) {
-    return { success: false, error: err.message };
+    console.error('[Solapi] Send error:', err);
+    return { success: false, error: err.message || 'Solapi 발송 오류' };
   }
 }
 
 async function sendKakaoAlimtalk(phone: string, message: string): Promise<SendResult> {
-  // Kakao Alimtalk requires business channel approval and template registration
-  // This is a placeholder for the Kakao Notification API integration
-  const apiKey = process.env.KAKAO_API_KEY;
-  if (!apiKey) {
-    return { success: false, error: 'Kakao API key not configured' };
-  }
-
-  // TODO: Implement Kakao Alimtalk API when business channel is approved
-  console.log(`[KAKAO] Would send to ${phone}: ${message}`);
-  return { success: false, error: 'Kakao Alimtalk not yet implemented. Use SMS instead.' };
+  // Solapi에서도 카카오 알림톡을 지원하지만, 비즈니스 채널 승인 + 템플릿 등록이 필요
+  // 승인 후 client.send({ to, from, text, kakaoOptions: { pfId, templateId } }) 로 발송 가능
+  console.log(`[KAKAO] 카카오 알림톡은 비즈니스 채널 승인 후 사용 가능합니다.`);
+  return { success: false, error: '카카오 알림톡은 비즈니스 채널 승인 후 사용 가능합니다. SMS로 발송합니다.' };
 }
 
 export async function sendSurveyMessage(
@@ -85,15 +94,14 @@ export async function sendSurveyMessage(
   const message = buildMessage(surveyUrl, date);
 
   if (method === 'kakao') {
-    // Try Kakao first, fall back to SMS
     const kakaoResult = await sendKakaoAlimtalk(phone, message);
     if (kakaoResult.success) return kakaoResult;
-    console.log('[SMS] Kakao failed, falling back to SMS');
+    console.log('[SMS] 카카오 실패, SMS로 대체 발송');
   }
 
   switch (SMS_PROVIDER) {
-    case 'coolsms':
-      return sendCoolSMS(phone, message);
+    case 'solapi':
+      return sendSolapi(phone, message);
     case 'mock':
     default:
       return sendMock(phone, message);

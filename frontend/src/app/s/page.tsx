@@ -138,6 +138,7 @@ function SurveyContent() {
   };
 
   const handleClockOut = async () => {
+    if (!confirm("확실하게 퇴근 하셨습니까?")) return;
     setSubmitting(true);
     try {
       await submitClockOut(token, {
@@ -288,6 +289,12 @@ function SurveyContent() {
             <div className="flex items-center gap-2 text-blue-700 mb-2">
               <LogIn className="w-5 h-5" />
               <h2 className="font-semibold">출근 기록</h2>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-xs text-amber-700 font-medium">
+                모든 정보를 정확히 입력해주셔야 합니다.
+              </p>
             </div>
 
             <div>

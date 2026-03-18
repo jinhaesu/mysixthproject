@@ -231,6 +231,14 @@ export async function exportSurveyExcel(params: Record<string, string> = {}) {
   return res.blob();
 }
 
+export async function updateSurveyResponseTime(id: number, data: { clock_in_time?: string; clock_out_time?: string }) {
+  return fetchAPI<any>(`/api/survey/responses/${id}/time`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
 // Public survey API (no auth)
 export async function fetchSurveyPublic(token: string) {
   const res = await fetch(`${API_URL}/api/survey-public/${token}`);

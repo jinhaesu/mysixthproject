@@ -13,6 +13,7 @@ import {
   exportSurveyExcel,
   getSurveyStats,
   resendSurvey,
+  updateSurveyResponseTime,
 } from "@/lib/api";
 import {
   Send,
@@ -430,6 +431,23 @@ function ResponsesTab() {
     workplace: "",
   });
   const [workplaces, setWorkplaces] = useState<any[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editClockIn, setEditClockIn] = useState("");
+  const [editClockOut, setEditClockOut] = useState("");
+
+  const handleTimeSave = async () => {
+    if (editingId === null) return;
+    try {
+      await updateSurveyResponseTime(editingId, {
+        clock_in_time: editClockIn || undefined,
+        clock_out_time: editClockOut || undefined,
+      });
+      setEditingId(null);
+      load(pagination.page);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
 
   const load = useCallback(async (page = 1) => {
     setLoading(true);
@@ -581,6 +599,7 @@ function ResponsesTab() {
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">은행</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계좌</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">상태</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -591,9 +610,18 @@ function ResponsesTab() {
                     <td className="py-2.5 px-4 whitespace-nowrap font-medium text-gray-900">{r.worker_name_ko || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.worker_name_en || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
-                      {r.clock_in_time
-                        ? new Date(r.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-                        : "-"}
+                      {editingId === r.id ? (
+                        <input
+                          type="datetime-local"
+                          value={editClockIn}
+                          onChange={(e) => setEditClockIn(e.target.value)}
+                          className="px-2 py-1 border border-blue-300 rounded text-xs w-40 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      ) : (
+                        r.clock_in_time
+                          ? new Date(r.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+                          : "-"
+                      )}
                     </td>
                     <td className="py-2.5 px-4 text-center">
                       {r.clock_in_time ? (
@@ -607,9 +635,18 @@ function ResponsesTab() {
                       )}
                     </td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
-                      {r.clock_out_time
-                        ? new Date(r.clock_out_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-                        : "-"}
+                      {editingId === r.id ? (
+                        <input
+                          type="datetime-local"
+                          value={editClockOut}
+                          onChange={(e) => setEditClockOut(e.target.value)}
+                          className="px-2 py-1 border border-blue-300 rounded text-xs w-40 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      ) : (
+                        r.clock_out_time
+                          ? new Date(r.clock_out_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+                          : "-"
+                      )}
                     </td>
                     <td className="py-2.5 px-4 text-center">
                       {r.clock_out_time ? (
@@ -627,6 +664,35 @@ function ResponsesTab() {
                     <td className="py-2.5 px-4 whitespace-nowrap font-mono text-xs text-gray-600">{r.bank_account || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       <StatusBadge status={r.status} />
+                    </td>
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      {editingId === r.id ? (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={handleTimeSave}
+                            className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                          >
+                            저장
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingId(r.id);
+                            setEditClockIn(r.clock_in_time ? new Date(r.clock_in_time).toISOString().slice(0, 16) : "");
+                            setEditClockOut(r.clock_out_time ? new Date(r.clock_out_time).toISOString().slice(0, 16) : "");
+                          }}
+                          className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                        >
+                          시간수정
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

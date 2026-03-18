@@ -11,7 +11,10 @@ import orgChartRoutes from './routes/orgChart';
 import workforcePlanRoutes from './routes/workforcePlan';
 import surveyRoutes from './routes/survey';
 import surveyPublicRoutes from './routes/surveyPublic';
+import payrollRoutes from './routes/payroll';
+import workersRoutes from './routes/workers';
 import { requireAuth } from './middleware/auth';
+import { startReminderService } from './services/reminderService';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -38,6 +41,8 @@ app.use('/api/org-chart', requireAuth, orgChartRoutes);
 app.use('/api/workforce-plan', requireAuth, workforcePlanRoutes);
 app.use('/api/survey', requireAuth, surveyRoutes);
 app.use('/api/survey-public', surveyPublicRoutes);
+app.use('/api/payroll', requireAuth, payrollRoutes);
+app.use('/api/workers', requireAuth, workersRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -53,6 +58,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // Initialize database and start server
 initializeDB()
   .then(() => {
+    startReminderService();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

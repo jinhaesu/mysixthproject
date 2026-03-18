@@ -262,6 +262,84 @@ export async function submitClockIn(token: string, data: any) {
   return res.json();
 }
 
+// ===== Attendance Live Dashboard =====
+export async function getAttendanceLiveDashboard(date: string) {
+  return fetchAPI<any>(`/api/survey/dashboard?date=${date}`);
+}
+
+// ===== Workers =====
+export async function getWorkers(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/workers?${query}`);
+}
+
+export async function getWorkerByPhone(phone: string) {
+  return fetchAPI<any>(`/api/workers/by-phone/${encodeURIComponent(phone)}`);
+}
+
+export async function createWorker(data: any) {
+  return fetchAPI<any>('/api/workers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateWorker(id: number, data: any) {
+  return fetchAPI<any>(`/api/workers/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteWorker(id: number) {
+  return fetchAPI<any>(`/api/workers/${id}`, { method: 'DELETE' });
+}
+
+export async function importWorkers() {
+  return fetchAPI<any>('/api/workers/import', { method: 'POST' });
+}
+
+// ===== Payroll =====
+export async function getPayrollSettings() {
+  return fetchAPI<any[]>('/api/payroll/settings');
+}
+
+export async function savePayrollSettings(settings: any[]) {
+  return fetchAPI<any>('/api/payroll/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings }),
+  });
+}
+
+export async function calculatePayroll(year: number, month: number) {
+  return fetchAPI<any>(`/api/payroll/calculate?year=${year}&month=${month}`);
+}
+
+export async function exportPayrollExcel(year: number, month: number) {
+  const res = await fetch(`${API_URL}/api/payroll/export?year=${year}&month=${month}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('급여 엑셀 다운로드 실패');
+  return res.blob();
+}
+
+// ===== Reminders =====
+export async function triggerReminders(date: string, thresholdHours = 2) {
+  return fetchAPI<any>('/api/survey/remind', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, threshold_hours: thresholdHours }),
+  });
+}
+
+// ===== Anomalies =====
+export async function getAttendanceAnomalies(year: number, month: number) {
+  return fetchAPI<any>(`/api/attendance/anomalies?year=${year}&month=${month}`);
+}
+
 export async function submitClockOut(token: string, data: any) {
   const res = await fetch(`${API_URL}/api/survey-public/${token}/clock-out`, {
     method: 'POST',

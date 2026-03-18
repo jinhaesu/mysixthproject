@@ -30,6 +30,9 @@ router.get('/:token', async (req: Request, res: Response) => {
 
   const response = await dbGet('SELECT * FROM survey_responses WHERE request_id = ?', request.id) as any;
 
+  // Look up worker profile for pre-fill
+  const worker = await dbGet('SELECT * FROM workers WHERE phone = ?', request.phone);
+
   res.json({
     status: request.status,
     date: request.date,
@@ -45,6 +48,13 @@ router.get('/:token', async (req: Request, res: Response) => {
       clock_out_time: response.clock_out_time,
       worker_name_ko: response.worker_name_ko,
       worker_name_en: response.worker_name_en,
+    } : null,
+    worker: worker ? {
+      name_ko: worker.name_ko,
+      name_en: worker.name_en,
+      bank_name: worker.bank_name,
+      bank_account: worker.bank_account,
+      emergency_contact: worker.emergency_contact,
     } : null,
   });
 });
@@ -130,6 +140,31 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
   }
 
   await dbRun('UPDATE survey_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 'clock_in', request.id);
+
+  // Auto-upsert worker profile
+  try {
+    const existingWorker = await dbGet('SELECT id FROM workers WHERE phone = ?', request.phone);
+    if (!existingWorker) {
+      await dbRun(`
+        INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '');
+    } else {
+      await dbRun(`
+        UPDATE workers SET
+          name_ko = COALESCE(NULLIF(?, ''), name_ko),
+          name_en = COALESCE(NULLIF(?, ''), name_en),
+          bank_name = COALESCE(NULLIF(?, ''), bank_name),
+          bank_account = COALESCE(NULLIF(?, ''), bank_account),
+          id_number = COALESCE(NULLIF(?, ''), id_number),
+          emergency_contact = COALESCE(NULLIF(?, ''), emergency_contact),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE phone = ?
+      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', request.phone);
+    }
+  } catch (err) {
+    console.error('[Worker] Auto-upsert failed:', err);
+  }
 
   res.json({
     success: true,

@@ -244,7 +244,42 @@ export async function initializeDB(): Promise<void> {
     );
 
     CREATE INDEX IF NOT EXISTS idx_survey_responses_request ON survey_responses(request_id);
+
+    CREATE TABLE IF NOT EXISTS workers (
+      id SERIAL PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
+      name_ko TEXT NOT NULL DEFAULT '',
+      name_en TEXT DEFAULT '',
+      bank_name TEXT DEFAULT '',
+      bank_account TEXT DEFAULT '',
+      id_number TEXT DEFAULT '',
+      emergency_contact TEXT DEFAULT '',
+      category TEXT DEFAULT '',
+      department TEXT DEFAULT '',
+      workplace TEXT DEFAULT '',
+      memo TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_workers_phone ON workers(phone);
+    CREATE INDEX IF NOT EXISTS idx_workers_name ON workers(name_ko);
+
+    CREATE TABLE IF NOT EXISTS payroll_settings (
+      id SERIAL PRIMARY KEY,
+      category TEXT NOT NULL UNIQUE,
+      hourly_rate INTEGER NOT NULL DEFAULT 0,
+      overtime_multiplier DOUBLE PRECISION NOT NULL DEFAULT 1.5,
+      night_multiplier DOUBLE PRECISION NOT NULL DEFAULT 0.5,
+      weekly_holiday_enabled INTEGER NOT NULL DEFAULT 1,
+      memo TEXT DEFAULT '',
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
+
+  // Migrations
+  try { await pool.query('ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS reminder_sent INTEGER DEFAULT 0'); } catch {}
+  try { await pool.query('ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ'); } catch {}
 
   console.log('Database initialized successfully');
 }

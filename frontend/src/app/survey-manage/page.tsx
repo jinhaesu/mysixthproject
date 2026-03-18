@@ -14,6 +14,7 @@ import {
   getSurveyStats,
   resendSurvey,
   updateSurveyResponseTime,
+  triggerReminders,
 } from "@/lib/api";
 import {
   Send,
@@ -33,6 +34,7 @@ import {
   Users,
   ClipboardList,
   Building2,
+  Bell,
 } from "lucide-react";
 
 type Tab = "send" | "responses" | "workplaces";
@@ -127,6 +129,9 @@ function SendTab() {
   const [recentSends, setRecentSends] = useState<any[]>([]);
   const [mode, setMode] = useState<"single" | "batch">("single");
   const [stats, setStats] = useState<any>(null);
+  const [reminderHours, setReminderHours] = useState(2);
+  const [reminding, setReminding] = useState(false);
+  const [reminderResult, setReminderResult] = useState<any>(null);
 
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(console.error);
@@ -175,6 +180,18 @@ function SendTab() {
       alert(err.message);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleRemind = async () => {
+    setReminding(true);
+    try {
+      const result = await triggerReminders(date, reminderHours);
+      setReminderResult(result);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setReminding(false);
     }
   };
 
@@ -413,6 +430,44 @@ function SendTab() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Reminder Section */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">미출근자 리마인더</h2>
+          <p className="text-xs text-gray-500 mt-0.5">설문 발송 후 출근하지 않은 근무자에게 리마인드 문자를 발송합니다.</p>
+        </div>
+        <div className="p-5">
+          <div className="flex items-center gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">기준 시간 (시간)</label>
+              <input
+                type="number"
+                value={reminderHours}
+                onChange={(e) => setReminderHours(Number(e.target.value))}
+                min={1}
+                max={24}
+                className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleRemind}
+                disabled={reminding}
+                className="px-5 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
+              >
+                {reminding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                리마인더 발송
+              </button>
+            </div>
+          </div>
+          {reminderResult && (
+            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+              미출근 {reminderResult.total_pending}명 중 {reminderResult.reminders_sent}명에게 리마인더를 발송했습니다.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -221,6 +221,90 @@ router.get('/stats', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// ===== Dashboard =====
+
+// GET /api/survey/dashboard - Real-time attendance by workplace
+router.get('/dashboard', async (req: AuthRequest, res: Response) => {
+  try {
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+
+    const byWorkplace = await dbAll(`
+      SELECT sw.id as workplace_id, sw.name as workplace_name,
+        COUNT(*) as total,
+        SUM(CASE WHEN sr.status = 'sent' THEN 1 ELSE 0 END) as not_clocked_in,
+        SUM(CASE WHEN sr.status = 'clock_in' THEN 1 ELSE 0 END) as clocked_in,
+        SUM(CASE WHEN sr.status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN sr.status = 'expired' THEN 1 ELSE 0 END) as expired
+      FROM survey_requests sr
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      WHERE sr.date = ?
+      GROUP BY sw.id, sw.name
+      ORDER BY sw.name
+    `, date);
+
+    const workers = await dbAll(`
+      SELECT sr.id, sr.phone, sr.status, sr.workplace_id,
+             sw.name as workplace_name,
+             resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time
+      FROM survey_requests sr
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.date = ?
+      ORDER BY sw.name, sr.status, resp.worker_name_ko
+    `, date);
+
+    const totals = {
+      total: workers.length,
+      not_clocked_in: workers.filter((w: any) => w.status === 'sent').length,
+      clocked_in: workers.filter((w: any) => w.status === 'clock_in').length,
+      completed: workers.filter((w: any) => w.status === 'completed').length,
+    };
+
+    res.json({ date, byWorkplace, workers, totals });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== Reminders =====
+
+// POST /api/survey/remind - Send reminders to workers who haven't clocked in
+router.post('/remind', async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, threshold_hours = 2 } = req.body;
+    const targetDate = date || new Date().toISOString().slice(0, 10);
+
+    // Find requests that are still 'sent' and older than threshold
+    const threshold = new Date(Date.now() - threshold_hours * 60 * 60 * 1000).toISOString();
+
+    const pending = await dbAll(`
+      SELECT sr.id, sr.phone, sr.token, sr.date, sr.workplace_id, sw.name as workplace_name
+      FROM survey_requests sr
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      WHERE sr.date = ? AND sr.status = 'sent' AND sr.reminder_sent = 0
+        AND sr.created_at < ?
+    `, targetDate, threshold);
+
+    let sentCount = 0;
+    for (const req of pending) {
+      const result = await sendSurveyMessage(
+        req.phone, req.token, req.date, req.workplace_name || '', 'sms'
+      );
+      if (result.success) {
+        await dbRun(
+          'UPDATE survey_requests SET reminder_sent = 1, reminder_sent_at = CURRENT_TIMESTAMP WHERE id = ?',
+          req.id
+        );
+        sentCount++;
+      }
+    }
+
+    res.json({ success: true, total_pending: pending.length, reminders_sent: sentCount });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== Survey Responses Query =====
 
 // GET /api/survey/responses

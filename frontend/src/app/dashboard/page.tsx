@@ -6,7 +6,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { Calendar, TrendingUp, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
-import { getReportSummary, getReportDaily } from "@/lib/api";
+import { getReportSummary, getReportDaily, getAttendanceAnomalies } from "@/lib/api";
 
 // --- Types ---
 interface SummaryRow {
@@ -141,6 +141,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [anomalies, setAnomalies] = useState<any[]>([]);
+  const [anomalyCount, setAnomalyCount] = useState(0);
+
   const [rates, setRates] = useState<Record<string, number>>({ "정규직": 9860, "파견": 9860, "알바": 9860 });
   const [revenue, setRevenue] = useState(0);
   const [targetRatio, setTargetRatio] = useState(30);
@@ -159,6 +162,10 @@ export default function DashboardPage() {
       setDailyData(daily);
       setTwoMonthsAgoData(twoMonthsAgoSummary.previous || []);
       setTwoMonthsAgoWHH(twoMonthsAgoSummary.weeklyHolidayHours?.previous || {});
+      getAttendanceAnomalies(year, month).then(data => {
+        setAnomalies(data.anomalies || []);
+        setAnomalyCount(data.total || 0);
+      }).catch(console.error);
     } catch (err: any) {
       setError(err.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
@@ -378,6 +385,27 @@ export default function DashboardPage() {
 
       {!loading && !error && (
         <>
+          {anomalyCount > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <h2 className="text-base font-semibold text-red-800">근태 이상 감지 ({anomalyCount}건)</h2>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {anomalies.slice(0, 20).map((a: any, i: number) => (
+                  <div key={i} className={`flex items-start gap-2 text-sm ${
+                    a.severity === 'high' ? 'text-red-700' : 'text-amber-700'
+                  }`}>
+                    <span className={`shrink-0 mt-0.5 w-2 h-2 rounded-full ${
+                      a.severity === 'high' ? 'bg-red-500' : 'bg-amber-500'
+                    }`} />
+                    <span>{a.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ============ TAB 1: 월별 근태 요약 ============ */}
           {activeTab === "summary" && (
             <div className="space-y-4">

@@ -1,0 +1,143 @@
+import { Router, Response } from 'express';
+import { dbGet, dbAll, dbRun } from '../db';
+import { AuthRequest } from '../middleware/auth';
+
+const router = Router();
+
+// GET /api/workers - List with search/pagination
+router.get('/', async (req: AuthRequest, res: Response) => {
+  try {
+    const { search, category, page = '1', limit = '50' } = req.query as Record<string, string>;
+
+    let where = 'WHERE 1=1';
+    const params: any[] = [];
+
+    if (search) {
+      where += ' AND (name_ko LIKE ? OR phone LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (category) {
+      where += ' AND category = ?';
+      params.push(category);
+    }
+
+    const countResult = await dbGet(`SELECT COUNT(*) as total FROM workers ${where}`, ...params);
+    const total = countResult.total;
+    const pageNum = parseInt(page);
+    const limitNum = Math.min(parseInt(limit), 500);
+    const offset = (pageNum - 1) * limitNum;
+
+    const workers = await dbAll(`
+      SELECT * FROM workers ${where} ORDER BY name_ko ASC LIMIT ? OFFSET ?
+    `, ...params, limitNum, offset);
+
+    res.json({
+      workers,
+      pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/workers/by-phone/:phone
+router.get('/by-phone/:phone', async (req: AuthRequest, res: Response) => {
+  try {
+    const worker = await dbGet('SELECT * FROM workers WHERE phone = ?', req.params.phone);
+    if (!worker) {
+      res.status(404).json({ error: '근무자를 찾을 수 없습니다.' });
+      return;
+    }
+    res.json(worker);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/workers
+router.post('/', async (req: AuthRequest, res: Response) => {
+  try {
+    const { phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+    if (!phone) {
+      res.status(400).json({ error: '전화번호는 필수입니다.' });
+      return;
+    }
+
+    const existing = await dbGet('SELECT id FROM workers WHERE phone = ?', phone);
+    if (existing) {
+      res.status(409).json({ error: '이미 등록된 전화번호입니다.' });
+      return;
+    }
+
+    const result = await dbRun(`
+      INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, phone, name_ko || '', name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', category || '', department || '', workplace || '', memo || '');
+
+    const created = await dbGet('SELECT * FROM workers WHERE id = ?', result.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/workers/:id
+router.put('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+
+    await dbRun(`
+      UPDATE workers SET phone = ?, name_ko = ?, name_en = ?, bank_name = ?, bank_account = ?,
+        id_number = ?, emergency_contact = ?, category = ?, department = ?, workplace = ?, memo = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, phone, name_ko || '', name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', category || '', department || '', workplace || '', memo || '', id);
+
+    const updated = await dbGet('SELECT * FROM workers WHERE id = ?', id);
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/workers/:id
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM workers WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/workers/import - Bulk import from survey_responses
+router.post('/import', async (_req: AuthRequest, res: Response) => {
+  try {
+    const responses = await dbAll(`
+      SELECT DISTINCT sr.phone, resp.worker_name_ko, resp.worker_name_en,
+             resp.bank_name, resp.bank_account, resp.id_number, resp.emergency_contact
+      FROM survey_requests sr
+      JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE resp.worker_name_ko IS NOT NULL AND resp.worker_name_ko != ''
+    `);
+
+    let imported = 0;
+    for (const r of responses) {
+      const existing = await dbGet('SELECT id FROM workers WHERE phone = ?', r.phone);
+      if (!existing) {
+        await dbRun(`
+          INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, r.phone, r.worker_name_ko, r.worker_name_en || '', r.bank_name || '', r.bank_account || '', r.id_number || '', r.emergency_contact || '');
+        imported++;
+      }
+    }
+
+    res.json({ success: true, total_found: responses.length, imported });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;

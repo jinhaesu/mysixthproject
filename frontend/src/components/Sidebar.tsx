@@ -13,6 +13,9 @@ import {
   Network,
   Users,
   MessageSquare,
+  Activity,
+  Calculator,
+  Contact,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -24,7 +27,10 @@ const navItems = [
   { href: "/records", label: "기록 조회", icon: ClipboardList },
   { href: "/org-chart", label: "조직도", icon: Network },
   { href: "/workforce-plan", label: "인력 조달 계획", icon: Users },
+  { href: "/attendance-live", label: "실시간 현황판", icon: Activity },
   { href: "/survey-manage", label: "설문 출퇴근", icon: MessageSquare },
+  { href: "/workers", label: "근무자 DB", icon: Contact },
+  { href: "/payroll", label: "급여 계산", icon: Calculator },
   { href: "/manage", label: "데이터 관리", icon: Database },
 ];
 

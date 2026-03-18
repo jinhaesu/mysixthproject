@@ -270,6 +270,134 @@ router.get('/filters', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/attendance/anomalies - Detect attendance anomalies
+router.get('/anomalies', async (req: Request, res: Response) => {
+  try {
+    const { year, month } = req.query;
+    if (!year || !month) {
+      res.status(400).json({ error: 'year와 month 파라미터가 필요합니다.' });
+      return;
+    }
+
+    const y = Number(year);
+    const m = Number(month);
+    const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const endDate = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const anomalies: any[] = [];
+
+    // 1. Daily overtime exceeded (>12h)
+    const dailyOvertime = await dbAll(`
+      SELECT name, date, total_hours
+      FROM attendance_records
+      WHERE date >= ? AND date <= ? AND total_hours > 12
+      ORDER BY total_hours DESC
+    `, startDate, endDate);
+
+    for (const r of dailyOvertime) {
+      anomalies.push({
+        type: 'daily_overtime',
+        severity: 'high',
+        message: `${r.name}: ${r.date} 일 근무시간 ${Number(r.total_hours).toFixed(1)}시간 (12시간 초과)`,
+        worker_name: r.name,
+        date: r.date,
+        details: { total_hours: r.total_hours },
+      });
+    }
+
+    // 2. Weekly overtime exceeded (>52h)
+    const allRecords = await dbAll(`
+      SELECT name, date, total_hours
+      FROM attendance_records
+      WHERE date >= ? AND date <= ?
+    `, startDate, endDate);
+
+    // Group by worker + week
+    const weeklyMap = new Map<string, number>();
+    const weeklyWorkerMap = new Map<string, string>();
+    for (const r of allRecords) {
+      // getWeekKey logic inline
+      const d = new Date(r.date + 'T12:00:00Z');
+      const day = d.getUTCDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      const monday = new Date(d);
+      monday.setUTCDate(monday.getUTCDate() + diff);
+      const weekKey = monday.toISOString().slice(0, 10);
+
+      const key = `${r.name}|${weekKey}`;
+      weeklyMap.set(key, (weeklyMap.get(key) || 0) + Number(r.total_hours));
+      weeklyWorkerMap.set(key, r.name);
+    }
+
+    for (const [key, hours] of weeklyMap) {
+      if (hours > 52) {
+        const name = weeklyWorkerMap.get(key)!;
+        const weekStart = key.split('|')[1];
+        anomalies.push({
+          type: 'weekly_overtime',
+          severity: 'high',
+          message: `${name}: ${weekStart} 주 총 ${hours.toFixed(1)}시간 (주 52시간 초과)`,
+          worker_name: name,
+          date: weekStart,
+          details: { weekly_hours: hours },
+        });
+      }
+    }
+
+    // 3. Missing clock-out in attendance records
+    const missingClockOut = await dbAll(`
+      SELECT name, date, clock_in
+      FROM attendance_records
+      WHERE date >= ? AND date <= ? AND (clock_out IS NULL OR clock_out = '')
+      ORDER BY date DESC
+    `, startDate, endDate);
+
+    for (const r of missingClockOut) {
+      anomalies.push({
+        type: 'missing_clock_out',
+        severity: 'medium',
+        message: `${r.name}: ${r.date} 퇴근 기록 누락 (출근: ${r.clock_in || '미기록'})`,
+        worker_name: r.name,
+        date: r.date,
+        details: { clock_in: r.clock_in },
+      });
+    }
+
+    // 4. Survey incomplete (clocked in but not out)
+    const incompleteSurveys = await dbAll(`
+      SELECT sr.phone, sr.date, resp.worker_name_ko, resp.clock_in_time
+      FROM survey_requests sr
+      JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.date >= ? AND sr.date <= ? AND sr.status = 'clock_in'
+      ORDER BY sr.date DESC
+    `, startDate, endDate);
+
+    for (const r of incompleteSurveys) {
+      anomalies.push({
+        type: 'incomplete_survey',
+        severity: 'medium',
+        message: `${r.worker_name_ko || r.phone}: ${r.date} 출근 후 퇴근 미기록`,
+        worker_name: r.worker_name_ko || r.phone,
+        date: r.date,
+        details: { clock_in_time: r.clock_in_time },
+      });
+    }
+
+    // Sort by severity (high first) then date
+    const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    anomalies.sort((a, b) => {
+      const s = (severityOrder[a.severity] || 9) - (severityOrder[b.severity] || 9);
+      if (s !== 0) return s;
+      return (b.date || '').localeCompare(a.date || '');
+    });
+
+    res.json({ year: y, month: m, anomalies, total: anomalies.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Helper: get ISO week key (Monday date) for a date string
 function getWeekKey(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00Z');

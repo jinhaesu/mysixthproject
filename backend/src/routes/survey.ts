@@ -56,6 +56,85 @@ router.delete('/workplaces/:id', async (req: AuthRequest, res: Response) => {
   res.json({ success: true });
 });
 
+// ===== Admin Edit Time =====
+
+// POST /api/survey/edit-time/:id - Admin edit clock-in/out times
+router.post('/edit-time/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { clock_in_time, clock_out_time } = req.body;
+
+    const request = await dbGet(`
+      SELECT sr.id, sr.date, sr.status, resp.id as resp_id, resp.clock_in_time, resp.clock_out_time,
+             resp.worker_name_ko
+      FROM survey_requests sr
+      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.id = ?
+    `, id);
+
+    if (!request || !request.resp_id) {
+      res.status(404).json({ error: '응답을 찾을 수 없습니다.' });
+      return;
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (clock_in_time !== undefined) {
+      updates.push('clock_in_time = ?');
+      params.push(clock_in_time || null);
+    }
+    if (clock_out_time !== undefined) {
+      updates.push('clock_out_time = ?');
+      params.push(clock_out_time || null);
+    }
+
+    if (updates.length === 0) {
+      res.status(400).json({ error: '수정할 시간을 입력해주세요.' });
+      return;
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(request.resp_id);
+
+    await dbRun(`UPDATE survey_responses SET ${updates.join(', ')} WHERE id = ?`, ...params);
+
+    if (clock_in_time !== undefined || clock_out_time !== undefined) {
+      const uploadId = 'survey-' + request.date;
+      const updatedResp = await dbGet('SELECT * FROM survey_responses WHERE id = ?', request.resp_id);
+
+      if (updatedResp && updatedResp.clock_in_time && updatedResp.clock_out_time) {
+        const clockIn = new Date(updatedResp.clock_in_time);
+        const clockOut = new Date(updatedResp.clock_out_time);
+        const totalMs = clockOut.getTime() - clockIn.getTime();
+        const totalHours = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100;
+        const breakTime = totalHours >= 8 ? 1 : totalHours >= 4 ? 0.5 : 0;
+        const regularHours = Math.min(Math.max(totalHours - breakTime, 0), 8);
+        const overtimeHours = Math.max(totalHours - breakTime - 8, 0);
+        const clockInStr = clockIn.toTimeString().slice(0, 5);
+        const clockOutStr = clockOut.toTimeString().slice(0, 5);
+
+        const existing = await dbGet(
+          'SELECT id FROM attendance_records WHERE upload_id = ? AND name = ? AND date = ?',
+          uploadId, updatedResp.worker_name_ko, request.date
+        );
+
+        if (existing) {
+          await dbRun(`
+            UPDATE attendance_records SET clock_in = ?, clock_out = ?, total_hours = ?, regular_hours = ?, overtime_hours = ?, break_time = ?
+            WHERE id = ?
+          `, clockInStr, clockOutStr, totalHours, regularHours, overtimeHours, breakTime, existing.id);
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[edit-time] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== Survey Send =====
 
 // POST /api/survey/send - Send survey to a single phone
@@ -428,87 +507,5 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
   res.json(rows);
 });
 
-// POST /api/survey/edit-time/:id - Admin edit clock-in/out times
-router.post('/edit-time/:id', async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { clock_in_time, clock_out_time } = req.body;
-
-    // Get the survey request by id
-    const request = await dbGet(`
-      SELECT sr.id, sr.date, sr.status, resp.id as resp_id, resp.clock_in_time, resp.clock_out_time,
-             resp.worker_name_ko
-      FROM survey_requests sr
-      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
-      WHERE sr.id = ?
-    `, id);
-
-    if (!request || !request.resp_id) {
-      res.status(404).json({ error: '응답을 찾을 수 없습니다.' });
-      return;
-    }
-
-    // Update times
-    const updates: string[] = [];
-    const params: any[] = [];
-
-    if (clock_in_time !== undefined) {
-      updates.push('clock_in_time = ?');
-      params.push(clock_in_time || null);
-    }
-    if (clock_out_time !== undefined) {
-      updates.push('clock_out_time = ?');
-      params.push(clock_out_time || null);
-    }
-
-    if (updates.length === 0) {
-      res.status(400).json({ error: '수정할 시간을 입력해주세요.' });
-      return;
-    }
-
-    updates.push('updated_at = CURRENT_TIMESTAMP');
-    params.push(request.resp_id);
-
-    await dbRun(`UPDATE survey_responses SET ${updates.join(', ')} WHERE id = ?`, ...params);
-
-    // Also update the corresponding attendance_record if it exists
-    if (clock_in_time !== undefined || clock_out_time !== undefined) {
-      const uploadId = 'survey-' + request.date;
-
-      // Get updated response
-      const updatedResp = await dbGet('SELECT * FROM survey_responses WHERE id = ?', request.resp_id);
-
-      if (updatedResp && updatedResp.clock_in_time && updatedResp.clock_out_time) {
-        const clockIn = new Date(updatedResp.clock_in_time);
-        const clockOut = new Date(updatedResp.clock_out_time);
-        const totalMs = clockOut.getTime() - clockIn.getTime();
-        const totalHours = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100;
-        const breakTime = totalHours >= 8 ? 1 : totalHours >= 4 ? 0.5 : 0;
-        const regularHours = Math.min(Math.max(totalHours - breakTime, 0), 8);
-        const overtimeHours = Math.max(totalHours - breakTime - 8, 0);
-
-        const clockInStr = clockIn.toTimeString().slice(0, 5);
-        const clockOutStr = clockOut.toTimeString().slice(0, 5);
-
-        // Try to update existing attendance record
-        const existing = await dbGet(
-          'SELECT id FROM attendance_records WHERE upload_id = ? AND name = ? AND date = ?',
-          uploadId, updatedResp.worker_name_ko, request.date
-        );
-
-        if (existing) {
-          await dbRun(`
-            UPDATE attendance_records SET clock_in = ?, clock_out = ?, total_hours = ?, regular_hours = ?, overtime_hours = ?, break_time = ?
-            WHERE id = ?
-          `, clockInStr, clockOutStr, totalHours, regularHours, overtimeHours, breakTime, existing.id);
-        }
-      }
-    }
-
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 export default router;

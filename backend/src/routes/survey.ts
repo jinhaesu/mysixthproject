@@ -428,8 +428,8 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
   res.json(rows);
 });
 
-// PUT /api/survey/responses/:id/time - Admin edit clock-in/out times
-router.put('/responses/:id/time', async (req: AuthRequest, res: Response) => {
+// POST /api/survey/edit-time/:id - Admin edit clock-in/out times
+router.post('/edit-time/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { clock_in_time, clock_out_time } = req.body;

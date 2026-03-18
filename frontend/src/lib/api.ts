@@ -232,8 +232,8 @@ export async function exportSurveyExcel(params: Record<string, string> = {}) {
 }
 
 export async function updateSurveyResponseTime(id: number, data: { clock_in_time?: string; clock_out_time?: string }) {
-  return fetchAPI<any>(`/api/survey/responses/${id}/time`, {
-    method: 'PUT',
+  return fetchAPI<any>(`/api/survey/edit-time/${id}`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });

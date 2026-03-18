@@ -428,8 +428,8 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
   res.json(rows);
 });
 
-// PATCH /api/survey/responses/:id/time - Admin edit clock-in/out times
-router.patch('/responses/:id/time', async (req: AuthRequest, res: Response) => {
+// PUT /api/survey/responses/:id/time - Admin edit clock-in/out times
+router.put('/responses/:id/time', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { clock_in_time, clock_out_time } = req.body;

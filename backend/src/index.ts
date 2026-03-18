@@ -3,7 +3,6 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
 import { initializeDB } from './db';
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
@@ -17,15 +16,7 @@ import { requireAuth } from './middleware/auth';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Initialize database
-initializeDB();
-
 // Middleware - CORS
-// FRONTEND_URL can be comma-separated for multiple origins
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
-  .split(',')
-  .map((s) => s.trim());
-
 app.use(cors({
   origin: true,
   credentials: true,
@@ -59,8 +50,16 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Initialize database and start server
+initializeDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  });
 
 export default app;

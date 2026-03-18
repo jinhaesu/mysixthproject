@@ -1,36 +1,127 @@
-import Database, { Database as DatabaseType } from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { Pool } from 'pg';
+import pg from 'pg';
 
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+// Parse BIGINT (INT8) as JavaScript number (for COUNT(*) etc.)
+pg.types.setTypeParser(20, (val: string) => parseInt(val, 10));
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+});
+
+/**
+ * Convert SQLite-style ? placeholders to PostgreSQL $1, $2, ... format
+ */
+function pg$(sql: string): string {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
 }
 
-const DB_PATH = path.join(DATA_DIR, 'attendance.db');
+/**
+ * Query single row (like db.prepare(sql).get(...params))
+ */
+export async function dbGet(sql: string, ...params: any[]): Promise<any> {
+  const result = await pool.query(pg$(sql), params);
+  return result.rows[0] || undefined;
+}
 
-const db: DatabaseType = new Database(DB_PATH);
+/**
+ * Query all rows (like db.prepare(sql).all(...params))
+ */
+export async function dbAll(sql: string, ...params: any[]): Promise<any[]> {
+  const result = await pool.query(pg$(sql), params);
+  return result.rows;
+}
 
-// Enable WAL mode for better concurrent performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+/**
+ * Execute INSERT/UPDATE/DELETE (like db.prepare(sql).run(...params))
+ * For INSERTs, automatically adds RETURNING id
+ */
+export async function dbRun(sql: string, ...params: any[]): Promise<{ lastInsertRowid: number | string; changes: number }> {
+  let pgSql = pg$(sql);
+  const isInsert = pgSql.trim().toUpperCase().startsWith('INSERT');
+  if (isInsert && !pgSql.toUpperCase().includes('RETURNING')) {
+    pgSql += ' RETURNING id';
+  }
+  const result = await pool.query(pgSql, params);
+  return {
+    lastInsertRowid: result.rows[0]?.id ?? 0,
+    changes: result.rowCount ?? 0,
+  };
+}
 
-export function initializeDB() {
-  db.exec(`
+/**
+ * Execute raw SQL (for DDL statements)
+ */
+export async function dbExec(sql: string): Promise<void> {
+  await pool.query(sql);
+}
+
+/**
+ * Transaction wrapper
+ */
+interface TxClient {
+  get: (sql: string, ...params: any[]) => Promise<any>;
+  all: (sql: string, ...params: any[]) => Promise<any[]>;
+  run: (sql: string, ...params: any[]) => Promise<{ lastInsertRowid: number | string; changes: number }>;
+}
+
+export async function dbTransaction<T>(fn: (tx: TxClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const txGet = async (sql: string, ...params: any[]) => {
+      const result = await client.query(pg$(sql), params);
+      return result.rows[0] || undefined;
+    };
+
+    const txAll = async (sql: string, ...params: any[]) => {
+      const result = await client.query(pg$(sql), params);
+      return result.rows;
+    };
+
+    const txRun = async (sql: string, ...params: any[]) => {
+      let pgSql = pg$(sql);
+      const isInsert = pgSql.trim().toUpperCase().startsWith('INSERT');
+      if (isInsert && !pgSql.toUpperCase().includes('RETURNING')) {
+        pgSql += ' RETURNING id';
+      }
+      const result = await client.query(pgSql, params);
+      return {
+        lastInsertRowid: result.rows[0]?.id ?? 0,
+        changes: result.rowCount ?? 0,
+      };
+    };
+
+    const result = await fn({ get: txGet, all: txAll, run: txRun });
+    await client.query('COMMIT');
+    return result;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Initialize database schema (PostgreSQL)
+ */
+export async function initializeDB(): Promise<void> {
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS uploads (
       id TEXT PRIMARY KEY,
       filename TEXT NOT NULL,
       original_filename TEXT NOT NULL,
       record_count INTEGER DEFAULT 0,
       ai_analysis TEXT,
-      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      uploaded_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS attendance_records (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      upload_id TEXT NOT NULL,
+      id SERIAL PRIMARY KEY,
+      upload_id TEXT NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
       date TEXT NOT NULL,
       name TEXT NOT NULL,
       clock_in TEXT,
@@ -38,13 +129,14 @@ export function initializeDB() {
       category TEXT,
       department TEXT,
       workplace TEXT,
-      total_hours REAL DEFAULT 0,
-      regular_hours REAL DEFAULT 0,
-      overtime_hours REAL DEFAULT 0,
-      break_time REAL DEFAULT 0,
+      shift TEXT DEFAULT '',
+      total_hours DOUBLE PRECISION DEFAULT 0,
+      regular_hours DOUBLE PRECISION DEFAULT 0,
+      overtime_hours DOUBLE PRECISION DEFAULT 0,
+      night_hours DOUBLE PRECISION DEFAULT 0,
+      break_time DOUBLE PRECISION DEFAULT 0,
       annual_leave TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE
+      created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE INDEX IF NOT EXISTS idx_records_date ON attendance_records(date);
@@ -53,16 +145,9 @@ export function initializeDB() {
     CREATE INDEX IF NOT EXISTS idx_records_department ON attendance_records(department);
     CREATE INDEX IF NOT EXISTS idx_records_workplace ON attendance_records(workplace);
     CREATE INDEX IF NOT EXISTS idx_records_category ON attendance_records(category);
-  `);
 
-  // Migration: add new columns for existing databases
-  try { db.exec('ALTER TABLE attendance_records ADD COLUMN shift TEXT DEFAULT ""'); } catch {}
-  try { db.exec('ALTER TABLE attendance_records ADD COLUMN night_hours REAL DEFAULT 0'); } catch {}
-
-  // Organization chart table
-  db.exec(`
     CREATE TABLE IF NOT EXISTS org_chart_nodes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       parent_id INTEGER,
       node_type TEXT NOT NULL DEFAULT 'person',
       name TEXT NOT NULL,
@@ -72,104 +157,80 @@ export function initializeDB() {
       phone TEXT DEFAULT '',
       memo TEXT DEFAULT '',
       sort_order INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
       FOREIGN KEY (parent_id) REFERENCES org_chart_nodes(id) ON DELETE CASCADE
     );
-  `);
 
-  // Workforce planning table
-  db.exec(`
     CREATE TABLE IF NOT EXISTS workforce_plans (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       year INTEGER NOT NULL,
       month INTEGER NOT NULL,
       day INTEGER NOT NULL,
       worker_type TEXT NOT NULL,
       planned_count INTEGER DEFAULT 0,
+      planned_hours DOUBLE PRECISION DEFAULT 0,
       memo TEXT DEFAULT '',
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(year, month, day, worker_type)
     );
-  `);
-  try {
-    db.exec('CREATE UNIQUE INDEX idx_workforce_plan_unique ON workforce_plans(year, month, day, worker_type)');
-  } catch {
-    // Index already exists
-  }
 
-  // Migration: add planned_hours column (transition from headcount to hours-based)
-  try { db.exec('ALTER TABLE workforce_plans ADD COLUMN planned_hours REAL DEFAULT 0'); } catch {}
-
-  // Workforce plan time slots - detailed time block entries
-  db.exec(`
     CREATE TABLE IF NOT EXISTS workforce_plan_slots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       year INTEGER NOT NULL,
       month INTEGER NOT NULL,
       day INTEGER NOT NULL,
       worker_type TEXT NOT NULL,
       start_hour INTEGER NOT NULL,
-      duration REAL NOT NULL,
+      duration DOUBLE PRECISION NOT NULL,
       headcount INTEGER NOT NULL DEFAULT 1,
       memo TEXT DEFAULT '',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `);
-  try {
-    db.exec('CREATE INDEX idx_wps_year_month ON workforce_plan_slots(year, month)');
-  } catch {
-    // Index already exists
-  }
 
-  // Survey workplaces - designated GPS locations
-  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_wps_year_month ON workforce_plan_slots(year, month);
+
     CREATE TABLE IF NOT EXISTS survey_workplaces (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       address TEXT DEFAULT '',
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
+      latitude DOUBLE PRECISION NOT NULL,
+      longitude DOUBLE PRECISION NOT NULL,
       radius_meters INTEGER NOT NULL DEFAULT 200,
       is_active INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `);
 
-  // Survey requests - sent to workers via SMS/KakaoTalk
-  db.exec(`
     CREATE TABLE IF NOT EXISTS survey_requests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       token TEXT NOT NULL UNIQUE,
       phone TEXT NOT NULL,
-      workplace_id INTEGER,
+      workplace_id INTEGER REFERENCES survey_workplaces(id),
       date TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'sent',
       message_type TEXT DEFAULT 'sms',
       message_id TEXT DEFAULT '',
-      expires_at DATETIME NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (workplace_id) REFERENCES survey_workplaces(id)
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
-  `);
-  try { db.exec('CREATE INDEX idx_survey_requests_token ON survey_requests(token)'); } catch {}
-  try { db.exec('CREATE INDEX idx_survey_requests_phone ON survey_requests(phone)'); } catch {}
-  try { db.exec('CREATE INDEX idx_survey_requests_date ON survey_requests(date)'); } catch {}
 
-  // Survey responses - worker-submitted clock-in/out and personal info
-  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_survey_requests_token ON survey_requests(token);
+    CREATE INDEX IF NOT EXISTS idx_survey_requests_phone ON survey_requests(phone);
+    CREATE INDEX IF NOT EXISTS idx_survey_requests_date ON survey_requests(date);
+
     CREATE TABLE IF NOT EXISTS survey_responses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      request_id INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      request_id INTEGER NOT NULL REFERENCES survey_requests(id) ON DELETE CASCADE,
       clock_in_time TEXT,
-      clock_in_lat REAL,
-      clock_in_lng REAL,
+      clock_in_lat DOUBLE PRECISION,
+      clock_in_lng DOUBLE PRECISION,
       clock_in_gps_valid INTEGER DEFAULT 0,
       clock_out_time TEXT,
-      clock_out_lat REAL,
-      clock_out_lng REAL,
+      clock_out_lat DOUBLE PRECISION,
+      clock_out_lng DOUBLE PRECISION,
       clock_out_gps_valid INTEGER DEFAULT 0,
       worker_name_ko TEXT DEFAULT '',
       worker_name_en TEXT DEFAULT '',
@@ -178,14 +239,14 @@ export function initializeDB() {
       id_number TEXT DEFAULT '',
       emergency_contact TEXT DEFAULT '',
       memo TEXT DEFAULT '',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (request_id) REFERENCES survey_requests(id) ON DELETE CASCADE
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+
+    CREATE INDEX IF NOT EXISTS idx_survey_responses_request ON survey_responses(request_id);
   `);
-  try { db.exec('CREATE INDEX idx_survey_responses_request ON survey_responses(request_id)'); } catch {}
 
   console.log('Database initialized successfully');
 }
 
-export default db;
+export { pool };

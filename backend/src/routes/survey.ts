@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
-import db from '../db';
+import { dbGet, dbAll, dbRun } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendSurveyMessage } from '../services/smsService';
 
@@ -12,13 +12,13 @@ const TOKEN_EXPIRY_HOURS = parseInt(process.env.SURVEY_TOKEN_EXPIRY_HOURS || '48
 // ===== Workplace CRUD =====
 
 // GET /api/survey/workplaces
-router.get('/workplaces', (_req: AuthRequest, res: Response) => {
-  const workplaces = db.prepare('SELECT * FROM survey_workplaces WHERE is_active = 1 ORDER BY name').all();
+router.get('/workplaces', async (_req: AuthRequest, res: Response) => {
+  const workplaces = await dbAll('SELECT * FROM survey_workplaces WHERE is_active = 1 ORDER BY name');
   res.json(workplaces);
 });
 
 // POST /api/survey/workplaces
-router.post('/workplaces', (req: AuthRequest, res: Response) => {
+router.post('/workplaces', async (req: AuthRequest, res: Response) => {
   const { name, address, latitude, longitude, radius_meters } = req.body;
 
   if (!name || latitude == null || longitude == null) {
@@ -26,33 +26,33 @@ router.post('/workplaces', (req: AuthRequest, res: Response) => {
     return;
   }
 
-  const result = db.prepare(`
+  const result = await dbRun(`
     INSERT INTO survey_workplaces (name, address, latitude, longitude, radius_meters)
     VALUES (?, ?, ?, ?, ?)
-  `).run(name, address || '', latitude, longitude, radius_meters || 200);
+  `, name, address || '', latitude, longitude, radius_meters || 200);
 
-  const created = db.prepare('SELECT * FROM survey_workplaces WHERE id = ?').get(result.lastInsertRowid);
+  const created = await dbGet('SELECT * FROM survey_workplaces WHERE id = ?', result.lastInsertRowid);
   res.status(201).json(created);
 });
 
 // PUT /api/survey/workplaces/:id
-router.put('/workplaces/:id', (req: AuthRequest, res: Response) => {
+router.put('/workplaces/:id', async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { name, address, latitude, longitude, radius_meters } = req.body;
 
-  db.prepare(`
+  await dbRun(`
     UPDATE survey_workplaces SET name = ?, address = ?, latitude = ?, longitude = ?, radius_meters = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(name, address || '', latitude, longitude, radius_meters || 200, id);
+  `, name, address || '', latitude, longitude, radius_meters || 200, id);
 
-  const updated = db.prepare('SELECT * FROM survey_workplaces WHERE id = ?').get(id);
+  const updated = await dbGet('SELECT * FROM survey_workplaces WHERE id = ?', id);
   res.json(updated);
 });
 
 // DELETE /api/survey/workplaces/:id (soft delete)
-router.delete('/workplaces/:id', (req: AuthRequest, res: Response) => {
+router.delete('/workplaces/:id', async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  db.prepare('UPDATE survey_workplaces SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  await dbRun('UPDATE survey_workplaces SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', id);
   res.json({ success: true });
 });
 
@@ -62,8 +62,14 @@ router.delete('/workplaces/:id', (req: AuthRequest, res: Response) => {
 router.post('/send', async (req: AuthRequest, res: Response) => {
   const { phone, date, workplace_id, message_type } = req.body;
 
-  if (!phone || !date) {
-    res.status(400).json({ error: '전화번호와 날짜는 필수입니다.' });
+  if (!phone || !date || !workplace_id) {
+    res.status(400).json({ error: '전화번호, 날짜, 근무지는 필수입니다.' });
+    return;
+  }
+
+  const workplace = await dbGet('SELECT name FROM survey_workplaces WHERE id = ? AND is_active = 1', workplace_id) as any;
+  if (!workplace) {
+    res.status(400).json({ error: '유효하지 않은 근무지입니다.' });
     return;
   }
 
@@ -71,28 +77,27 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 
   // Create survey request
-  const result = db.prepare(`
+  const result = await dbRun(`
     INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(token, phone, workplace_id || null, date, message_type || 'sms', expiresAt);
+  `, token, phone, workplace_id, date, message_type || 'sms', expiresAt);
 
   // Create empty response row
-  db.prepare('INSERT INTO survey_responses (request_id) VALUES (?)').run(result.lastInsertRowid);
+  await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
   // Send SMS/KakaoTalk
-  const sendResult = await sendSurveyMessage(phone, token, date, message_type || 'sms');
+  const sendResult = await sendSurveyMessage(phone, token, date, workplace.name, message_type || 'sms');
 
   if (sendResult.messageId) {
-    db.prepare('UPDATE survey_requests SET message_id = ? WHERE id = ?')
-      .run(sendResult.messageId, result.lastInsertRowid);
+    await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
   }
 
-  const created = db.prepare(`
+  const created = await dbGet(`
     SELECT sr.*, sw.name as workplace_name
     FROM survey_requests sr
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
     WHERE sr.id = ?
-  `).get(result.lastInsertRowid);
+  `, result.lastInsertRowid);
 
   res.status(201).json({
     request: created,
@@ -104,8 +109,14 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 router.post('/send-batch', async (req: AuthRequest, res: Response) => {
   const { phones, date, workplace_id, message_type } = req.body;
 
-  if (!phones || !Array.isArray(phones) || phones.length === 0 || !date) {
-    res.status(400).json({ error: '전화번호 목록과 날짜는 필수입니다.' });
+  if (!phones || !Array.isArray(phones) || phones.length === 0 || !date || !workplace_id) {
+    res.status(400).json({ error: '전화번호 목록, 날짜, 근무지는 필수입니다.' });
+    return;
+  }
+
+  const workplace = await dbGet('SELECT name FROM survey_workplaces WHERE id = ? AND is_active = 1', workplace_id) as any;
+  if (!workplace) {
+    res.status(400).json({ error: '유효하지 않은 근무지입니다.' });
     return;
   }
 
@@ -118,18 +129,17 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 
-    const result = db.prepare(`
+    const result = await dbRun(`
       INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(token, trimmedPhone, workplace_id || null, date, message_type || 'sms', expiresAt);
+    `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt);
 
-    db.prepare('INSERT INTO survey_responses (request_id) VALUES (?)').run(result.lastInsertRowid);
+    await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
-    const sendResult = await sendSurveyMessage(trimmedPhone, token, date, message_type || 'sms');
+    const sendResult = await sendSurveyMessage(trimmedPhone, token, date, workplace.name, message_type || 'sms');
 
     if (sendResult.messageId) {
-      db.prepare('UPDATE survey_requests SET message_id = ? WHERE id = ?')
-        .run(sendResult.messageId, result.lastInsertRowid);
+      await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
     }
 
     results.push({ phone: trimmedPhone, success: sendResult.success, error: sendResult.error });
@@ -141,7 +151,7 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
 // ===== Survey Responses Query =====
 
 // GET /api/survey/responses
-router.get('/responses', (req: AuthRequest, res: Response) => {
+router.get('/responses', async (req: AuthRequest, res: Response) => {
   const { startDate, endDate, phone, status, page = '1', limit = '50' } = req.query as Record<string, string>;
 
   let where = 'WHERE 1=1';
@@ -152,19 +162,19 @@ router.get('/responses', (req: AuthRequest, res: Response) => {
   if (phone) { where += ' AND sr.phone LIKE ?'; params.push(`%${phone}%`); }
   if (status) { where += ' AND sr.status = ?'; params.push(status); }
 
-  const countResult = db.prepare(`
+  const countResult = await dbGet(`
     SELECT COUNT(*) as total
     FROM survey_requests sr
     LEFT JOIN survey_responses resp ON sr.id = resp.request_id
     ${where}
-  `).get(...params) as any;
+  `, ...params) as any;
 
   const total = countResult.total;
   const pageNum = parseInt(page);
   const limitNum = Math.min(parseInt(limit), 500);
   const offset = (pageNum - 1) * limitNum;
 
-  const rows = db.prepare(`
+  const rows = await dbAll(`
     SELECT sr.id, sr.token, sr.phone, sr.date, sr.status, sr.message_type, sr.created_at as sent_at,
            resp.clock_in_time, resp.clock_in_gps_valid, resp.clock_out_time, resp.clock_out_gps_valid,
            resp.worker_name_ko, resp.worker_name_en, resp.bank_name, resp.bank_account,
@@ -176,7 +186,7 @@ router.get('/responses', (req: AuthRequest, res: Response) => {
     ${where}
     ORDER BY sr.date DESC, sr.created_at DESC
     LIMIT ? OFFSET ?
-  `).all(...params, limitNum, offset);
+  `, ...params, limitNum, offset);
 
   res.json({
     responses: rows,
@@ -190,7 +200,7 @@ router.get('/responses', (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/survey/responses/export - Excel export
-router.get('/responses/export', (req: AuthRequest, res: Response) => {
+router.get('/responses/export', async (req: AuthRequest, res: Response) => {
   const { startDate, endDate, phone, status } = req.query as Record<string, string>;
 
   let where = 'WHERE 1=1';
@@ -201,7 +211,7 @@ router.get('/responses/export', (req: AuthRequest, res: Response) => {
   if (phone) { where += ' AND sr.phone LIKE ?'; params.push(`%${phone}%`); }
   if (status) { where += ' AND sr.status = ?'; params.push(status); }
 
-  const rows = db.prepare(`
+  const rows = await dbAll(`
     SELECT sr.date as "근무일", sr.phone as "전화번호", sr.status as "상태",
            resp.worker_name_ko as "한글이름", resp.worker_name_en as "영문이름",
            resp.clock_in_time as "출근시간", resp.clock_in_gps_valid as "출근GPS유효",
@@ -214,7 +224,7 @@ router.get('/responses/export', (req: AuthRequest, res: Response) => {
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
     ${where}
     ORDER BY sr.date DESC, sr.created_at DESC
-  `).all(...params) as any[];
+  `, ...params) as any[];
 
   // Convert GPS valid flags and status
   const formatted = rows.map(row => ({
@@ -238,7 +248,7 @@ router.get('/responses/export', (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/survey/requests - List sent requests (for recent sends view)
-router.get('/requests', (req: AuthRequest, res: Response) => {
+router.get('/requests', async (req: AuthRequest, res: Response) => {
   const { date, limit = '20' } = req.query as Record<string, string>;
 
   let where = 'WHERE 1=1';
@@ -246,7 +256,7 @@ router.get('/requests', (req: AuthRequest, res: Response) => {
 
   if (date) { where += ' AND sr.date = ?'; params.push(date); }
 
-  const rows = db.prepare(`
+  const rows = await dbAll(`
     SELECT sr.*, sw.name as workplace_name,
            resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time
     FROM survey_requests sr
@@ -255,7 +265,7 @@ router.get('/requests', (req: AuthRequest, res: Response) => {
     ${where}
     ORDER BY sr.created_at DESC
     LIMIT ?
-  `).all(...params, parseInt(limit));
+  `, ...params, parseInt(limit));
 
   res.json(rows);
 });

@@ -181,8 +181,8 @@ function SurveyContent() {
   const isWithinRadius = hasWorkplace && distance !== null && distance <= data.workplace!.radius_meters;
   const isOutOfRange = hasWorkplace && gpsStatus === "acquired" && !isWithinRadius;
   const gpsReady = gpsStatus === "acquired";
-  // 근무지 지정 시: GPS 확인 + 범위 내에서만 가능. 미지정 시: 항상 가능
-  const canAct = hasWorkplace ? (gpsReady && isWithinRadius) : true;
+  // 근무지 + GPS 확인 + 범위 내에서만 가능
+  const canAct = hasWorkplace && gpsReady && isWithinRadius;
   const showForm = data.status === "sent" || data.status === "clock_in";
 
   return (
@@ -191,6 +191,17 @@ function SurveyContent() {
       <div className="bg-blue-600 text-white px-4 py-5">
         <h1 className="text-lg font-bold">조인앤조인 출퇴근 기록</h1>
         <p className="text-blue-100 text-sm mt-1">{data.date} 근무</p>
+        {data.workplace && (
+          <div className="mt-2 bg-blue-500/30 rounded-lg px-3 py-2">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <MapPin className="w-4 h-4" />
+              {data.workplace.name}
+            </p>
+            {data.workplace.address && (
+              <p className="text-blue-200 text-xs mt-0.5">{data.workplace.address}</p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
@@ -256,11 +267,16 @@ function SurveyContent() {
               </div>
             )}
 
-            {/* 근무지 미지정 + GPS 확인 완료 */}
-            {gpsReady && !hasWorkplace && (
-              <div className="rounded-lg p-4 bg-green-50 border border-green-200 flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
-                <p className="text-sm font-medium text-green-700">GPS 위치 확인 완료</p>
+            {/* 근무지 미지정 경고 */}
+            {!hasWorkplace && (
+              <div className="rounded-lg p-5 bg-yellow-50 border border-yellow-200 text-center">
+                <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto" />
+                <p className="mt-3 text-sm font-medium text-yellow-700">
+                  근무지가 지정되지 않았습니다
+                </p>
+                <p className="text-xs text-yellow-600 mt-1">
+                  관리자에게 문의하여 근무지가 지정된 새 설문 링크를 요청해주세요.
+                </p>
               </div>
             )}
           </>

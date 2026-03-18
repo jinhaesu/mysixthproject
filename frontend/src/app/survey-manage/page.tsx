@@ -138,6 +138,7 @@ function SendTab() {
 
   const handleSend = async () => {
     if (!phone.trim()) return alert("전화번호를 입력해주세요.");
+    if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
       const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType });
@@ -158,6 +159,7 @@ function SendTab() {
   const handleBatchSend = async () => {
     const phones = bulkPhones.split("\n").map((p) => p.trim()).filter(Boolean);
     if (phones.length === 0) return alert("전화번호를 입력해주세요.");
+    if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
       const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType });
@@ -191,13 +193,13 @@ function SendTab() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무지</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무지 <span className="text-red-500">*</span></label>
               <select
                 value={workplaceId ?? ""}
                 onChange={(e) => setWorkplaceId(e.target.value ? parseInt(e.target.value) : null)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
-                <option value="">선택하세요</option>
+                <option value="">근무지를 선택하세요 (필수)</option>
                 {workplaces.map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}

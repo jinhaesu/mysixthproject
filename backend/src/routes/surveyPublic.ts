@@ -1,20 +1,20 @@
 import { Router, Request, Response } from 'express';
-import db from '../db';
+import { dbGet, dbAll, dbRun } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 
 const router = Router();
 
 // GET /api/survey-public/:token - Get survey state (public, no auth)
-router.get('/:token', (req: Request, res: Response) => {
+router.get('/:token', async (req: Request, res: Response) => {
   const { token } = req.params;
 
-  const request = db.prepare(`
+  const request = await dbGet(`
     SELECT sr.*, sw.name as workplace_name, sw.address as workplace_address,
            sw.latitude, sw.longitude, sw.radius_meters
     FROM survey_requests sr
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
     WHERE sr.token = ?
-  `).get(token) as any;
+  `, token) as any;
 
   if (!request) {
     res.status(404).json({ error: '유효하지 않은 설문 링크입니다.' });
@@ -23,12 +23,12 @@ router.get('/:token', (req: Request, res: Response) => {
 
   // Check expiration
   if (new Date(request.expires_at) < new Date()) {
-    db.prepare('UPDATE survey_requests SET status = ? WHERE id = ?').run('expired', request.id);
+    await dbRun('UPDATE survey_requests SET status = ? WHERE id = ?', 'expired', request.id);
     res.status(410).json({ error: '설문 링크가 만료되었습니다.' });
     return;
   }
 
-  const response = db.prepare('SELECT * FROM survey_responses WHERE request_id = ?').get(request.id) as any;
+  const response = await dbGet('SELECT * FROM survey_responses WHERE request_id = ?', request.id) as any;
 
   res.json({
     status: request.status,
@@ -50,7 +50,7 @@ router.get('/:token', (req: Request, res: Response) => {
 });
 
 // POST /api/survey-public/:token/clock-in - Submit clock-in
-router.post('/:token/clock-in', (req: Request, res: Response) => {
+router.post('/:token/clock-in', async (req: Request, res: Response) => {
   const { token } = req.params;
   const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo } = req.body;
 
@@ -59,12 +59,12 @@ router.post('/:token/clock-in', (req: Request, res: Response) => {
     return;
   }
 
-  const request = db.prepare(`
-    SELECT sr.*, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters
+  const request = await dbGet(`
+    SELECT sr.*, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters, sw.name as workplace_name
     FROM survey_requests sr
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
     WHERE sr.token = ?
-  `).get(token) as any;
+  `, token) as any;
 
   if (!request) {
     res.status(404).json({ error: '유효하지 않은 설문 링크입니다.' });
@@ -72,7 +72,7 @@ router.post('/:token/clock-in', (req: Request, res: Response) => {
   }
 
   if (new Date(request.expires_at) < new Date()) {
-    db.prepare('UPDATE survey_requests SET status = ? WHERE id = ?').run('expired', request.id);
+    await dbRun('UPDATE survey_requests SET status = ? WHERE id = ?', 'expired', request.id);
     res.status(410).json({ error: '설문 링크가 만료되었습니다.' });
     return;
   }
@@ -103,34 +103,33 @@ router.post('/:token/clock-in', (req: Request, res: Response) => {
 
   const clockInTime = new Date().toISOString();
 
-  const existing = db.prepare('SELECT id FROM survey_responses WHERE request_id = ?').get(request.id) as any;
+  const existing = await dbGet('SELECT id FROM survey_responses WHERE request_id = ?', request.id) as any;
 
   if (existing) {
-    db.prepare(`
+    await dbRun(`
       UPDATE survey_responses SET
         clock_in_time = ?, clock_in_lat = ?, clock_in_lng = ?, clock_in_gps_valid = ?,
         worker_name_ko = ?, worker_name_en = ?, bank_name = ?, bank_account = ?,
         id_number = ?, emergency_contact = ?, memo = ?, updated_at = CURRENT_TIMESTAMP
       WHERE request_id = ?
-    `).run(
+    `,
       clockInTime, latitude || null, longitude || null, gpsValid,
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
       id_number || '', emergency_contact || '', memo || '', request.id
     );
   } else {
-    db.prepare(`
+    await dbRun(`
       INSERT INTO survey_responses (request_id, clock_in_time, clock_in_lat, clock_in_lng, clock_in_gps_valid,
         worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
       request.id, clockInTime, latitude || null, longitude || null, gpsValid,
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
       id_number || '', emergency_contact || '', memo || ''
     );
   }
 
-  db.prepare('UPDATE survey_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run('clock_in', request.id);
+  await dbRun('UPDATE survey_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 'clock_in', request.id);
 
   res.json({
     success: true,
@@ -141,16 +140,16 @@ router.post('/:token/clock-in', (req: Request, res: Response) => {
 });
 
 // POST /api/survey-public/:token/clock-out - Submit clock-out
-router.post('/:token/clock-out', (req: Request, res: Response) => {
+router.post('/:token/clock-out', async (req: Request, res: Response) => {
   const { token } = req.params;
   const { latitude, longitude } = req.body;
 
-  const request = db.prepare(`
-    SELECT sr.*, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters
+  const request = await dbGet(`
+    SELECT sr.*, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters, sw.name as workplace_name
     FROM survey_requests sr
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
     WHERE sr.token = ?
-  `).get(token) as any;
+  `, token) as any;
 
   if (!request) {
     res.status(404).json({ error: '유효하지 않은 설문 링크입니다.' });
@@ -158,7 +157,7 @@ router.post('/:token/clock-out', (req: Request, res: Response) => {
   }
 
   if (new Date(request.expires_at) < new Date()) {
-    db.prepare('UPDATE survey_requests SET status = ? WHERE id = ?').run('expired', request.id);
+    await dbRun('UPDATE survey_requests SET status = ? WHERE id = ?', 'expired', request.id);
     res.status(410).json({ error: '설문 링크가 만료되었습니다.' });
     return;
   }
@@ -190,15 +189,15 @@ router.post('/:token/clock-out', (req: Request, res: Response) => {
   const clockOutTime = new Date().toISOString();
 
   // 퇴근 기록 먼저 저장
-  db.prepare(`
+  await dbRun(`
     UPDATE survey_responses SET
       clock_out_time = ?, clock_out_lat = ?, clock_out_lng = ?, clock_out_gps_valid = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE request_id = ?
-  `).run(clockOutTime, latitude || null, longitude || null, gpsValid, request.id);
+  `, clockOutTime, latitude || null, longitude || null, gpsValid, request.id);
 
   // attendance_records 생성 시도 (실패해도 퇴근 기록은 유지)
-  const response = db.prepare('SELECT * FROM survey_responses WHERE request_id = ?').get(request.id) as any;
+  const response = await dbGet('SELECT * FROM survey_responses WHERE request_id = ?', request.id) as any;
   if (response && response.clock_in_time) {
     try {
       const clockIn = new Date(response.clock_in_time);
@@ -214,27 +213,26 @@ router.post('/:token/clock-out', (req: Request, res: Response) => {
 
       // uploads 테이블에 survey 용 레코드 생성 (FK 충족)
       const uploadId = `survey-${request.date}`;
-      const existingUpload = db.prepare('SELECT id FROM uploads WHERE id = ?').get(uploadId);
+      const existingUpload = await dbGet('SELECT id FROM uploads WHERE id = ?', uploadId);
       if (!existingUpload) {
-        db.prepare('INSERT INTO uploads (id, filename, original_filename, record_count) VALUES (?, ?, ?, 0)')
-          .run(uploadId, 'survey', `설문 출퇴근 ${request.date}`);
+        await dbRun('INSERT INTO uploads (id, filename, original_filename, record_count) VALUES (?, ?, ?, 0)',
+          uploadId, 'survey', `설문 출퇴근 ${request.date}`);
       }
 
-      db.prepare(`
+      await dbRun(`
         INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, total_hours, regular_hours, overtime_hours, break_time)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(uploadId, request.date, response.worker_name_ko, clockInStr, clockOutStr, '파견', '', '', totalHours, regularHours, overtimeHours, breakTime);
+      `, uploadId, request.date, response.worker_name_ko, clockInStr, clockOutStr, '파견', '', request.workplace_name || '', totalHours, regularHours, overtimeHours, breakTime);
 
       // record_count 업데이트
-      db.prepare('UPDATE uploads SET record_count = record_count + 1 WHERE id = ?').run(uploadId);
+      await dbRun('UPDATE uploads SET record_count = record_count + 1 WHERE id = ?', uploadId);
     } catch (err) {
       console.error('[Survey] attendance_records 생성 실패:', err);
     }
   }
 
   // 모든 처리 성공 후 상태 변경
-  db.prepare('UPDATE survey_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run('completed', request.id);
+  await dbRun('UPDATE survey_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 'completed', request.id);
 
   res.json({
     success: true,

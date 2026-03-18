@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import db from '../db';
+import { dbGet, dbAll, dbRun, dbTransaction } from '../db';
 import { parseExcelFile } from '../services/excelParser';
 import { analyzeAttendance } from '../services/aiAnalysis';
 
@@ -62,20 +62,17 @@ router.post('/', upload.single('file'), async (req: Request, res: Response): Pro
     const analysis = await analyzeAttendance(records);
 
     // Save upload record
-    const insertUpload = db.prepare(
-      'INSERT INTO uploads (id, filename, original_filename, record_count, ai_analysis) VALUES (?, ?, ?, ?, ?)'
+    await dbRun(
+      'INSERT INTO uploads (id, filename, original_filename, record_count, ai_analysis) VALUES (?, ?, ?, ?, ?)',
+      uploadId, req.file.filename, originalFilename, records.length, JSON.stringify(analysis)
     );
-    insertUpload.run(uploadId, req.file.filename, originalFilename, records.length, JSON.stringify(analysis));
 
     // Save attendance records
-    const insertRecord = db.prepare(`
-      INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, shift, total_hours, regular_hours, overtime_hours, night_hours, break_time, annual_leave)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const insertMany = db.transaction((recs: typeof records) => {
-      for (const r of recs) {
-        insertRecord.run(
+    await dbTransaction(async (tx) => {
+      for (const r of records) {
+        await tx.run(
+          `INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, shift, total_hours, regular_hours, overtime_hours, night_hours, break_time, annual_leave)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           uploadId, r.date, r.name, r.clock_in, r.clock_out,
           r.category, r.department, r.workplace, r.shift,
           r.total_hours, r.regular_hours, r.overtime_hours, r.night_hours, r.break_time,
@@ -83,8 +80,6 @@ router.post('/', upload.single('file'), async (req: Request, res: Response): Pro
         );
       }
     });
-
-    insertMany(records);
 
     res.json({
       uploadId,
@@ -99,11 +94,11 @@ router.post('/', upload.single('file'), async (req: Request, res: Response): Pro
 });
 
 // Get all uploads
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
-    const uploads = db.prepare(
+    const uploads = await dbAll(
       'SELECT * FROM uploads ORDER BY uploaded_at DESC'
-    ).all();
+    );
     res.json(uploads);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -111,11 +106,11 @@ router.get('/', (_req: Request, res: Response) => {
 });
 
 // Delete upload and its records
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    db.prepare('DELETE FROM attendance_records WHERE upload_id = ?').run(id);
-    db.prepare('DELETE FROM uploads WHERE id = ?').run(id);
+    await dbRun('DELETE FROM attendance_records WHERE upload_id = ?', id);
+    await dbRun('DELETE FROM uploads WHERE id = ?', id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

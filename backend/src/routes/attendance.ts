@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
-import db from '../db';
+import { dbGet, dbAll } from '../db';
 
 const router = Router();
 
 // Get all records with optional filters
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const {
       startDate, endDate, name, category,
@@ -46,7 +46,8 @@ router.get('/', (req: Request, res: Response) => {
 
     // Count total
     const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
-    const total = (db.prepare(countQuery).get(...params) as any).total;
+    const totalRow = await dbGet(countQuery, ...params);
+    const total = totalRow.total;
 
     // Paginate
     const pageNum = Math.max(1, parseInt(page as string));
@@ -56,7 +57,7 @@ router.get('/', (req: Request, res: Response) => {
     query += ' ORDER BY date DESC, name ASC LIMIT ? OFFSET ?';
     params.push(limitNum, offset);
 
-    const records = db.prepare(query).all(...params);
+    const records = await dbAll(query, ...params);
 
     res.json({
       records,
@@ -73,7 +74,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // Get summary statistics
-router.get('/stats', (req: Request, res: Response) => {
+router.get('/stats', async (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -89,7 +90,7 @@ router.get('/stats', (req: Request, res: Response) => {
     }
 
     // By worker
-    const byWorker = db.prepare(`
+    const byWorker = await dbAll(`
       SELECT name,
         COUNT(*) as days,
         SUM(total_hours) as total_hours,
@@ -98,10 +99,10 @@ router.get('/stats', (req: Request, res: Response) => {
         AVG(total_hours) as avg_hours
       FROM attendance_records WHERE 1=1 ${dateFilter}
       GROUP BY name ORDER BY total_hours DESC
-    `).all(...params);
+    `, ...params);
 
     // By category
-    const byCategory = db.prepare(`
+    const byCategory = await dbAll(`
       SELECT category,
         COUNT(*) as count,
         SUM(total_hours) as total_hours,
@@ -109,10 +110,10 @@ router.get('/stats', (req: Request, res: Response) => {
         SUM(overtime_hours) as overtime_hours
       FROM attendance_records WHERE 1=1 ${dateFilter}
       GROUP BY category
-    `).all(...params);
+    `, ...params);
 
     // By department
-    const byDepartment = db.prepare(`
+    const byDepartment = await dbAll(`
       SELECT department,
         COUNT(*) as count,
         SUM(total_hours) as total_hours,
@@ -120,10 +121,10 @@ router.get('/stats', (req: Request, res: Response) => {
         SUM(overtime_hours) as overtime_hours
       FROM attendance_records WHERE 1=1 ${dateFilter}
       GROUP BY department
-    `).all(...params);
+    `, ...params);
 
     // By workplace
-    const byWorkplace = db.prepare(`
+    const byWorkplace = await dbAll(`
       SELECT workplace,
         COUNT(*) as count,
         SUM(total_hours) as total_hours,
@@ -131,27 +132,27 @@ router.get('/stats', (req: Request, res: Response) => {
         SUM(overtime_hours) as overtime_hours
       FROM attendance_records WHERE 1=1 ${dateFilter}
       GROUP BY workplace
-    `).all(...params);
+    `, ...params);
 
     // Daily trend
-    const dailyTrend = db.prepare(`
+    const dailyTrend = await dbAll(`
       SELECT date,
         COUNT(*) as count,
         SUM(total_hours) as total_hours,
         SUM(overtime_hours) as overtime_hours
       FROM attendance_records WHERE 1=1 ${dateFilter}
       GROUP BY date ORDER BY date ASC
-    `).all(...params);
+    `, ...params);
 
     // Monthly trend
-    const monthlyTrend = db.prepare(`
+    const monthlyTrend = await dbAll(`
       SELECT substr(date, 1, 7) as month,
         COUNT(*) as count,
         SUM(total_hours) as total_hours,
         SUM(overtime_hours) as overtime_hours
       FROM attendance_records WHERE 1=1 ${dateFilter}
       GROUP BY substr(date, 1, 7) ORDER BY month ASC
-    `).all(...params);
+    `, ...params);
 
     res.json({
       byWorker,
@@ -167,7 +168,7 @@ router.get('/stats', (req: Request, res: Response) => {
 });
 
 // Pivot table data
-router.get('/pivot', (req: Request, res: Response) => {
+router.get('/pivot', async (req: Request, res: Response) => {
   try {
     const {
       rowField = 'name',
@@ -207,18 +208,19 @@ router.get('/pivot', (req: Request, res: Response) => {
     }
 
     // Get distinct column values
-    const colValues = db.prepare(
-      `SELECT DISTINCT ${colField} as val FROM attendance_records WHERE 1=1 ${dateFilter} ORDER BY val`
-    ).all(...params) as { val: string }[];
+    const colValues = await dbAll(
+      `SELECT DISTINCT ${colField} as val FROM attendance_records WHERE 1=1 ${dateFilter} ORDER BY val`,
+      ...params
+    ) as { val: string }[];
 
     // Get pivot data
-    const rows = db.prepare(`
+    const rows = await dbAll(`
       SELECT ${rowField} as row_key, ${colField} as col_key,
         ${aggFunc === 'count' ? 'COUNT(*)' : `${aggFunc.toString().toUpperCase()}(${valueField})`} as value
       FROM attendance_records WHERE 1=1 ${dateFilter}
       GROUP BY ${rowField}, ${colField}
       ORDER BY ${rowField}
-    `).all(...params) as { row_key: string; col_key: string; value: number }[];
+    `, ...params) as { row_key: string; col_key: string; value: number }[];
 
     // Build pivot table structure
     const pivotMap = new Map<string, Record<string, number>>();
@@ -248,13 +250,13 @@ router.get('/pivot', (req: Request, res: Response) => {
 });
 
 // Get filter options (distinct values)
-router.get('/filters', (_req: Request, res: Response) => {
+router.get('/filters', async (_req: Request, res: Response) => {
   try {
-    const names = db.prepare('SELECT DISTINCT name FROM attendance_records ORDER BY name').all() as { name: string }[];
-    const categories = db.prepare('SELECT DISTINCT category FROM attendance_records WHERE category != "" ORDER BY category').all() as { category: string }[];
-    const departments = db.prepare('SELECT DISTINCT department FROM attendance_records WHERE department != "" ORDER BY department').all() as { department: string }[];
-    const workplaces = db.prepare('SELECT DISTINCT workplace FROM attendance_records WHERE workplace != "" ORDER BY workplace').all() as { workplace: string }[];
-    const dateRange = db.prepare('SELECT MIN(date) as minDate, MAX(date) as maxDate FROM attendance_records').get() as { minDate: string; maxDate: string };
+    const names = await dbAll('SELECT DISTINCT name FROM attendance_records ORDER BY name') as { name: string }[];
+    const categories = await dbAll('SELECT DISTINCT category FROM attendance_records WHERE category != \'\' ORDER BY category') as { category: string }[];
+    const departments = await dbAll('SELECT DISTINCT department FROM attendance_records WHERE department != \'\' ORDER BY department') as { department: string }[];
+    const workplaces = await dbAll('SELECT DISTINCT workplace FROM attendance_records WHERE workplace != \'\' ORDER BY workplace') as { workplace: string }[];
+    const dateRange = await dbGet('SELECT MIN(date) as minDate, MAX(date) as maxDate FROM attendance_records') as { minDate: string; maxDate: string };
 
     res.json({
       names: names.map((n) => n.name),
@@ -290,7 +292,7 @@ function normalizeNameForGrouping(name: string): string {
 
 // Calculate weekly holiday allowance (주휴수당) hours by category
 // Rule: for 파견/알바, if a worker works 5+ days in one week → 8 hours bonus
-function calcWeeklyHolidayHours(monthStart: string, monthEnd: string): Record<string, number> {
+async function calcWeeklyHolidayHours(monthStart: string, monthEnd: string): Promise<Record<string, number>> {
   // Expand query range by ±6 days to capture full weeks at month boundaries
   const first = new Date(monthStart + 'T12:00:00Z');
   const last = new Date(monthEnd + 'T12:00:00Z');
@@ -299,11 +301,11 @@ function calcWeeklyHolidayHours(monthStart: string, monthEnd: string): Record<st
   const queryStart = first.toISOString().slice(0, 10);
   const queryEnd = last.toISOString().slice(0, 10);
 
-  const records = db.prepare(`
+  const records = await dbAll(`
     SELECT name, category, date
     FROM attendance_records
     WHERE date >= ? AND date <= ?
-  `).all(queryStart, queryEnd) as { name: string; category: string; date: string }[];
+  `, queryStart, queryEnd) as { name: string; category: string; date: string }[];
 
   const normCat = (c: string): string => {
     if (c.includes('파견')) return '파견';
@@ -339,7 +341,7 @@ function getLastDayOfMonth(year: number, month: number): string {
 }
 
 // Monthly summary report (for dashboard)
-router.get('/report/summary', (req: Request, res: Response) => {
+router.get('/report/summary', async (req: Request, res: Response) => {
   try {
     const { year, month } = req.query;
     if (!year || !month) {
@@ -380,13 +382,13 @@ router.get('/report/summary', (req: Request, res: Response) => {
       ORDER BY department, workplace, category, shift
     `;
 
-    const current = db.prepare(summaryQuery).all(startDate, endDate);
-    const previous = db.prepare(summaryQuery).all(prevStartDate, prevEndDate);
+    const current = await dbAll(summaryQuery, startDate, endDate);
+    const previous = await dbAll(summaryQuery, prevStartDate, prevEndDate);
 
     // Calculate weekly holiday allowance (주휴수당) for 파견/알바
     const weeklyHolidayHours = {
-      current: calcWeeklyHolidayHours(startDate, endDate),
-      previous: calcWeeklyHolidayHours(prevStartDate, prevEndDate),
+      current: await calcWeeklyHolidayHours(startDate, endDate),
+      previous: await calcWeeklyHolidayHours(prevStartDate, prevEndDate),
     };
 
     res.json({ current, previous, year: y, month: m, prevYear: prevY, prevMonth: prevM, weeklyHolidayHours });
@@ -396,7 +398,7 @@ router.get('/report/summary', (req: Request, res: Response) => {
 });
 
 // Daily attendance report (for dashboard)
-router.get('/report/daily', (req: Request, res: Response) => {
+router.get('/report/daily', async (req: Request, res: Response) => {
   try {
     const { year, month } = req.query;
     if (!year || !month) {
@@ -423,21 +425,21 @@ router.get('/report/daily', (req: Request, res: Response) => {
       ORDER BY date, department, workplace, category
     `;
 
-    const data = db.prepare(dailyQuery).all(startDate, endDate);
+    const data = await dbAll(dailyQuery, startDate, endDate);
 
-    const groups = db.prepare(`
+    const groups = await dbAll(`
       SELECT DISTINCT COALESCE(department, '') as department, COALESCE(workplace, '') as workplace
       FROM attendance_records
       WHERE date >= ? AND date <= ?
       ORDER BY department, workplace
-    `).all(startDate, endDate) as { department: string; workplace: string }[];
+    `, startDate, endDate) as { department: string; workplace: string }[];
 
-    const categories = db.prepare(`
+    const categories = await dbAll(`
       SELECT DISTINCT COALESCE(category, '') as category
       FROM attendance_records
       WHERE date >= ? AND date <= ? AND category IS NOT NULL AND category != ''
       ORDER BY category
-    `).all(startDate, endDate) as { category: string }[];
+    `, startDate, endDate) as { category: string }[];
 
     res.json({
       data,

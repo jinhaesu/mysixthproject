@@ -4,10 +4,34 @@ import pg from 'pg';
 // Parse BIGINT (INT8) as JavaScript number (for COUNT(*) etc.)
 pg.types.setTypeParser(20, (val: string) => parseInt(val, 10));
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-});
+// Parse DATABASE_URL and ensure database name defaults to 'postgres'
+function createPool() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.error('DATABASE_URL is not set!');
+    process.exit(1);
+  }
+
+  try {
+    const parsed = new URL(url);
+    return new Pool({
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      host: parsed.hostname,
+      port: parseInt(parsed.port) || 5432,
+      database: parsed.pathname.slice(1) || 'postgres',
+      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+    });
+  } catch {
+    // Fallback to connection string
+    return new Pool({
+      connectionString: url,
+      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+    });
+  }
+}
+
+const pool = createPool();
 
 /**
  * Convert SQLite-style ? placeholders to PostgreSQL $1, $2, ... format

@@ -493,28 +493,14 @@ function ResponsesTab() {
   const handleTimeSave = async () => {
     if (editingId === null) return;
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const res = await fetch(`${API_URL}/api/survey/edit-time/${editingId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          clock_in_time: editClockIn || undefined,
-          clock_out_time: editClockOut || undefined,
-        }),
+      await updateSurveyResponseTime(editingId, {
+        clock_in_time: editClockIn || undefined,
+        clock_out_time: editClockOut || undefined,
       });
-      if (!res.ok) {
-        const text = await res.text();
-        alert(`오류 ${res.status}: ${text.slice(0, 200)}`);
-        return;
-      }
       setEditingId(null);
       load(pagination.page);
     } catch (err: any) {
-      alert(`네트워크 오류: ${err.message}`);
+      alert(err.message);
     }
   };
 

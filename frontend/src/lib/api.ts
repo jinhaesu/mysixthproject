@@ -96,6 +96,10 @@ export async function getReportDaily(year: number, month: number) {
 }
 
 // Org Chart
+export async function getOrgChartStats() {
+  return fetchAPI<any>('/api/org-chart/stats');
+}
+
 export async function getOrgChartNodes() {
   return fetchAPI<any[]>('/api/org-chart');
 }
@@ -150,6 +154,10 @@ export async function deleteWorkforcePlanSlot(id: number) {
   return fetchAPI<any>(`/api/workforce-plan/slots/${id}`, { method: 'DELETE' });
 }
 
+export async function getWorkforcePlanComparison(year: number, month: number) {
+  return fetchAPI<any>(`/api/workforce-plan/comparison?year=${year}&month=${month}`);
+}
+
 // ===== Survey =====
 
 // Workplaces
@@ -192,6 +200,15 @@ export async function sendSurveyBatch(data: { phones: string[]; date: string; wo
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
+}
+
+// Survey stats & resend
+export async function getSurveyStats() {
+  return fetchAPI<any>('/api/survey/stats');
+}
+
+export async function resendSurvey(id: number) {
+  return fetchAPI<any>(`/api/survey/resend/${id}`, { method: 'POST' });
 }
 
 // Survey responses

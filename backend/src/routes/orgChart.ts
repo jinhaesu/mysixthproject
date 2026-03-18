@@ -15,6 +15,38 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /org-chart/stats - Organization summary
+router.get('/stats', async (_req: Request, res: Response) => {
+  try {
+    const totalNodes = await dbGet('SELECT COUNT(*) as count FROM org_chart_nodes');
+    const byType = await dbAll(`
+      SELECT
+        COALESCE(NULLIF(employment_type, ''), '미지정') as employment_type,
+        COUNT(*) as count
+      FROM org_chart_nodes
+      WHERE node_type = 'person'
+      GROUP BY employment_type
+      ORDER BY count DESC
+    `);
+    const byDepartment = await dbAll(`
+      SELECT
+        COALESCE(NULLIF(department, ''), '미지정') as department,
+        COUNT(*) as count
+      FROM org_chart_nodes
+      WHERE node_type = 'person'
+      GROUP BY department
+      ORDER BY count DESC
+    `);
+    res.json({
+      total: totalNodes?.count || 0,
+      byType,
+      byDepartment,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create a node
 router.post('/', async (req: Request, res: Response) => {
   try {

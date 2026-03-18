@@ -11,6 +11,8 @@ import {
   getSurveyResponses,
   getSurveyRequests,
   exportSurveyExcel,
+  getSurveyStats,
+  resendSurvey,
 } from "@/lib/api";
 import {
   Send,
@@ -123,9 +125,11 @@ function SendTab() {
   const [bulkPhones, setBulkPhones] = useState("");
   const [recentSends, setRecentSends] = useState<any[]>([]);
   const [mode, setMode] = useState<"single" | "batch">("single");
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(console.error);
+    getSurveyStats().then(setStats).catch(console.error);
     loadRecentSends();
   }, []);
 
@@ -177,6 +181,28 @@ function SendTab() {
 
   return (
     <div className="space-y-6">
+      {/* Stats Summary */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900">{stats.today || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">오늘 발송</p>
+          </div>
+          <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
+            <p className="text-2xl font-bold text-blue-600">{stats.todayByStatus?.sent || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">대기중</p>
+          </div>
+          <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
+            <p className="text-2xl font-bold text-amber-600">{stats.todayByStatus?.clock_in || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">출근완료</p>
+          </div>
+          <div className="bg-white rounded-xl border border-green-200 p-4 text-center">
+            <p className="text-2xl font-bold text-green-600">{stats.todayByStatus?.completed || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">퇴근완료</p>
+          </div>
+        </div>
+      )}
+
       {/* Send Form Card */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Common Settings */}
@@ -337,6 +363,7 @@ function SendTab() {
                   <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">출근</th>
                   <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">퇴근</th>
                   <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">상태</th>
+                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -360,6 +387,25 @@ function SendTab() {
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       <StatusBadge status={r.status} />
                     </td>
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      {(r.status === 'sent' || r.status === 'expired') && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await resendSurvey(r.id);
+                              alert('재발송 완료');
+                              loadRecentSends();
+                              getSurveyStats().then(setStats);
+                            } catch (err: any) {
+                              alert(err.message);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                        >
+                          재발송
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -381,7 +427,9 @@ function ResponsesTab() {
     endDate: "",
     phone: "",
     status: "",
+    workplace: "",
   });
+  const [workplaces, setWorkplaces] = useState<any[]>([]);
 
   const load = useCallback(async (page = 1) => {
     setLoading(true);
@@ -391,6 +439,7 @@ function ResponsesTab() {
       if (filters.endDate) params.endDate = filters.endDate;
       if (filters.phone) params.phone = filters.phone;
       if (filters.status) params.status = filters.status;
+      if (filters.workplace) params.workplace = filters.workplace;
 
       const data = await getSurveyResponses(params);
       setResponses(data.responses);
@@ -404,6 +453,7 @@ function ResponsesTab() {
 
   useEffect(() => {
     load();
+    getSurveyWorkplaces().then(setWorkplaces).catch(console.error);
   }, []);
 
   const handleExport = async () => {
@@ -471,6 +521,19 @@ function ResponsesTab() {
               <option value="clock_in">출근완료</option>
               <option value="completed">퇴근완료</option>
               <option value="expired">만료</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">근무지</label>
+            <select
+              value={filters.workplace}
+              onChange={(e) => setFilters({ ...filters, workplace: e.target.value })}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">전체</option>
+              {workplaces.map((w: any) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
+              ))}
             </select>
           </div>
           <button

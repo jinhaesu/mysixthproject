@@ -148,11 +148,84 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
   res.json({ total: results.length, results });
 });
 
+// POST /api/survey/resend/:id - Resend an expired or sent survey with new token
+router.post('/resend/:id', async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+
+  const original = await dbGet(`
+    SELECT sr.*, sw.name as workplace_name
+    FROM survey_requests sr
+    LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+    WHERE sr.id = ?
+  `, id);
+
+  if (!original) {
+    res.status(404).json({ error: '설문 요청을 찾을 수 없습니다.' });
+    return;
+  }
+
+  // Create new survey request with same phone/workplace/date
+  const token = uuidv4();
+  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+  const result = await dbRun(`
+    INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, token, original.phone, original.workplace_id, original.date, original.message_type || 'sms', expiresAt);
+
+  await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
+
+  // Send SMS
+  const workplace = await dbGet('SELECT name FROM survey_workplaces WHERE id = ?', original.workplace_id);
+  const sendResult = await sendSurveyMessage(original.phone, token, original.date, workplace?.name || '', original.message_type || 'sms');
+
+  if (sendResult.messageId) {
+    await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
+  }
+
+  // Mark original as expired if it was still active
+  if (original.status === 'sent') {
+    await dbRun('UPDATE survey_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 'expired', original.id);
+  }
+
+  res.status(201).json({ success: true, message: sendResult });
+});
+
+// GET /api/survey/stats - Summary statistics
+router.get('/stats', async (_req: AuthRequest, res: Response) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const total = await dbGet('SELECT COUNT(*) as count FROM survey_requests');
+    const todayCount = await dbGet('SELECT COUNT(*) as count FROM survey_requests WHERE date = ?', today);
+    const byStatus = await dbAll(`
+      SELECT status, COUNT(*) as count
+      FROM survey_requests
+      GROUP BY status
+    `);
+    const todayByStatus = await dbAll(`
+      SELECT status, COUNT(*) as count
+      FROM survey_requests
+      WHERE date = ?
+      GROUP BY status
+    `, today);
+
+    res.json({
+      total: total.count,
+      today: todayCount.count,
+      byStatus: Object.fromEntries(byStatus.map((r: any) => [r.status, r.count])),
+      todayByStatus: Object.fromEntries(todayByStatus.map((r: any) => [r.status, r.count])),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== Survey Responses Query =====
 
 // GET /api/survey/responses
 router.get('/responses', async (req: AuthRequest, res: Response) => {
-  const { startDate, endDate, phone, status, page = '1', limit = '50' } = req.query as Record<string, string>;
+  const { startDate, endDate, phone, status, workplace, page = '1', limit = '50' } = req.query as Record<string, string>;
 
   let where = 'WHERE 1=1';
   const params: any[] = [];
@@ -161,6 +234,7 @@ router.get('/responses', async (req: AuthRequest, res: Response) => {
   if (endDate) { where += ' AND sr.date <= ?'; params.push(endDate); }
   if (phone) { where += ' AND sr.phone LIKE ?'; params.push(`%${phone}%`); }
   if (status) { where += ' AND sr.status = ?'; params.push(status); }
+  if (workplace) { where += ' AND sr.workplace_id = ?'; params.push(workplace); }
 
   const countResult = await dbGet(`
     SELECT COUNT(*) as total

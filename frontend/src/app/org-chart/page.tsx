@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import {
   getOrgChartNodes, createOrgChartNode, updateOrgChartNode, deleteOrgChartNode,
+  getOrgChartStats,
 } from "@/lib/api";
 
 interface OrgNode {
@@ -61,6 +62,16 @@ export default function OrgChartPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const data = await getOrgChartStats();
+      setStats(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const fetchNodes = useCallback(async () => {
     try {
@@ -76,21 +87,9 @@ export default function OrgChartPage() {
     }
   }, []);
 
-  useEffect(() => { fetchNodes(); }, [fetchNodes]);
+  useEffect(() => { fetchNodes(); fetchStats(); }, [fetchNodes, fetchStats]);
 
   const tree = useMemo(() => buildTree(nodes), [nodes]);
-
-  const totalPeople = useMemo(() => nodes.filter(n => n.node_type === "person").length, [nodes]);
-  const byType = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const n of nodes) {
-      if (n.node_type === "person") {
-        const t = n.employment_type || "미분류";
-        map[t] = (map[t] || 0) + 1;
-      }
-    }
-    return map;
-  }, [nodes]);
 
   const toggleExpand = (id: number) => {
     setExpandedIds(prev => {
@@ -247,18 +246,20 @@ export default function OrgChartPage() {
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm mb-4">{error}</div>}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">전체 인원</div>
-          <div className="text-2xl font-bold text-gray-900 mt-1">{totalPeople}명</div>
-        </div>
-        {Object.entries(byType).map(([type, count]) => (
-          <div key={type} className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="text-sm text-gray-500">{type}</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">{count}명</div>
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+            <p className="text-xs text-gray-500 mt-1">전체 인원</p>
           </div>
-        ))}
-      </div>
+          {stats.byType?.slice(0, 3).map((t: any) => (
+            <div key={t.employment_type} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+              <p className="text-2xl font-bold text-blue-600">{t.count}</p>
+              <p className="text-xs text-gray-500 mt-1">{t.employment_type}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Tree View */}
       {loading ? (

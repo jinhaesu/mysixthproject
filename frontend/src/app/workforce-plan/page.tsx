@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Save, Info, Clock, UserCheck,
   Plus, X, Trash2, Edit3, ChevronDown, ChevronUp
 } from "lucide-react";
-import { getWorkforcePlanSlots, saveWorkforcePlanSlotsBatch } from "@/lib/api";
+import { getWorkforcePlanSlots, saveWorkforcePlanSlotsBatch, getWorkforcePlanComparison } from "@/lib/api";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 const WORKER_TYPES = ["파견", "알바(사업소득)"] as const;
@@ -84,6 +84,9 @@ export default function WorkforcePlanPage() {
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   // Collapsed weeks
   const [collapsedWeeks, setCollapsedWeeks] = useState<Set<number>>(new Set());
+  // Comparison
+  const [comparison, setComparison] = useState<any>(null);
+  const [showComparison, setShowComparison] = useState(false);
 
   const daysInMonth = getDaysInMonth(year, month);
 
@@ -248,6 +251,15 @@ export default function WorkforcePlanPage() {
     });
   };
 
+  const loadComparison = async () => {
+    try {
+      const data = await getWorkforcePlanComparison(year, month);
+      setComparison(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Mini 24h timeline bar for a day - split top/bottom for 파견/알바
   const MiniTimeline = ({ day }: { day: number }) => {
     const daySlots = slotsByDay[day] || [];
@@ -303,6 +315,14 @@ export default function WorkforcePlanPage() {
               <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded"><ChevronRight size={18} /></button>
             </div>
             <button
+              onClick={() => { setShowComparison(!showComparison); if (!showComparison) loadComparison(); }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                showComparison ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              계획 vs 실적
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving || !hasChanges}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -336,6 +356,54 @@ export default function WorkforcePlanPage() {
           </div>
         )}
         {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm mb-4">{error}</div>}
+
+        {/* Comparison Table */}
+        {showComparison && comparison && (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">계획 vs 실적 비교</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="py-2.5 px-3 text-left font-medium text-gray-600">일</th>
+                    <th className="py-2.5 px-3 text-right font-medium text-blue-600">계획(h)</th>
+                    <th className="py-2.5 px-3 text-right font-medium text-green-600">실적(h)</th>
+                    <th className="py-2.5 px-3 text-right font-medium text-gray-600">인원</th>
+                    <th className="py-2.5 px-3 text-left font-medium text-gray-600">달성률</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {comparison.days.filter((d: any) => d.planned_hours > 0 || d.actual_hours > 0).map((d: any) => {
+                    const rate = d.planned_hours > 0 ? Math.round((d.actual_hours / d.planned_hours) * 100) : 0;
+                    return (
+                      <tr key={d.day} className="hover:bg-gray-50/50">
+                        <td className="py-2 px-3 font-medium">{d.day}일</td>
+                        <td className="py-2 px-3 text-right text-blue-700">{d.planned_hours}</td>
+                        <td className="py-2 px-3 text-right text-green-700">{d.actual_hours}</td>
+                        <td className="py-2 px-3 text-right">{d.worker_count}명</td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${rate >= 100 ? 'bg-green-500' : rate >= 70 ? 'bg-amber-500' : 'bg-red-400'}`}
+                                style={{ width: `${Math.min(rate, 100)}%` }}
+                              />
+                            </div>
+                            <span className={`text-xs font-medium ${rate >= 100 ? 'text-green-600' : rate >= 70 ? 'text-amber-600' : 'text-red-500'}`}>
+                              {rate}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">

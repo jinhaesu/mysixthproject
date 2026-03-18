@@ -59,6 +59,58 @@ router.post('/batch', async (req: Request, res: Response) => {
   }
 });
 
+// GET /workforce-plan/comparison - Compare planned vs actual
+router.get('/comparison', async (req: Request, res: Response) => {
+  try {
+    const { year, month } = req.query;
+    if (!year || !month) {
+      res.status(400).json({ error: 'year와 month 파라미터가 필요합니다.' });
+      return;
+    }
+
+    const y = Number(year);
+    const m = Number(month);
+    const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const endDate = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    // Get planned data grouped by day
+    const planned = await dbAll(
+      'SELECT day, SUM(planned_hours) as planned_hours FROM workforce_plans WHERE year = ? AND month = ? GROUP BY day ORDER BY day',
+      y, m
+    );
+
+    // Get actual attendance data grouped by day
+    const actual = await dbAll(`
+      SELECT
+        CAST(SUBSTR(date, 9, 2) AS INTEGER) as day,
+        COUNT(DISTINCT name) as worker_count,
+        ROUND(CAST(SUM(total_hours) AS NUMERIC), 1) as actual_hours
+      FROM attendance_records
+      WHERE date >= ? AND date <= ?
+      GROUP BY SUBSTR(date, 9, 2)
+      ORDER BY day
+    `, startDate, endDate);
+
+    // Build comparison array for all days
+    const days = [];
+    for (let d = 1; d <= lastDay; d++) {
+      const p = planned.find((r: any) => r.day === d);
+      const a = actual.find((r: any) => r.day === d);
+      days.push({
+        day: d,
+        planned_hours: p ? Number(p.planned_hours) : 0,
+        actual_hours: a ? Number(a.actual_hours) : 0,
+        worker_count: a ? Number(a.worker_count) : 0,
+      });
+    }
+
+    res.json({ year: y, month: m, days });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── New: time-slot based planning ───
 
 // Get all slots for a month

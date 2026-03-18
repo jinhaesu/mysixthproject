@@ -131,8 +131,15 @@ export async function dbTransaction<T>(fn: (tx: TxClient) => Promise<T>): Promis
 
 /**
  * Initialize database schema (PostgreSQL)
+ * SAFETY: Only uses CREATE TABLE IF NOT EXISTS and ALTER TABLE ADD COLUMN IF NOT EXISTS.
+ * NEVER drops, truncates, or deletes existing data.
+ * All schema changes are additive only - safe to run on every server start.
  */
 export async function initializeDB(): Promise<void> {
+  // Verify connection first
+  const connTest = await pool.query('SELECT current_database(), current_user');
+  console.log(`DB connected: database=${connTest.rows[0].current_database}, user=${connTest.rows[0].current_user}`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS uploads (
       id TEXT PRIMARY KEY,

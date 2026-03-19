@@ -264,11 +264,11 @@ export async function deleteSafetyNotice(id: number) {
   return fetchAPI<any>(`/api/survey/safety-notices/${id}`, { method: 'DELETE' });
 }
 
-export async function sendSafetyNotice(date: string, noticeId: number) {
+export async function sendSafetyNotice(date: string, noticeId: number, phones?: string[]) {
   return fetchAPI<any>('/api/survey/send-safety-notice', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, notice_id: noticeId }),
+    body: JSON.stringify({ date, notice_id: noticeId, phones }),
   });
 }
 

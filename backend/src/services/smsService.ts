@@ -121,3 +121,14 @@ export async function sendSurveyMessage(
       return sendMock(phone, message);
   }
 }
+
+export async function sendGeneralSms(phone: string, message: string): Promise<SendResult> {
+  console.log(`[SMS] General message to: ${phone}`);
+  switch (SMS_PROVIDER) {
+    case 'solapi':
+      return sendSolapi(phone, message);
+    case 'mock':
+    default:
+      return sendMock(phone, message);
+  }
+}

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
 import { dbGet, dbAll, dbRun } from '../db';
 import { AuthRequest } from '../middleware/auth';
-import { sendSurveyMessage } from '../services/smsService';
+import { sendSurveyMessage, sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
@@ -131,6 +131,112 @@ router.post('/edit-time/:id', async (req: AuthRequest, res: Response) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('[edit-time] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== Safety Notices =====
+
+// GET /api/survey/safety-notices - List all notice templates
+router.get('/safety-notices', async (_req: AuthRequest, res: Response) => {
+  try {
+    const notices = await dbAll('SELECT * FROM safety_notices WHERE is_active = 1 ORDER BY id');
+    res.json(notices);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/survey/safety-notices - Create notice template
+router.post('/safety-notices', async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, content } = req.body;
+    if (!title || !content) {
+      res.status(400).json({ error: '제목과 내용은 필수입니다.' });
+      return;
+    }
+    const result = await dbRun(
+      'INSERT INTO safety_notices (title, content) VALUES (?, ?)', title, content
+    );
+    const created = await dbGet('SELECT * FROM safety_notices WHERE id = ?', result.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/survey/safety-notices/:id - Update notice template
+router.put('/safety-notices/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, content } = req.body;
+    await dbRun(
+      'UPDATE safety_notices SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      title, content, req.params.id
+    );
+    const updated = await dbGet('SELECT * FROM safety_notices WHERE id = ?', req.params.id);
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/survey/safety-notices/:id - Soft delete
+router.delete('/safety-notices/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('UPDATE safety_notices SET is_active = 0 WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/survey/send-safety-notice - Send safety notice to workers scheduled for a date
+router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
+  try {
+    const { date, notice_id } = req.body;
+    if (!date || !notice_id) {
+      res.status(400).json({ error: '날짜와 안내문 ID는 필수입니다.' });
+      return;
+    }
+
+    const notice = await dbGet('SELECT * FROM safety_notices WHERE id = ? AND is_active = 1', notice_id);
+    if (!notice) {
+      res.status(404).json({ error: '안내문을 찾을 수 없습니다.' });
+      return;
+    }
+
+    // Find all workers who have surveys for the given date
+    const workers = await dbAll(`
+      SELECT DISTINCT sr.phone
+      FROM survey_requests sr
+      WHERE sr.date = ? AND sr.status IN ('sent', 'clock_in')
+    `, date);
+
+    if (workers.length === 0) {
+      res.json({ success: true, total: 0, sent: 0, message: '해당 날짜에 설문 대상자가 없습니다.' });
+      return;
+    }
+
+    let sentCount = 0;
+    const errors: string[] = [];
+
+    for (const w of workers) {
+      const result = await sendGeneralSms(w.phone, notice.content);
+      if (result.success) {
+        sentCount++;
+      } else {
+        errors.push(`${w.phone}: ${result.error}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      total: workers.length,
+      sent: sentCount,
+      failed: workers.length - sentCount,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });

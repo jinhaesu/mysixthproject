@@ -239,6 +239,39 @@ export async function updateSurveyResponseTime(id: number, data: { clock_in_time
   });
 }
 
+// ===== Safety Notices =====
+export async function getSafetyNotices() {
+  return fetchAPI<any[]>('/api/survey/safety-notices');
+}
+
+export async function createSafetyNotice(data: { title: string; content: string }) {
+  return fetchAPI<any>('/api/survey/safety-notices', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateSafetyNotice(id: number, data: { title: string; content: string }) {
+  return fetchAPI<any>(`/api/survey/safety-notices/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteSafetyNotice(id: number) {
+  return fetchAPI<any>(`/api/survey/safety-notices/${id}`, { method: 'DELETE' });
+}
+
+export async function sendSafetyNotice(date: string, noticeId: number) {
+  return fetchAPI<any>('/api/survey/send-safety-notice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, notice_id: noticeId }),
+  });
+}
+
 // Public survey API (no auth)
 export async function fetchSurveyPublic(token: string) {
   const res = await fetch(`${API_URL}/api/survey-public/${token}`);

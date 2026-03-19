@@ -15,6 +15,11 @@ import {
   resendSurvey,
   updateSurveyResponseTime,
   triggerReminders,
+  getSafetyNotices,
+  createSafetyNotice,
+  updateSafetyNotice,
+  deleteSafetyNotice,
+  sendSafetyNotice,
 } from "@/lib/api";
 import {
   Send,
@@ -35,9 +40,10 @@ import {
   ClipboardList,
   Building2,
   Bell,
+  ShieldAlert,
 } from "lucide-react";
 
-type Tab = "send" | "responses" | "workplaces";
+type Tab = "send" | "responses" | "workplaces" | "safety";
 
 interface Workplace {
   id: number;
@@ -71,6 +77,7 @@ export default function SurveyManagePage() {
     { key: "send", label: "설문 발송", icon: MessageSquare },
     { key: "responses", label: "응답 조회", icon: ClipboardList },
     { key: "workplaces", label: "근무지 관리", icon: Building2 },
+    { key: "safety", label: "안전위생 안내", icon: ShieldAlert },
   ];
 
   return (
@@ -112,6 +119,7 @@ export default function SurveyManagePage() {
         {tab === "send" && <SendTab />}
         {tab === "responses" && <ResponsesTab />}
         {tab === "workplaces" && <WorkplacesTab />}
+        {tab === "safety" && <SafetyTab />}
       </div>
     </div>
   );
@@ -1063,6 +1071,229 @@ function WorkplacesTab() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== Safety Notices Tab =====
+function SafetyTab() {
+  const [notices, setNotices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [sendDate, setSendDate] = useState("");
+  const [selectedNotice, setSelectedNotice] = useState<number | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<any>(null);
+
+  const load = async () => {
+    try {
+      const data = await getSafetyNotices();
+      setNotices(data);
+      if (data.length > 0 && !selectedNotice) setSelectedNotice(data[0].id);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!title.trim() || !content.trim()) return alert("제목과 내용을 입력해주세요.");
+    try {
+      if (editing) {
+        await updateSafetyNotice(editing.id, { title, content });
+      } else {
+        await createSafetyNotice({ title, content });
+      }
+      setShowForm(false);
+      setEditing(null);
+      setTitle("");
+      setContent("");
+      load();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteSafetyNotice(id);
+      load();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!sendDate || !selectedNotice) return alert("날짜와 안내문을 선택해주세요.");
+    setSending(true);
+    setSendResult(null);
+    try {
+      const result = await sendSafetyNotice(sendDate, selectedNotice);
+      setSendResult(result);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Get tomorrow's date as default
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+  return (
+    <div className="space-y-6">
+      {/* Send Section */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">안전위생 안내 발송</h2>
+          <p className="text-xs text-gray-500 mt-0.5">근무 전날 근무자에게 안전/위생 안내 문자를 발송합니다.</p>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무일 (안내 대상)</label>
+              <input
+                type="date"
+                value={sendDate || tomorrowStr}
+                onChange={(e) => setSendDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">안내문 선택</label>
+              <select
+                value={selectedNotice ?? ""}
+                onChange={(e) => setSelectedNotice(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">선택하세요</option>
+                {notices.map((n) => (
+                  <option key={n.id} value={n.id}>{n.title}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={handleSend}
+                disabled={sending || !selectedNotice}
+                className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                안내 발송
+              </button>
+            </div>
+          </div>
+          {sendResult && (
+            <div className={`p-3 rounded-lg text-sm ${sendResult.sent > 0 ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+              총 {sendResult.total}명 중 {sendResult.sent}명에게 안전위생 안내를 발송했습니다.
+              {sendResult.failed > 0 && ` (실패: ${sendResult.failed}명)`}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Preview selected notice */}
+      {selectedNotice && notices.find(n => n.id === selectedNotice) && (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">발송 미리보기</h3>
+          <pre className="whitespace-pre-wrap text-sm text-gray-600 bg-white rounded-lg p-4 border border-gray-200 font-sans">
+            {notices.find(n => n.id === selectedNotice)?.content}
+          </pre>
+        </div>
+      )}
+
+      {/* Templates Management */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">안내문 템플릿</h2>
+          <button
+            onClick={() => { setShowForm(true); setEditing(null); setTitle(""); setContent(""); }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            새 안내문
+          </button>
+        </div>
+
+        {showForm && (
+          <div className="p-5 border-b border-gray-200 bg-blue-50/30">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">제목</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="예: 위생관리 안내"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">내용 (문자 발송 내용)</label>
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={10}
+                  placeholder="근무자에게 발송될 문자 내용을 입력하세요."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleSave} className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                  {editing ? "수정 완료" : "등록"}
+                </button>
+                <button onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 text-gray-600 rounded-lg text-sm hover:bg-gray-100">
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="py-10 text-center">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+          </div>
+        ) : notices.length === 0 ? (
+          <div className="py-10 text-center">
+            <ShieldAlert className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">등록된 안내문이 없습니다.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {notices.map((n) => (
+              <div key={n.id} className="px-5 py-4 hover:bg-gray-50/50">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-gray-900">{n.title}</h3>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => { setEditing(n); setTitle(n.title); setContent(n.content); setShowForm(true); }}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(n.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <pre className="whitespace-pre-wrap text-xs text-gray-500 line-clamp-3 font-sans">{n.content}</pre>
+              </div>
+            ))}
           </div>
         )}
       </div>

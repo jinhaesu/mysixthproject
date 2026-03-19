@@ -4,10 +4,34 @@ import pg from 'pg';
 // Parse BIGINT (INT8) as JavaScript number (for COUNT(*) etc.)
 pg.types.setTypeParser(20, (val: string) => parseInt(val, 10));
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-});
+// Parse DATABASE_URL and ensure database name defaults to 'postgres'
+function createPool() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.error('DATABASE_URL is not set!');
+    process.exit(1);
+  }
+
+  try {
+    const parsed = new URL(url);
+    return new Pool({
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      host: parsed.hostname,
+      port: parseInt(parsed.port) || 5432,
+      database: parsed.pathname.slice(1) || 'postgres',
+      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+    });
+  } catch {
+    // Fallback to connection string
+    return new Pool({
+      connectionString: url,
+      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+    });
+  }
+}
+
+const pool = createPool();
 
 /**
  * Convert SQLite-style ? placeholders to PostgreSQL $1, $2, ... format
@@ -107,8 +131,15 @@ export async function dbTransaction<T>(fn: (tx: TxClient) => Promise<T>): Promis
 
 /**
  * Initialize database schema (PostgreSQL)
+ * SAFETY: Only uses CREATE TABLE IF NOT EXISTS and ALTER TABLE ADD COLUMN IF NOT EXISTS.
+ * NEVER drops, truncates, or deletes existing data.
+ * All schema changes are additive only - safe to run on every server start.
  */
 export async function initializeDB(): Promise<void> {
+  // Verify connection first
+  const connTest = await pool.query('SELECT current_database(), current_user');
+  console.log(`DB connected: database=${connTest.rows[0].current_database}, user=${connTest.rows[0].current_user}`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS uploads (
       id TEXT PRIMARY KEY,
@@ -280,6 +311,47 @@ export async function initializeDB(): Promise<void> {
   // Migrations
   try { await pool.query('ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS reminder_sent INTEGER DEFAULT 0'); } catch {}
   try { await pool.query('ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ'); } catch {}
+
+  // Safety notice templates
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS safety_notices (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    // Insert default templates if table is empty
+    const count = await pool.query('SELECT COUNT(*) as cnt FROM safety_notices');
+    if (parseInt(count.rows[0].cnt) === 0) {
+      await pool.query(`
+        INSERT INTO safety_notices (title, content) VALUES
+        ('위생관리 안내', '[조인앤조인 근무 안내]\n\n내일 근무 예정이신 분께 안내드립니다.\n\n■ 위생관리 수칙\n• 작업 전 반드시 손 세척 및 소독\n• 위생복, 위생모, 마스크 착용 필수\n• 작업장 내 음식물 반입 금지\n• 손에 상처가 있을 경우 반드시 보고\n\n■ 시설물 안전\n• 장비 작동 전 이상 유무 확인\n• 바닥 물기 주의 (미끄럼 방지)\n• 시설물 파손 발견 시 즉시 보고\n• 안전장비 미착용 시 작업 금지\n\n■ 개인 안전\n• 무리한 작업 금지, 컨디션 불량 시 보고\n• 비상구 위치 숙지\n• 안전사고 발생 시 즉시 관리자에게 연락\n\n안전하고 건강한 근무 되시기 바랍니다.\n조인앤조인 관리팀')
+      `);
+    }
+  } catch (err) {
+    console.error('Safety notices table init error:', err);
+  }
+
+  // Safety notice log
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS safety_notice_log (
+        id SERIAL PRIMARY KEY,
+        phone TEXT NOT NULL,
+        date TEXT NOT NULL,
+        notice_id INTEGER REFERENCES safety_notices(id),
+        sent_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_safety_log_phone_date ON safety_notice_log(phone, date)');
+  } catch (err) {
+    console.error('Safety notice log table init error:', err);
+  }
 
   console.log('Database initialized successfully');
 }

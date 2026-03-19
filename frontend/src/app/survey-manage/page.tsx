@@ -1086,10 +1086,15 @@ function SafetyTab() {
   const [editing, setEditing] = useState<any>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [sendDate, setSendDate] = useState("");
+  const [sendDate, setSendDate] = useState(() => {
+    const t = new Date(); t.setDate(t.getDate() + 1);
+    return t.toISOString().slice(0, 10);
+  });
   const [selectedNotice, setSelectedNotice] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<any>(null);
+  const [sendMode, setSendMode] = useState<"survey" | "direct">("direct");
+  const [directPhones, setDirectPhones] = useState("");
 
   const load = async () => {
     try {
@@ -1133,23 +1138,27 @@ function SafetyTab() {
   };
 
   const handleSend = async () => {
-    if (!sendDate || !selectedNotice) return alert("날짜와 안내문을 선택해주세요.");
+    if (!selectedNotice) return alert("안내문을 선택해주세요.");
+    if (sendMode === "direct") {
+      const phones = directPhones.split("\n").map(p => p.trim()).filter(Boolean);
+      if (phones.length === 0) return alert("전화번호를 입력해주세요.");
+    }
+    if (sendMode === "survey" && !sendDate) return alert("근무일을 선택해주세요.");
     setSending(true);
     setSendResult(null);
     try {
-      const result = await sendSafetyNotice(sendDate, selectedNotice);
+      const phones = sendMode === "direct"
+        ? directPhones.split("\n").map(p => p.trim()).filter(Boolean)
+        : undefined;
+      const result = await sendSafetyNotice(sendDate, selectedNotice, phones);
       setSendResult(result);
+      if (sendMode === "direct" && result.sent > 0) setDirectPhones("");
     } catch (err: any) {
       alert(err.message);
     } finally {
       setSending(false);
     }
   };
-
-  // Get tomorrow's date as default
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -1160,16 +1169,38 @@ function SafetyTab() {
           <p className="text-xs text-gray-500 mt-0.5">근무 전날 근무자에게 안전/위생 안내 문자를 발송합니다.</p>
         </div>
         <div className="p-5 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무일 (안내 대상)</label>
-              <input
-                type="date"
-                value={sendDate || tomorrowStr}
-                onChange={(e) => setSendDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          {/* Mode Toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSendMode("direct")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                sendMode === "direct" ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              연락처 직접 입력
+            </button>
+            <button
+              onClick={() => setSendMode("survey")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                sendMode === "survey" ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              설문 대상자 자동
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {sendMode === "survey" && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">근무일 (설문 대상 조회)</label>
+                <input
+                  type="date"
+                  value={sendDate}
+                  onChange={(e) => setSendDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">안내문 선택</label>
               <select
@@ -1183,17 +1214,35 @@ function SafetyTab() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleSend}
-                disabled={sending || !selectedNotice}
-                className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
-              >
-                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                안내 발송
-              </button>
-            </div>
           </div>
+
+          {/* Direct phone input */}
+          {sendMode === "direct" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                전화번호 <span className="text-gray-400">(줄바꿈으로 구분, 여러 명 가능)</span>
+              </label>
+              <textarea
+                value={directPhones}
+                onChange={(e) => setDirectPhones(e.target.value)}
+                placeholder={"010-1234-5678\n010-9876-5432"}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                {directPhones.split("\n").filter(l => l.trim()).length}명 입력됨
+              </p>
+            </div>
+          )}
+
+          <button
+            onClick={handleSend}
+            disabled={sending || !selectedNotice}
+            className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
+          >
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            안내 발송
+          </button>
           {sendResult && (
             <div className={`p-3 rounded-lg text-sm ${sendResult.sent > 0 ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
               총 {sendResult.total}명 중 {sendResult.sent}명에게 안전위생 안내를 발송했습니다.

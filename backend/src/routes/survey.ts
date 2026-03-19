@@ -190,12 +190,12 @@ router.delete('/safety-notices/:id', async (req: AuthRequest, res: Response) => 
   }
 });
 
-// POST /api/survey/send-safety-notice - Send safety notice to workers scheduled for a date
+// POST /api/survey/send-safety-notice - Send safety notice to phones (direct) or survey workers
 router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
   try {
-    const { date, notice_id } = req.body;
-    if (!date || !notice_id) {
-      res.status(400).json({ error: '날짜와 안내문 ID는 필수입니다.' });
+    const { date, notice_id, phones } = req.body;
+    if (!notice_id) {
+      res.status(400).json({ error: '안내문을 선택해주세요.' });
       return;
     }
 
@@ -205,35 +205,44 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Find all workers who have surveys for the given date
-    const workers = await dbAll(`
-      SELECT DISTINCT sr.phone
-      FROM survey_requests sr
-      WHERE sr.date = ? AND sr.status IN ('sent', 'clock_in')
-    `, date);
+    // Determine target phone numbers
+    let targetPhones: string[] = [];
 
-    if (workers.length === 0) {
-      res.json({ success: true, total: 0, sent: 0, message: '해당 날짜에 설문 대상자가 없습니다.' });
+    if (phones && Array.isArray(phones) && phones.length > 0) {
+      // Direct phone list
+      targetPhones = phones.map((p: string) => p.trim()).filter(Boolean);
+    } else if (date) {
+      // From survey requests for the given date
+      const workers = await dbAll(`
+        SELECT DISTINCT sr.phone
+        FROM survey_requests sr
+        WHERE sr.date = ? AND sr.status IN ('sent', 'clock_in')
+      `, date);
+      targetPhones = workers.map((w: any) => w.phone);
+    }
+
+    if (targetPhones.length === 0) {
+      res.json({ success: true, total: 0, sent: 0, message: '발송 대상이 없습니다.' });
       return;
     }
 
     let sentCount = 0;
     const errors: string[] = [];
 
-    for (const w of workers) {
-      const result = await sendGeneralSms(w.phone, notice.content);
+    for (const phone of targetPhones) {
+      const result = await sendGeneralSms(phone, notice.content);
       if (result.success) {
         sentCount++;
       } else {
-        errors.push(`${w.phone}: ${result.error}`);
+        errors.push(`${phone}: ${result.error}`);
       }
     }
 
     res.json({
       success: true,
-      total: workers.length,
+      total: targetPhones.length,
       sent: sentCount,
-      failed: workers.length - sentCount,
+      failed: targetPhones.length - sentCount,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: any) {

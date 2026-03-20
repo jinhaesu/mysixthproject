@@ -665,14 +665,15 @@ router.get('/report-schedules', async (_req: AuthRequest, res: Response) => {
 
 router.post('/report-schedules', async (req: AuthRequest, res: Response) => {
   try {
-    const { time, phones } = req.body;
+    const { time, phones, repeat_days } = req.body;
     if (!time || !phones) {
       res.status(400).json({ error: '시간과 전화번호는 필수입니다.' });
       return;
     }
     const phonesJson = JSON.stringify(Array.isArray(phones) ? phones : [phones]);
     const result = await dbRun(
-      'INSERT INTO report_schedules (time, phones) VALUES (?, ?)', time, phonesJson
+      'INSERT INTO report_schedules (time, phones, repeat_days) VALUES (?, ?, ?)',
+      time, phonesJson, repeat_days || 'daily'
     );
     const created = await dbGet('SELECT * FROM report_schedules WHERE id = ?', result.lastInsertRowid);
     res.status(201).json(created);
@@ -780,7 +781,7 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
       FROM survey_requests WHERE date = ?
     `, today);
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || process.env.SURVEY_BASE_URL?.replace('/s', '') || 'https://mysixthproject.vercel.app';
     const detailLink = `${frontendUrl}/attendance-live`;
     const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근완료: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명\n\n상세 현황: ${detailLink}`;
 

@@ -167,7 +167,7 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? scheduledAt : undefined });
+      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? new Date(scheduledAt).toISOString() : undefined });
       if (result.scheduled) {
         alert("설문이 예약되었습니다.");
         setPhone("");
@@ -191,7 +191,7 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? scheduledAt : undefined });
+      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? new Date(scheduledAt).toISOString() : undefined });
       alert(result.scheduled ? `${result.total}건 예약 완료` : `${result.total}건 발송 완료`);
       setBulkPhones("");
       loadRecentSends();
@@ -1273,7 +1273,7 @@ function SafetyTab() {
         : undefined;
       const result = await sendSafetyNotice(
         sendDate, selectedNotice, phones,
-        isScheduled ? scheduledAt : undefined
+        isScheduled ? new Date(scheduledAt).toISOString() : undefined
       );
       setSendResult(result);
       if (sendMode === "direct" && result.sent > 0) setDirectPhones("");

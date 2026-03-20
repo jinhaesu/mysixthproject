@@ -95,6 +95,15 @@ async function checkAndSendReports() {
 
       if (diffMinutes > 5) continue; // Not within window
 
+      // Check if today matches the repeat pattern
+      const jsDay = new Date(now.getTime() + 9 * 60 * 60 * 1000).getDay(); // KST day
+      const kstDayOfWeek = jsDay === 0 ? 7 : jsDay; // 1=Mon ... 7=Sun
+
+      if (schedule.repeat_days && schedule.repeat_days !== 'daily') {
+        const allowedDays = schedule.repeat_days.split(',').map(Number);
+        if (!allowedDays.includes(kstDayOfWeek)) continue;
+      }
+
       // Check if already sent in last 30 minutes
       if (schedule.last_sent_at) {
         const lastSent = new Date(schedule.last_sent_at);
@@ -114,7 +123,7 @@ async function checkAndSendReports() {
 
       if (!stats || stats.total === 0) continue;
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || process.env.SURVEY_BASE_URL?.replace('/s', '') || 'https://mysixthproject.vercel.app';
       const detailLink = `${frontendUrl}/attendance-live`;
       const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats.total}명\n출근완료: ${stats.clocked_in || 0}명\n미출근: ${stats.not_clocked_in || 0}명\n퇴근완료: ${stats.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
@@ -133,13 +142,12 @@ async function checkAndSendReports() {
 
 async function checkAndSendScheduledSurveys() {
   try {
-    const now = new Date().toISOString();
     const pending = await dbAll(`
       SELECT sr.id, sr.phone, sr.token, sr.date, sr.department, sw.name as workplace_name
       FROM survey_requests sr
       LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
-      WHERE sr.scheduled_status = 'scheduled' AND sr.scheduled_at <= ?
-    `, now);
+      WHERE sr.scheduled_status = 'scheduled' AND sr.scheduled_at <= NOW()
+    `);
 
     for (const req of pending) {
       const result = await sendSurveyMessage(req.phone, req.token, req.date, req.workplace_name || '', 'sms', req.department || '');
@@ -155,13 +163,12 @@ async function checkAndSendScheduledSurveys() {
 
 async function checkAndSendScheduledMessages() {
   try {
-    const now = new Date().toISOString();
     const pending = await dbAll(`
       SELECT sm.*, sn.content as notice_content
       FROM scheduled_messages sm
       LEFT JOIN safety_notices sn ON sm.notice_id = sn.id
-      WHERE sm.status = 'scheduled' AND sm.scheduled_at <= ?
-    `, now);
+      WHERE sm.status = 'scheduled' AND sm.scheduled_at <= NOW()
+    `);
 
     for (const msg of pending) {
       const phones = JSON.parse(msg.phones);

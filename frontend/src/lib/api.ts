@@ -379,7 +379,7 @@ export async function exportPayrollExcel(year: number, month: number) {
 export async function getReportSchedules() {
   return fetchAPI<any[]>('/api/survey/report-schedules');
 }
-export async function createReportSchedule(data: { time: string; phones: string[] }) {
+export async function createReportSchedule(data: { time: string; phones: string[]; repeat_days?: string }) {
   return fetchAPI<any>('/api/survey/report-schedules', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
   });

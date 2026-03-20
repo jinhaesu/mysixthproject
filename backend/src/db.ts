@@ -354,6 +354,9 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Report schedules: add repeat_days column
+  try { await pool.query("ALTER TABLE report_schedules ADD COLUMN IF NOT EXISTS repeat_days TEXT DEFAULT 'daily'"); } catch {}
+
   // Safety notice templates
   try {
     await pool.query(`

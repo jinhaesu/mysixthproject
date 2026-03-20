@@ -110,6 +110,7 @@ export default function AttendanceLivePage() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [showReportConfig, setShowReportConfig] = useState(false);
   const [reportTime, setReportTime] = useState("09:00");
+  const [repeatDays, setRepeatDays] = useState("daily");
   const [reportPhones, setReportPhones] = useState("");
 
   const fetchData = useCallback(async () => {
@@ -414,6 +415,14 @@ export default function AttendanceLivePage() {
                         <span className="text-sm font-medium text-gray-800">{s.time}</span>
                         <span className="text-xs text-gray-500">
                           {(() => {
+                            const rd = s.repeat_days || 'daily';
+                            if (rd === 'daily') return '매일';
+                            const dayNames: Record<string, string> = {'1':'월','2':'화','3':'수','4':'목','5':'금','6':'토','7':'일'};
+                            return rd.split(',').map((d: string) => dayNames[d] || d).join('/');
+                          })()}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {(() => {
                             try {
                               return JSON.parse(s.phones).join(", ");
                             } catch {
@@ -461,6 +470,23 @@ export default function AttendanceLivePage() {
                     className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">반복</label>
+                  <select value={repeatDays} onChange={(e) => setRepeatDays(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="daily">매일</option>
+                    <option value="1,2,3,4,5">평일 (월~금)</option>
+                    <option value="1">월요일</option>
+                    <option value="2">화요일</option>
+                    <option value="3">수요일</option>
+                    <option value="4">목요일</option>
+                    <option value="5">금요일</option>
+                    <option value="6">토요일</option>
+                    <option value="7">일요일</option>
+                    <option value="1,3,5">월/수/금</option>
+                    <option value="2,4">화/목</option>
+                  </select>
+                </div>
                 <div className="flex-1 min-w-[200px]">
                   <label className="block text-xs text-gray-500 mb-1">
                     수신 전화번호 (줄바꿈 구분)
@@ -487,6 +513,7 @@ export default function AttendanceLivePage() {
                       const created = await createReportSchedule({
                         time: reportTime,
                         phones,
+                        repeat_days: repeatDays,
                       });
                       setSchedules([...schedules, created]);
                       setReportPhones("");

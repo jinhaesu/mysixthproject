@@ -59,6 +59,10 @@ function SurveyContent() {
   const [gender, setGender] = useState("");
   const [birthYear, setBirthYear] = useState("");
 
+  // Agency & Overtime
+  const [agency, setAgency] = useState("");
+  const [overtimeWilling, setOvertimeWilling] = useState("");
+
   // Safety agreement (F5)
   const [agreementAccepted, setAgreementAccepted] = useState(false);
 
@@ -136,7 +140,7 @@ function SurveyContent() {
   }, [loadSurvey]);
 
   const handleClockIn = async () => {
-    if (!nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted) {
+    if (!nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted || !agency.trim() || !overtimeWilling) {
       alert(t(lang, 'allFieldsRequired'));
       return;
     }
@@ -156,6 +160,8 @@ function SurveyContent() {
         birth_year: parseInt(birthYear),
         agreement_accepted: true,
         agreement_accepted_at: new Date().toISOString(),
+        agency,
+        overtime_willing: overtimeWilling,
       });
       await loadSurvey();
     } catch (err: any) {
@@ -570,6 +576,39 @@ function SurveyContent() {
               />
             </div>
 
+            {/* Agency */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {lang === 'ko' ? '연결 업체 (파견사)' : lang === 'en' ? 'Recruitment Agency' : lang === 'zh' ? '派遣公司' : 'Công ty phái cử'} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={agency}
+                onChange={(e) => setAgency(e.target.value)}
+                placeholder={lang === 'ko' ? '예: 주식회사 채용, 급구앱 등' : 'e.g. Agency name'}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+              />
+            </div>
+
+            {/* Overtime Availability */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {lang === 'ko' ? '추가 잔업 가능 여부' : lang === 'en' ? 'Overtime Availability' : lang === 'zh' ? '加班意愿' : 'Sẵn sàng làm thêm'} <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="overtime" value="가능" checked={overtimeWilling === '가능'}
+                    onChange={(e) => setOvertimeWilling(e.target.value)} className="accent-blue-600" />
+                  <span className="text-sm text-gray-700">{lang === 'ko' ? '가능(여)' : lang === 'en' ? 'Yes' : lang === 'zh' ? '可以' : 'Có'}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="overtime" value="불가" checked={overtimeWilling === '불가'}
+                    onChange={(e) => setOvertimeWilling(e.target.value)} className="accent-blue-600" />
+                  <span className="text-sm text-gray-700">{lang === 'ko' ? '불가(부)' : lang === 'en' ? 'No' : lang === 'zh' ? '不可以' : 'Không'}</span>
+                </label>
+              </div>
+            </div>
+
             {/* Memo */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'memo')}</label>
@@ -584,7 +623,7 @@ function SurveyContent() {
 
             <button
               onClick={handleClockIn}
-              disabled={submitting || !nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted}
+              disabled={submitting || !nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted || !agency.trim() || !overtimeWilling}
               className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
             >
               {submitting ? (

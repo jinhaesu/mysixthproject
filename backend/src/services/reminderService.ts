@@ -93,7 +93,7 @@ async function checkAndSendReports() {
       const [schedH, schedM] = schedule.time.split(':').map(Number);
       const diffMinutes = Math.abs((kstHours * 60 + kstMinutes) - (schedH * 60 + schedM));
 
-      if (diffMinutes > 5) continue; // Not within window
+      if (diffMinutes > 10) continue; // Changed from 5 to 10 to match interval
 
       // Check if today matches the repeat pattern
       const jsDay = new Date(now.getTime() + 9 * 60 * 60 * 1000).getDay(); // KST day
@@ -124,7 +124,7 @@ async function checkAndSendReports() {
       if (!stats || stats.total === 0) continue;
 
       const frontendUrl = process.env.FRONTEND_URL || process.env.SURVEY_BASE_URL?.replace('/s', '') || 'https://mysixthproject.vercel.app';
-      const detailLink = `${frontendUrl}/attendance-live`;
+      const detailLink = `${frontendUrl}/report?date=${today}`;
       const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats.total}명\n출근완료: ${stats.clocked_in || 0}명\n미출근: ${stats.not_clocked_in || 0}명\n퇴근완료: ${stats.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
       const phones = JSON.parse(schedule.phones);
@@ -192,6 +192,7 @@ export function startReminderService() {
   setTimeout(checkAndSendSafetyNotices, 30 * 1000);
   // Report schedule check every 10 minutes
   setInterval(checkAndSendReports, 10 * 60 * 1000);
+  setTimeout(checkAndSendReports, 60 * 1000); // Run reports check 1 min after startup
   // Check scheduled items every 5 minutes
   setInterval(checkAndSendScheduledSurveys, 5 * 60 * 1000);
   setInterval(checkAndSendScheduledMessages, 5 * 60 * 1000);

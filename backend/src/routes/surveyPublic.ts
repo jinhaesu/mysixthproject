@@ -63,7 +63,7 @@ router.get('/:token', async (req: Request, res: Response) => {
 // POST /api/survey-public/:token/clock-in - Submit clock-in
 router.post('/:token/clock-in', async (req: Request, res: Response) => {
   const { token } = req.params;
-  const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo, gender, birth_year, agreement_accepted, agreement_accepted_at } = req.body;
+  const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo, gender, birth_year, agreement_accepted, agreement_accepted_at, agency, overtime_willing } = req.body;
 
   if (!worker_name_ko || !worker_name_en || !bank_name || !bank_account || !id_number || !emergency_contact || !gender || !birth_year || !agreement_accepted) {
     res.status(400).json({ error: '모든 필수 항목을 입력해주세요.' });
@@ -123,6 +123,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
         worker_name_ko = ?, worker_name_en = ?, bank_name = ?, bank_account = ?,
         id_number = ?, emergency_contact = ?, memo = ?,
         gender = ?, birth_year = ?, agreement_accepted = ?, agreement_accepted_at = ?,
+        agency = ?, overtime_willing = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE request_id = ?
     `,
@@ -130,19 +131,21 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
       id_number || '', emergency_contact || '', memo || '',
       gender || '', birth_year || null, agreement_accepted ? 1 : 0, agreement_accepted_at || null,
+      agency || '', overtime_willing || '',
       request.id
     );
   } else {
     await dbRun(`
       INSERT INTO survey_responses (request_id, clock_in_time, clock_in_lat, clock_in_lng, clock_in_gps_valid,
         worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo,
-        gender, birth_year, agreement_accepted, agreement_accepted_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        gender, birth_year, agreement_accepted, agreement_accepted_at, agency, overtime_willing)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       request.id, clockInTime, latitude || null, longitude || null, gpsValid,
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
       id_number || '', emergency_contact || '', memo || '',
-      gender || '', birth_year || null, agreement_accepted ? 1 : 0, agreement_accepted_at || null
+      gender || '', birth_year || null, agreement_accepted ? 1 : 0, agreement_accepted_at || null,
+      agency || '', overtime_willing || ''
     );
   }
 
@@ -153,9 +156,9 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
     const existingWorker = await dbGet('SELECT id FROM workers WHERE phone = ?', request.phone);
     if (!existingWorker) {
       await dbRun(`
-        INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, gender, birth_year)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null);
+        INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, gender, birth_year, agency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '');
     } else {
       await dbRun(`
         UPDATE workers SET
@@ -167,9 +170,10 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
           emergency_contact = COALESCE(NULLIF(?, ''), emergency_contact),
           gender = COALESCE(NULLIF(?, ''), gender),
           birth_year = COALESCE(?, birth_year),
+          agency = COALESCE(NULLIF(?, ''), agency),
           updated_at = CURRENT_TIMESTAMP
         WHERE phone = ?
-      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, request.phone);
+      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', request.phone);
     }
   } catch (err) {
     console.error('[Worker] Auto-upsert failed:', err);
@@ -284,6 +288,49 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     gps_valid: true,
     distance,
   });
+});
+
+// GET /api/survey-public/dashboard-report/:date - Public dashboard view (no auth)
+router.get('/dashboard-report/:date', async (req: Request, res: Response) => {
+  try {
+    const { date } = req.params;
+
+    const byWorkplace = await dbAll(`
+      SELECT sw.id as workplace_id, sw.name as workplace_name,
+        COUNT(*) as total,
+        SUM(CASE WHEN sr.status = 'sent' THEN 1 ELSE 0 END) as not_clocked_in,
+        SUM(CASE WHEN sr.status = 'clock_in' THEN 1 ELSE 0 END) as clocked_in,
+        SUM(CASE WHEN sr.status = 'completed' THEN 1 ELSE 0 END) as completed
+      FROM survey_requests sr
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      WHERE sr.date = ?
+      GROUP BY sw.id, sw.name
+      ORDER BY sw.name
+    `, date);
+
+    const workers = await dbAll(`
+      SELECT sr.id, sr.phone, sr.status, sr.department,
+             sw.name as workplace_name,
+             resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time,
+             sr.planned_clock_in, sr.planned_clock_out
+      FROM survey_requests sr
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.date = ?
+      ORDER BY sw.name, sr.department, sr.status, resp.worker_name_ko
+    `, date);
+
+    const totals = {
+      total: workers.length,
+      not_clocked_in: workers.filter((w: any) => w.status === 'sent').length,
+      clocked_in: workers.filter((w: any) => w.status === 'clock_in').length,
+      completed: workers.filter((w: any) => w.status === 'completed').length,
+    };
+
+    res.json({ date, byWorkplace, workers, totals });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;

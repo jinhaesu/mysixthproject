@@ -782,7 +782,7 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
     `, today);
 
     const frontendUrl = process.env.FRONTEND_URL || process.env.SURVEY_BASE_URL?.replace('/s', '') || 'https://mysixthproject.vercel.app';
-    const detailLink = `${frontendUrl}/attendance-live`;
+    const detailLink = `${frontendUrl}/report?date=${today}`;
     const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근완료: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
     const phones = JSON.parse(schedule.phones);

@@ -800,4 +800,71 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
   }
 });
 
+// POST /api/survey/run-scheduler - Manually trigger all schedulers
+router.post('/run-scheduler', async (_req: AuthRequest, res: Response) => {
+  try {
+    // Send all scheduled surveys whose time has passed
+    const pendingSurveys = await dbAll(`
+      SELECT sr.id, sr.phone, sr.token, sr.date, sr.department, sw.name as workplace_name
+      FROM survey_requests sr
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      WHERE sr.scheduled_status = 'scheduled' AND sr.scheduled_at <= NOW()
+    `);
+
+    let surveysSent = 0;
+    for (const req of pendingSurveys) {
+      const result = await sendSurveyMessage(req.phone, req.token, req.date, req.workplace_name || '', 'sms', req.department || '');
+      if (result.success) {
+        await dbRun("UPDATE survey_requests SET scheduled_status = 'sent', status = 'sent' WHERE id = ?", req.id);
+        surveysSent++;
+      }
+    }
+
+    // Send all scheduled safety messages whose time has passed
+    const pendingMessages = await dbAll(`
+      SELECT sm.*, sn.content as notice_content
+      FROM scheduled_messages sm
+      LEFT JOIN safety_notices sn ON sm.notice_id = sn.id
+      WHERE sm.status = 'scheduled' AND sm.scheduled_at <= NOW()
+    `);
+
+    let messagesSent = 0;
+    for (const msg of pendingMessages) {
+      try {
+        const phones = JSON.parse(msg.phones);
+        for (const phone of phones) {
+          await sendGeneralSms(phone, msg.notice_content);
+        }
+        await dbRun("UPDATE scheduled_messages SET status = 'sent' WHERE id = ?", msg.id);
+        messagesSent++;
+      } catch {}
+    }
+
+    res.json({
+      success: true,
+      surveys: { pending: pendingSurveys.length, sent: surveysSent },
+      messages: { pending: pendingMessages.length, sent: messagesSent },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/survey/force-send-scheduled - Force send all stuck scheduled items
+router.post('/force-send-scheduled', async (_req: AuthRequest, res: Response) => {
+  try {
+    // Update all scheduled items' scheduled_at to now so they get picked up
+    const updated1 = await dbRun("UPDATE survey_requests SET scheduled_at = NOW() WHERE scheduled_status = 'scheduled'");
+    const updated2 = await dbRun("UPDATE scheduled_messages SET scheduled_at = NOW() WHERE status = 'scheduled'");
+
+    res.json({
+      success: true,
+      surveys_updated: updated1.changes,
+      messages_updated: updated2.changes,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

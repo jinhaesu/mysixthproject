@@ -391,6 +391,11 @@ export async function sendReportNow(id: number) {
   return fetchAPI<any>(`/api/survey/report-schedules/${id}/send-now`, { method: 'POST' });
 }
 
+// ===== Scheduler =====
+export async function runScheduler() {
+  return fetchAPI<any>('/api/survey/run-scheduler', { method: 'POST' });
+}
+
 // ===== Reminders =====
 export async function triggerReminders(date: string, thresholdHours = 2) {
   return fetchAPI<any>('/api/survey/remind', {

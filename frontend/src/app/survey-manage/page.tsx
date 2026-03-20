@@ -22,6 +22,7 @@ import {
   updateSafetyNotice,
   deleteSafetyNotice,
   sendSafetyNotice,
+  runScheduler,
 } from "@/lib/api";
 import {
   Send,
@@ -146,7 +147,10 @@ function SendTab() {
   const [reminderResult, setReminderResult] = useState<any>(null);
   const [plannedClockIn, setPlannedClockIn] = useState("");
   const [plannedClockOut, setPlannedClockOut] = useState("");
-  const [scheduledAt, setScheduledAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [scheduledAt, setScheduledAt] = useState(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  });
   const [isScheduled, setIsScheduled] = useState(false);
 
   useEffect(() => {
@@ -339,6 +343,21 @@ function SendTab() {
                 onChange={(e) => setScheduledAt(e.target.value)}
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            )}
+            {isScheduled && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const result = await runScheduler();
+                    alert(`설문 ${result.surveys.sent}건, 안내문 ${result.messages.sent}건 발송 완료`);
+                    loadRecentSends();
+                  } catch (err: any) { alert(err.message); }
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+              >
+                예약 대기 즉시 발송
+              </button>
             )}
           </div>
         </div>
@@ -557,7 +576,10 @@ function ResponsesTab() {
   const [editClockOut, setEditClockOut] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [batchTimeType, setBatchTimeType] = useState<'clock_in' | 'clock_out'>('clock_in');
-  const [batchTimeValue, setBatchTimeValue] = useState(() => new Date().toISOString().slice(0, 16));
+  const [batchTimeValue, setBatchTimeValue] = useState(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  });
 
   const handleTimeSave = async () => {
     if (editingId === null) return;
@@ -1215,7 +1237,10 @@ function SafetyTab() {
   const [sendMode, setSendMode] = useState<"survey" | "direct">("direct");
   const [directPhones, setDirectPhones] = useState("");
   const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [scheduledAt, setScheduledAt] = useState(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  });
 
   const load = async () => {
     try {

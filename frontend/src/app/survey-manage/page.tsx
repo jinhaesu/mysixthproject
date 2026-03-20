@@ -792,6 +792,11 @@ function ResponsesTab() {
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계획출근</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계획퇴근</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무지</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">파트</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">성별</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">출생연도</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">연결업체</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">잔업희망</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">은행</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계좌</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">상태</th>
@@ -864,6 +869,17 @@ function ResponsesTab() {
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{r.planned_clock_in || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{r.planned_clock_out || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.department || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.gender || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.birth_year || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.agency || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      {r.overtime_willing ? (
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${r.overtime_willing === '가능' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-600'}`}>
+                          {r.overtime_willing}
+                        </span>
+                      ) : "-"}
+                    </td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.bank_name || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap font-mono text-xs text-gray-600">{r.bank_account || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap">

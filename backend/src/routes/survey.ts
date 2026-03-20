@@ -558,8 +558,9 @@ router.get('/responses', async (req: AuthRequest, res: Response) => {
            resp.clock_in_time, resp.clock_in_gps_valid, resp.clock_out_time, resp.clock_out_gps_valid,
            resp.worker_name_ko, resp.worker_name_en, resp.bank_name, resp.bank_account,
            resp.id_number, resp.emergency_contact, resp.memo,
+           resp.gender, resp.birth_year, resp.agency, resp.overtime_willing,
            sw.name as workplace_name, sw.address as workplace_address,
-           sr.planned_clock_in, sr.planned_clock_out
+           sr.planned_clock_in, sr.planned_clock_out, sr.department
     FROM survey_requests sr
     LEFT JOIN survey_responses resp ON sr.id = resp.request_id
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
@@ -598,7 +599,9 @@ router.get('/responses/export', async (req: AuthRequest, res: Response) => {
            resp.clock_out_time as "퇴근시간", resp.clock_out_gps_valid as "퇴근GPS유효",
            resp.bank_name as "은행명", resp.bank_account as "계좌번호",
            resp.emergency_contact as "비상연락처", resp.memo as "비고",
-           sw.name as "근무지"
+           resp.gender as "성별", resp.birth_year as "출생연도",
+           resp.agency as "연결업체", resp.overtime_willing as "잔업희망",
+           sw.name as "근무지", sr.department as "배정파트"
     FROM survey_requests sr
     LEFT JOIN survey_responses resp ON sr.id = resp.request_id
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id

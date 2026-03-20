@@ -348,8 +348,8 @@ function SurveyContent() {
           </>
         )}
 
-        {/* Safety Agreement (F5) - shown before clock-in form */}
-        {data.status === "sent" && canAct && !agreementAccepted && (
+        {/* Safety Agreement (F5) - shown regardless of GPS, before clock-in */}
+        {data.status === "sent" && !agreementAccepted && (
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2 text-red-700 mb-2">
               <Shield className="w-5 h-5" />
@@ -395,8 +395,8 @@ function SurveyContent() {
           </div>
         )}
 
-        {/* Factory Guide Video - after agreement, before clock-in form */}
-        {data.status === "sent" && canAct && agreementAccepted && (
+        {/* Factory Guide Video - after agreement, shown regardless of GPS */}
+        {data.status === "sent" && agreementAccepted && (
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-5 pt-4 pb-2">
               <h2 className="font-semibold text-gray-900 text-sm">

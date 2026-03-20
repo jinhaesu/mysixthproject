@@ -136,6 +136,7 @@ function SendTab() {
   const [bulkPhones, setBulkPhones] = useState("");
   const [recentSends, setRecentSends] = useState<any[]>([]);
   const [mode, setMode] = useState<"single" | "batch">("single");
+  const [department, setDepartment] = useState("");
   const [stats, setStats] = useState<any>(null);
   const [reminderHours, setReminderHours] = useState(2);
   const [reminding, setReminding] = useState(false);
@@ -159,7 +160,7 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType });
+      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType, department });
       if (result.message && !result.message.success) {
         alert(`발송 실패: ${result.message.error || '알 수 없는 오류'}`);
       } else {
@@ -180,7 +181,7 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType });
+      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType, department });
       alert(`${result.total}건 발송 완료`);
       setBulkPhones("");
       loadRecentSends();
@@ -234,7 +235,7 @@ function SendTab() {
         {/* Common Settings */}
         <div className="p-5 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900 mb-4">발송 설정</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">근무일</label>
               <input
@@ -255,6 +256,21 @@ function SendTab() {
                 {workplaces.map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">배정 파트</label>
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">파트 선택 (선택사항)</option>
+                <option value="생산팀">생산팀</option>
+                <option value="물류팀">물류팀</option>
+                <option value="포장팀">포장팀</option>
+                <option value="품질관리팀">품질관리팀</option>
+                <option value="기타">기타</option>
               </select>
             </div>
             <div>

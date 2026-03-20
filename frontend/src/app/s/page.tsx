@@ -192,14 +192,21 @@ function SurveyContent() {
       <div className="bg-blue-600 text-white px-4 py-5">
         <h1 className="text-lg font-bold">조인앤조인 출퇴근 기록</h1>
         <p className="text-blue-100 text-sm mt-1">{data.date} 근무</p>
-        {data.workplace && (
-          <div className="mt-2 bg-blue-500/30 rounded-lg px-3 py-2">
-            <p className="text-sm font-medium flex items-center gap-1.5">
-              <MapPin className="w-4 h-4" />
-              {data.workplace.name}
-            </p>
-            {data.workplace.address && (
-              <p className="text-blue-200 text-xs mt-0.5">{data.workplace.address}</p>
+        {(data.workplace || data.department) && (
+          <div className="mt-2 bg-blue-500/30 rounded-lg px-3 py-2 space-y-1">
+            {data.workplace && (
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                <MapPin className="w-4 h-4" />
+                {data.workplace.name}
+              </p>
+            )}
+            {data.workplace?.address && (
+              <p className="text-blue-200 text-xs">{data.workplace.address}</p>
+            )}
+            {data.department && (
+              <p className="text-sm font-semibold text-yellow-200 flex items-center gap-1.5">
+                배정파트: {data.department}
+              </p>
             )}
           </div>
         )}

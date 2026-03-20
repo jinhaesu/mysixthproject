@@ -186,7 +186,7 @@ export async function deleteSurveyWorkplace(id: number) {
 }
 
 // Send survey
-export async function sendSurvey(data: { phone: string; date: string; workplace_id: number | null; message_type: string }) {
+export async function sendSurvey(data: { phone: string; date: string; workplace_id: number | null; message_type: string; department?: string }) {
   return fetchAPI<any>('/api/survey/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -194,7 +194,7 @@ export async function sendSurvey(data: { phone: string; date: string; workplace_
   });
 }
 
-export async function sendSurveyBatch(data: { phones: string[]; date: string; workplace_id: number | null; message_type: string }) {
+export async function sendSurveyBatch(data: { phones: string[]; date: string; workplace_id: number | null; message_type: string; department?: string }) {
   return fetchAPI<any>('/api/survey/send-batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -36,6 +36,7 @@ router.get('/:token', async (req: Request, res: Response) => {
   res.json({
     status: request.status,
     date: request.date,
+    department: request.department || '',
     workplace: request.workplace_id ? {
       name: request.workplace_name,
       address: request.workplace_address,

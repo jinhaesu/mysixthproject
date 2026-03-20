@@ -58,6 +58,7 @@ export interface SurveyResponseWithDetails extends SurveyResponse {
 export interface SurveyPublicData {
   status: string;
   date: string;
+  department: string;
   workplace: {
     name: string;
     address: string;

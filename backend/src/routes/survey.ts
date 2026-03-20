@@ -254,7 +254,7 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
 
 // POST /api/survey/send - Send survey to a single phone
 router.post('/send', async (req: AuthRequest, res: Response) => {
-  const { phone, date, workplace_id, message_type } = req.body;
+  const { phone, date, workplace_id, message_type, department } = req.body;
 
   if (!phone || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호, 날짜, 근무지는 필수입니다.' });
@@ -272,15 +272,15 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
   // Create survey request
   const result = await dbRun(`
-    INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `, token, phone, workplace_id, date, message_type || 'sms', expiresAt);
+    INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, token, phone, workplace_id, date, message_type || 'sms', expiresAt, department || '');
 
   // Create empty response row
   await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
   // Send SMS/KakaoTalk
-  const sendResult = await sendSurveyMessage(phone, token, date, workplace.name, message_type || 'sms');
+  const sendResult = await sendSurveyMessage(phone, token, date, workplace.name, message_type || 'sms', department || '');
 
   if (sendResult.messageId) {
     await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
@@ -301,7 +301,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
 // POST /api/survey/send-batch - Send to multiple phones
 router.post('/send-batch', async (req: AuthRequest, res: Response) => {
-  const { phones, date, workplace_id, message_type } = req.body;
+  const { phones, date, workplace_id, message_type, department } = req.body;
 
   if (!phones || !Array.isArray(phones) || phones.length === 0 || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호 목록, 날짜, 근무지는 필수입니다.' });
@@ -324,13 +324,13 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 
     const result = await dbRun(`
-      INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt);
+      INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt, department || '');
 
     await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
-    const sendResult = await sendSurveyMessage(trimmedPhone, token, date, workplace.name, message_type || 'sms');
+    const sendResult = await sendSurveyMessage(trimmedPhone, token, date, workplace.name, message_type || 'sms', department || '');
 
     if (sendResult.messageId) {
       await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);

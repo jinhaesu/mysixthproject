@@ -289,9 +289,9 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
   // Create survey request
   const result = await dbRun(`
-    INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, token, phone, workplace_id, date, message_type || 'sms', expiresAt, department || '', planned_clock_in || null, planned_clock_out || null, scheduled_at || null, isScheduled ? 'scheduled' : 'immediate');
+    INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, token, phone, workplace_id, date, message_type || 'sms', expiresAt, department || '', planned_clock_in || null, planned_clock_out || null, scheduled_at || null, isScheduled ? 'scheduled' : 'immediate', isScheduled ? 'scheduled' : 'sent');
 
   // Create empty response row
   await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
@@ -346,9 +346,9 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 
     const result = await dbRun(`
-      INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt, department || '', planned_clock_in || null, planned_clock_out || null, scheduled_at || null, isScheduled ? 'scheduled' : 'immediate');
+      INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt, department || '', planned_clock_in || null, planned_clock_out || null, scheduled_at || null, isScheduled ? 'scheduled' : 'immediate', isScheduled ? 'scheduled' : 'sent');
 
     await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
@@ -463,7 +463,7 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
     `, date);
 
     const workers = await dbAll(`
-      SELECT sr.id, sr.phone, sr.status, sr.workplace_id,
+      SELECT sr.id, sr.phone, sr.status, sr.workplace_id, sr.department,
              sw.name as workplace_name,
              resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time,
              sr.planned_clock_in, sr.planned_clock_out

@@ -38,6 +38,7 @@ interface Worker {
   workplace_id: number;
   workplace_name: string;
   worker_name_ko: string | null;
+  department: string | null;
   clock_in_time: string | null;
   clock_out_time: string | null;
   planned_clock_in: string | null;
@@ -297,6 +298,7 @@ export default function AttendanceLivePage() {
                             <thead>
                               <tr className="bg-gray-50 text-left">
                                 <th className="py-2.5 px-5 font-medium text-gray-600">이름</th>
+                                <th className="py-2.5 px-4 font-medium text-gray-600">배정파트</th>
                                 <th className="py-2.5 px-4 font-medium text-gray-600">전화번호</th>
                                 <th className="py-2.5 px-4 font-medium text-gray-600">계획출근</th>
                                 <th className="py-2.5 px-4 font-medium text-gray-600">출근시간</th>
@@ -310,6 +312,11 @@ export default function AttendanceLivePage() {
                                 <tr key={w.id} className="hover:bg-gray-50/50">
                                   <td className="py-2.5 px-5 whitespace-nowrap font-medium text-gray-900">
                                     {w.worker_name_ko || "-"}
+                                  </td>
+                                  <td className="py-2.5 px-4 whitespace-nowrap">
+                                    {w.department ? (
+                                      <span className="inline-flex px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-xs font-medium">{w.department}</span>
+                                    ) : <span className="text-gray-300">-</span>}
                                   </td>
                                   <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">
                                     {w.phone}

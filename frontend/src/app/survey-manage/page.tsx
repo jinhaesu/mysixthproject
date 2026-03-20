@@ -55,6 +55,7 @@ interface Workplace {
 }
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  scheduled: { label: "예약됨", cls: "bg-purple-50 text-purple-700 border border-purple-200" },
   sent: { label: "발송완료", cls: "bg-blue-50 text-blue-700 border border-blue-200" },
   clock_in: { label: "출근완료", cls: "bg-amber-50 text-amber-700 border border-amber-200" },
   completed: { label: "퇴근완료", cls: "bg-green-50 text-green-700 border border-green-200" },

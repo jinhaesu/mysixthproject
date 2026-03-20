@@ -389,6 +389,37 @@ function SurveyContent() {
           </div>
         )}
 
+        {/* Factory Guide Video - after agreement, before clock-in form */}
+        {data.status === "sent" && canAct && agreementAccepted && (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 pt-4 pb-2">
+              <h2 className="font-semibold text-gray-900 text-sm">
+                {lang === 'ko' ? '조인앤조인 공장 진입 안내 영상' :
+                 lang === 'en' ? 'Factory Entry Guide Video' :
+                 lang === 'zh' ? '工厂入场指南视频' :
+                 'Video hướng dẫn vào nhà máy'}
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {lang === 'ko' ? '출근 기록 전 반드시 시청해 주세요.' :
+                 lang === 'en' ? 'Please watch before clocking in.' :
+                 lang === 'zh' ? '请在打卡前观看。' :
+                 'Vui lòng xem trước khi chấm công.'}
+              </p>
+            </div>
+            <div className="px-5 pb-4">
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full rounded-lg bg-black"
+                style={{ maxHeight: '300px' }}
+              >
+                <source src="/videos/factory-guide.mp4" type="video/mp4" />
+              </video>
+            </div>
+          </div>
+        )}
+
         {/* Clock-in Form (F3) - GPS confirmed + within range + agreement accepted */}
         {data.status === "sent" && canAct && agreementAccepted && (
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">

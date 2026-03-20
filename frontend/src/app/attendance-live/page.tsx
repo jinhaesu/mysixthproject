@@ -6,6 +6,7 @@ import {
   getReportSchedules,
   createReportSchedule,
   deleteReportSchedule,
+  sendReportNow,
 } from "@/lib/api";
 import {
   Activity,
@@ -421,6 +422,17 @@ export default function AttendanceLivePage() {
                           })()}
                         </span>
                       </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const result = await sendReportNow(s.id);
+                            alert(`${result.sent}/${result.total}명에게 리포트를 발송했습니다.`);
+                          } catch (err: any) { alert(err.message); }
+                        }}
+                        className="px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100 transition-colors"
+                      >
+                        지금 발송
+                      </button>
                       <button
                         onClick={async () => {
                           await deleteReportSchedule(s.id);

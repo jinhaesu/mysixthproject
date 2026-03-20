@@ -14,6 +14,8 @@ import {
   getSurveyStats,
   resendSurvey,
   updateSurveyResponseTime,
+  batchEditResponseTime,
+  batchDeleteResponses,
   triggerReminders,
   getSafetyNotices,
   createSafetyNotice,
@@ -553,6 +555,9 @@ function ResponsesTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editClockIn, setEditClockIn] = useState("");
   const [editClockOut, setEditClockOut] = useState("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [batchClockIn, setBatchClockIn] = useState("");
+  const [batchClockOut, setBatchClockOut] = useState("");
 
   const handleTimeSave = async () => {
     if (editingId === null) return;
@@ -689,6 +694,46 @@ function ResponsesTab() {
         </div>
       </div>
 
+      {/* Batch Actions */}
+      {selectedIds.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-blue-700">{selectedIds.length}건 선택</span>
+          <input type="datetime-local" value={batchClockIn} onChange={(e) => setBatchClockIn(e.target.value)}
+            placeholder="출근시간" className="px-2 py-1 border border-blue-300 rounded text-xs w-44 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          <input type="datetime-local" value={batchClockOut} onChange={(e) => setBatchClockOut(e.target.value)}
+            placeholder="퇴근시간" className="px-2 py-1 border border-blue-300 rounded text-xs w-44 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          <button onClick={async () => {
+            if (!batchClockIn && !batchClockOut) return alert("수정할 시간을 입력해주세요.");
+            try {
+              await batchEditResponseTime(selectedIds, {
+                clock_in_time: batchClockIn || undefined,
+                clock_out_time: batchClockOut || undefined,
+              });
+              setSelectedIds([]);
+              setBatchClockIn("");
+              setBatchClockOut("");
+              load(pagination.page);
+            } catch (err: any) { alert(err.message); }
+          }} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+            일괄 시간수정
+          </button>
+          <button onClick={async () => {
+            if (!confirm(`${selectedIds.length}건을 삭제하시겠습니까?`)) return;
+            try {
+              await batchDeleteResponses(selectedIds);
+              setSelectedIds([]);
+              load(pagination.page);
+            } catch (err: any) { alert(err.message); }
+          }} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700">
+            일괄 삭제
+          </button>
+          <button onClick={() => setSelectedIds([])}
+            className="px-3 py-1.5 text-gray-600 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200">
+            선택 해제
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
@@ -706,6 +751,12 @@ function ResponsesTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left">
+                  <th className="py-3 px-3 w-10">
+                    <input type="checkbox"
+                      checked={selectedIds.length === responses.length && responses.length > 0}
+                      onChange={(e) => setSelectedIds(e.target.checked ? responses.map((r: any) => r.id) : [])}
+                      className="accent-blue-600" />
+                  </th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무일</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">전화번호</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">한글이름</th>
@@ -726,6 +777,12 @@ function ResponsesTab() {
               <tbody className="divide-y divide-gray-100">
                 {responses.map((r: any, i: number) => (
                   <tr key={i} className="hover:bg-gray-50/50">
+                    <td className="py-2.5 px-3">
+                      <input type="checkbox"
+                        checked={selectedIds.includes(r.id)}
+                        onChange={(e) => setSelectedIds(e.target.checked ? [...selectedIds, r.id] : selectedIds.filter(x => x !== r.id))}
+                        className="accent-blue-600" />
+                    </td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.date}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.phone}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap font-medium text-gray-900">{r.worker_name_ko || "-"}</td>
@@ -1155,6 +1212,8 @@ function SafetyTab() {
   const [sendResult, setSendResult] = useState<any>(null);
   const [sendMode, setSendMode] = useState<"survey" | "direct">("direct");
   const [directPhones, setDirectPhones] = useState("");
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState("");
 
   const load = async () => {
     try {
@@ -1210,7 +1269,10 @@ function SafetyTab() {
       const phones = sendMode === "direct"
         ? directPhones.split("\n").map(p => p.trim()).filter(Boolean)
         : undefined;
-      const result = await sendSafetyNotice(sendDate, selectedNotice, phones);
+      const result = await sendSafetyNotice(
+        sendDate, selectedNotice, phones,
+        isScheduled ? scheduledAt : undefined
+      );
       setSendResult(result);
       if (sendMode === "direct" && result.sent > 0) setDirectPhones("");
     } catch (err: any) {
@@ -1295,18 +1357,36 @@ function SafetyTab() {
             </div>
           )}
 
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="accent-green-600" />
+              <span className="text-sm text-gray-700">예약 발송</span>
+            </label>
+            {isScheduled && (
+              <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+            )}
+          </div>
+
           <button
             onClick={handleSend}
             disabled={sending || !selectedNotice}
             className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            안내 발송
+            {isScheduled ? '예약 발송' : '안내 발송'}
           </button>
           {sendResult && (
-            <div className={`p-3 rounded-lg text-sm ${sendResult.sent > 0 ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
-              총 {sendResult.total}명 중 {sendResult.sent}명에게 안전위생 안내를 발송했습니다.
-              {sendResult.failed > 0 && ` (실패: ${sendResult.failed}명)`}
+            <div className={`p-3 rounded-lg text-sm ${
+              sendResult.scheduled
+                ? 'bg-purple-50 border border-purple-200 text-purple-700'
+                : sendResult.sent > 0 ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'
+            }`}>
+              {sendResult.scheduled
+                ? `${sendResult.total}건이 ${sendResult.scheduled_at}에 예약되었습니다.`
+                : <>총 {sendResult.total}명 중 {sendResult.sent}명에게 안전위생 안내를 발송했습니다.
+                  {sendResult.failed > 0 && ` (실패: ${sendResult.failed}명)`}</>
+              }
             </div>
           )}
         </div>

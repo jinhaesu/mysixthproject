@@ -690,4 +690,111 @@ router.delete('/report-schedules/:id', async (req: AuthRequest, res: Response) =
   }
 });
 
+// POST /api/survey/responses/batch-edit-time - Batch edit clock-in/out times
+router.post('/responses/batch-edit-time', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids, clock_in_time, clock_out_time } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: '수정할 항목을 선택해주세요.' });
+      return;
+    }
+
+    let updated = 0;
+    for (const id of ids) {
+      const request = await dbGet(`
+        SELECT sr.id, sr.date, resp.id as resp_id
+        FROM survey_requests sr
+        LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+        WHERE sr.id = ?
+      `, id);
+
+      if (!request || !request.resp_id) continue;
+
+      const updates: string[] = [];
+      const params: any[] = [];
+      if (clock_in_time !== undefined && clock_in_time !== '') {
+        updates.push('clock_in_time = ?');
+        params.push(clock_in_time);
+      }
+      if (clock_out_time !== undefined && clock_out_time !== '') {
+        updates.push('clock_out_time = ?');
+        params.push(clock_out_time);
+      }
+      if (updates.length === 0) continue;
+
+      updates.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(request.resp_id);
+      await dbRun(`UPDATE survey_responses SET ${updates.join(', ')} WHERE id = ?`, ...params);
+      updated++;
+    }
+
+    res.json({ success: true, updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/survey/responses/batch-delete - Batch delete survey requests and responses
+router.post('/responses/batch-delete', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: '삭제할 항목을 선택해주세요.' });
+      return;
+    }
+
+    let deleted = 0;
+    for (const id of ids) {
+      await dbRun('DELETE FROM survey_responses WHERE request_id = ?', id);
+      await dbRun('DELETE FROM survey_requests WHERE id = ?', id);
+      deleted++;
+    }
+
+    res.json({ success: true, deleted });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/survey/report-schedules/:id/send-now - Manually trigger a report
+router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Response) => {
+  try {
+    const schedule = await dbGet('SELECT * FROM report_schedules WHERE id = ? AND is_active = 1', req.params.id);
+    if (!schedule) {
+      res.status(404).json({ error: '스케줄을 찾을 수 없습니다.' });
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const kstHours = (now.getUTCHours() + 9) % 24;
+    const kstMinutes = now.getUTCMinutes();
+    const currentTime = `${String(kstHours).padStart(2, '0')}:${String(kstMinutes).padStart(2, '0')}`;
+
+    const stats = await dbGet(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as not_clocked_in,
+        SUM(CASE WHEN status = 'clock_in' THEN 1 ELSE 0 END) as clocked_in,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+      FROM survey_requests WHERE date = ?
+    `, today);
+
+    const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근완료: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명`;
+
+    const phones = JSON.parse(schedule.phones);
+    let sent = 0;
+    for (const phone of phones) {
+      const result = await sendGeneralSms(phone, message);
+      if (result.success) sent++;
+    }
+
+    await dbRun('UPDATE report_schedules SET last_sent_at = CURRENT_TIMESTAMP WHERE id = ?', schedule.id);
+
+    res.json({ success: true, sent, total: phones.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

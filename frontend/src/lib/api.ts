@@ -264,11 +264,27 @@ export async function deleteSafetyNotice(id: number) {
   return fetchAPI<any>(`/api/survey/safety-notices/${id}`, { method: 'DELETE' });
 }
 
-export async function sendSafetyNotice(date: string, noticeId: number, phones?: string[]) {
+export async function sendSafetyNotice(date: string, noticeId: number, phones?: string[], scheduledAt?: string) {
   return fetchAPI<any>('/api/survey/send-safety-notice', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, notice_id: noticeId, phones }),
+    body: JSON.stringify({ date, notice_id: noticeId, phones, scheduled_at: scheduledAt }),
+  });
+}
+
+export async function batchEditResponseTime(ids: number[], data: { clock_in_time?: string; clock_out_time?: string }) {
+  return fetchAPI<any>('/api/survey/responses/batch-edit-time', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, ...data }),
+  });
+}
+
+export async function batchDeleteResponses(ids: number[]) {
+  return fetchAPI<any>('/api/survey/responses/batch-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
   });
 }
 
@@ -370,6 +386,9 @@ export async function createReportSchedule(data: { time: string; phones: string[
 }
 export async function deleteReportSchedule(id: number) {
   return fetchAPI<any>(`/api/survey/report-schedules/${id}`, { method: 'DELETE' });
+}
+export async function sendReportNow(id: number) {
+  return fetchAPI<any>(`/api/survey/report-schedules/${id}/send-now`, { method: 'POST' });
 }
 
 // ===== Reminders =====

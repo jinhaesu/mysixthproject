@@ -17,6 +17,15 @@ interface Worker {
   planned_clock_out: string | null;
 }
 
+function formatPlannedTime(time: string | null): string {
+  if (!time) return "-";
+  const [h, m] = time.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return time;
+  const period = h < 12 ? "오전" : "오후";
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 function ReportContent() {
   const searchParams = useSearchParams();
   const dateParam = searchParams.get("date") || new Date().toISOString().slice(0, 10);
@@ -24,6 +33,7 @@ function ReportContent() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");
   const [filter, setFilter] = useState<"all" | "sent" | "clock_in" | "completed">("all");
+  const [deptFilter, setDeptFilter] = useState<string>("all");
 
   const load = useCallback(async () => {
     try {
@@ -63,9 +73,21 @@ function ReportContent() {
   const { totals } = data;
   const allWorkers: Worker[] = data.workers || [];
 
-  const filteredWorkers = filter === "all"
-    ? allWorkers
-    : allWorkers.filter(w => w.status === filter);
+  const departments = Array.from(new Set(allWorkers.map(w => w.department).filter(Boolean))) as string[];
+
+  const deptWorkers = deptFilter === "all" ? allWorkers : allWorkers.filter(w => (w.department || "") === deptFilter);
+  const displayTotals = {
+    total: deptWorkers.length,
+    not_clocked_in: deptWorkers.filter(w => w.status === 'sent').length,
+    clocked_in: deptWorkers.filter(w => w.status === 'clock_in').length,
+    completed: deptWorkers.filter(w => w.status === 'completed').length,
+  };
+
+  const filteredWorkers = allWorkers.filter(w => {
+    if (filter !== "all" && w.status !== filter) return false;
+    if (deptFilter !== "all" && (w.department || "") !== deptFilter) return false;
+    return true;
+  });
 
   const formatTime = (t: string | null) => {
     if (!t) return null;
@@ -78,7 +100,7 @@ function ReportContent() {
     return { bg: 'bg-red-500', text: 'text-white', label: '미출근' };
   };
 
-  const rate = totals.total > 0 ? Math.round(((totals.clocked_in + totals.completed) / totals.total) * 100) : 0;
+  const rate = displayTotals.total > 0 ? Math.round(((displayTotals.clocked_in + displayTotals.completed) / displayTotals.total) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -112,10 +134,10 @@ function ReportContent() {
         {/* Summary Cards */}
         <div className="grid grid-cols-4 gap-2">
           {[
-            { key: "all" as const, count: totals.total, label: "전체", border: "border-gray-200" },
-            { key: "clock_in" as const, count: totals.clocked_in, label: "출근중", border: "border-amber-300" },
-            { key: "completed" as const, count: totals.completed, label: "퇴근", border: "border-green-300" },
-            { key: "sent" as const, count: totals.not_clocked_in, label: "미출근", border: "border-red-300" },
+            { key: "all" as const, count: displayTotals.total, label: "전체", border: "border-gray-200" },
+            { key: "clock_in" as const, count: displayTotals.clocked_in, label: "출근중", border: "border-amber-300" },
+            { key: "completed" as const, count: displayTotals.completed, label: "퇴근", border: "border-green-300" },
+            { key: "sent" as const, count: displayTotals.not_clocked_in, label: "미출근", border: "border-red-300" },
           ].map(card => (
             <button
               key={card.key}
@@ -129,6 +151,31 @@ function ReportContent() {
             </button>
           ))}
         </div>
+
+        {/* Department Filter */}
+        {departments.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <button
+              onClick={() => setDeptFilter("all")}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                deptFilter === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"
+              }`}
+            >
+              전체
+            </button>
+            {departments.map(dept => (
+              <button
+                key={dept}
+                onClick={() => setDeptFilter(dept)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  deptFilter === dept ? "bg-purple-600 text-white" : "bg-white text-gray-600 border border-gray-200"
+                }`}
+              >
+                {dept}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Worker List - Mobile Card Style */}
         <div className="space-y-2">
@@ -173,14 +220,14 @@ function ReportContent() {
                         <span className="text-gray-400">출근</span>
                         <p className="font-semibold text-gray-800 mt-0.5">
                           {formatTime(w.clock_in_time) || "-"}
-                          {w.planned_clock_in && <span className="text-gray-400 font-normal ml-1">/ {w.planned_clock_in}</span>}
+                          {w.planned_clock_in && <span className="text-gray-400 font-normal ml-1">/ {formatPlannedTime(w.planned_clock_in)}</span>}
                         </p>
                       </div>
                       <div>
                         <span className="text-gray-400">퇴근</span>
                         <p className="font-semibold text-gray-800 mt-0.5">
                           {formatTime(w.clock_out_time) || "-"}
-                          {w.planned_clock_out && <span className="text-gray-400 font-normal ml-1">/ {w.planned_clock_out}</span>}
+                          {w.planned_clock_out && <span className="text-gray-400 font-normal ml-1">/ {formatPlannedTime(w.planned_clock_out)}</span>}
                         </p>
                       </div>
                     </div>

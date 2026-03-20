@@ -85,6 +85,15 @@ function timeCompareClass(actual: string | null, planned: string | null, type: '
   }
 }
 
+function formatPlannedTime(time: string | null): string {
+  if (!time) return "-";
+  const [h, m] = time.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return time;
+  const period = h < 12 ? "오전" : "오후";
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 function statusColor(status: string) {
   switch (status) {
     case "sent":
@@ -324,7 +333,7 @@ export default function AttendanceLivePage() {
                                     {w.phone}
                                   </td>
                                   <td className="py-2.5 px-4 whitespace-nowrap text-gray-400 text-xs">
-                                    {w.planned_clock_in || "-"}
+                                    {formatPlannedTime(w.planned_clock_in)}
                                   </td>
                                   <td className="py-2.5 px-4 whitespace-nowrap">
                                     <span className={timeCompareClass(w.clock_in_time, w.planned_clock_in, 'in')}>
@@ -336,11 +345,11 @@ export default function AttendanceLivePage() {
                                         : "-"}
                                     </span>
                                     {w.planned_clock_in && (
-                                      <span className="text-xs text-gray-400 ml-1">({w.planned_clock_in})</span>
+                                      <span className="text-xs text-gray-400 ml-1">({formatPlannedTime(w.planned_clock_in)})</span>
                                     )}
                                   </td>
                                   <td className="py-2.5 px-4 whitespace-nowrap text-gray-400 text-xs">
-                                    {w.planned_clock_out || "-"}
+                                    {formatPlannedTime(w.planned_clock_out)}
                                   </td>
                                   <td className="py-2.5 px-4 whitespace-nowrap">
                                     <span className={timeCompareClass(w.clock_out_time, w.planned_clock_out, 'out')}>
@@ -352,7 +361,7 @@ export default function AttendanceLivePage() {
                                         : "-"}
                                     </span>
                                     {w.planned_clock_out && (
-                                      <span className="text-xs text-gray-400 ml-1">({w.planned_clock_out})</span>
+                                      <span className="text-xs text-gray-400 ml-1">({formatPlannedTime(w.planned_clock_out)})</span>
                                     )}
                                   </td>
                                   <td className="py-2.5 px-4 whitespace-nowrap">

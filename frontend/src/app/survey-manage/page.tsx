@@ -57,6 +57,15 @@ interface Workplace {
   radius_meters: number;
 }
 
+function formatPlannedTime(time: string | null): string {
+  if (!time) return "-";
+  const [h, m] = time.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return time;
+  const period = h < 12 ? "오전" : "오후";
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   scheduled: { label: "예약됨", cls: "bg-purple-50 text-purple-700 border border-purple-200" },
   sent: { label: "발송완료", cls: "bg-blue-50 text-blue-700 border border-blue-200" },
@@ -866,8 +875,8 @@ function ResponsesTab() {
                         <span className="text-gray-300">-</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{r.planned_clock_in || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{r.planned_clock_out || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{formatPlannedTime(r.planned_clock_in)}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{formatPlannedTime(r.planned_clock_out)}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.department || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.gender || "-"}</td>

@@ -434,9 +434,12 @@ function SurveyContent() {
               <h2 className="font-semibold">{t(lang, 'clockInTitle')}</h2>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-xs text-amber-700 font-medium">
-                {t(lang, 'allFieldsRequired')}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-xs text-red-700 font-bold">
+                {lang === 'ko' ? '정확하게 입력하지 않으면 급여가 지급되지 않습니다.' :
+                 lang === 'en' ? 'Payment will not be made if information is not entered accurately.' :
+                 lang === 'zh' ? '如未准确填写，将不予支付工资。' :
+                 'Nếu không nhập chính xác, lương sẽ không được thanh toán.'}
               </p>
             </div>
 
@@ -579,7 +582,7 @@ function SurveyContent() {
             {/* Agency */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {lang === 'ko' ? '연결 업체 (파견사)' : lang === 'en' ? 'Recruitment Agency' : lang === 'zh' ? '派遣公司' : 'Công ty phái cử'} <span className="text-red-500">*</span>
+                {lang === 'ko' ? '연결 업체 (파견/알바)' : lang === 'en' ? 'Recruitment Agency' : lang === 'zh' ? '派遣公司' : 'Công ty phái cử'} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -593,7 +596,7 @@ function SurveyContent() {
             {/* Overtime Availability */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {lang === 'ko' ? '추가 잔업 가능 여부' : lang === 'en' ? 'Overtime Availability' : lang === 'zh' ? '加班意愿' : 'Sẵn sàng làm thêm'} <span className="text-red-500">*</span>
+                {lang === 'ko' ? '추가 잔업 가능 시, 희망 여부' : lang === 'en' ? 'Overtime Availability' : lang === 'zh' ? '加班意愿' : 'Sẵn sàng làm thêm'} <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -681,6 +684,14 @@ function SurveyContent() {
                     </>
                   )}
                 </button>
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-xs text-red-700 font-bold text-center">
+                    {lang === 'ko' ? '퇴근 처리를 정확히 하지 않으면 급여가 지급되지 않습니다.' :
+                     lang === 'en' ? 'Payment will not be made if clock-out is not recorded properly.' :
+                     lang === 'zh' ? '如未正确记录下班，将不予支付工资。' :
+                     'Nếu không chấm công ra chính xác, lương sẽ không được thanh toán.'}
+                  </p>
+                </div>
               </div>
             )}
           </div>

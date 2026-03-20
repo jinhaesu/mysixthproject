@@ -78,6 +78,102 @@ async function checkAndSendSafetyNotices() {
   }
 }
 
+async function checkAndSendReports() {
+  try {
+    const now = new Date();
+    // KST time (UTC+9)
+    const kstHours = (now.getUTCHours() + 9) % 24;
+    const kstMinutes = now.getUTCMinutes();
+    const currentTime = `${String(kstHours).padStart(2, '0')}:${String(kstMinutes).padStart(2, '0')}`;
+
+    // Match within 10-minute window
+    const schedules = await dbAll('SELECT * FROM report_schedules WHERE is_active = 1');
+
+    for (const schedule of schedules) {
+      const [schedH, schedM] = schedule.time.split(':').map(Number);
+      const diffMinutes = Math.abs((kstHours * 60 + kstMinutes) - (schedH * 60 + schedM));
+
+      if (diffMinutes > 5) continue; // Not within window
+
+      // Check if already sent in last 30 minutes
+      if (schedule.last_sent_at) {
+        const lastSent = new Date(schedule.last_sent_at);
+        if (now.getTime() - lastSent.getTime() < 30 * 60 * 1000) continue;
+      }
+
+      // Get today's dashboard data
+      const today = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const stats = await dbGet(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as not_clocked_in,
+          SUM(CASE WHEN status = 'clock_in' THEN 1 ELSE 0 END) as clocked_in,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+        FROM survey_requests WHERE date = ?
+      `, today);
+
+      if (!stats || stats.total === 0) continue;
+
+      const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats.total}명\n출근완료: ${stats.clocked_in || 0}명\n미출근: ${stats.not_clocked_in || 0}명\n퇴근완료: ${stats.completed || 0}명`;
+
+      const phones = JSON.parse(schedule.phones);
+      for (const phone of phones) {
+        await sendGeneralSms(phone, message);
+      }
+
+      await dbRun('UPDATE report_schedules SET last_sent_at = CURRENT_TIMESTAMP WHERE id = ?', schedule.id);
+      console.log(`[Report] Sent status report at ${currentTime} to ${phones.length} recipients`);
+    }
+  } catch (err) {
+    console.error('[Report] Error:', err);
+  }
+}
+
+async function checkAndSendScheduledSurveys() {
+  try {
+    const now = new Date().toISOString();
+    const pending = await dbAll(`
+      SELECT sr.id, sr.phone, sr.token, sr.date, sr.department, sw.name as workplace_name
+      FROM survey_requests sr
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      WHERE sr.scheduled_status = 'scheduled' AND sr.scheduled_at <= ?
+    `, now);
+
+    for (const req of pending) {
+      const result = await sendSurveyMessage(req.phone, req.token, req.date, req.workplace_name || '', 'sms', req.department || '');
+      if (result.success) {
+        await dbRun("UPDATE survey_requests SET scheduled_status = 'sent', status = 'sent' WHERE id = ?", req.id);
+      }
+    }
+    if (pending.length > 0) console.log(`[Scheduler] Sent ${pending.length} scheduled surveys`);
+  } catch (err) {
+    console.error('[Scheduler] Error checking scheduled surveys:', err);
+  }
+}
+
+async function checkAndSendScheduledMessages() {
+  try {
+    const now = new Date().toISOString();
+    const pending = await dbAll(`
+      SELECT sm.*, sn.content as notice_content
+      FROM scheduled_messages sm
+      LEFT JOIN safety_notices sn ON sm.notice_id = sn.id
+      WHERE sm.status = 'scheduled' AND sm.scheduled_at <= ?
+    `, now);
+
+    for (const msg of pending) {
+      const phones = JSON.parse(msg.phones);
+      for (const phone of phones) {
+        await sendGeneralSms(phone, msg.notice_content);
+      }
+      await dbRun("UPDATE scheduled_messages SET status = 'sent' WHERE id = ?", msg.id);
+    }
+    if (pending.length > 0) console.log(`[Scheduler] Sent ${pending.length} scheduled messages`);
+  } catch (err) {
+    console.error('[Scheduler] Error checking scheduled messages:', err);
+  }
+}
+
 export function startReminderService() {
   console.log(`[Reminder] Service started (interval: ${REMINDER_INTERVAL_MS / 60000}min, threshold: ${THRESHOLD_HOURS}h)`);
   setInterval(checkAndSendReminders, REMINDER_INTERVAL_MS);
@@ -85,4 +181,9 @@ export function startReminderService() {
   setInterval(checkAndSendSafetyNotices, 60 * 60 * 1000);
   // Also run once on startup (after 30 seconds delay)
   setTimeout(checkAndSendSafetyNotices, 30 * 1000);
+  // Report schedule check every 10 minutes
+  setInterval(checkAndSendReports, 10 * 60 * 1000);
+  // Check scheduled items every 5 minutes
+  setInterval(checkAndSendScheduledSurveys, 5 * 60 * 1000);
+  setInterval(checkAndSendScheduledMessages, 5 * 60 * 1000);
 }

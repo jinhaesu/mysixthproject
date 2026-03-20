@@ -72,4 +72,11 @@ export interface SurveyPublicData {
     worker_name_ko: string;
     worker_name_en: string;
   } | null;
+  worker: {
+    name_ko: string;
+    name_en: string;
+    bank_name: string;
+    bank_account: string;
+    emergency_contact: string;
+  } | null;
 }

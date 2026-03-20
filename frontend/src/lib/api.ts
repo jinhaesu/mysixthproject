@@ -186,7 +186,7 @@ export async function deleteSurveyWorkplace(id: number) {
 }
 
 // Send survey
-export async function sendSurvey(data: { phone: string; date: string; workplace_id: number | null; message_type: string; department?: string }) {
+export async function sendSurvey(data: { phone: string; date: string; workplace_id: number | null; message_type: string; department?: string; planned_clock_in?: string; planned_clock_out?: string; scheduled_at?: string }) {
   return fetchAPI<any>('/api/survey/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -194,7 +194,7 @@ export async function sendSurvey(data: { phone: string; date: string; workplace_
   });
 }
 
-export async function sendSurveyBatch(data: { phones: string[]; date: string; workplace_id: number | null; message_type: string; department?: string }) {
+export async function sendSurveyBatch(data: { phones: string[]; date: string; workplace_id: number | null; message_type: string; department?: string; planned_clock_in?: string; planned_clock_out?: string; scheduled_at?: string }) {
   return fetchAPI<any>('/api/survey/send-batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -357,6 +357,19 @@ export async function exportPayrollExcel(year: number, month: number) {
   });
   if (!res.ok) throw new Error('급여 엑셀 다운로드 실패');
   return res.blob();
+}
+
+// ===== Report Schedules =====
+export async function getReportSchedules() {
+  return fetchAPI<any[]>('/api/survey/report-schedules');
+}
+export async function createReportSchedule(data: { time: string; phones: string[] }) {
+  return fetchAPI<any>('/api/survey/report-schedules', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+}
+export async function deleteReportSchedule(id: number) {
+  return fetchAPI<any>(`/api/survey/report-schedules/${id}`, { method: 'DELETE' });
 }
 
 // ===== Reminders =====

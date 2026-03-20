@@ -311,6 +311,48 @@ export async function initializeDB(): Promise<void> {
   // Migrations
   try { await pool.query('ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS reminder_sent INTEGER DEFAULT 0'); } catch {}
   try { await pool.query('ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ'); } catch {}
+  try { await pool.query("ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS department TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ"); } catch {}
+  try { await pool.query("ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS scheduled_status TEXT DEFAULT 'immediate'"); } catch {}
+  try { await pool.query("ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS planned_clock_in TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS planned_clock_out TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT ''"); } catch {}
+  try { await pool.query('ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS birth_year INTEGER'); } catch {}
+  try { await pool.query('ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS agreement_accepted INTEGER DEFAULT 0'); } catch {}
+  try { await pool.query('ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS agreement_accepted_at TIMESTAMPTZ'); } catch {}
+  try { await pool.query("ALTER TABLE workers ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT ''"); } catch {}
+  try { await pool.query('ALTER TABLE workers ADD COLUMN IF NOT EXISTS birth_year INTEGER'); } catch {}
+
+  // Scheduled messages table
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS scheduled_messages (
+        id SERIAL PRIMARY KEY,
+        type TEXT NOT NULL,
+        notice_id INTEGER REFERENCES safety_notices(id),
+        phones TEXT NOT NULL,
+        date TEXT NOT NULL,
+        scheduled_at TIMESTAMPTZ NOT NULL,
+        status TEXT DEFAULT 'scheduled',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch {}
+
+  // Report schedules table
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS report_schedules (
+        id SERIAL PRIMARY KEY,
+        time TEXT NOT NULL,
+        phones TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        last_sent_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch {}
 
   // Safety notice templates
   try {

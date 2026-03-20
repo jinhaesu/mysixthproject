@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { getAttendanceLiveDashboard } from "@/lib/api";
+import {
+  getAttendanceLiveDashboard,
+  getReportSchedules,
+  createReportSchedule,
+  deleteReportSchedule,
+} from "@/lib/api";
 import {
   Activity,
   RefreshCw,
@@ -11,6 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Settings,
+  Trash2,
+  Plus,
 } from "lucide-react";
 
 interface WorkplaceSummary {
@@ -32,6 +40,8 @@ interface Worker {
   worker_name_ko: string | null;
   clock_in_time: string | null;
   clock_out_time: string | null;
+  planned_clock_in: string | null;
+  planned_clock_out: string | null;
 }
 
 interface DashboardData {
@@ -63,6 +73,16 @@ function statusLabel(status: string) {
   }
 }
 
+function timeCompareClass(actual: string | null, planned: string | null, type: 'in' | 'out'): string {
+  if (!actual || !planned) return 'text-gray-700';
+  const actualTime = new Date(actual).toTimeString().slice(0, 5);
+  if (type === 'in') {
+    return actualTime <= planned ? 'text-green-600 font-medium' : 'text-red-600 font-medium';
+  } else {
+    return actualTime >= planned ? 'text-green-600 font-medium' : 'text-amber-600 font-medium';
+  }
+}
+
 function statusColor(status: string) {
   switch (status) {
     case "sent":
@@ -85,6 +105,10 @@ export default function AttendanceLivePage() {
   const [countdown, setCountdown] = useState(AUTO_REFRESH_SECONDS);
   const [expandedWorkplaces, setExpandedWorkplaces] = useState<Set<number>>(new Set());
   const countdownRef = useRef(AUTO_REFRESH_SECONDS);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [showReportConfig, setShowReportConfig] = useState(false);
+  const [reportTime, setReportTime] = useState("09:00");
+  const [reportPhones, setReportPhones] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -101,6 +125,7 @@ export default function AttendanceLivePage() {
   useEffect(() => {
     setLoading(true);
     fetchData();
+    getReportSchedules().then(setSchedules).catch(console.error);
   }, [fetchData]);
 
   // Auto-refresh countdown
@@ -273,7 +298,9 @@ export default function AttendanceLivePage() {
                               <tr className="bg-gray-50 text-left">
                                 <th className="py-2.5 px-5 font-medium text-gray-600">이름</th>
                                 <th className="py-2.5 px-4 font-medium text-gray-600">전화번호</th>
+                                <th className="py-2.5 px-4 font-medium text-gray-600">계획출근</th>
                                 <th className="py-2.5 px-4 font-medium text-gray-600">출근시간</th>
+                                <th className="py-2.5 px-4 font-medium text-gray-600">계획퇴근</th>
                                 <th className="py-2.5 px-4 font-medium text-gray-600">퇴근시간</th>
                                 <th className="py-2.5 px-4 font-medium text-gray-600">상태</th>
                               </tr>
@@ -287,21 +314,37 @@ export default function AttendanceLivePage() {
                                   <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">
                                     {w.phone}
                                   </td>
-                                  <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
-                                    {w.clock_in_time
-                                      ? new Date(w.clock_in_time).toLocaleTimeString("ko-KR", {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })
-                                      : "-"}
+                                  <td className="py-2.5 px-4 whitespace-nowrap text-gray-400 text-xs">
+                                    {w.planned_clock_in || "-"}
                                   </td>
-                                  <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
-                                    {w.clock_out_time
-                                      ? new Date(w.clock_out_time).toLocaleTimeString("ko-KR", {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })
-                                      : "-"}
+                                  <td className="py-2.5 px-4 whitespace-nowrap">
+                                    <span className={timeCompareClass(w.clock_in_time, w.planned_clock_in, 'in')}>
+                                      {w.clock_in_time
+                                        ? new Date(w.clock_in_time).toLocaleTimeString("ko-KR", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })
+                                        : "-"}
+                                    </span>
+                                    {w.planned_clock_in && (
+                                      <span className="text-xs text-gray-400 ml-1">({w.planned_clock_in})</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-4 whitespace-nowrap text-gray-400 text-xs">
+                                    {w.planned_clock_out || "-"}
+                                  </td>
+                                  <td className="py-2.5 px-4 whitespace-nowrap">
+                                    <span className={timeCompareClass(w.clock_out_time, w.planned_clock_out, 'out')}>
+                                      {w.clock_out_time
+                                        ? new Date(w.clock_out_time).toLocaleTimeString("ko-KR", {
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })
+                                        : "-"}
+                                    </span>
+                                    {w.planned_clock_out && (
+                                      <span className="text-xs text-gray-400 ml-1">({w.planned_clock_out})</span>
+                                    )}
                                   </td>
                                   <td className="py-2.5 px-4 whitespace-nowrap">
                                     <span
@@ -330,6 +373,118 @@ export default function AttendanceLivePage() {
           <p className="text-sm text-gray-500">데이터를 불러올 수 없습니다.</p>
         </div>
       )}
+
+      {/* Report Schedule Config */}
+      <div className="mt-6">
+        <button
+          onClick={() => setShowReportConfig(!showReportConfig)}
+          className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <Settings className="w-4 h-4" />
+          리포트 문자 설정
+          {showReportConfig ? (
+            <ChevronUp className="w-4 h-4" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )}
+        </button>
+
+        {showReportConfig && (
+          <div className="mt-3 bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            {/* Existing schedules */}
+            {schedules.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">등록된 스케줄</h4>
+                <div className="space-y-2">
+                  {schedules.map((s: any) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2.5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Clock className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm font-medium text-gray-800">{s.time}</span>
+                        <span className="text-xs text-gray-500">
+                          {(() => {
+                            try {
+                              return JSON.parse(s.phones).join(", ");
+                            } catch {
+                              return s.phones;
+                            }
+                          })()}
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await deleteReportSchedule(s.id);
+                          setSchedules(schedules.filter((x: any) => x.id !== s.id));
+                        }}
+                        className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Add new schedule */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">새 스케줄 추가</h4>
+              <div className="flex flex-wrap gap-3 items-end">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">발송 시간</label>
+                  <input
+                    type="time"
+                    value={reportTime}
+                    onChange={(e) => setReportTime(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs text-gray-500 mb-1">
+                    수신 전화번호 (줄바꿈 구분)
+                  </label>
+                  <textarea
+                    value={reportPhones}
+                    onChange={(e) => setReportPhones(e.target.value)}
+                    placeholder={"010-1234-5678\n010-9876-5432"}
+                    rows={3}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    const phones = reportPhones
+                      .split("\n")
+                      .map((p) => p.trim())
+                      .filter(Boolean);
+                    if (!reportTime || phones.length === 0) {
+                      alert("시간과 전화번호를 입력해주세요.");
+                      return;
+                    }
+                    try {
+                      const created = await createReportSchedule({
+                        time: reportTime,
+                        phones,
+                      });
+                      setSchedules([...schedules, created]);
+                      setReportPhones("");
+                    } catch (err: any) {
+                      alert(err.message);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  추가
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

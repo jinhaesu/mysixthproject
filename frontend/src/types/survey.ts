@@ -58,6 +58,7 @@ export interface SurveyResponseWithDetails extends SurveyResponse {
 export interface SurveyPublicData {
   status: string;
   date: string;
+  department: string;
   workplace: {
     name: string;
     address: string;
@@ -70,5 +71,12 @@ export interface SurveyPublicData {
     clock_out_time: string | null;
     worker_name_ko: string;
     worker_name_en: string;
+  } | null;
+  worker: {
+    name_ko: string;
+    name_en: string;
+    bank_name: string;
+    bank_account: string;
+    emergency_contact: string;
   } | null;
 }

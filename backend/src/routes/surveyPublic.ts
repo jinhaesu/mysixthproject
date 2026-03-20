@@ -36,6 +36,7 @@ router.get('/:token', async (req: Request, res: Response) => {
   res.json({
     status: request.status,
     date: request.date,
+    department: request.department || '',
     workplace: request.workplace_id ? {
       name: request.workplace_name,
       address: request.workplace_address,
@@ -62,10 +63,10 @@ router.get('/:token', async (req: Request, res: Response) => {
 // POST /api/survey-public/:token/clock-in - Submit clock-in
 router.post('/:token/clock-in', async (req: Request, res: Response) => {
   const { token } = req.params;
-  const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo } = req.body;
+  const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo, gender, birth_year, agreement_accepted, agreement_accepted_at } = req.body;
 
-  if (!worker_name_ko || !worker_name_en) {
-    res.status(400).json({ error: '한글 이름과 영문 이름을 모두 입력해주세요.' });
+  if (!worker_name_ko || !worker_name_en || !bank_name || !bank_account || !id_number || !emergency_contact || !gender || !birth_year || !agreement_accepted) {
+    res.status(400).json({ error: '모든 필수 항목을 입력해주세요.' });
     return;
   }
 
@@ -120,22 +121,28 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       UPDATE survey_responses SET
         clock_in_time = ?, clock_in_lat = ?, clock_in_lng = ?, clock_in_gps_valid = ?,
         worker_name_ko = ?, worker_name_en = ?, bank_name = ?, bank_account = ?,
-        id_number = ?, emergency_contact = ?, memo = ?, updated_at = CURRENT_TIMESTAMP
+        id_number = ?, emergency_contact = ?, memo = ?,
+        gender = ?, birth_year = ?, agreement_accepted = ?, agreement_accepted_at = ?,
+        updated_at = CURRENT_TIMESTAMP
       WHERE request_id = ?
     `,
       clockInTime, latitude || null, longitude || null, gpsValid,
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
-      id_number || '', emergency_contact || '', memo || '', request.id
+      id_number || '', emergency_contact || '', memo || '',
+      gender || '', birth_year || null, agreement_accepted ? 1 : 0, agreement_accepted_at || null,
+      request.id
     );
   } else {
     await dbRun(`
       INSERT INTO survey_responses (request_id, clock_in_time, clock_in_lat, clock_in_lng, clock_in_gps_valid,
-        worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo,
+        gender, birth_year, agreement_accepted, agreement_accepted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       request.id, clockInTime, latitude || null, longitude || null, gpsValid,
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
-      id_number || '', emergency_contact || '', memo || ''
+      id_number || '', emergency_contact || '', memo || '',
+      gender || '', birth_year || null, agreement_accepted ? 1 : 0, agreement_accepted_at || null
     );
   }
 
@@ -146,9 +153,9 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
     const existingWorker = await dbGet('SELECT id FROM workers WHERE phone = ?', request.phone);
     if (!existingWorker) {
       await dbRun(`
-        INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '');
+        INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, gender, birth_year)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null);
     } else {
       await dbRun(`
         UPDATE workers SET
@@ -158,9 +165,11 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
           bank_account = COALESCE(NULLIF(?, ''), bank_account),
           id_number = COALESCE(NULLIF(?, ''), id_number),
           emergency_contact = COALESCE(NULLIF(?, ''), emergency_contact),
+          gender = COALESCE(NULLIF(?, ''), gender),
+          birth_year = COALESCE(?, birth_year),
           updated_at = CURRENT_TIMESTAMP
         WHERE phone = ?
-      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', request.phone);
+      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, request.phone);
     }
   } catch (err) {
     console.error('[Worker] Auto-upsert failed:', err);

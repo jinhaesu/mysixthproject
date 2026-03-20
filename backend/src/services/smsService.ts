@@ -20,8 +20,11 @@ function buildSurveyUrl(token: string): string {
   return `${SURVEY_BASE_URL}?token=${token}`;
 }
 
-function buildMessage(surveyUrl: string, date: string, workplaceName: string): string {
-  return `[조인앤조인 출퇴근 기록]\n${date} 근무 설문입니다.\n근무지: ${workplaceName}\n아래 링크를 눌러 출퇴근을 기록해주세요.\n${surveyUrl}`;
+function buildMessage(surveyUrl: string, date: string, workplaceName: string, department?: string): string {
+  let msg = `[조인앤조인 출퇴근 기록]\n${date} 근무 설문입니다.\n근무지: ${workplaceName}`;
+  if (department) msg += `\n배정파트: ${department}`;
+  msg += `\n아래 링크를 눌러 출퇴근을 기록해주세요.\n${surveyUrl}`;
+  return msg;
 }
 
 function buildSolapiAuth(apiKey: string, apiSecret: string): string {
@@ -101,10 +104,11 @@ export async function sendSurveyMessage(
   token: string,
   date: string,
   workplaceName: string,
-  method: 'sms' | 'kakao' = 'sms'
+  method: 'sms' | 'kakao' = 'sms',
+  department?: string
 ): Promise<SendResult> {
   const surveyUrl = buildSurveyUrl(token);
-  const message = buildMessage(surveyUrl, date, workplaceName);
+  const message = buildMessage(surveyUrl, date, workplaceName, department);
 
   if (method === 'kakao') {
     const kakaoResult = await sendKakaoAlimtalk(phone, message);

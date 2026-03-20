@@ -136,10 +136,15 @@ function SendTab() {
   const [bulkPhones, setBulkPhones] = useState("");
   const [recentSends, setRecentSends] = useState<any[]>([]);
   const [mode, setMode] = useState<"single" | "batch">("single");
+  const [department, setDepartment] = useState("");
   const [stats, setStats] = useState<any>(null);
   const [reminderHours, setReminderHours] = useState(2);
   const [reminding, setReminding] = useState(false);
   const [reminderResult, setReminderResult] = useState<any>(null);
+  const [plannedClockIn, setPlannedClockIn] = useState("");
+  const [plannedClockOut, setPlannedClockOut] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [isScheduled, setIsScheduled] = useState(false);
 
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(console.error);
@@ -159,8 +164,11 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType });
-      if (result.message && !result.message.success) {
+      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? scheduledAt : undefined });
+      if (result.scheduled) {
+        alert("설문이 예약되었습니다.");
+        setPhone("");
+      } else if (result.message && !result.message.success) {
         alert(`발송 실패: ${result.message.error || '알 수 없는 오류'}`);
       } else {
         alert("설문이 발송되었습니다.");
@@ -180,8 +188,8 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType });
-      alert(`${result.total}건 발송 완료`);
+      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? scheduledAt : undefined });
+      alert(result.scheduled ? `${result.total}건 예약 완료` : `${result.total}건 발송 완료`);
       setBulkPhones("");
       loadRecentSends();
     } catch (err: any) {
@@ -258,6 +266,39 @@ function SendTab() {
               </select>
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">배정 파트</label>
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">파트 선택 (선택사항)</option>
+                <option value="생산팀">생산팀</option>
+                <option value="물류팀">물류팀</option>
+                <option value="포장팀">포장팀</option>
+                <option value="품질관리팀">품질관리팀</option>
+                <option value="기타">기타</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 출근시간</label>
+              <input
+                type="time"
+                value={plannedClockIn}
+                onChange={(e) => setPlannedClockIn(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 퇴근시간</label>
+              <input
+                type="time"
+                value={plannedClockOut}
+                onChange={(e) => setPlannedClockOut(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">발송 방법</label>
               <div className="flex gap-4 pt-1.5">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -282,6 +323,20 @@ function SendTab() {
                 </label>
               </div>
             </div>
+          </div>
+          <div className="flex items-center gap-3 pt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="accent-blue-600" />
+              <span className="text-sm text-gray-700">예약 발송</span>
+            </label>
+            {isScheduled && (
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
         </div>
 
@@ -658,6 +713,8 @@ function ResponsesTab() {
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">출근GPS</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">퇴근시간</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">퇴근GPS</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계획출근</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계획퇴근</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무지</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">은행</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계좌</th>
@@ -722,6 +779,8 @@ function ResponsesTab() {
                         <span className="text-gray-300">-</span>
                       )}
                     </td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{r.planned_clock_in || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{r.planned_clock_out || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.bank_name || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap font-mono text-xs text-gray-600">{r.bank_account || "-"}</td>

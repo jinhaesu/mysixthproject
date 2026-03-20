@@ -193,7 +193,7 @@ router.delete('/safety-notices/:id', async (req: AuthRequest, res: Response) => 
 // POST /api/survey/send-safety-notice - Send safety notice to phones (direct) or survey workers
 router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
   try {
-    const { date, notice_id, phones } = req.body;
+    const { date, notice_id, phones, scheduled_at } = req.body;
     if (!notice_id) {
       res.status(400).json({ error: '안내문을 선택해주세요.' });
       return;
@@ -226,6 +226,22 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // If scheduled, insert into scheduled_messages table instead of sending immediately
+    if (scheduled_at) {
+      await dbRun(
+        'INSERT INTO scheduled_messages (notice_id, phones, scheduled_at, status) VALUES (?, ?, ?, ?)',
+        notice_id, JSON.stringify(targetPhones), scheduled_at, 'scheduled'
+      );
+      res.json({
+        success: true,
+        total: targetPhones.length,
+        scheduled: true,
+        scheduled_at,
+        message: `${targetPhones.length}건이 예약되었습니다.`,
+      });
+      return;
+    }
+
     let sentCount = 0;
     const errors: string[] = [];
 
@@ -254,7 +270,7 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
 
 // POST /api/survey/send - Send survey to a single phone
 router.post('/send', async (req: AuthRequest, res: Response) => {
-  const { phone, date, workplace_id, message_type } = req.body;
+  const { phone, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at } = req.body;
 
   if (!phone || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호, 날짜, 근무지는 필수입니다.' });
@@ -269,21 +285,25 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
   const token = uuidv4();
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+  const isScheduled = !!scheduled_at;
 
   // Create survey request
   const result = await dbRun(`
-    INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `, token, phone, workplace_id, date, message_type || 'sms', expiresAt);
+    INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, token, phone, workplace_id, date, message_type || 'sms', expiresAt, department || '', planned_clock_in || null, planned_clock_out || null, scheduled_at || null, isScheduled ? 'scheduled' : 'immediate');
 
   // Create empty response row
   await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
-  // Send SMS/KakaoTalk
-  const sendResult = await sendSurveyMessage(phone, token, date, workplace.name, message_type || 'sms');
+  // Only send SMS if not scheduled
+  let sendResult: any = { success: true };
+  if (!isScheduled) {
+    sendResult = await sendSurveyMessage(phone, token, date, workplace.name, message_type || 'sms', department || '');
 
-  if (sendResult.messageId) {
-    await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
+    if (sendResult.messageId) {
+      await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
+    }
   }
 
   const created = await dbGet(`
@@ -296,12 +316,13 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   res.status(201).json({
     request: created,
     message: sendResult,
+    scheduled: isScheduled,
   });
 });
 
 // POST /api/survey/send-batch - Send to multiple phones
 router.post('/send-batch', async (req: AuthRequest, res: Response) => {
-  const { phones, date, workplace_id, message_type } = req.body;
+  const { phones, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at } = req.body;
 
   if (!phones || !Array.isArray(phones) || phones.length === 0 || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호 목록, 날짜, 근무지는 필수입니다.' });
@@ -314,6 +335,7 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
     return;
   }
 
+  const isScheduled = !!scheduled_at;
   const results = [];
 
   for (const phone of phones) {
@@ -324,22 +346,26 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 
     const result = await dbRun(`
-      INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt);
+      INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt, department || '', planned_clock_in || null, planned_clock_out || null, scheduled_at || null, isScheduled ? 'scheduled' : 'immediate');
 
     await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
-    const sendResult = await sendSurveyMessage(trimmedPhone, token, date, workplace.name, message_type || 'sms');
+    if (!isScheduled) {
+      const sendResult = await sendSurveyMessage(trimmedPhone, token, date, workplace.name, message_type || 'sms', department || '');
 
-    if (sendResult.messageId) {
-      await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
+      if (sendResult.messageId) {
+        await dbRun('UPDATE survey_requests SET message_id = ? WHERE id = ?', sendResult.messageId, result.lastInsertRowid);
+      }
+
+      results.push({ phone: trimmedPhone, success: sendResult.success, error: sendResult.error });
+    } else {
+      results.push({ phone: trimmedPhone, success: true, scheduled: true });
     }
-
-    results.push({ phone: trimmedPhone, success: sendResult.success, error: sendResult.error });
   }
 
-  res.json({ total: results.length, results });
+  res.json({ total: results.length, results, scheduled: isScheduled });
 });
 
 // POST /api/survey/resend/:id - Resend an expired or sent survey with new token
@@ -439,7 +465,8 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
     const workers = await dbAll(`
       SELECT sr.id, sr.phone, sr.status, sr.workplace_id,
              sw.name as workplace_name,
-             resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time
+             resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time,
+             sr.planned_clock_in, sr.planned_clock_out
       FROM survey_requests sr
       LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
       LEFT JOIN survey_responses resp ON sr.id = resp.request_id
@@ -531,7 +558,8 @@ router.get('/responses', async (req: AuthRequest, res: Response) => {
            resp.clock_in_time, resp.clock_in_gps_valid, resp.clock_out_time, resp.clock_out_gps_valid,
            resp.worker_name_ko, resp.worker_name_en, resp.bank_name, resp.bank_account,
            resp.id_number, resp.emergency_contact, resp.memo,
-           sw.name as workplace_name, sw.address as workplace_address
+           sw.name as workplace_name, sw.address as workplace_address,
+           sr.planned_clock_in, sr.planned_clock_out
     FROM survey_requests sr
     LEFT JOIN survey_responses resp ON sr.id = resp.request_id
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
@@ -610,7 +638,8 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
 
   const rows = await dbAll(`
     SELECT sr.*, sw.name as workplace_name,
-           resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time
+           resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time,
+           sr.planned_clock_in, sr.planned_clock_out
     FROM survey_requests sr
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
     LEFT JOIN survey_responses resp ON sr.id = resp.request_id
@@ -622,5 +651,43 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
   res.json(rows);
 });
 
+
+// ===== Report Schedules =====
+
+router.get('/report-schedules', async (_req: AuthRequest, res: Response) => {
+  try {
+    const schedules = await dbAll('SELECT * FROM report_schedules WHERE is_active = 1 ORDER BY time');
+    res.json(schedules);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/report-schedules', async (req: AuthRequest, res: Response) => {
+  try {
+    const { time, phones } = req.body;
+    if (!time || !phones) {
+      res.status(400).json({ error: '시간과 전화번호는 필수입니다.' });
+      return;
+    }
+    const phonesJson = JSON.stringify(Array.isArray(phones) ? phones : [phones]);
+    const result = await dbRun(
+      'INSERT INTO report_schedules (time, phones) VALUES (?, ?)', time, phonesJson
+    );
+    const created = await dbGet('SELECT * FROM report_schedules WHERE id = ?', result.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/report-schedules/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('UPDATE report_schedules SET is_active = 0 WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 export default router;

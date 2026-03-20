@@ -229,8 +229,8 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
     // If scheduled, insert into scheduled_messages table instead of sending immediately
     if (scheduled_at) {
       await dbRun(
-        'INSERT INTO scheduled_messages (notice_id, phones, scheduled_at, status) VALUES (?, ?, ?, ?)',
-        notice_id, JSON.stringify(targetPhones), scheduled_at, 'scheduled'
+        'INSERT INTO scheduled_messages (type, notice_id, phones, date, scheduled_at, status) VALUES (?, ?, ?, ?, ?, ?)',
+        'safety_notice', notice_id, JSON.stringify(targetPhones), date || new Date().toISOString().slice(0, 10), scheduled_at, 'scheduled'
       );
       res.json({
         success: true,
@@ -780,7 +780,9 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
       FROM survey_requests WHERE date = ?
     `, today);
 
-    const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근완료: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const detailLink = `${frontendUrl}/attendance-live`;
+    const message = `[조인앤조인 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근완료: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
     const phones = JSON.parse(schedule.phones);
     let sent = 0;

@@ -146,7 +146,7 @@ function SendTab() {
   const [reminderResult, setReminderResult] = useState<any>(null);
   const [plannedClockIn, setPlannedClockIn] = useState("");
   const [plannedClockOut, setPlannedClockOut] = useState("");
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [isScheduled, setIsScheduled] = useState(false);
 
   useEffect(() => {
@@ -556,8 +556,8 @@ function ResponsesTab() {
   const [editClockIn, setEditClockIn] = useState("");
   const [editClockOut, setEditClockOut] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [batchClockIn, setBatchClockIn] = useState("");
-  const [batchClockOut, setBatchClockOut] = useState("");
+  const [batchTimeType, setBatchTimeType] = useState<'clock_in' | 'clock_out'>('clock_in');
+  const [batchTimeValue, setBatchTimeValue] = useState(() => new Date().toISOString().slice(0, 16));
 
   const handleTimeSave = async () => {
     if (editingId === null) return;
@@ -698,24 +698,26 @@ function ResponsesTab() {
       {selectedIds.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium text-blue-700">{selectedIds.length}건 선택</span>
-          <input type="datetime-local" value={batchClockIn} onChange={(e) => setBatchClockIn(e.target.value)}
-            placeholder="출근시간" className="px-2 py-1 border border-blue-300 rounded text-xs w-44 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-          <input type="datetime-local" value={batchClockOut} onChange={(e) => setBatchClockOut(e.target.value)}
-            placeholder="퇴근시간" className="px-2 py-1 border border-blue-300 rounded text-xs w-44 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          <select value={batchTimeType} onChange={(e) => setBatchTimeType(e.target.value as 'clock_in' | 'clock_out')}
+            className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <option value="clock_in">출근시간</option>
+            <option value="clock_out">퇴근시간</option>
+          </select>
+          <input type="datetime-local" value={batchTimeValue} onChange={(e) => setBatchTimeValue(e.target.value)}
+            className="px-2 py-1.5 border border-blue-300 rounded text-xs w-44 focus:outline-none focus:ring-1 focus:ring-blue-500" />
           <button onClick={async () => {
-            if (!batchClockIn && !batchClockOut) return alert("수정할 시간을 입력해주세요.");
+            if (!batchTimeValue) return alert("시간을 입력해주세요.");
             try {
-              await batchEditResponseTime(selectedIds, {
-                clock_in_time: batchClockIn || undefined,
-                clock_out_time: batchClockOut || undefined,
-              });
+              await batchEditResponseTime(selectedIds,
+                batchTimeType === 'clock_in'
+                  ? { clock_in_time: batchTimeValue }
+                  : { clock_out_time: batchTimeValue }
+              );
               setSelectedIds([]);
-              setBatchClockIn("");
-              setBatchClockOut("");
               load(pagination.page);
             } catch (err: any) { alert(err.message); }
           }} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
-            일괄 시간수정
+            일괄 수정
           </button>
           <button onClick={async () => {
             if (!confirm(`${selectedIds.length}건을 삭제하시겠습니까?`)) return;
@@ -1213,7 +1215,7 @@ function SafetyTab() {
   const [sendMode, setSendMode] = useState<"survey" | "direct">("direct");
   const [directPhones, setDirectPhones] = useState("");
   const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(() => new Date().toISOString().slice(0, 16));
 
   const load = async () => {
     try {

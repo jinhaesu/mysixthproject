@@ -960,4 +960,127 @@ router.post('/force-send-scheduled', async (_req: AuthRequest, res: Response) =>
   }
 });
 
+// ===== Weekly Holiday Pay (주휴수당) Monitoring =====
+
+// GET /api/survey/weekly-holiday-status - Weekly holiday pay monitoring
+router.get('/weekly-holiday-status', async (req: AuthRequest, res: Response) => {
+  try {
+    const { week_start, week_end } = req.query as Record<string, string>;
+
+    let monday: string;
+    let sundayStr: string;
+
+    if (week_start && week_end) {
+      monday = week_start;
+      sundayStr = week_end;
+    } else {
+      const now = new Date();
+      const day = now.getDay();
+      const mon = new Date(now);
+      mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+      monday = mon.toISOString().slice(0, 10);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      sundayStr = sun.toISOString().slice(0, 10);
+    }
+
+    // Get all survey-based attendance in this week
+    const records = await dbAll(`
+      SELECT sr.phone, sr.date, sr.department,
+             resp.worker_name_ko, resp.clock_in_time, resp.clock_out_time,
+             sw.name as workplace_name
+      FROM survey_requests sr
+      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+      LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+      WHERE sr.date >= ? AND sr.date <= ?
+        AND sr.status IN ('clock_in', 'completed')
+      ORDER BY sr.phone, sr.date
+    `, monday, sundayStr);
+
+    // Group by worker (phone)
+    const workerMap = new Map<string, any>();
+    for (const r of records) {
+      const key = r.phone;
+      if (!workerMap.has(key)) {
+        workerMap.set(key, {
+          phone: r.phone,
+          name: r.worker_name_ko || r.phone,
+          department: r.department || '',
+          workplace: r.workplace_name || '',
+          days: new Set<string>(),
+          total_hours: 0,
+          daily_details: [] as { date: string; hours: number }[],
+        });
+      }
+      const w = workerMap.get(key)!;
+      w.days.add(r.date);
+
+      // Calculate hours for this day
+      let hours = 0;
+      if (r.clock_in_time && r.clock_out_time) {
+        const inTime = new Date(r.clock_in_time);
+        const outTime = new Date(r.clock_out_time);
+        hours = Math.round(((outTime.getTime() - inTime.getTime()) / (1000 * 60 * 60)) * 10) / 10;
+      }
+      w.total_hours += hours;
+      w.daily_details.push({ date: r.date, hours });
+    }
+
+    // Build result with warnings
+    const workers = [];
+    for (const [, w] of workerMap) {
+      const workDays = w.days.size;
+      const totalHours = Math.round(w.total_hours * 10) / 10;
+
+      // 주휴수당 발생 조건: 주 15시간 이상 + 개근 (5일 이상)
+      const qualifies = totalHours >= 15 && workDays >= 5;
+
+      // 경고 레벨
+      let warning = 'safe'; // safe, caution, danger
+      let warningMessage = '';
+
+      if (qualifies) {
+        warning = 'danger';
+        warningMessage = `주휴수당 발생! (${workDays}일, ${totalHours}시간)`;
+      } else if (workDays >= 4 && totalHours >= 12) {
+        warning = 'caution';
+        warningMessage = `주의: 1일 추가 근무 시 주휴수당 발생 가능 (현재 ${workDays}일, ${totalHours}시간)`;
+      } else if (totalHours >= 13) {
+        warning = 'caution';
+        warningMessage = `주의: 시간 초과 임박 (현재 ${totalHours}시간/15시간)`;
+      }
+
+      workers.push({
+        phone: w.phone,
+        name: w.name,
+        department: w.department,
+        workplace: w.workplace,
+        work_days: workDays,
+        total_hours: totalHours,
+        qualifies,
+        warning,
+        warning_message: warningMessage,
+        daily_details: w.daily_details,
+      });
+    }
+
+    // Sort: danger first, then caution, then safe
+    const order: Record<string, number> = { danger: 0, caution: 1, safe: 2 };
+    workers.sort((a, b) => (order[a.warning] ?? 9) - (order[b.warning] ?? 9));
+
+    const summary = {
+      week_start: monday,
+      week_end: sundayStr,
+      total_workers: workers.length,
+      danger_count: workers.filter(w => w.warning === 'danger').length,
+      caution_count: workers.filter(w => w.warning === 'caution').length,
+      safe_count: workers.filter(w => w.warning === 'safe').length,
+    };
+
+    res.json({ summary, workers });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

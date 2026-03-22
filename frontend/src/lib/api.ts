@@ -410,6 +410,12 @@ export async function getAttendanceAnomalies(year: number, month: number) {
   return fetchAPI<any>(`/api/attendance/anomalies?year=${year}&month=${month}`);
 }
 
+// ===== Weekly Holiday Pay (주휴수당) =====
+export async function getWeeklyHolidayStatus(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/survey/weekly-holiday-status?${query}`);
+}
+
 export async function submitClockOut(token: string, data: any) {
   const res = await fetch(`${API_URL}/api/survey-public/${token}/clock-out`, {
     method: 'POST',

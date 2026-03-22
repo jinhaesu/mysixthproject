@@ -257,16 +257,22 @@ router.get('/notices', async (req: AuthRequest, res: Response) => {
 // POST /api/regular/notices - Create notice
 router.post('/notices', async (req: AuthRequest, res: Response) => {
   try {
-    const { title, content, date } = req.body;
+    const { title, content, date, date_type, end_date, target_department } = req.body;
 
-    if (!title || !content || !date) {
-      res.status(400).json({ error: '제목, 내용, 날짜는 필수입니다.' });
+    if (!title || !content) {
+      res.status(400).json({ error: '제목과 내용은 필수입니다.' });
+      return;
+    }
+
+    const dtype = date_type || 'specific';
+    if (dtype === 'specific' && !date) {
+      res.status(400).json({ error: '날짜를 지정해주세요.' });
       return;
     }
 
     const result = await dbRun(
-      'INSERT INTO regular_notices (title, content, date) VALUES (?, ?, ?)',
-      title, content, date
+      'INSERT INTO regular_notices (title, content, date, date_type, end_date, target_department) VALUES (?, ?, ?, ?, ?, ?)',
+      title, content, date || '', dtype, end_date || '', target_department || ''
     );
 
     const created = await dbGet('SELECT * FROM regular_notices WHERE id = ?', result.lastInsertRowid);
@@ -279,10 +285,10 @@ router.post('/notices', async (req: AuthRequest, res: Response) => {
 // PUT /api/regular/notices/:id - Update notice
 router.put('/notices/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { title, content, date } = req.body;
+    const { title, content, date, date_type, end_date, target_department } = req.body;
     await dbRun(
-      'UPDATE regular_notices SET title = ?, content = ?, date = ? WHERE id = ?',
-      title, content, date, req.params.id
+      'UPDATE regular_notices SET title = ?, content = ?, date = ?, date_type = ?, end_date = ?, target_department = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      title, content, date || '', date_type || 'specific', end_date || '', target_department || '', req.params.id
     );
     const updated = await dbGet('SELECT * FROM regular_notices WHERE id = ?', req.params.id);
     res.json(updated);

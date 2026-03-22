@@ -314,7 +314,7 @@ export async function getRegularDashboard(date: string) {
 export async function getRegularNotices(date?: string) {
   return fetchAPI<any[]>(`/api/regular/notices${date ? '?date=' + date : ''}`);
 }
-export async function createRegularNotice(data: { title: string; content: string; date: string }) {
+export async function createRegularNotice(data: any) {
   return fetchAPI<any>('/api/regular/notices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
 export async function updateRegularNotice(id: number, data: any) {

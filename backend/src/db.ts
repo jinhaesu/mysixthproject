@@ -449,6 +449,9 @@ export async function initializeDB(): Promise<void> {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_regular_notices_date ON regular_notices(date);
+      ALTER TABLE regular_notices ADD COLUMN IF NOT EXISTS date_type TEXT DEFAULT 'specific';
+      ALTER TABLE regular_notices ADD COLUMN IF NOT EXISTS end_date TEXT DEFAULT '';
+      ALTER TABLE regular_notices ADD COLUMN IF NOT EXISTS target_department TEXT DEFAULT '';
 
       CREATE TABLE IF NOT EXISTS regular_org_settings (
         id SERIAL PRIMARY KEY,

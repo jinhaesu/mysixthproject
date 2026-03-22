@@ -77,7 +77,7 @@ const emptyEmployeeForm = {
   workplace_id: null as number | null,
 };
 
-const emptyNoticeForm = { title: "", content: "" };
+const emptyNoticeForm = { title: "", content: "", date_type: "specific", end_date: "", target_department: "" };
 
 const emptyOrgForm = {
   department: DEPARTMENTS[0],
@@ -263,7 +263,7 @@ export default function RegularManagePage() {
 
   function startEditNotice(notice: Notice) {
     setEditingNotice(notice);
-    setNoticeForm({ title: notice.title, content: notice.content });
+    setNoticeForm({ title: notice.title, content: notice.content, date_type: (notice as any).date_type || 'specific', end_date: (notice as any).end_date || '', target_department: (notice as any).target_department || '' });
   }
 
   // ===== Org Handlers =====
@@ -565,6 +565,35 @@ export default function RegularManagePage() {
                   placeholder="공지문 제목"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">날짜 유형</label>
+                  <select value={noticeForm.date_type} onChange={(e) => setNoticeForm({ ...noticeForm, date_type: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="specific">특정 날짜</option>
+                    <option value="daily">매일 고정</option>
+                    <option value="range">기간 설정</option>
+                  </select>
+                </div>
+                {noticeForm.date_type === 'range' && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">종료일</label>
+                    <input type="date" value={noticeForm.end_date}
+                      onChange={(e) => setNoticeForm({ ...noticeForm, end_date: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">대상 부서</label>
+                  <select value={noticeForm.target_department} onChange={(e) => setNoticeForm({ ...noticeForm, target_department: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="">전체 (모든 부서)</option>
+                    <option value="생산2층">생산2층</option>
+                    <option value="생산3층">생산3층</option>
+                    <option value="물류1층">물류1층</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">내용</label>

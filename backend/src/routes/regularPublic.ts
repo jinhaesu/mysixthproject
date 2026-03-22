@@ -25,8 +25,20 @@ router.get('/:token', async (req: Request, res: Response) => {
     const today = new Date().toISOString().slice(0, 10);
     const attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
 
-    // Get today's notices
-    const notices = await dbAll('SELECT * FROM regular_notices WHERE date = ? AND is_active = 1 ORDER BY id', today);
+    // Get today's notices (specific date, daily, or date range + department filter)
+    const allNotices = await dbAll(`
+      SELECT * FROM regular_notices WHERE is_active = 1
+        AND (
+          (COALESCE(date_type, 'specific') = 'specific' AND date = ?)
+          OR (date_type = 'daily')
+          OR (date_type = 'range' AND date <= ? AND COALESCE(end_date, '') >= ?)
+        )
+      ORDER BY id
+    `, today, today, today);
+    // Filter by department: show if target_department is empty (all) or matches employee's department
+    const notices = (allNotices as any[]).filter((n: any) =>
+      !n.target_department || n.target_department === '' || n.target_department === employee.department
+    );
 
     // Get org settings (all departments for full view)
     const orgRows = await dbAll('SELECT * FROM regular_org_settings ORDER BY sort_order, department, team') as any[];

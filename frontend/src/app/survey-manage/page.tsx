@@ -156,11 +156,17 @@ function SendTab() {
   const [reminderResult, setReminderResult] = useState<any>(null);
   const [plannedClockIn, setPlannedClockIn] = useState("");
   const [plannedClockOut, setPlannedClockOut] = useState("");
+  const [scheduleType, setScheduleType] = useState<'immediate' | 'single' | 'range'>('immediate');
   const [scheduledAt, setScheduledAt] = useState(() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
   });
-  const [isScheduled, setIsScheduled] = useState(false);
+  const [rangeStart, setRangeStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [rangeEnd, setRangeEnd] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
+  const [rangeDailyTime, setRangeDailyTime] = useState("08:00");
 
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(console.error);
@@ -180,8 +186,17 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? new Date(scheduledAt).toISOString() : undefined });
-      if (result.scheduled) {
+      const schedParams: any = {};
+      if (scheduleType === 'single') {
+        schedParams.scheduled_at = new Date(scheduledAt).toISOString();
+      } else if (scheduleType === 'range') {
+        schedParams.schedule_range = { start_date: rangeStart, end_date: rangeEnd, daily_time: rangeDailyTime };
+      }
+      const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, ...schedParams });
+      if (result.scheduled_range) {
+        alert(`${result.count}일간 기간 예약 완료`);
+        setPhone("");
+      } else if (result.scheduled) {
         alert("설문이 예약되었습니다.");
         setPhone("");
       } else if (result.message && !result.message.success) {
@@ -204,8 +219,18 @@ function SendTab() {
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
     setSending(true);
     try {
-      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, scheduled_at: isScheduled ? new Date(scheduledAt).toISOString() : undefined });
-      alert(result.scheduled ? `${result.total}건 예약 완료` : `${result.total}건 발송 완료`);
+      const schedParams: any = {};
+      if (scheduleType === 'single') {
+        schedParams.scheduled_at = new Date(scheduledAt).toISOString();
+      } else if (scheduleType === 'range') {
+        schedParams.schedule_range = { start_date: rangeStart, end_date: rangeEnd, daily_time: rangeDailyTime };
+      }
+      const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, ...schedParams });
+      if (result.scheduled_range) {
+        alert(`${result.count}건 기간 예약 완료`);
+      } else {
+        alert(result.scheduled ? `${result.total}건 예약 완료` : `${result.total}건 발송 완료`);
+      }
       setBulkPhones("");
       loadRecentSends();
     } catch (err: any) {
@@ -340,31 +365,53 @@ function SendTab() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 pt-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="accent-blue-600" />
-              <span className="text-sm text-gray-700">예약 발송</span>
-            </label>
-            {isScheduled && (
-              <input
-                type="datetime-local"
-                value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          <div className="space-y-2 pt-2 border-t border-gray-100 mt-2">
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="schedType" value="immediate" checked={scheduleType === 'immediate'}
+                  onChange={() => setScheduleType('immediate')} className="accent-blue-600" />
+                <span className="text-sm text-gray-700">즉시 발송</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="schedType" value="single" checked={scheduleType === 'single'}
+                  onChange={() => setScheduleType('single')} className="accent-blue-600" />
+                <span className="text-sm text-gray-700">예약 발송</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="schedType" value="range" checked={scheduleType === 'range'}
+                  onChange={() => setScheduleType('range')} className="accent-blue-600" />
+                <span className="text-sm text-gray-700">기간 예약</span>
+              </label>
+            </div>
+
+            {scheduleType === 'single' && (
+              <div className="flex items-center gap-2">
+                <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
             )}
-            {isScheduled && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const result = await runScheduler();
-                    alert(`설문 ${result.surveys.sent}건, 안내문 ${result.messages.sent}건 발송 완료`);
-                    loadRecentSends();
-                  } catch (err: any) { alert(err.message); }
-                }}
-                className="px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
-              >
+
+            {scheduleType === 'range' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <span className="text-gray-400">~</span>
+                <input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="time" value={rangeDailyTime} onChange={(e) => setRangeDailyTime(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <span className="text-xs text-gray-500">매일 발송</span>
+              </div>
+            )}
+
+            {scheduleType !== 'immediate' && (
+              <button type="button" onClick={async () => {
+                try {
+                  const result = await runScheduler();
+                  alert(`설문 ${result.surveys.sent}건, 안내문 ${result.messages.sent}건 발송 완료`);
+                  loadRecentSends();
+                } catch (err: any) { alert(err.message); }
+              }} className="px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
                 예약 대기 즉시 발송
               </button>
             )}
@@ -1261,11 +1308,17 @@ function SafetyTab() {
   const [sendResult, setSendResult] = useState<any>(null);
   const [sendMode, setSendMode] = useState<"survey" | "direct">("direct");
   const [directPhones, setDirectPhones] = useState("");
-  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduleType, setScheduleType] = useState<'immediate' | 'single' | 'range'>('immediate');
   const [scheduledAt, setScheduledAt] = useState(() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
   });
+  const [rangeStart, setRangeStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [rangeEnd, setRangeEnd] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
+  const [rangeDailyTime, setRangeDailyTime] = useState("08:00");
 
   const load = async () => {
     try {
@@ -1321,12 +1374,14 @@ function SafetyTab() {
       const phones = sendMode === "direct"
         ? directPhones.split("\n").map(p => p.trim()).filter(Boolean)
         : undefined;
+      const schedAt = scheduleType === 'single' ? new Date(scheduledAt).toISOString() : undefined;
+      const schedRange = scheduleType === 'range' ? { start_date: rangeStart, end_date: rangeEnd, daily_time: rangeDailyTime } : undefined;
       const result = await sendSafetyNotice(
         sendDate, selectedNotice, phones,
-        isScheduled ? new Date(scheduledAt).toISOString() : undefined
+        schedAt, schedRange
       );
       setSendResult(result);
-      if (sendMode === "direct" && result.sent > 0) setDirectPhones("");
+      if (sendMode === "direct" && (result.sent > 0 || result.scheduled_range)) setDirectPhones("");
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -1409,14 +1464,54 @@ function SafetyTab() {
             </div>
           )}
 
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={isScheduled} onChange={(e) => setIsScheduled(e.target.checked)} className="accent-green-600" />
-              <span className="text-sm text-gray-700">예약 발송</span>
-            </label>
-            {isScheduled && (
-              <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+          <div className="space-y-2 pt-2 border-t border-gray-100 mt-2">
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="safetySchedType" value="immediate" checked={scheduleType === 'immediate'}
+                  onChange={() => setScheduleType('immediate')} className="accent-green-600" />
+                <span className="text-sm text-gray-700">즉시 발송</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="safetySchedType" value="single" checked={scheduleType === 'single'}
+                  onChange={() => setScheduleType('single')} className="accent-green-600" />
+                <span className="text-sm text-gray-700">예약 발송</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="safetySchedType" value="range" checked={scheduleType === 'range'}
+                  onChange={() => setScheduleType('range')} className="accent-green-600" />
+                <span className="text-sm text-gray-700">기간 예약</span>
+              </label>
+            </div>
+
+            {scheduleType === 'single' && (
+              <div className="flex items-center gap-2">
+                <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+              </div>
+            )}
+
+            {scheduleType === 'range' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <span className="text-gray-400">~</span>
+                <input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <input type="time" value={rangeDailyTime} onChange={(e) => setRangeDailyTime(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <span className="text-xs text-gray-500">매일 발송</span>
+              </div>
+            )}
+
+            {scheduleType !== 'immediate' && (
+              <button type="button" onClick={async () => {
+                try {
+                  const result = await runScheduler();
+                  alert(`설문 ${result.surveys.sent}건, 안내문 ${result.messages.sent}건 발송 완료`);
+                } catch (err: any) { alert(err.message); }
+              }} className="px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
+                예약 대기 즉시 발송
+              </button>
             )}
           </div>
 
@@ -1426,15 +1521,17 @@ function SafetyTab() {
             className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            {isScheduled ? '예약 발송' : '안내 발송'}
+            {scheduleType !== 'immediate' ? '예약 발송' : '안내 발송'}
           </button>
           {sendResult && (
             <div className={`p-3 rounded-lg text-sm ${
-              sendResult.scheduled
+              sendResult.scheduled || sendResult.scheduled_range
                 ? 'bg-purple-50 border border-purple-200 text-purple-700'
                 : sendResult.sent > 0 ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'
             }`}>
-              {sendResult.scheduled
+              {sendResult.scheduled_range
+                ? sendResult.message
+                : sendResult.scheduled
                 ? `${sendResult.total}건이 ${sendResult.scheduled_at}에 예약되었습니다.`
                 : <>총 {sendResult.total}명 중 {sendResult.sent}명에게 안전위생 안내를 발송했습니다.
                   {sendResult.failed > 0 && ` (실패: ${sendResult.failed}명)`}</>

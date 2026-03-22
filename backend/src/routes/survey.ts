@@ -193,7 +193,7 @@ router.delete('/safety-notices/:id', async (req: AuthRequest, res: Response) => 
 // POST /api/survey/send-safety-notice - Send safety notice to phones (direct) or survey workers
 router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
   try {
-    const { date, notice_id, phones, scheduled_at } = req.body;
+    const { date, notice_id, phones, scheduled_at, schedule_range } = req.body;
     if (!notice_id) {
       res.status(400).json({ error: '안내문을 선택해주세요.' });
       return;
@@ -223,6 +223,36 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
 
     if (targetPhones.length === 0) {
       res.json({ success: true, total: 0, sent: 0, message: '발송 대상이 없습니다.' });
+      return;
+    }
+
+    // Date-range scheduled sending for safety notices
+    const hasRange = !scheduled_at && schedule_range;
+    if (hasRange) {
+      const { start_date, end_date, daily_time } = schedule_range;
+      const start = new Date(start_date);
+      const end = new Date(end_date);
+      const results = [];
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().slice(0, 10);
+        const schedTime = new Date(`${dateStr}T${daily_time}`).toISOString();
+
+        await dbRun(
+          'INSERT INTO scheduled_messages (type, notice_id, phones, date, scheduled_at, status) VALUES (?, ?, ?, ?, ?, ?)',
+          'safety_notice', notice_id, JSON.stringify(targetPhones), dateStr, schedTime, 'scheduled'
+        );
+        results.push({ date: dateStr, scheduled_at: schedTime });
+      }
+
+      res.json({
+        success: true,
+        total: targetPhones.length,
+        scheduled_range: true,
+        count: results.length,
+        items: results,
+        message: `${targetPhones.length}명 x ${results.length}일 = ${targetPhones.length * results.length}건 예약 완료`,
+      });
       return;
     }
 
@@ -270,7 +300,7 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
 
 // POST /api/survey/send - Send survey to a single phone
 router.post('/send', async (req: AuthRequest, res: Response) => {
-  const { phone, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at } = req.body;
+  const { phone, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range } = req.body;
 
   if (!phone || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호, 날짜, 근무지는 필수입니다.' });
@@ -280,6 +310,33 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   const workplace = await dbGet('SELECT name FROM survey_workplaces WHERE id = ? AND is_active = 1', workplace_id) as any;
   if (!workplace) {
     res.status(400).json({ error: '유효하지 않은 근무지입니다.' });
+    return;
+  }
+
+  // Date-range scheduled sending
+  const hasRange = !scheduled_at && schedule_range;
+  if (hasRange) {
+    const { start_date, end_date, daily_time } = schedule_range;
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+    const results = [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().slice(0, 10);
+      const schedTime = new Date(`${dateStr}T${daily_time}`).toISOString();
+      const t = uuidv4();
+      const exp = new Date(new Date(schedTime).getTime() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+      const r = await dbRun(`
+        INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, t, phone, workplace_id, dateStr, message_type || 'sms', exp, department || '', planned_clock_in || null, planned_clock_out || null, schedTime, 'scheduled', 'scheduled');
+
+      await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', r.lastInsertRowid);
+      results.push({ date: dateStr, scheduled_at: schedTime });
+    }
+
+    res.status(201).json({ success: true, scheduled_range: true, count: results.length, items: results });
     return;
   }
 
@@ -322,7 +379,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
 // POST /api/survey/send-batch - Send to multiple phones
 router.post('/send-batch', async (req: AuthRequest, res: Response) => {
-  const { phones, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at } = req.body;
+  const { phones, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range } = req.body;
 
   if (!phones || !Array.isArray(phones) || phones.length === 0 || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호 목록, 날짜, 근무지는 필수입니다.' });
@@ -332,6 +389,39 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
   const workplace = await dbGet('SELECT name FROM survey_workplaces WHERE id = ? AND is_active = 1', workplace_id) as any;
   if (!workplace) {
     res.status(400).json({ error: '유효하지 않은 근무지입니다.' });
+    return;
+  }
+
+  // Date-range scheduled sending (batch)
+  const hasRange = !scheduled_at && schedule_range;
+  if (hasRange) {
+    const { start_date, end_date, daily_time } = schedule_range;
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+    const results = [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().slice(0, 10);
+      const schedTime = new Date(`${dateStr}T${daily_time}`).toISOString();
+
+      for (const phone of phones) {
+        const trimmedPhone = phone.trim();
+        if (!trimmedPhone) continue;
+
+        const t = uuidv4();
+        const exp = new Date(new Date(schedTime).getTime() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+        const r = await dbRun(`
+          INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, t, trimmedPhone, workplace_id, dateStr, message_type || 'sms', exp, department || '', planned_clock_in || null, planned_clock_out || null, schedTime, 'scheduled', 'scheduled');
+
+        await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', r.lastInsertRowid);
+        results.push({ phone: trimmedPhone, date: dateStr, scheduled_at: schedTime });
+      }
+    }
+
+    res.status(201).json({ success: true, scheduled_range: true, count: results.length, items: results });
     return;
   }
 

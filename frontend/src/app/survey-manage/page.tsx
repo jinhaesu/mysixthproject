@@ -404,17 +404,6 @@ function SendTab() {
               </div>
             )}
 
-            {scheduleType !== 'immediate' && (
-              <button type="button" onClick={async () => {
-                try {
-                  const result = await runScheduler();
-                  alert(`설문 ${result.surveys.sent}건, 안내문 ${result.messages.sent}건 발송 완료`);
-                  loadRecentSends();
-                } catch (err: any) { alert(err.message); }
-              }} className="px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
-                예약 대기 즉시 발송
-              </button>
-            )}
           </div>
         </div>
 
@@ -1503,16 +1492,6 @@ function SafetyTab() {
               </div>
             )}
 
-            {scheduleType !== 'immediate' && (
-              <button type="button" onClick={async () => {
-                try {
-                  const result = await runScheduler();
-                  alert(`설문 ${result.surveys.sent}건, 안내문 ${result.messages.sent}건 발송 완료`);
-                } catch (err: any) { alert(err.message); }
-              }} className="px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors">
-                예약 대기 즉시 발송
-              </button>
-            )}
           </div>
 
           <button

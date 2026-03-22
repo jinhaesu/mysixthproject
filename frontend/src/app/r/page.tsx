@@ -365,9 +365,11 @@ interface Attendance {
 }
 
 interface RegularPublicData {
-  employee_name: string;
-  department: string | null;
-  team: string | null;
+  employee: { name: string; department: string; team: string; role: string };
+  employee_name?: string;
+  department?: string | null;
+  team?: string | null;
+  role?: string | null;
   status: "ready" | "clocked_in" | "completed" | "deactivated";
   date: string;
   workplace: Workplace | null;
@@ -429,8 +431,15 @@ function RegularContent() {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `Error ${res.status}`);
       }
-      const result: RegularPublicData = await res.json();
-      setData(result);
+      const result = await res.json();
+      // Flatten employee fields for easy access
+      if (result.employee) {
+        result.employee_name = result.employee.name;
+        result.department = result.employee.department;
+        result.team = result.employee.team;
+        result.role = result.employee.role;
+      }
+      setData(result as RegularPublicData);
 
       // Auto-expand all departments for org chart
       if (result.org_chart && result.org_chart.length) {
@@ -616,13 +625,18 @@ function RegularContent() {
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-5">
         <h1 className="text-lg font-bold">{t(lang, "pageTitle")}</h1>
-        <p className="text-indigo-200 text-sm mt-0.5">{t(lang, "regular")}</p>
+        <p className="text-indigo-200 text-sm mt-0.5">{data.date} {t(lang, "workDate")}</p>
         <div className="mt-2 bg-indigo-500/30 rounded-lg px-3 py-2 space-y-1">
-          <p className="text-base font-semibold">{data.employee_name}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-base font-semibold">{data.employee_name}</p>
+            {data.role && data.role !== '일반' && (
+              <span className="px-2 py-0.5 bg-yellow-400 text-yellow-900 rounded text-xs font-bold">{data.role}</span>
+            )}
+          </div>
           {(data.department || data.team) && (
             <p className="text-indigo-200 text-sm">
               {data.department}
-              {data.department && data.team && " / "}
+              {data.department && data.team && " · "}
               {data.team}
             </p>
           )}
@@ -919,7 +933,7 @@ function RegularContent() {
                             </span>
                             {team.leader && (
                               <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                                {t(lang, "leader")}: {team.leader}
+                                {team.leader_role || '반장'}: {team.leader}
                               </span>
                             )}
                           </div>

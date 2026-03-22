@@ -8,8 +8,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/login";
   const isSurveyPage = pathname === "/s";
   const isReportPage = pathname === "/report";
+  const isRegularPage = pathname === "/r";
 
-  if (isLoginPage || isSurveyPage || isReportPage) {
+  if (isLoginPage || isSurveyPage || isReportPage || isRegularPage) {
     return <>{children}</>;
   }
 

@@ -288,6 +288,54 @@ export async function batchDeleteResponses(ids: number[]) {
   });
 }
 
+// ===== Regular Employees (현장 정규직) =====
+export async function getRegularEmployees(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/regular/employees?${query}`);
+}
+export async function createRegularEmployee(data: any) {
+  return fetchAPI<any>('/api/regular/employees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function updateRegularEmployee(id: number, data: any) {
+  return fetchAPI<any>(`/api/regular/employees/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function deleteRegularEmployee(id: number) {
+  return fetchAPI<any>(`/api/regular/employees/${id}`, { method: 'DELETE' });
+}
+export async function sendRegularLink(id: number) {
+  return fetchAPI<any>(`/api/regular/employees/${id}/send-link`, { method: 'POST' });
+}
+export async function sendRegularLinkBatch(ids: number[]) {
+  return fetchAPI<any>('/api/regular/employees/send-link-batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+}
+export async function getRegularDashboard(date: string) {
+  return fetchAPI<any>(`/api/regular/dashboard?date=${date}`);
+}
+export async function getRegularNotices(date?: string) {
+  return fetchAPI<any[]>(`/api/regular/notices${date ? '?date=' + date : ''}`);
+}
+export async function createRegularNotice(data: { title: string; content: string; date: string }) {
+  return fetchAPI<any>('/api/regular/notices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function updateRegularNotice(id: number, data: any) {
+  return fetchAPI<any>(`/api/regular/notices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function deleteRegularNotice(id: number) {
+  return fetchAPI<any>(`/api/regular/notices/${id}`, { method: 'DELETE' });
+}
+export async function getRegularOrgSettings() {
+  return fetchAPI<any[]>('/api/regular/org-settings');
+}
+export async function createRegularOrgSetting(data: any) {
+  return fetchAPI<any>('/api/regular/org-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function updateRegularOrgSetting(id: number, data: any) {
+  return fetchAPI<any>(`/api/regular/org-settings/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function deleteRegularOrgSetting(id: number) {
+  return fetchAPI<any>(`/api/regular/org-settings/${id}`, { method: 'DELETE' });
+}
+
 // Public survey API (no auth)
 export async function fetchSurveyPublic(token: string) {
   const res = await fetch(`${API_URL}/api/survey-public/${token}`);

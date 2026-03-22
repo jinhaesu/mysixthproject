@@ -34,7 +34,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const savedToken = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
 
-    const isPublicPage = pathname === "/login" || pathname === "/s" || pathname === "/report";
+    const isPublicPage = pathname === "/login" || pathname === "/s" || pathname === "/report" || pathname === "/r";
 
     if (savedToken && savedUser) {
       setToken(savedToken);
@@ -59,7 +59,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
-  const isPublicPage = pathname === "/login" || pathname === "/s" || pathname === "/report";
+  const isPublicPage = pathname === "/login" || pathname === "/s" || pathname === "/report" || pathname === "/r";
 
   if (!checked) return null;
   if (!token && !isPublicPage) return null;

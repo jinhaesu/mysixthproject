@@ -401,6 +401,69 @@ export async function initializeDB(): Promise<void> {
     console.error('Safety notice log table init error:', err);
   }
 
+  // Regular employees (현장 정규직)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_employees (
+        id SERIAL PRIMARY KEY,
+        phone TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        department TEXT NOT NULL DEFAULT '',
+        team TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT '일반',
+        workplace_id INTEGER REFERENCES survey_workplaces(id),
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_regular_employees_token ON regular_employees(token);
+      CREATE INDEX IF NOT EXISTS idx_regular_employees_phone ON regular_employees(phone);
+
+      CREATE TABLE IF NOT EXISTS regular_attendance (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        clock_in_time TIMESTAMPTZ,
+        clock_out_time TIMESTAMPTZ,
+        clock_in_lat DOUBLE PRECISION,
+        clock_in_lng DOUBLE PRECISION,
+        clock_out_lat DOUBLE PRECISION,
+        clock_out_lng DOUBLE PRECISION,
+        gps_valid INTEGER DEFAULT 0,
+        agreement_accepted INTEGER DEFAULT 0,
+        agreement_accepted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(employee_id, date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_regular_attendance_date ON regular_attendance(date);
+      CREATE INDEX IF NOT EXISTS idx_regular_attendance_employee ON regular_attendance(employee_id);
+
+      CREATE TABLE IF NOT EXISTS regular_notices (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        date TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_regular_notices_date ON regular_notices(date);
+
+      CREATE TABLE IF NOT EXISTS regular_org_settings (
+        id SERIAL PRIMARY KEY,
+        department TEXT NOT NULL,
+        team TEXT NOT NULL,
+        leader_name TEXT DEFAULT '',
+        leader_role TEXT DEFAULT '',
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch (err) {
+    console.error('Regular employee tables init error:', err);
+  }
+
   console.log('Database initialized successfully');
 }
 

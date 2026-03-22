@@ -13,6 +13,8 @@ import surveyRoutes from './routes/survey';
 import surveyPublicRoutes from './routes/surveyPublic';
 import payrollRoutes from './routes/payroll';
 import workersRoutes from './routes/workers';
+import regularRoutes from './routes/regular';
+import regularPublicRoutes from './routes/regularPublic';
 import { requireAuth } from './middleware/auth';
 import { startReminderService } from './services/reminderService';
 
@@ -43,6 +45,8 @@ app.use('/api/survey', requireAuth, surveyRoutes);
 app.use('/api/survey-public', surveyPublicRoutes);
 app.use('/api/payroll', requireAuth, payrollRoutes);
 app.use('/api/workers', requireAuth, workersRoutes);
+app.use('/api/regular', requireAuth, regularRoutes);
+app.use('/api/regular-public', regularPublicRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

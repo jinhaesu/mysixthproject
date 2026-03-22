@@ -22,6 +22,7 @@ import {
   Briefcase,
   UserCheck,
   Shield,
+  HardHat,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -56,11 +57,19 @@ const groups: NavGroup[] = [
     label: "사업소득(알바)/파견 관리",
     icon: UserCheck,
     items: [
-      { href: "/workforce-plan", label: "인력 조달 계획", icon: Users },
       { href: "/attendance-live", label: "실시간 현황판", icon: Activity },
       { href: "/survey-manage", label: "설문 출퇴근", icon: MessageSquare },
       { href: "/workers", label: "근무자 DB", icon: Contact },
       { href: "/weekly-holiday", label: "주휴수당 관리", icon: Shield },
+    ],
+  },
+  {
+    label: "현장 정규직 관리",
+    icon: HardHat,
+    items: [
+      { href: "/regular-live", label: "실시간 현황판", icon: Activity },
+      { href: "/regular-manage", label: "설문 출퇴근", icon: MessageSquare },
+      { href: "/regular-workers", label: "근무자 DB", icon: Contact },
     ],
   },
 ];

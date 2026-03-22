@@ -433,8 +433,8 @@ function RegularContent() {
       setData(result);
 
       // Auto-expand all departments for org chart
-      if (result.org_chart?.length) {
-        setExpandedDepts(new Set(result.org_chart.map((d) => d.department)));
+      if (result.org_chart && result.org_chart.length) {
+        setExpandedDepts(new Set(result.org_chart.map((d: any) => d.department)));
       }
     } catch (err: any) {
       setError(err.message);
@@ -850,7 +850,7 @@ function RegularContent() {
         {/* ── Daily Notices ────────────────────────────────────────── */}
         {data.status === "ready" &&
           agreementAccepted &&
-          data.notices.length > 0 && (
+          (data.notices?.length ?? 0) > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <div className="flex items-center gap-2 text-indigo-700 mb-3">
                 <Megaphone className="w-5 h-5" />
@@ -877,7 +877,7 @@ function RegularContent() {
         {/* ── Org Chart ────────────────────────────────────────────── */}
         {data.status === "ready" &&
           agreementAccepted &&
-          data.org_chart.length > 0 && (
+          (data.org_chart?.length ?? 0) > 0 && (
             <div className="bg-white rounded-xl shadow-sm p-5">
               <div className="flex items-center gap-2 text-indigo-700 mb-3">
                 <Users className="w-5 h-5" />
@@ -886,7 +886,7 @@ function RegularContent() {
                 </h2>
               </div>
               <div className="space-y-2">
-                {data.org_chart.map((dept) => (
+                {(data.org_chart || []).map((dept: any) => (
                   <div
                     key={dept.department}
                     className="border border-gray-200 rounded-lg overflow-hidden"
@@ -909,7 +909,7 @@ function RegularContent() {
                     </button>
                     {expandedDepts.has(dept.department) && (
                       <div className="px-4 py-2 space-y-2">
-                        {dept.teams.map((team) => (
+                        {(dept.teams || []).map((team: any) => (
                           <div
                             key={team.team}
                             className="flex items-center gap-2 py-1.5 border-b border-gray-100 last:border-b-0"

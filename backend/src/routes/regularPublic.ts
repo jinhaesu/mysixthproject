@@ -28,8 +28,22 @@ router.get('/:token', async (req: Request, res: Response) => {
     // Get today's notices
     const notices = await dbAll('SELECT * FROM regular_notices WHERE date = ? AND is_active = 1 ORDER BY id', today);
 
-    // Get org settings for employee's department
-    const orgChart = await dbAll('SELECT * FROM regular_org_settings WHERE department = ? ORDER BY sort_order, team', employee.department);
+    // Get org settings (all departments for full view)
+    const orgRows = await dbAll('SELECT * FROM regular_org_settings ORDER BY sort_order, department, team') as any[];
+
+    // Group into OrgDepartment structure
+    const deptMap = new Map<string, { department: string; teams: { team: string; leader: string | null; leader_role: string }[] }>();
+    for (const row of orgRows) {
+      if (!deptMap.has(row.department)) {
+        deptMap.set(row.department, { department: row.department, teams: [] });
+      }
+      deptMap.get(row.department)!.teams.push({
+        team: row.team,
+        leader: row.leader_name || null,
+        leader_role: row.leader_role || '',
+      });
+    }
+    const orgChart = Array.from(deptMap.values());
 
     // Determine status
     let status = 'ready'; // ready, clocked_in, completed
@@ -55,8 +69,8 @@ router.get('/:token', async (req: Request, res: Response) => {
         clock_in_time: attendance.clock_in_time,
         clock_out_time: attendance.clock_out_time,
       } : null,
-      notices,
-      orgChart,
+      notices: notices || [],
+      org_chart: orgChart,
       date: today,
     });
   } catch (error: any) {

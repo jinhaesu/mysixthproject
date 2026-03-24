@@ -62,7 +62,7 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/regular/employees - Create employee
+// POST /api/regular/employees - Create employee (v6 - bulletproof)
 router.post('/employees', async (req: AuthRequest, res: Response) => {
   try {
     const { phone, name, department, team, role, workplace_id } = req.body;
@@ -72,26 +72,28 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Check if already exists (active or inactive)
-    const existing = await dbGet('SELECT * FROM regular_employees WHERE phone = ?', phone) as any;
+    const token = uuidv4();
+    const dept = department || '';
+    const tm = team || '';
+    const rl = role || '';
+    const wpId = workplace_id || null;
 
-    if (existing) {
-      // Re-activate and update the existing record
-      const token = existing.token || uuidv4();
-      await dbRun(
-        'UPDATE regular_employees SET name = ?, token = ?, department = ?, team = ?, role = ?, workplace_id = ?, is_active = 1, updated_at = NOW() WHERE phone = ?',
-        name, token, department || '', team || '', role || '', workplace_id || null, phone
-      );
-      const updated = await dbGet('SELECT * FROM regular_employees WHERE phone = ?', phone);
-      res.status(201).json(updated);
-    } else {
-      const token = uuidv4();
+    // Strategy: try INSERT, if fails due to unique constraint, UPDATE instead
+    try {
       const result = await dbRun(
         'INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        phone, name, token, department || '', team || '', role || '', workplace_id || null
+        phone, name, token, dept, tm, rl, wpId
       );
       const created = await dbGet('SELECT * FROM regular_employees WHERE id = ?', result.lastInsertRowid);
       res.status(201).json(created);
+    } catch (insertErr: any) {
+      // Unique constraint violation — record exists, just update it
+      await dbRun(
+        'UPDATE regular_employees SET name = ?, token = ?, department = ?, team = ?, role = ?, workplace_id = ?, is_active = 1, updated_at = NOW() WHERE phone = ?',
+        name, token, dept, tm, rl, wpId, phone
+      );
+      const updated = await dbGet('SELECT * FROM regular_employees WHERE phone = ?', phone);
+      res.status(201).json(updated);
     }
   } catch (error: any) {
     res.status(500).json({ error: error.message });

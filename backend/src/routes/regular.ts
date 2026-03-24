@@ -72,23 +72,22 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Check if phone already exists
-    const existing = await dbGet('SELECT id, is_active FROM regular_employees WHERE phone = ?', phone) as any;
-    if (existing) {
-      if (existing.is_active === 1 || existing.is_active === true) {
-        res.status(400).json({ error: '이미 등록된 전화번호입니다.' });
-        return;
-      }
-      // Hard delete the inactive record so we can re-register
-      await dbRun('DELETE FROM regular_attendance WHERE employee_id = ?', existing.id);
-      await dbRun('DELETE FROM regular_employees WHERE id = ?', existing.id);
-    }
-
     const token = uuidv4();
 
+    // Use ON CONFLICT to handle re-registration with same phone
     const result = await dbRun(`
-      INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+      ON CONFLICT (phone) DO UPDATE SET
+        name = EXCLUDED.name,
+        token = EXCLUDED.token,
+        department = EXCLUDED.department,
+        team = EXCLUDED.team,
+        role = EXCLUDED.role,
+        workplace_id = EXCLUDED.workplace_id,
+        is_active = 1,
+        updated_at = NOW()
+      RETURNING id
     `, phone, name, token, department || '', team || '', role || '', workplace_id || null);
 
     const created = await dbGet('SELECT * FROM regular_employees WHERE id = ?', result.lastInsertRowid);

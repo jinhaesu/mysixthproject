@@ -5,6 +5,13 @@ import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
+// Helper: Get current date in KST (UTC+9)
+function getKSTDate(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
 // In-memory OTP store: key = token, value = { code, phone, expiresAt }
 const otpStore = new Map<string, { code: string; phone: string; expiresAt: number }>();
 
@@ -91,7 +98,7 @@ router.get('/:token', async (req: Request, res: Response) => {
       return;
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKSTDate();
     const attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
 
     // Get today's notices (specific date, daily, or date range + department filter)
@@ -291,7 +298,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       ? Math.round(calculateDistance(latitude, longitude, employee.wp_lat, employee.wp_lng))
       : null;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKSTDate();
     const clockInTime = new Date().toISOString();
 
     // Check if already clocked in today (UNIQUE constraint on employee_id + date)
@@ -354,7 +361,7 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
       ? Math.round(calculateDistance(latitude, longitude, employee.wp_lat, employee.wp_lng))
       : null;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKSTDate();
     const clockOutTime = new Date().toISOString();
 
     // Must have clocked in first

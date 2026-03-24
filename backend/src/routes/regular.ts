@@ -6,6 +6,12 @@ import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
+function getKSTDate(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
 // ===== Employees CRUD =====
 
 // GET /api/regular/employees - List with filters
@@ -200,7 +206,7 @@ router.post('/employees/send-link-batch', async (req: AuthRequest, res: Response
 // GET /api/regular/dashboard - Real-time attendance by department/team
 router.get('/dashboard', async (req: AuthRequest, res: Response) => {
   try {
-    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const date = (req.query.date as string) || getKSTDate();
 
     const workers = await dbAll(`
       SELECT re.id, re.phone, re.name, re.department, re.team, re.role,
@@ -487,7 +493,7 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
       return;
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKSTDate();
     const now = new Date();
     const kstHours = (now.getUTCHours() + 9) % 24;
     const kstMinutes = now.getUTCMinutes();

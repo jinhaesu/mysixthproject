@@ -1144,6 +1144,8 @@ function VacationTab() {
   const [initDays, setInitDays] = useState("15");
   const [editingBalance, setEditingBalance] = useState<number | null>(null);
   const [editDays, setEditDays] = useState("");
+  const [selectedEmpIds, setSelectedEmpIds] = useState<Set<number>>(new Set());
+  const [batchDays, setBatchDays] = useState("15");
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -1288,16 +1290,43 @@ function VacationTab() {
             </div>
           </div>
 
+          {/* Batch update for selected employees */}
+          {selectedEmpIds.size > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+              <span className="text-sm font-medium text-blue-700">{selectedEmpIds.size}명 선택</span>
+              <input type="number" step="0.5" value={batchDays} onChange={(e) => setBatchDays(e.target.value)}
+                className="px-3 py-1.5 border border-blue-300 rounded-lg text-sm w-20" />
+              <span className="text-sm text-blue-600">일</span>
+              <button onClick={async () => {
+                if (!confirm(`선택한 ${selectedEmpIds.size}명의 보유 휴가를 ${batchDays}일로 변경하시겠습니까?`)) return;
+                try {
+                  for (const empId of Array.from(selectedEmpIds)) {
+                    await setVacationBalance(empId, { year, total_days: parseFloat(batchDays) });
+                  }
+                  setSelectedEmpIds(new Set());
+                  loadBalances();
+                } catch (e: any) { alert(e.message); }
+              }} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">일괄 변경</button>
+              <button onClick={() => setSelectedEmpIds(new Set())} className="px-3 py-1.5 text-gray-600 bg-gray-100 rounded-lg text-sm">선택 해제</button>
+            </div>
+          )}
+
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {loading ? (
               <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
             ) : balances.length === 0 ? (
-              <div className="py-12 text-center text-sm text-gray-400">데이터가 없습니다. 일괄 초기화를 실행해주세요.</div>
+              <div className="py-12 text-center text-sm text-gray-400">등록된 직원이 없습니다.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left">
+                      <th className="py-2 px-3 w-10">
+                        <input type="checkbox"
+                          checked={selectedEmpIds.size === balances.length && balances.length > 0}
+                          onChange={(e) => setSelectedEmpIds(e.target.checked ? new Set(balances.map((b: any) => b.employee_id)) : new Set())}
+                          className="rounded border-gray-300" />
+                      </th>
                       <th className="py-2 px-4 font-medium text-gray-600">이름</th>
                       <th className="py-2 px-4 font-medium text-gray-600">부서</th>
                       <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
@@ -1309,7 +1338,17 @@ function VacationTab() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {balances.map((b: any) => (
-                      <tr key={b.id} className="hover:bg-gray-50">
+                      <tr key={b.employee_id} className={`hover:bg-gray-50 ${selectedEmpIds.has(b.employee_id) ? 'bg-blue-50/50' : ''}`}>
+                        <td className="py-2.5 px-3">
+                          <input type="checkbox"
+                            checked={selectedEmpIds.has(b.employee_id)}
+                            onChange={(e) => {
+                              const next = new Set(selectedEmpIds);
+                              if (e.target.checked) next.add(b.employee_id); else next.delete(b.employee_id);
+                              setSelectedEmpIds(next);
+                            }}
+                            className="rounded border-gray-300" />
+                        </td>
                         <td className="py-2.5 px-4 font-medium text-gray-900">{b.employee_name}</td>
                         <td className="py-2.5 px-4 text-gray-600">{b.department} {b.team}</td>
                         <td className="py-2.5 px-4 text-gray-600">{b.phone}</td>

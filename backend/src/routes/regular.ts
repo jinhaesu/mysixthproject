@@ -588,10 +588,11 @@ router.get('/vacation-balances', async (req: AuthRequest, res: Response) => {
   try {
     const year = (req.query.year as string) || new Date().getFullYear().toString();
     const balances = await dbAll(`
-      SELECT vb.*, re.name as employee_name, re.department, re.team, re.phone
-      FROM regular_vacation_balances vb
-      JOIN regular_employees re ON vb.employee_id = re.id
-      WHERE vb.year = ? AND re.is_active = 1
+      SELECT re.id as employee_id, re.name as employee_name, re.department, re.team, re.phone,
+             COALESCE(vb.id, 0) as id, COALESCE(vb.total_days, 0) as total_days, COALESCE(vb.used_days, 0) as used_days, vb.year
+      FROM regular_employees re
+      LEFT JOIN regular_vacation_balances vb ON re.id = vb.employee_id AND vb.year = ?
+      WHERE re.is_active = 1
       ORDER BY re.department, re.team, re.name
     `, year);
     res.json(balances);

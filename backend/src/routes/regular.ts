@@ -104,11 +104,13 @@ router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// DELETE /api/regular/employees/:id - Soft delete
+// DELETE /api/regular/employees/:id - Hard delete (allows re-registration with same phone)
 router.delete('/employees/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    await dbRun('UPDATE regular_employees SET is_active = 0 WHERE id = ?', id);
+    // Also delete related attendance records
+    await dbRun('DELETE FROM regular_attendance WHERE employee_id = ?', id);
+    await dbRun('DELETE FROM regular_employees WHERE id = ?', id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -195,24 +197,36 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
       ORDER BY re.department, re.team, re.name
     `, date) as any[];
 
-    const byDepartment = new Map<string, { total: number; clocked_in: number; completed: number; not_clocked_in: number }>();
+    // Build departments array with nested teams (matching frontend DepartmentSummary interface)
+    const deptMap = new Map<string, { department: string; total: number; clocked_in: number; completed: number; not_clocked_in: number; teamMap: Map<string, any[]> }>();
 
     for (const w of workers) {
       const dept = w.department || '미배정';
-      if (!byDepartment.has(dept)) {
-        byDepartment.set(dept, { total: 0, clocked_in: 0, completed: 0, not_clocked_in: 0 });
-      }
-      const stats = byDepartment.get(dept)!;
-      stats.total++;
+      const team = w.team || '미배정';
+      const status = w.clock_out_time ? 'completed' : w.clock_in_time ? 'clocked_in' : 'not_clocked_in';
+      w.status = status;
 
-      if (w.clock_out_time) {
-        stats.completed++;
-      } else if (w.clock_in_time) {
-        stats.clocked_in++;
-      } else {
-        stats.not_clocked_in++;
+      if (!deptMap.has(dept)) {
+        deptMap.set(dept, { department: dept, total: 0, clocked_in: 0, completed: 0, not_clocked_in: 0, teamMap: new Map() });
       }
+      const deptData = deptMap.get(dept)!;
+      deptData.total++;
+      if (status === 'completed') deptData.completed++;
+      else if (status === 'clocked_in') deptData.clocked_in++;
+      else deptData.not_clocked_in++;
+
+      if (!deptData.teamMap.has(team)) deptData.teamMap.set(team, []);
+      deptData.teamMap.get(team)!.push(w);
     }
+
+    const departments = Array.from(deptMap.values()).map(d => ({
+      department: d.department,
+      total: d.total,
+      clocked_in: d.clocked_in,
+      completed: d.completed,
+      not_clocked_in: d.not_clocked_in,
+      teams: Array.from(d.teamMap.entries()).map(([team, employees]) => ({ team, employees })),
+    }));
 
     const totals = {
       total: workers.length,
@@ -223,7 +237,7 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
 
     res.json({
       date,
-      byDepartment: Object.fromEntries(byDepartment),
+      departments,
       workers,
       totals,
     });
@@ -432,8 +446,9 @@ router.post('/report-schedules', async (req: AuthRequest, res: Response) => {
       'INSERT INTO regular_report_schedules (time, phones, repeat_days) VALUES (?, ?, ?)',
       time, phonesJson, repeat_days || 'daily'
     );
-    const created = await dbGet('SELECT * FROM regular_report_schedules WHERE id = ?', result.lastInsertRowid);
-    res.status(201).json(created);
+    const newId = result.lastInsertRowid;
+    const created = newId ? await dbGet('SELECT * FROM regular_report_schedules WHERE id = ?', newId) : null;
+    res.status(201).json(created || { id: newId, time, phones: phonesJson, repeat_days: repeat_days || 'daily', is_active: 1 });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

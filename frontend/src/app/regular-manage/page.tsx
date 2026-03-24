@@ -1146,6 +1146,7 @@ function VacationTab() {
   const [editDays, setEditDays] = useState("");
   const [selectedEmpIds, setSelectedEmpIds] = useState<Set<number>>(new Set());
   const [batchDays, setBatchDays] = useState("15");
+  const [balanceSearch, setBalanceSearch] = useState("");
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -1270,11 +1271,17 @@ function VacationTab() {
 
       {subTab === 'balances' && (
         <>
-          <div className="flex gap-3 items-end">
+          <div className="flex flex-wrap gap-3 items-end">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
               <input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value))}
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-24" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
+              <input type="text" value={balanceSearch} onChange={(e) => setBalanceSearch(e.target.value)}
+                placeholder="이름으로 검색..."
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-36" />
             </div>
             <button onClick={loadBalances} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">조회</button>
             <div className="flex items-end gap-2 ml-auto">
@@ -1337,7 +1344,7 @@ function VacationTab() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {balances.map((b: any) => (
+                    {balances.filter((b: any) => !balanceSearch || b.employee_name?.includes(balanceSearch) || b.phone?.includes(balanceSearch)).map((b: any) => (
                       <tr key={b.employee_id} className={`hover:bg-gray-50 ${selectedEmpIds.has(b.employee_id) ? 'bg-blue-50/50' : ''}`}>
                         <td className="py-2.5 px-3">
                           <input type="checkbox"

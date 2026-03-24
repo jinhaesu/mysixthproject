@@ -1179,46 +1179,42 @@ function RegularContent() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t(lang, "phoneVerification")}
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="tel"
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
-                      placeholder="010-0000-0000"
-                      disabled={phoneVerified}
-                      className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
-                    />
-                    <button
-                      onClick={handleSendOtp}
-                      disabled={otpSending || !phoneInput.trim()}
-                      className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-indigo-700 whitespace-nowrap"
-                    >
-                      {otpSending ? "..." : otpSent ? t(lang, "resendOtp") : t(lang, "requestOtp")}
-                    </button>
-                  </div>
+                  <input
+                    type="tel"
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="010-0000-0000"
+                    disabled={phoneVerified}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                  />
+                  <button
+                    onClick={handleSendOtp}
+                    disabled={otpSending || !phoneInput.trim()}
+                    className="w-full mt-2 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-indigo-700"
+                  >
+                    {otpSending ? "..." : otpSent ? t(lang, "resendOtp") : t(lang, "requestOtp")}
+                  </button>
                 </div>
 
                 {otpSent && (
                   <div className="space-y-2">
                     <p className="text-xs text-green-600 font-medium">{t(lang, "otpSent")}</p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder={t(lang, "otpPlaceholder")}
-                        maxLength={6}
-                        inputMode="numeric"
-                        className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base text-center tracking-widest font-mono"
-                      />
-                      <button
-                        onClick={handleVerifyOtp}
-                        disabled={otpVerifying || otpCode.length !== 6}
-                        className="px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-green-700 whitespace-nowrap"
-                      >
-                        {otpVerifying ? "..." : t(lang, "verifyOtp")}
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder={t(lang, "otpPlaceholder")}
+                      maxLength={6}
+                      inputMode="numeric"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base text-center tracking-widest font-mono"
+                    />
+                    <button
+                      onClick={handleVerifyOtp}
+                      disabled={otpVerifying || otpCode.length !== 6}
+                      className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-green-700"
+                    >
+                      {otpVerifying ? "..." : t(lang, "verifyOtp")}
+                    </button>
                   </div>
                 )}
 
@@ -1411,11 +1407,12 @@ function RegularContent() {
           </div>
         )}
         {/* Vacation Request Section - always available */}
-        {data && (
-          <div className="mt-4">
+        {data && (data.status as string) !== "deactivated" && (
+          <div className="mt-4 pb-16">
             <button
+              type="button"
               onClick={() => setShowVacation(!showVacation)}
-              className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold text-base hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-4 bg-purple-600 text-white rounded-xl font-semibold text-base hover:bg-purple-700 active:bg-purple-800 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <Calendar className="w-5 h-5" />
               {t(lang, "vacation")}

@@ -23,6 +23,9 @@ import {
   deleteSafetyNotice,
   sendSafetyNotice,
   runScheduler,
+  getWorkers,
+  updateWorker,
+  deleteWorker,
 } from "@/lib/api";
 import {
   Send,
@@ -44,9 +47,10 @@ import {
   Building2,
   Bell,
   ShieldAlert,
+  Contact,
 } from "lucide-react";
 
-type Tab = "send" | "responses" | "workplaces" | "safety";
+type Tab = "send" | "responses" | "workplaces" | "safety" | "workers";
 
 interface Workplace {
   id: number;
@@ -91,6 +95,7 @@ export default function SurveyManagePage() {
     { key: "responses", label: "응답 조회", icon: ClipboardList },
     { key: "workplaces", label: "근무지 관리", icon: Building2 },
     { key: "safety", label: "안전위생 안내", icon: ShieldAlert },
+    { key: "workers", label: "직원 관리", icon: Contact },
   ];
 
   return (
@@ -133,6 +138,7 @@ export default function SurveyManagePage() {
         {tab === "responses" && <ResponsesTab />}
         {tab === "workplaces" && <WorkplacesTab />}
         {tab === "safety" && <SafetyTab />}
+        {tab === "workers" && <WorkersTab />}
       </div>
     </div>
   );
@@ -1614,6 +1620,211 @@ function SafetyTab() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ===== Workers Tab =====
+function WorkersTab() {
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 0 });
+  const [editingWorker, setEditingWorker] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ name_ko: "", name_en: "", phone: "", bank_name: "", bank_account: "", emergency_contact: "", category: "", department: "", memo: "" });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async (p = 1) => {
+    setLoading(true);
+    try {
+      const data = await getWorkers({ page: String(p), limit: "50", search });
+      setWorkers(data.workers);
+      setPagination(data.pagination);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => { load(); }, []);
+
+  const handleSearch = () => { setPage(1); load(1); };
+
+  const startEdit = (w: any) => {
+    setEditingWorker(w);
+    setEditForm({
+      name_ko: w.name_ko || "",
+      name_en: w.name_en || "",
+      phone: w.phone || "",
+      bank_name: w.bank_name || "",
+      bank_account: w.bank_account || "",
+      emergency_contact: w.emergency_contact || "",
+      category: w.category || "",
+      department: w.department || "",
+      memo: w.memo || "",
+    });
+  };
+
+  const handleSave = async () => {
+    if (!editingWorker) return;
+    setSaving(true);
+    try {
+      await updateWorker(editingWorker.id, editForm);
+      setEditingWorker(null);
+      load(pagination.page);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`${name} 직원을 삭제하시겠습니까?`)) return;
+    try {
+      await deleteWorker(id);
+      load(pagination.page);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Search */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="block text-xs font-medium text-gray-600 mb-1">검색 (이름/연락처)</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="이름 또는 연락처로 검색"
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button onClick={handleSearch} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            검색
+          </button>
+        </div>
+      </div>
+
+      {/* Worker List */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-900">등록 직원 목록 ({pagination.total}명)</h3>
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+          </div>
+        ) : workers.length === 0 ? (
+          <div className="py-12 text-center text-sm text-gray-400">등록된 직원이 없습니다.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="py-2 px-4 font-medium text-gray-600">이름</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">영문이름</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">은행</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">계좌번호</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">비상연락처</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">구분</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">부서</th>
+                  <th className="py-2 px-4 font-medium text-gray-600 text-center">관리</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {workers.map((w: any) => (
+                  <tr key={w.id} className="hover:bg-gray-50">
+                    <td className="py-2.5 px-4 font-medium text-gray-900">{w.name_ko}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{w.name_en}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{w.phone}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{w.bank_name}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{w.bank_account}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{w.emergency_contact}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{w.category}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{w.department}</td>
+                    <td className="py-2.5 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => startEdit(w)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="수정">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(w.id, w.name_ko)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="삭제">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-500">총 {pagination.total}명 중 {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)}</p>
+            <div className="flex gap-1">
+              <button disabled={pagination.page <= 1} onClick={() => { setPage(pagination.page - 1); load(pagination.page - 1); }} className="px-2 py-1 text-xs border rounded disabled:opacity-30">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button disabled={pagination.page >= pagination.totalPages} onClick={() => { setPage(pagination.page + 1); load(pagination.page + 1); }} className="px-2 py-1 text-xs border rounded disabled:opacity-30">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      {editingWorker && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900">직원 정보 수정</h3>
+
+            {[
+              { label: "이름", key: "name_ko" },
+              { label: "영문이름", key: "name_en" },
+              { label: "연락처", key: "phone" },
+              { label: "은행", key: "bank_name" },
+              { label: "계좌번호", key: "bank_account" },
+              { label: "비상연락처", key: "emergency_contact" },
+              { label: "구분", key: "category" },
+              { label: "부서", key: "department" },
+              { label: "메모", key: "memo" },
+            ].map((f) => (
+              <div key={f.key}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                <input
+                  type="text"
+                  value={(editForm as any)[f.key]}
+                  onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            ))}
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setEditingWorker(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                취소
+              </button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

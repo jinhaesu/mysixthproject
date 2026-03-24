@@ -17,6 +17,7 @@ import {
   createRegularOrgSetting,
   updateRegularOrgSetting,
   deleteRegularOrgSetting,
+  getRegularDashboard,
 } from "@/lib/api";
 import {
   MessageSquare,
@@ -35,7 +36,7 @@ const TEAMS = ["1조", "2조", "3조"];
 const ROLES = ["일반", "조장", "반장"];
 const LEADER_ROLES = ["조장", "반장"];
 
-type Tab = "employees" | "notices" | "org";
+type Tab = "employees" | "notices" | "org" | "attendance";
 
 interface Employee {
   id: number;
@@ -319,6 +320,7 @@ export default function RegularManagePage() {
     { key: "employees", label: "직원 등록", icon: <Users size={16} /> },
     { key: "notices", label: "공지문 관리", icon: <ClipboardList size={16} /> },
     { key: "org", label: "조직도 설정", icon: <Network size={16} /> },
+    { key: "attendance", label: "출결 조회", icon: <ClipboardList size={16} /> },
   ];
 
   return (
@@ -855,6 +857,147 @@ export default function RegularManagePage() {
           )}
         </div>
       )}
+      {/* ===== Tab 4: 출결 조회 ===== */}
+      {tab === "attendance" && <AttendanceTab />}
+    </div>
+  );
+}
+
+function AttendanceTab() {
+  const [records, setRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [searchName, setSearchName] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getRegularDashboard(date);
+      setRecords(data.workers || []);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [date]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = searchName
+    ? records.filter((r: any) => r.name?.includes(searchName) || r.phone?.includes(searchName))
+    : records;
+
+  const formatTime = (t: string | null) => {
+    if (!t) return "-";
+    try { return new Date(t).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }); } catch { return t; }
+  };
+
+  const getStatus = (r: any) => {
+    if (r.clock_out_time) return { label: "퇴근완료", cls: "bg-green-50 text-green-700 border border-green-200" };
+    if (r.clock_in_time) return { label: "출근중", cls: "bg-amber-50 text-amber-700 border border-amber-200" };
+    return { label: "미출근", cls: "bg-red-50 text-red-700 border border-red-200" };
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">날짜</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">이름/연락처 검색</label>
+            <input
+              type="text"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              placeholder="검색..."
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button onClick={load} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            조회
+          </button>
+        </div>
+      </div>
+
+      {/* Summary */}
+      {!loading && records.length > 0 && (
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900">{records.length}</p>
+            <p className="text-xs text-gray-500 mt-1">전체</p>
+          </div>
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 text-center">
+            <p className="text-2xl font-bold text-amber-600">{records.filter((r: any) => r.clock_in_time && !r.clock_out_time).length}</p>
+            <p className="text-xs text-amber-600 mt-1">출근중</p>
+          </div>
+          <div className="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
+            <p className="text-2xl font-bold text-green-600">{records.filter((r: any) => r.clock_out_time).length}</p>
+            <p className="text-xs text-green-600 mt-1">퇴근완료</p>
+          </div>
+          <div className="bg-red-50 rounded-xl border border-red-200 p-4 text-center">
+            <p className="text-2xl font-bold text-red-600">{records.filter((r: any) => !r.clock_in_time).length}</p>
+            <p className="text-xs text-red-600 mt-1">미출근</p>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="py-12 text-center">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 text-center text-sm text-gray-400">데이터가 없습니다.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="py-2 px-4 font-medium text-gray-600">이름</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">부서</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">조</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">직책</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">출근시간</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">퇴근시간</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map((r: any) => {
+                  const st = getStatus(r);
+                  return (
+                    <tr key={r.id} className="hover:bg-gray-50">
+                      <td className="py-2.5 px-4 font-medium text-gray-900">{r.name}</td>
+                      <td className="py-2.5 px-4 text-gray-600">
+                        <a href={`tel:${r.phone}`} className="text-blue-600 hover:underline">{r.phone}</a>
+                      </td>
+                      <td className="py-2.5 px-4 text-gray-600">{r.department}</td>
+                      <td className="py-2.5 px-4 text-gray-600">{r.team}</td>
+                      <td className="py-2.5 px-4 text-gray-600">{r.role}</td>
+                      <td className="py-2.5 px-4 text-gray-700">{formatTime(r.clock_in_time)}</td>
+                      <td className="py-2.5 px-4 text-gray-700">{formatTime(r.clock_out_time)}</td>
+                      <td className="py-2.5 px-4">
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

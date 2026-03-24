@@ -226,4 +226,32 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/regular-public/dashboard-report/:date - Public dashboard view for regular employees (no auth)
+router.get('/dashboard-report/:date', async (req: Request, res: Response) => {
+  try {
+    const { date } = req.params;
+
+    const workers = await dbAll(`
+      SELECT re.id, re.phone, re.name, re.department, re.team, re.role,
+             ra.clock_in_time, ra.clock_out_time
+      FROM regular_employees re
+      LEFT JOIN regular_attendance ra ON re.id = ra.employee_id AND ra.date = ?
+      WHERE re.is_active = 1
+      ORDER BY re.department, re.team, re.name
+    `, date);
+
+    const totals = {
+      total: workers.length,
+      not_clocked_in: (workers as any[]).filter((w: any) => !w.clock_in_time).length,
+      clocked_in: (workers as any[]).filter((w: any) => w.clock_in_time && !w.clock_out_time).length,
+      completed: (workers as any[]).filter((w: any) => w.clock_out_time).length,
+    };
+
+    res.json({ date, workers, totals });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
+

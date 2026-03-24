@@ -199,6 +199,9 @@ function ReportContent() {
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">{w.worker_name_ko || w.phone}</p>
+                        {w.phone && (
+                          <a href={`tel:${w.phone}`} className="text-[11px] text-blue-600 font-medium">{w.phone}</a>
+                        )}
                         <div className="flex items-center gap-2 mt-0.5">
                           {w.department && (
                             <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">{w.department}</span>

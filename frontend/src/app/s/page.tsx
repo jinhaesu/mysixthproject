@@ -140,7 +140,7 @@ function SurveyContent() {
   }, [loadSurvey]);
 
   const handleClockIn = async () => {
-    if (!nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted || !agency.trim() || !overtimeWilling) {
+    if (!nameKo.trim() || !nameEn.trim() || !idNumber.trim() || !emergencyContact.trim() || !agreementAccepted) {
       alert(t(lang, 'allFieldsRequired'));
       return;
     }
@@ -474,7 +474,7 @@ function SurveyContent() {
             {/* Bank Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t(lang, 'bankName')} <span className="text-red-500">*</span>
+                {t(lang, 'bankName')} <span className="text-gray-400 text-xs font-normal ml-1">(선택)</span>
               </label>
               <select
                 value={bankName}
@@ -491,7 +491,7 @@ function SurveyContent() {
             {/* Bank Account */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t(lang, 'bankAccount')} <span className="text-red-500">*</span>
+                {t(lang, 'bankAccount')} <span className="text-gray-400 text-xs font-normal ml-1">(선택)</span>
               </label>
               <input
                 type="text"
@@ -535,7 +535,7 @@ function SurveyContent() {
             {/* Gender (F3) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t(lang, 'gender')} <span className="text-red-500">*</span>
+                {t(lang, 'gender')} <span className="text-gray-400 text-xs font-normal ml-1">(선택)</span>
               </label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -566,7 +566,7 @@ function SurveyContent() {
             {/* Birth Year (F3) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t(lang, 'birthYear')} <span className="text-red-500">*</span>
+                {t(lang, 'birthYear')} <span className="text-gray-400 text-xs font-normal ml-1">(선택)</span>
               </label>
               <input
                 type="text"
@@ -582,7 +582,7 @@ function SurveyContent() {
             {/* Agency */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {lang === 'ko' ? '연결 업체 (파견/알바)' : lang === 'en' ? 'Recruitment Agency' : lang === 'zh' ? '派遣公司' : 'Công ty phái cử'} <span className="text-red-500">*</span>
+                {lang === 'ko' ? '연결 업체 (파견/알바)' : lang === 'en' ? 'Recruitment Agency' : lang === 'zh' ? '派遣公司' : 'Công ty phái cử'} <span className="text-gray-400 text-xs font-normal ml-1">(선택)</span>
               </label>
               <input
                 type="text"
@@ -596,7 +596,7 @@ function SurveyContent() {
             {/* Overtime Availability */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {lang === 'ko' ? '추가 잔업 가능 시, 희망 여부' : lang === 'en' ? 'Overtime Availability' : lang === 'zh' ? '加班意愿' : 'Sẵn sàng làm thêm'} <span className="text-red-500">*</span>
+                {lang === 'ko' ? '추가 잔업 가능 시, 희망 여부' : lang === 'en' ? 'Overtime Availability' : lang === 'zh' ? '加班意愿' : 'Sẵn sàng làm thêm'} <span className="text-gray-400 text-xs font-normal ml-1">(선택)</span>
               </label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -626,7 +626,7 @@ function SurveyContent() {
 
             <button
               onClick={handleClockIn}
-              disabled={submitting || !nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted || !agency.trim() || !overtimeWilling}
+              disabled={submitting || !nameKo.trim() || !nameEn.trim() || !idNumber.trim() || !emergencyContact.trim() || !agreementAccepted}
               className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
             >
               {submitting ? (

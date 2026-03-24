@@ -407,4 +407,91 @@ router.post('/edit-time/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ===== Regular Report Schedules =====
+
+// GET /api/regular/report-schedules
+router.get('/report-schedules', async (_req: AuthRequest, res: Response) => {
+  try {
+    const schedules = await dbAll('SELECT * FROM regular_report_schedules WHERE is_active = 1 ORDER BY time');
+    res.json(schedules);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/report-schedules
+router.post('/report-schedules', async (req: AuthRequest, res: Response) => {
+  try {
+    const { time, phones, repeat_days } = req.body;
+    if (!time || !phones) {
+      res.status(400).json({ error: '시간과 전화번호는 필수입니다.' });
+      return;
+    }
+    const phonesJson = JSON.stringify(Array.isArray(phones) ? phones : [phones]);
+    const result = await dbRun(
+      'INSERT INTO regular_report_schedules (time, phones, repeat_days) VALUES (?, ?, ?)',
+      time, phonesJson, repeat_days || 'daily'
+    );
+    const created = await dbGet('SELECT * FROM regular_report_schedules WHERE id = ?', result.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/regular/report-schedules/:id
+router.delete('/report-schedules/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('UPDATE regular_report_schedules SET is_active = 0 WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/report-schedules/:id/send-now - Manually trigger a report
+router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Response) => {
+  try {
+    const schedule = await dbGet('SELECT * FROM regular_report_schedules WHERE id = ? AND is_active = 1', req.params.id) as any;
+    if (!schedule) {
+      res.status(404).json({ error: '스케줄을 찾을 수 없습니다.' });
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const kstHours = (now.getUTCHours() + 9) % 24;
+    const kstMinutes = now.getUTCMinutes();
+    const currentTime = `${String(kstHours).padStart(2, '0')}:${String(kstMinutes).padStart(2, '0')}`;
+
+    const stats = await dbGet(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN ra.clock_in_time IS NOT NULL AND ra.clock_out_time IS NULL THEN 1 ELSE 0 END) as clocked_in,
+        SUM(CASE WHEN ra.clock_out_time IS NOT NULL THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN ra.clock_in_time IS NULL THEN 1 ELSE 0 END) as not_clocked_in
+      FROM regular_employees re
+      LEFT JOIN regular_attendance ra ON re.id = ra.employee_id AND ra.date = ?
+      WHERE re.is_active = 1
+    `, today) as any;
+
+    const frontendUrl = process.env.FRONTEND_URL || process.env.SURVEY_BASE_URL?.replace('/s', '') || 'https://mysixthproject.vercel.app';
+    const detailLink = `${frontendUrl}/report-regular?date=${today}`;
+    const message = `[조인앤조인 정규직 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근중: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명\n\n상세 현황: ${detailLink}`;
+
+    const phones = JSON.parse(schedule.phones);
+    let sent = 0;
+    for (const phone of phones) {
+      const result = await sendGeneralSms(phone, message);
+      if (result.success) sent++;
+    }
+
+    await dbRun('UPDATE regular_report_schedules SET last_sent_at = CURRENT_TIMESTAMP WHERE id = ?', schedule.id);
+
+    res.json({ success: true, sent, total: phones.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

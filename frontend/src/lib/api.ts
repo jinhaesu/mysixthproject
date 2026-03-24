@@ -439,6 +439,22 @@ export async function sendReportNow(id: number) {
   return fetchAPI<any>(`/api/survey/report-schedules/${id}/send-now`, { method: 'POST' });
 }
 
+// ===== Regular Report Schedules =====
+export async function getRegularReportSchedules() {
+  return fetchAPI<any[]>('/api/regular/report-schedules');
+}
+export async function createRegularReportSchedule(data: { time: string; phones: string[]; repeat_days?: string }) {
+  return fetchAPI<any>('/api/regular/report-schedules', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+}
+export async function deleteRegularReportSchedule(id: number) {
+  return fetchAPI<any>(`/api/regular/report-schedules/${id}`, { method: 'DELETE' });
+}
+export async function sendRegularReportNow(id: number) {
+  return fetchAPI<any>(`/api/regular/report-schedules/${id}/send-now`, { method: 'POST' });
+}
+
 // ===== Scheduler =====
 export async function runScheduler() {
   return fetchAPI<any>('/api/survey/run-scheduler', { method: 'POST' });

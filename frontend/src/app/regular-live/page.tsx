@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { getRegularDashboard } from "@/lib/api";
+import {
+  getRegularDashboard,
+  getRegularReportSchedules,
+  createRegularReportSchedule,
+  deleteRegularReportSchedule,
+  sendRegularReportNow,
+} from "@/lib/api";
 import {
   Activity,
   Clock,
@@ -11,6 +17,10 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Settings,
+  Trash2,
+  Plus,
+  Send,
 } from "lucide-react";
 
 interface EmployeeRecord {
@@ -92,6 +102,11 @@ export default function RegularLivePage() {
   const [countdown, setCountdown] = useState(AUTO_REFRESH_SECONDS);
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
   const countdownRef = useRef(AUTO_REFRESH_SECONDS);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [showSchedulePanel, setShowSchedulePanel] = useState(false);
+  const [newTime, setNewTime] = useState("08:00");
+  const [newPhones, setNewPhones] = useState("");
+  const [newRepeatDays, setNewRepeatDays] = useState("daily");
 
   const fetchData = useCallback(async () => {
     try {
@@ -131,6 +146,10 @@ export default function RegularLivePage() {
 
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  useEffect(() => {
+    getRegularReportSchedules().then(setSchedules).catch(console.error);
+  }, []);
 
   const handleManualRefresh = () => {
     countdownRef.current = AUTO_REFRESH_SECONDS;
@@ -183,11 +202,102 @@ export default function RegularLivePage() {
             <RefreshCw className="w-4 h-4" />
             새로고침
           </button>
+          <button
+            onClick={() => setShowSchedulePanel(!showSchedulePanel)}
+            className={`p-2 rounded-lg transition-colors ${showSchedulePanel ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+            title="리포트 스케줄 설정"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
           <span className="text-xs text-gray-400 whitespace-nowrap">
             {countdown}초 후 자동 갱신
           </span>
         </div>
       </div>
+
+      {showSchedulePanel && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            정규직 리포트 스케줄
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">설정한 시간에 지정 번호로 정규직 출퇴근 현황 문자를 발송합니다.</p>
+
+          {/* Existing schedules */}
+          {schedules.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {schedules.map((s: any) => {
+                const phones = (() => { try { return JSON.parse(s.phones); } catch { return [s.phones]; } })();
+                return (
+                  <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{s.time}</p>
+                      <p className="text-xs text-gray-500">{phones.join(', ')} · {s.repeat_days === 'daily' ? '매일' : s.repeat_days === 'weekdays' ? '평일' : s.repeat_days}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          try { await sendRegularReportNow(s.id); alert('리포트가 발송되었습니다.'); } catch (e: any) { alert(e.message); }
+                        }}
+                        className="px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await deleteRegularReportSchedule(s.id);
+                          setSchedules(schedules.filter((x: any) => x.id !== s.id));
+                        }}
+                        className="px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Add new schedule */}
+          <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-gray-100">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">발송 시간</label>
+              <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">수신 번호 (쉼표 구분)</label>
+              <input type="text" value={newPhones} onChange={(e) => setNewPhones(e.target.value)}
+                placeholder="010-1234-5678"
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-48" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">반복</label>
+              <select value={newRepeatDays} onChange={(e) => setNewRepeatDays(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                <option value="daily">매일</option>
+                <option value="weekdays">평일만</option>
+              </select>
+            </div>
+            <button
+              onClick={async () => {
+                if (!newPhones.trim()) return alert('수신 번호를 입력해주세요.');
+                const phones = newPhones.split(',').map(p => p.trim()).filter(Boolean);
+                try {
+                  const created = await createRegularReportSchedule({ time: newTime, phones, repeat_days: newRepeatDays });
+                  setSchedules([...schedules, created]);
+                  setNewPhones("");
+                } catch (e: any) { alert(e.message); }
+              }}
+              className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              추가
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && !data ? (
         <div className="py-20 text-center">

@@ -65,7 +65,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
   const { token } = req.params;
   const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo, gender, birth_year, agreement_accepted, agreement_accepted_at, agency, overtime_willing } = req.body;
 
-  if (!worker_name_ko || !worker_name_en || !id_number || !emergency_contact || !agreement_accepted) {
+  if (!worker_name_ko || !worker_name_en || !bank_name || !bank_account || !id_number || !emergency_contact || !gender || !birth_year || !agreement_accepted) {
     res.status(400).json({ error: '모든 필수 항목을 입력해주세요.' });
     return;
   }

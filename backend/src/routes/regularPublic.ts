@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { dbGet, dbAll, dbRun } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
+import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
+
+// In-memory OTP store: key = token, value = { code, phone, expiresAt }
+const otpStore = new Map<string, { code: string; phone: string; expiresAt: number }>();
 
 // GET /api/regular-public/:token - Get employee info + today's state
 router.get('/:token', async (req: Request, res: Response) => {
@@ -90,11 +94,96 @@ router.get('/:token', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/regular-public/:token/send-otp - Send SMS verification code
+router.post('/:token/send-otp', async (req: Request, res: Response) => {
+  try {
+    const token = req.params.token as string;
+    const { phone } = req.body;
+
+    if (!phone) {
+      res.status(400).json({ error: '전화번호를 입력해주세요.' });
+      return;
+    }
+
+    const employee = await dbGet(`
+      SELECT re.* FROM regular_employees re WHERE re.token = ? AND re.is_active = 1
+    `, token) as any;
+
+    if (!employee) {
+      res.status(403).json({ error: '접근 권한이 없습니다.' });
+      return;
+    }
+
+    // Verify phone matches the registered employee phone
+    const normalizedInput = phone.replace(/[^0-9]/g, '');
+    const normalizedRegistered = employee.phone.replace(/[^0-9]/g, '');
+    if (normalizedInput !== normalizedRegistered) {
+      res.status(400).json({ error: '등록된 전화번호와 일치하지 않습니다.' });
+      return;
+    }
+
+    // Generate 6-digit OTP
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    otpStore.set(token, { code, phone: normalizedInput, expiresAt });
+
+    // Send SMS
+    const message = `[조인앤조인] 출근 인증번호: ${code}\n5분 내에 입력해주세요.`;
+    const result = await sendGeneralSms(phone, message);
+
+    if (!result.success) {
+      res.status(500).json({ error: '인증번호 발송에 실패했습니다.' });
+      return;
+    }
+
+    res.json({ success: true, message: '인증번호가 발송되었습니다.' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular-public/:token/verify-otp - Verify SMS code
+router.post('/:token/verify-otp', async (req: Request, res: Response) => {
+  try {
+    const token = req.params.token as string;
+    const { code } = req.body;
+
+    if (!code) {
+      res.status(400).json({ error: '인증번호를 입력해주세요.' });
+      return;
+    }
+
+    const stored = otpStore.get(token);
+    if (!stored) {
+      res.status(400).json({ error: '인증번호를 먼저 요청해주세요.' });
+      return;
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      otpStore.delete(token);
+      res.status(400).json({ error: '인증번호가 만료되었습니다. 다시 요청해주세요.' });
+      return;
+    }
+
+    if (stored.code !== code) {
+      res.status(400).json({ error: '인증번호가 일치하지 않습니다.' });
+      return;
+    }
+
+    // Mark as verified
+    otpStore.delete(token);
+    res.json({ success: true, verified: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/regular-public/:token/clock-in
 router.post('/:token/clock-in', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const { latitude, longitude, agreement_accepted, agreement_accepted_at } = req.body;
+    const { latitude, longitude, agreement_accepted, agreement_accepted_at, phone_verified } = req.body;
 
     const employee = await dbGet(`
       SELECT re.*, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters, sw.name as workplace_name
@@ -110,6 +199,11 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
 
     if (!agreement_accepted) {
       res.status(400).json({ error: '개인정보 수집 동의가 필요합니다.' });
+      return;
+    }
+
+    if (!phone_verified) {
+      res.status(400).json({ error: '전화번호 인증이 필요합니다.' });
       return;
     }
 

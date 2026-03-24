@@ -467,6 +467,21 @@ export async function initializeDB(): Promise<void> {
     console.error('Regular employee tables init error:', err);
   }
 
+  // Regular employee report schedules table
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_report_schedules (
+        id SERIAL PRIMARY KEY,
+        time TEXT NOT NULL,
+        phones TEXT NOT NULL,
+        repeat_days TEXT DEFAULT 'daily',
+        is_active INTEGER DEFAULT 1,
+        last_sent_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  } catch {}
+
   console.log('Database initialized successfully');
 }
 

@@ -108,6 +108,16 @@ const tr: Record<Lang, Record<string, string>> = {
     totalWorkHours: "총 근무시간",
     hours: "시간",
     thankYou: "감사합니다. 이 페이지를 닫으셔도 됩니다.",
+    enterPhone: "전화번호를 입력해주세요.",
+    enterOtp: "인증번호를 입력해주세요.",
+    phoneVerification: "전화번호 인증",
+    phoneVerificationDesc: "본인 확인을 위해 등록된 전화번호를 입력해주세요.",
+    requestOtp: "인증번호 요청",
+    otpSent: "인증번호가 발송되었습니다. 5분 내에 입력해주세요.",
+    otpPlaceholder: "6자리 인증번호",
+    verifyOtp: "인증 확인",
+    phoneVerified: "전화번호 인증 완료",
+    resendOtp: "재발송",
   },
   en: {
     langKo: "한국어",
@@ -182,6 +192,16 @@ const tr: Record<Lang, Record<string, string>> = {
     totalWorkHours: "Total Work Hours",
     hours: "hours",
     thankYou: "Thank you. You may close this page.",
+    enterPhone: "Please enter your phone number.",
+    enterOtp: "Please enter the verification code.",
+    phoneVerification: "Phone Verification",
+    phoneVerificationDesc: "Enter your registered phone number for identity verification.",
+    requestOtp: "Request Code",
+    otpSent: "Verification code sent. Enter within 5 minutes.",
+    otpPlaceholder: "6-digit code",
+    verifyOtp: "Verify",
+    phoneVerified: "Phone verified",
+    resendOtp: "Resend",
   },
   zh: {
     langKo: "한국어",
@@ -250,6 +270,16 @@ const tr: Record<Lang, Record<string, string>> = {
     totalWorkHours: "总工作时间",
     hours: "小时",
     thankYou: "谢谢。您可以关闭此页面。",
+    enterPhone: "请输入手机号码。",
+    enterOtp: "请输入验证码。",
+    phoneVerification: "手机验证",
+    phoneVerificationDesc: "请输入注册的手机号码进行身份验证。",
+    requestOtp: "发送验证码",
+    otpSent: "验证码已发送。请在5分钟内输入。",
+    otpPlaceholder: "6位验证码",
+    verifyOtp: "验证",
+    phoneVerified: "手机验证完成",
+    resendOtp: "重新发送",
   },
   vi: {
     langKo: "한국어",
@@ -324,6 +354,16 @@ const tr: Record<Lang, Record<string, string>> = {
     totalWorkHours: "Tổng giờ làm việc",
     hours: "giờ",
     thankYou: "Cảm ơn bạn. Bạn có thể đóng trang này.",
+    enterPhone: "Vui lòng nhập số điện thoại.",
+    enterOtp: "Vui lòng nhập mã xác minh.",
+    phoneVerification: "Xác minh số điện thoại",
+    phoneVerificationDesc: "Nhập số điện thoại đã đăng ký để xác minh danh tính.",
+    requestOtp: "Yêu cầu mã",
+    otpSent: "Mã xác minh đã gửi. Nhập trong vòng 5 phút.",
+    otpPlaceholder: "Mã 6 chữ số",
+    verifyOtp: "Xác minh",
+    phoneVerified: "Đã xác minh",
+    resendOtp: "Gửi lại",
   },
 };
 
@@ -405,6 +445,15 @@ function RegularContent() {
 
   // Safety agreement (daily)
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+
+  // Phone verification
+  const [phoneInput, setPhoneInput] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState("");
 
   // Org chart expand
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
@@ -506,6 +555,47 @@ function RegularContent() {
     loadData();
   }, [loadData]);
 
+  // ── Phone OTP verification ──────────────────────────────────────
+  const handleSendOtp = async () => {
+    if (!phoneInput.trim()) { setOtpError(t(lang, "enterPhone")); return; }
+    setOtpSending(true);
+    setOtpError("");
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phoneInput.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Failed");
+      setOtpSent(true);
+    } catch (err: any) {
+      setOtpError(err.message);
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) { setOtpError(t(lang, "enterOtp")); return; }
+    setOtpVerifying(true);
+    setOtpError("");
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: otpCode.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Failed");
+      setPhoneVerified(true);
+    } catch (err: any) {
+      setOtpError(err.message);
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
   // ── Clock-in (simple, no personal info form) ──────────────────
   const handleClockIn = async () => {
     if (!agreementAccepted) return;
@@ -521,6 +611,7 @@ function RegularContent() {
             longitude: coords?.lng,
             agreement_accepted: true,
             agreement_accepted_at: new Date().toISOString(),
+            phone_verified: true,
           }),
         }
       );
@@ -948,40 +1039,109 @@ function RegularContent() {
 
         {/* ── Clock-in Button (simple - no form fields) ───────────── */}
         {data.status === "ready" && canAct && agreementAccepted && (
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <div className="flex items-center gap-2 text-indigo-700 mb-2">
-              <LogIn className="w-5 h-5" />
-              <h2 className="font-semibold">
-                {lang === "ko"
-                  ? "출근 기록"
-                  : lang === "en"
-                  ? "Clock In"
-                  : lang === "zh"
-                  ? "上班打卡"
-                  : "Chấm công vào"}
-              </h2>
-            </div>
+          <div className="space-y-4">
+            {/* Phone Verification */}
+            {!phoneVerified ? (
+              <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+                <div className="flex items-center gap-2 text-indigo-700 mb-2">
+                  <Shield className="w-5 h-5" />
+                  <h2 className="font-semibold">{t(lang, "phoneVerification")}</h2>
+                </div>
+                <p className="text-sm text-gray-600">{t(lang, "phoneVerificationDesc")}</p>
 
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <p className="text-xs text-red-700 font-bold">
-                {t(lang, "clockInWarning")}
-              </p>
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t(lang, "phoneVerification")}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="010-0000-0000"
+                      disabled={phoneVerified}
+                      className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                    />
+                    <button
+                      onClick={handleSendOtp}
+                      disabled={otpSending || !phoneInput.trim()}
+                      className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-indigo-700 whitespace-nowrap"
+                    >
+                      {otpSending ? "..." : otpSent ? t(lang, "resendOtp") : t(lang, "requestOtp")}
+                    </button>
+                  </div>
+                </div>
 
-            <button
-              onClick={handleClockIn}
-              disabled={submitting || !agreementAccepted}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Clock className="w-5 h-5" />
-                  {t(lang, "clockInButton")}
-                </>
-              )}
-            </button>
+                {otpSent && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-green-600 font-medium">{t(lang, "otpSent")}</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder={t(lang, "otpPlaceholder")}
+                        maxLength={6}
+                        inputMode="numeric"
+                        className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base text-center tracking-widest font-mono"
+                      />
+                      <button
+                        onClick={handleVerifyOtp}
+                        disabled={otpVerifying || otpCode.length !== 6}
+                        className="px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-green-700 whitespace-nowrap"
+                      >
+                        {otpVerifying ? "..." : t(lang, "verifyOtp")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {otpError && (
+                  <p className="text-xs text-red-600 font-medium">{otpError}</p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                <p className="text-sm font-medium text-green-700">{t(lang, "phoneVerified")}</p>
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <div className="flex items-center gap-2 text-indigo-700 mb-2">
+                <LogIn className="w-5 h-5" />
+                <h2 className="font-semibold">
+                  {lang === "ko"
+                    ? "출근 기록"
+                    : lang === "en"
+                    ? "Clock In"
+                    : lang === "zh"
+                    ? "上班打卡"
+                    : "Chấm công vào"}
+                </h2>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-xs text-red-700 font-bold">
+                  {t(lang, "clockInWarning")}
+                </p>
+              </div>
+
+              <button
+                onClick={handleClockIn}
+                disabled={submitting || !agreementAccepted || !phoneVerified}
+                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Clock className="w-5 h-5" />
+                    {t(lang, "clockInButton")}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 

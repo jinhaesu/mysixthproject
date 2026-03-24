@@ -72,26 +72,27 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const token = uuidv4();
+    // Check if already exists (active or inactive)
+    const existing = await dbGet('SELECT * FROM regular_employees WHERE phone = ?', phone) as any;
 
-    // Use ON CONFLICT to handle re-registration with same phone
-    const result = await dbRun(`
-      INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-      ON CONFLICT (phone) DO UPDATE SET
-        name = EXCLUDED.name,
-        token = EXCLUDED.token,
-        department = EXCLUDED.department,
-        team = EXCLUDED.team,
-        role = EXCLUDED.role,
-        workplace_id = EXCLUDED.workplace_id,
-        is_active = 1,
-        updated_at = NOW()
-      RETURNING id
-    `, phone, name, token, department || '', team || '', role || '', workplace_id || null);
-
-    const created = await dbGet('SELECT * FROM regular_employees WHERE id = ?', result.lastInsertRowid);
-    res.status(201).json(created);
+    if (existing) {
+      // Re-activate and update the existing record
+      const token = existing.token || uuidv4();
+      await dbRun(
+        'UPDATE regular_employees SET name = ?, token = ?, department = ?, team = ?, role = ?, workplace_id = ?, is_active = 1, updated_at = NOW() WHERE phone = ?',
+        name, token, department || '', team || '', role || '', workplace_id || null, phone
+      );
+      const updated = await dbGet('SELECT * FROM regular_employees WHERE phone = ?', phone);
+      res.status(201).json(updated);
+    } else {
+      const token = uuidv4();
+      const result = await dbRun(
+        'INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        phone, name, token, department || '', team || '', role || '', workplace_id || null
+      );
+      const created = await dbGet('SELECT * FROM regular_employees WHERE id = ?', result.lastInsertRowid);
+      res.status(201).json(created);
+    }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -1,4 +1,4 @@
-import { dbAll, dbRun, dbGet } from '../db';
+import { dbAll, dbRun, dbGet, getKSTDate } from '../db';
 import { sendSurveyMessage, sendGeneralSms } from './smsService';
 
 const REMINDER_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
@@ -6,7 +6,7 @@ const THRESHOLD_HOURS = parseInt(process.env.REMINDER_THRESHOLD_HOURS || '2', 10
 
 async function checkAndSendReminders() {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKSTDate();
     const threshold = new Date(Date.now() - THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
 
     const pending = await dbAll(`
@@ -40,10 +40,10 @@ async function checkAndSendReminders() {
 
 async function checkAndSendSafetyNotices() {
   try {
-    // Get tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+    // Get tomorrow's date in KST
+    const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    nowKst.setUTCDate(nowKst.getUTCDate() + 1);
+    const tomorrowStr = nowKst.toISOString().slice(0, 10);
 
     // Check if there are workers scheduled for tomorrow who haven't received a safety notice
     const workers = await dbAll(`

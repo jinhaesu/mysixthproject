@@ -111,7 +111,7 @@ export default function RegularManagePage() {
 
   // ===== Notices Tab =====
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [noticeDate, setNoticeDate] = useState(new Date().toISOString().slice(0, 10));
+  const [noticeDate, setNoticeDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [noticeForm, setNoticeForm] = useState({ ...emptyNoticeForm });
   const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
   const [noticeSaving, setNoticeSaving] = useState(false);
@@ -998,7 +998,7 @@ export default function RegularManagePage() {
 function AttendanceTab() {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [searchName, setSearchName] = useState("");
 
   const load = useCallback(async () => {

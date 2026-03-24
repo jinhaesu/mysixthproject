@@ -148,7 +148,7 @@ export default function SurveyManagePage() {
 function SendTab() {
   const [workplaces, setWorkplaces] = useState<Workplace[]>([]);
   const [phone, setPhone] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [workplaceId, setWorkplaceId] = useState<number | null>(null);
   const [messageType, setMessageType] = useState("sms");
   const [sending, setSending] = useState(false);
@@ -167,7 +167,7 @@ function SendTab() {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
   });
-  const [rangeStart, setRangeStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [rangeStart, setRangeStart] = useState(() => new Date().toLocaleDateString('sv-SE'));
   const [rangeEnd, setRangeEnd] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 7);
     return d.toISOString().slice(0, 10);
@@ -683,7 +683,7 @@ function ResponsesTab() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `설문응답_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.download = `설문응답_${new Date().toLocaleDateString('sv-SE')}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
@@ -1308,7 +1308,7 @@ function SafetyTab() {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
   });
-  const [rangeStart, setRangeStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [rangeStart, setRangeStart] = useState(() => new Date().toLocaleDateString('sv-SE'));
   const [rangeEnd, setRangeEnd] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 7);
     return d.toISOString().slice(0, 10);

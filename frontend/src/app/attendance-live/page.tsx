@@ -110,7 +110,7 @@ function statusColor(status: string) {
 }
 
 export default function AttendanceLivePage() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState(AUTO_REFRESH_SECONDS);

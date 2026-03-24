@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun } from '../db';
+import { dbGet, dbAll, dbRun, getKSTTimestamp } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 
 const router = Router();
@@ -112,7 +112,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
     ? Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng))
     : null;
 
-  const clockInTime = new Date().toISOString();
+  const clockInTime = getKSTTimestamp();
 
   const existing = await dbGet('SELECT id FROM survey_responses WHERE request_id = ?', request.id) as any;
 
@@ -234,7 +234,7 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     ? Math.round(calculateDistance(latitude, longitude, request.wp_lat, request.wp_lng))
     : null;
 
-  const clockOutTime = new Date().toISOString();
+  const clockOutTime = getKSTTimestamp();
 
   // 퇴근 기록 먼저 저장
   await dbRun(`

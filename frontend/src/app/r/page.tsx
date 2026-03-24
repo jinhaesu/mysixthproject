@@ -530,8 +530,8 @@ function RegularContent() {
 
   // Vacation
   const [showVacation, setShowVacation] = useState(false);
-  const [vacStartDate, setVacStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [vacEndDate, setVacEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [vacStartDate, setVacStartDate] = useState(new Date().toLocaleDateString('sv-SE'));
+  const [vacEndDate, setVacEndDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [vacDays, setVacDays] = useState("1");
   const [vacReason, setVacReason] = useState("");
   const [vacSubmitting, setVacSubmitting] = useState(false);

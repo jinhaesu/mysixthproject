@@ -96,7 +96,7 @@ function roleBadge(role: string) {
 }
 
 export default function RegularLivePage() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState(AUTO_REFRESH_SECONDS);
@@ -238,6 +238,24 @@ export default function RegularLivePage() {
               <p className="text-xs text-red-600 mt-1">미출근</p>
             </div>
           </div>
+
+          {/* Vacation Section */}
+          {(data as any).vacations && (data as any).vacations.length > 0 && (
+            <div className="bg-purple-50 rounded-xl border border-purple-200 p-4 mb-6">
+              <h3 className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+                🏖️ 휴가중 ({(data as any).vacations.length}명)
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {(data as any).vacations.map((v: any) => (
+                  <div key={v.id} className="bg-white rounded-lg px-3 py-2 border border-purple-200 text-sm">
+                    <span className="font-medium text-purple-900">{v.employee_name}</span>
+                    <span className="text-purple-600 ml-2 text-xs">{v.department} {v.team}</span>
+                    <span className="text-purple-400 ml-2 text-xs">{v.start_date}~{v.end_date}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Per-department Sections */}
           {!data.departments || data.departments.length === 0 ? (

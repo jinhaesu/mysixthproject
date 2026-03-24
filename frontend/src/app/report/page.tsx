@@ -28,7 +28,7 @@ function formatPlannedTime(time: string | null): string {
 
 function ReportContent() {
   const searchParams = useSearchParams();
-  const dateParam = searchParams.get("date") || new Date().toISOString().slice(0, 10);
+  const dateParam = searchParams.get("date") || new Date().toLocaleDateString('sv-SE');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");

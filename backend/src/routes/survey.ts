@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
-import { dbGet, dbAll, dbRun } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendSurveyMessage, sendGeneralSms } from '../services/smsService';
 
@@ -260,7 +260,7 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
     if (scheduled_at) {
       await dbRun(
         'INSERT INTO scheduled_messages (type, notice_id, phones, date, scheduled_at, status) VALUES (?, ?, ?, ?, ?, ?)',
-        'safety_notice', notice_id, JSON.stringify(targetPhones), date || new Date().toISOString().slice(0, 10), scheduled_at, 'scheduled'
+        'safety_notice', notice_id, JSON.stringify(targetPhones), date || getKSTDate(), scheduled_at, 'scheduled'
       );
       res.json({
         success: true,
@@ -504,7 +504,7 @@ router.post('/resend/:id', async (req: AuthRequest, res: Response) => {
 // GET /api/survey/stats - Summary statistics
 router.get('/stats', async (_req: AuthRequest, res: Response) => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKSTDate();
 
     const total = await dbGet('SELECT COUNT(*) as count FROM survey_requests');
     const todayCount = await dbGet('SELECT COUNT(*) as count FROM survey_requests WHERE date = ?', today);
@@ -536,7 +536,7 @@ router.get('/stats', async (_req: AuthRequest, res: Response) => {
 // GET /api/survey/dashboard - Real-time attendance by workplace
 router.get('/dashboard', async (req: AuthRequest, res: Response) => {
   try {
-    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const date = (req.query.date as string) || getKSTDate();
 
     const byWorkplace = await dbAll(`
       SELECT sw.id as workplace_id, sw.name as workplace_name,
@@ -583,7 +583,7 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
 router.post('/remind', async (req: AuthRequest, res: Response) => {
   try {
     const { date, threshold_hours = 2 } = req.body;
-    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const targetDate = date || getKSTDate();
 
     // Find requests that are still 'sent' and older than threshold
     const threshold = new Date(Date.now() - threshold_hours * 60 * 60 * 1000).toISOString();
@@ -716,7 +716,7 @@ router.get('/responses/export', async (req: AuthRequest, res: Response) => {
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename=survey_responses_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  res.setHeader('Content-Disposition', `attachment; filename=survey_responses_${getKSTDate()}.xlsx`);
   res.send(buf);
 });
 
@@ -859,7 +859,7 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
       return;
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKSTDate();
     const now = new Date();
     const kstHours = (now.getUTCHours() + 9) % 24;
     const kstMinutes = now.getUTCMinutes();

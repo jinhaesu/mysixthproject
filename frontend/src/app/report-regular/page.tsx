@@ -25,7 +25,7 @@ function getWorkerStatus(w: Worker): WorkerStatus {
 
 function ReportRegularContent() {
   const searchParams = useSearchParams();
-  const dateParam = searchParams.get("date") || new Date().toISOString().slice(0, 10);
+  const dateParam = searchParams.get("date") || new Date().toLocaleDateString('sv-SE');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");
@@ -220,6 +220,22 @@ function ReportRegularContent() {
               >
                 {dept}
               </button>
+            ))}
+          </div>
+        )}
+
+        {/* Vacation List */}
+        {data.vacations && data.vacations.length > 0 && (
+          <div className="bg-purple-50 rounded-xl border border-purple-200 p-3">
+            <p className="text-xs font-semibold text-purple-800 mb-2">🏖️ 휴가중 ({data.vacations.length}명)</p>
+            {data.vacations.map((v: any) => (
+              <div key={v.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 mb-1 border border-purple-100">
+                <div>
+                  <span className="font-medium text-sm text-purple-900">{v.employee_name}</span>
+                  {v.phone && <a href={`tel:${v.phone}`} className="text-xs text-purple-600 ml-2">{v.phone}</a>}
+                </div>
+                <span className="text-xs text-purple-500">{v.start_date}~{v.end_date}</span>
+              </div>
             ))}
           </div>
         )}

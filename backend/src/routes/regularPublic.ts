@@ -1,16 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
-
-// Helper: Get current date in KST (UTC+9)
-function getKSTDate(): string {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10);
-}
 
 // In-memory OTP store: key = token, value = { code, phone, expiresAt }
 const otpStore = new Map<string, { code: string; phone: string; expiresAt: number }>();
@@ -299,7 +292,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       : null;
 
     const today = getKSTDate();
-    const clockInTime = new Date().toISOString();
+    const clockInTime = getKSTTimestamp();
 
     // Check if already clocked in today (UNIQUE constraint on employee_id + date)
     const existing = await dbGet('SELECT id FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
@@ -362,7 +355,7 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
       : null;
 
     const today = getKSTDate();
-    const clockOutTime = new Date().toISOString();
+    const clockOutTime = getKSTTimestamp();
 
     // Must have clocked in first
     const attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
@@ -413,7 +406,15 @@ router.get('/dashboard-report/:date', async (req: Request, res: Response) => {
       completed: (workers as any[]).filter((w: any) => w.clock_out_time).length,
     };
 
-    res.json({ date, workers, totals });
+    const vacations = await dbAll(`
+      SELECT vr.*, re.name as employee_name, re.department, re.team, re.phone
+      FROM regular_vacation_requests vr
+      JOIN regular_employees re ON vr.employee_id = re.id
+      WHERE vr.status = 'approved' AND vr.start_date <= ? AND vr.end_date >= ?
+      ORDER BY re.department, re.name
+    `, date, date) as any[];
+
+    res.json({ date, workers, totals, vacations });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

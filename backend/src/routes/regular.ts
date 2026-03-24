@@ -1,16 +1,10 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbAll, dbRun } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
-
-function getKSTDate(): string {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10);
-}
 
 // ===== Employees CRUD =====
 
@@ -255,11 +249,21 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
       not_clocked_in: workers.filter(w => !w.clock_in_time).length,
     };
 
+    // Get approved vacations for this date
+    const vacations = await dbAll(`
+      SELECT vr.*, re.name as employee_name, re.department, re.team, re.phone
+      FROM regular_vacation_requests vr
+      JOIN regular_employees re ON vr.employee_id = re.id
+      WHERE vr.status = 'approved' AND vr.start_date <= ? AND vr.end_date >= ?
+      ORDER BY re.department, re.name
+    `, date, date) as any[];
+
     res.json({
       date,
       departments,
       workers,
       totals,
+      vacations,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

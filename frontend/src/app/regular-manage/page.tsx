@@ -99,6 +99,8 @@ export default function RegularManagePage() {
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [batchSending, setBatchSending] = useState(false);
   const [empSaving, setEmpSaving] = useState(false);
+  const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
+  const [editEmpForm, setEditEmpForm] = useState({ ...emptyEmployeeForm });
 
   // ===== Notices Tab =====
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -227,6 +229,35 @@ export default function RegularManagePage() {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(employees.map((e) => e.id)));
+    }
+  }
+
+  function startEditEmp(emp: Employee) {
+    setEditingEmp(emp);
+    setEditEmpForm({ name: emp.name, phone: emp.phone, department: emp.department, team: emp.team, role: emp.role, workplace_id: emp.workplace_id });
+  }
+
+  async function handleSaveEmp() {
+    if (!editingEmp) return;
+    setEmpSaving(true);
+    try {
+      await updateRegularEmployee(editingEmp.id, editEmpForm);
+      setEditingEmp(null);
+      loadEmployees();
+    } catch (err: any) {
+      alert(err.message || "수정 실패");
+    } finally {
+      setEmpSaving(false);
+    }
+  }
+
+  async function handleDeleteEmp(id: number, name: string) {
+    if (!confirm(`${name} 직원을 삭제하시겠습니까?`)) return;
+    try {
+      await deleteRegularEmployee(id);
+      loadEmployees();
+    } catch (err: any) {
+      alert(err.message || "삭제 실패");
     }
   }
 
@@ -453,6 +484,26 @@ export default function RegularManagePage() {
                 {batchSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 일괄 링크발송 ({selectedIds.size}명)
               </button>
+              <button
+                onClick={async () => {
+                  if (selectedIds.size === 0) return;
+                  if (!confirm(`선택한 ${selectedIds.size}명을 삭제하시겠습니까?`)) return;
+                  try {
+                    for (const id of Array.from(selectedIds)) {
+                      await deleteRegularEmployee(id);
+                    }
+                    setSelectedIds(new Set());
+                    loadEmployees();
+                  } catch (err: any) {
+                    alert(err.message || "삭제 실패");
+                  }
+                }}
+                disabled={selectedIds.size === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                일괄 삭제 ({selectedIds.size}명)
+              </button>
             </div>
           )}
 
@@ -520,23 +571,94 @@ export default function RegularManagePage() {
                           {emp.token_link || "-"}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleSendLink(emp.id)}
-                            disabled={sendingId === emp.id}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-medium disabled:opacity-50"
-                          >
-                            {sendingId === emp.id ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <Send size={12} />
-                            )}
-                            링크발송
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleSendLink(emp.id)}
+                              disabled={sendingId === emp.id}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-medium disabled:opacity-50"
+                            >
+                              {sendingId === emp.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                              발송
+                            </button>
+                            <button
+                              onClick={() => startEditEmp(emp)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                              title="수정"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEmp(emp.id, emp.name)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                              title="삭제"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Employee Modal */}
+          {editingEmp && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">직원 정보 수정</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">이름</label>
+                    <input type="text" value={editEmpForm.name} onChange={(e) => setEditEmpForm({ ...editEmpForm, name: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">전화번호</label>
+                    <input type="text" value={editEmpForm.phone} onChange={(e) => setEditEmpForm({ ...editEmpForm, phone: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">부서</label>
+                      <select value={editEmpForm.department} onChange={(e) => setEditEmpForm({ ...editEmpForm, department: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">조</label>
+                      <select value={editEmpForm.team} onChange={(e) => setEditEmpForm({ ...editEmpForm, team: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        {TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">직책</label>
+                      <select value={editEmpForm.role} onChange={(e) => setEditEmpForm({ ...editEmpForm, role: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">근무지</label>
+                    <select value={editEmpForm.workplace_id ?? ""} onChange={(e) => setEditEmpForm({ ...editEmpForm, workplace_id: e.target.value ? Number(e.target.value) : null })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                      <option value="">선택</option>
+                      {workplaces.map((wp) => <option key={wp.id} value={wp.id}>{wp.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setEditingEmp(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">취소</button>
+                  <button onClick={handleSaveEmp} disabled={empSaving} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2">
+                    {empSaving && <Loader2 size={14} className="animate-spin" />}
+                    저장
+                  </button>
+                </div>
               </div>
             </div>
           )}

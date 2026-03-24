@@ -72,6 +72,10 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Remove any previously soft-deleted record with the same phone
+    await dbRun('DELETE FROM regular_attendance WHERE employee_id IN (SELECT id FROM regular_employees WHERE phone = ? AND is_active = 0)', phone);
+    await dbRun('DELETE FROM regular_employees WHERE phone = ? AND is_active = 0', phone);
+
     const token = uuidv4();
 
     const result = await dbRun(`

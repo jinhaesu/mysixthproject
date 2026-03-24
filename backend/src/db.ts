@@ -482,6 +482,40 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Regular employee vacation balances
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_vacation_balances (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        year INTEGER NOT NULL,
+        total_days NUMERIC(4,1) NOT NULL DEFAULT 0,
+        used_days NUMERIC(4,1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(employee_id, year)
+      )
+    `);
+  } catch {}
+
+  // Regular employee vacation requests
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_vacation_requests (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        days NUMERIC(4,1) NOT NULL DEFAULT 1,
+        reason TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending',
+        admin_memo TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch {}
+
   console.log('Database initialized successfully');
 }
 

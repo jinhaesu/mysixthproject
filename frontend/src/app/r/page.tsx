@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   Ban,
+  Calendar,
 } from "lucide-react";
 
 // ─── Translations (정규직 version) ──────────────────────────────
@@ -118,6 +119,24 @@ const tr: Record<Lang, Record<string, string>> = {
     verifyOtp: "인증 확인",
     phoneVerified: "전화번호 인증 완료",
     resendOtp: "재발송",
+    vacation: "휴가 신청",
+    vacationDesc: "GPS 위치와 관계없이 휴가를 신청할 수 있습니다.",
+    vacationStart: "시작일",
+    vacationEnd: "종료일",
+    vacationDays: "일수",
+    vacationReason: "사유",
+    vacationReasonPlaceholder: "휴가 사유를 입력해주세요",
+    vacationSubmit: "휴가 신청하기",
+    vacationSuccess: "휴가 신청이 완료되었습니다. 관리자 승인을 기다려주세요.",
+    vacationBalance: "보유 휴가",
+    vacationUsed: "사용",
+    vacationRemaining: "잔여",
+    vacationDaysUnit: "일",
+    vacationPending: "대기중",
+    vacationApproved: "승인",
+    vacationRejected: "반려",
+    vacationHistory: "휴가 신청 내역",
+    vacationNone: "신청 내역이 없습니다.",
   },
   en: {
     langKo: "한국어",
@@ -202,6 +221,24 @@ const tr: Record<Lang, Record<string, string>> = {
     verifyOtp: "Verify",
     phoneVerified: "Phone verified",
     resendOtp: "Resend",
+    vacation: "Leave Request",
+    vacationDesc: "Request leave regardless of GPS location.",
+    vacationStart: "Start Date",
+    vacationEnd: "End Date",
+    vacationDays: "Days",
+    vacationReason: "Reason",
+    vacationReasonPlaceholder: "Enter reason for leave",
+    vacationSubmit: "Submit Request",
+    vacationSuccess: "Leave request submitted. Waiting for approval.",
+    vacationBalance: "Leave Balance",
+    vacationUsed: "Used",
+    vacationRemaining: "Remaining",
+    vacationDaysUnit: "days",
+    vacationPending: "Pending",
+    vacationApproved: "Approved",
+    vacationRejected: "Rejected",
+    vacationHistory: "Leave History",
+    vacationNone: "No requests found.",
   },
   zh: {
     langKo: "한국어",
@@ -280,6 +317,24 @@ const tr: Record<Lang, Record<string, string>> = {
     verifyOtp: "验证",
     phoneVerified: "手机验证完成",
     resendOtp: "重新发送",
+    vacation: "请假申请",
+    vacationDesc: "可以不受GPS位置限制申请休假。",
+    vacationStart: "开始日期",
+    vacationEnd: "结束日期",
+    vacationDays: "天数",
+    vacationReason: "事由",
+    vacationReasonPlaceholder: "请输入请假事由",
+    vacationSubmit: "提交申请",
+    vacationSuccess: "请假申请已提交，等待管理员审批。",
+    vacationBalance: "年假余额",
+    vacationUsed: "已用",
+    vacationRemaining: "剩余",
+    vacationDaysUnit: "天",
+    vacationPending: "待审批",
+    vacationApproved: "已批准",
+    vacationRejected: "已拒绝",
+    vacationHistory: "请假记录",
+    vacationNone: "暂无记录。",
   },
   vi: {
     langKo: "한국어",
@@ -364,6 +419,24 @@ const tr: Record<Lang, Record<string, string>> = {
     verifyOtp: "Xác minh",
     phoneVerified: "Đã xác minh",
     resendOtp: "Gửi lại",
+    vacation: "Đơn xin nghỉ",
+    vacationDesc: "Xin nghỉ không cần vị trí GPS.",
+    vacationStart: "Ngày bắt đầu",
+    vacationEnd: "Ngày kết thúc",
+    vacationDays: "Số ngày",
+    vacationReason: "Lý do",
+    vacationReasonPlaceholder: "Nhập lý do xin nghỉ",
+    vacationSubmit: "Gửi đơn",
+    vacationSuccess: "Đã gửi đơn. Chờ phê duyệt.",
+    vacationBalance: "Ngày phép",
+    vacationUsed: "Đã dùng",
+    vacationRemaining: "Còn lại",
+    vacationDaysUnit: "ngày",
+    vacationPending: "Chờ duyệt",
+    vacationApproved: "Đã duyệt",
+    vacationRejected: "Từ chối",
+    vacationHistory: "Lịch sử nghỉ phép",
+    vacationNone: "Chưa có đơn nào.",
   },
 };
 
@@ -455,6 +528,15 @@ function RegularContent() {
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError, setOtpError] = useState("");
 
+  // Vacation
+  const [showVacation, setShowVacation] = useState(false);
+  const [vacStartDate, setVacStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [vacEndDate, setVacEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [vacDays, setVacDays] = useState("1");
+  const [vacReason, setVacReason] = useState("");
+  const [vacSubmitting, setVacSubmitting] = useState(false);
+  const [vacData, setVacData] = useState<any>(null);
+
   // Org chart expand
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
 
@@ -500,6 +582,28 @@ function RegularContent() {
       setLoading(false);
     }
   }, [token]);
+
+  const loadVacations = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/vacations`);
+      if (res.ok) {
+        const data = await res.json();
+        setVacData(data);
+      }
+    } catch {}
+  }, [token]);
+
+  useEffect(() => { loadVacations(); }, [loadVacations]);
+
+  useEffect(() => {
+    if (vacStartDate && vacEndDate) {
+      const start = new Date(vacStartDate);
+      const end = new Date(vacEndDate);
+      const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (diff > 0) setVacDays(String(diff));
+    }
+  }, [vacStartDate, vacEndDate]);
 
   // ── Distance calculation ───────────────────────────────────────
   const calcDistance = useCallback(
@@ -593,6 +697,28 @@ function RegularContent() {
       setOtpError(err.message);
     } finally {
       setOtpVerifying(false);
+    }
+  };
+
+  // ── Vacation submit ────────────────────────────────────────────
+  const handleVacationSubmit = async () => {
+    if (!vacStartDate || !vacEndDate || !vacDays) return;
+    setVacSubmitting(true);
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/vacation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start_date: vacStartDate, end_date: vacEndDate, days: parseFloat(vacDays), reason: vacReason }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Failed");
+      alert(t(lang, "vacationSuccess"));
+      setVacReason("");
+      loadVacations();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setVacSubmitting(false);
     }
   };
 
@@ -1282,6 +1408,98 @@ function RegularContent() {
             <p className="mt-6 text-gray-500 text-sm">
               {t(lang, "thankYou")}
             </p>
+          </div>
+        )}
+        {/* Vacation Request Section - always available */}
+        {data && (
+          <div className="mt-4">
+            <button
+              onClick={() => setShowVacation(!showVacation)}
+              className="w-full py-3 bg-purple-600 text-white rounded-xl font-semibold text-base hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Calendar className="w-5 h-5" />
+              {t(lang, "vacation")}
+            </button>
+
+            {showVacation && (
+              <div className="mt-3 bg-white rounded-xl shadow-sm p-5 space-y-4">
+                <p className="text-sm text-gray-600">{t(lang, "vacationDesc")}</p>
+
+                {/* Balance display */}
+                {vacData?.balance && (
+                  <div className="flex gap-3">
+                    <div className="flex-1 bg-blue-50 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-blue-700">{vacData.balance.total}</p>
+                      <p className="text-xs text-blue-600">{t(lang, "vacationBalance")}</p>
+                    </div>
+                    <div className="flex-1 bg-amber-50 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-amber-700">{vacData.balance.used}</p>
+                      <p className="text-xs text-amber-600">{t(lang, "vacationUsed")}</p>
+                    </div>
+                    <div className="flex-1 bg-green-50 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-green-700">{(vacData.balance.total - vacData.balance.used).toFixed(1)}</p>
+                      <p className="text-xs text-green-600">{t(lang, "vacationRemaining")}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Request form */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationStart")}</label>
+                    <input type="date" value={vacStartDate} onChange={(e) => setVacStartDate(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationEnd")}</label>
+                    <input type="date" value={vacEndDate} onChange={(e) => setVacEndDate(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationDays")}</label>
+                  <input type="number" step="0.5" min="0.5" value={vacDays} onChange={(e) => setVacDays(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationReason")}</label>
+                  <textarea value={vacReason} onChange={(e) => setVacReason(e.target.value)}
+                    placeholder={t(lang, "vacationReasonPlaceholder")}
+                    rows={2} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base resize-none" />
+                </div>
+                <button onClick={handleVacationSubmit} disabled={vacSubmitting || !vacStartDate || !vacEndDate}
+                  className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold disabled:bg-gray-300 hover:bg-purple-700 transition-colors">
+                  {vacSubmitting ? "..." : t(lang, "vacationSubmit")}
+                </button>
+
+                {/* History */}
+                {vacData?.requests && vacData.requests.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">{t(lang, "vacationHistory")}</h3>
+                    <div className="space-y-2">
+                      {vacData.requests.map((r: any) => (
+                        <div key={r.id} className="bg-gray-50 rounded-lg p-3 text-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{r.start_date} ~ {r.end_date} ({r.days}{t(lang, "vacationDaysUnit")})</span>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              r.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              r.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}>
+                              {r.status === 'approved' ? t(lang, "vacationApproved") :
+                               r.status === 'rejected' ? t(lang, "vacationRejected") :
+                               t(lang, "vacationPending")}
+                            </span>
+                          </div>
+                          {r.reason && <p className="text-gray-500 text-xs mt-1">{r.reason}</p>}
+                          {r.admin_memo && <p className="text-blue-600 text-xs mt-1">관리자: {r.admin_memo}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

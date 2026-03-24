@@ -18,6 +18,12 @@ import {
   updateRegularOrgSetting,
   deleteRegularOrgSetting,
   getRegularDashboard,
+  getRegularVacations,
+  approveVacation,
+  rejectVacation,
+  getVacationBalances,
+  setVacationBalance,
+  initVacationBalances,
 } from "@/lib/api";
 import {
   MessageSquare,
@@ -29,6 +35,7 @@ import {
   Loader2,
   ClipboardList,
   Network,
+  Calendar,
 } from "lucide-react";
 
 const DEPARTMENTS = ["생산2층", "생산3층", "물류1층"];
@@ -36,7 +43,7 @@ const TEAMS = ["1조", "2조", "3조"];
 const ROLES = ["일반", "조장", "반장"];
 const LEADER_ROLES = ["조장", "반장"];
 
-type Tab = "employees" | "notices" | "org" | "attendance";
+type Tab = "employees" | "notices" | "org" | "attendance" | "vacation";
 
 interface Employee {
   id: number;
@@ -352,6 +359,7 @@ export default function RegularManagePage() {
     { key: "notices", label: "공지문 관리", icon: <ClipboardList size={16} /> },
     { key: "org", label: "조직도 설정", icon: <Network size={16} /> },
     { key: "attendance", label: "출결 조회", icon: <ClipboardList size={16} /> },
+    { key: "vacation", label: "휴가 관리", icon: <Calendar size={16} /> },
   ];
 
   return (
@@ -981,6 +989,8 @@ export default function RegularManagePage() {
       )}
       {/* ===== Tab 4: 출결 조회 ===== */}
       {tab === "attendance" && <AttendanceTab />}
+      {/* ===== Tab 5: 휴가 관리 ===== */}
+      {tab === "vacation" && <VacationTab />}
     </div>
   );
 }
@@ -1120,6 +1130,221 @@ function AttendanceTab() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function VacationTab() {
+  const [subTab, setSubTab] = useState<'requests' | 'balances'>('requests');
+  const [requests, setRequests] = useState<any[]>([]);
+  const [balances, setBalances] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [initDays, setInitDays] = useState("15");
+  const [editingBalance, setEditingBalance] = useState<number | null>(null);
+  const [editDays, setEditDays] = useState("");
+
+  const loadRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = {};
+      if (statusFilter) params.status = statusFilter;
+      const data = await getRegularVacations(params);
+      setRequests(data || []);
+    } catch {} finally { setLoading(false); }
+  }, [statusFilter]);
+
+  const loadBalances = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getVacationBalances(String(year));
+      setBalances(data || []);
+    } catch {} finally { setLoading(false); }
+  }, [year]);
+
+  useEffect(() => {
+    if (subTab === 'requests') loadRequests();
+    else loadBalances();
+  }, [subTab, loadRequests, loadBalances]);
+
+  const handleApprove = async (id: number) => {
+    const memo = prompt("승인 메모 (선택):");
+    try { await approveVacation(id, memo || ""); loadRequests(); } catch (e: any) { alert(e.message); }
+  };
+  const handleReject = async (id: number) => {
+    const memo = prompt("반려 사유:");
+    if (!memo) return;
+    try { await rejectVacation(id, memo); loadRequests(); } catch (e: any) { alert(e.message); }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Sub tabs */}
+      <div className="flex gap-2">
+        <button onClick={() => setSubTab('requests')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'requests' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          휴가 신청 목록
+        </button>
+        <button onClick={() => setSubTab('balances')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'balances' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          보유 휴가 설정
+        </button>
+      </div>
+
+      {subTab === 'requests' && (
+        <>
+          <div className="flex gap-3 items-end">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">상태</label>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                <option value="">전체</option>
+                <option value="pending">대기중</option>
+                <option value="approved">승인</option>
+                <option value="rejected">반려</option>
+              </select>
+            </div>
+            <button onClick={loadRequests} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">조회</button>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {loading ? (
+              <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+            ) : requests.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-400">휴가 신청이 없습니다.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      <th className="py-2 px-4 font-medium text-gray-600">이름</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">부서</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">기간</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">일수</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">사유</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">상태</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {requests.map((r: any) => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="py-2.5 px-4 font-medium text-gray-900">{r.employee_name}</td>
+                        <td className="py-2.5 px-4 text-gray-600">{r.department} {r.team}</td>
+                        <td className="py-2.5 px-4 text-gray-600">{r.phone}</td>
+                        <td className="py-2.5 px-4 text-gray-700">{r.start_date} ~ {r.end_date}</td>
+                        <td className="py-2.5 px-4 text-gray-700">{r.days}일</td>
+                        <td className="py-2.5 px-4 text-gray-600 max-w-[150px] truncate">{r.reason || "-"}</td>
+                        <td className="py-2.5 px-4">
+                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                            r.status === 'approved' ? 'bg-green-50 text-green-700' :
+                            r.status === 'rejected' ? 'bg-red-50 text-red-700' :
+                            'bg-amber-50 text-amber-700'
+                          }`}>
+                            {r.status === 'approved' ? '승인' : r.status === 'rejected' ? '반려' : '대기중'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4">
+                          {r.status === 'pending' && (
+                            <div className="flex gap-1">
+                              <button onClick={() => handleApprove(r.id)}
+                                className="px-2.5 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100">승인</button>
+                              <button onClick={() => handleReject(r.id)}
+                                className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100">반려</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {subTab === 'balances' && (
+        <>
+          <div className="flex gap-3 items-end">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
+              <input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value))}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-24" />
+            </div>
+            <button onClick={loadBalances} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">조회</button>
+            <div className="flex items-end gap-2 ml-auto">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">일괄 설정 일수</label>
+                <input type="number" step="0.5" value={initDays} onChange={(e) => setInitDays(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-20" />
+              </div>
+              <button onClick={async () => {
+                if (!confirm(`${year}년 전체 직원에게 ${initDays}일을 일괄 설정하시겠습니까?`)) return;
+                try { await initVacationBalances({ year, total_days: parseFloat(initDays) }); loadBalances(); } catch (e: any) { alert(e.message); }
+              }} className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium">일괄 초기화</button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {loading ? (
+              <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+            ) : balances.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-400">데이터가 없습니다. 일괄 초기화를 실행해주세요.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      <th className="py-2 px-4 font-medium text-gray-600">이름</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">부서</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">보유(일)</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">사용(일)</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">잔여(일)</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {balances.map((b: any) => (
+                      <tr key={b.id} className="hover:bg-gray-50">
+                        <td className="py-2.5 px-4 font-medium text-gray-900">{b.employee_name}</td>
+                        <td className="py-2.5 px-4 text-gray-600">{b.department} {b.team}</td>
+                        <td className="py-2.5 px-4 text-gray-600">{b.phone}</td>
+                        <td className="py-2.5 px-4">
+                          {editingBalance === b.employee_id ? (
+                            <input type="number" step="0.5" value={editDays} onChange={(e) => setEditDays(e.target.value)}
+                              className="w-16 px-2 py-1 border border-blue-300 rounded text-sm" />
+                          ) : (
+                            <span className="font-medium text-blue-700">{parseFloat(b.total_days)}</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4 text-amber-600">{parseFloat(b.used_days)}</td>
+                        <td className="py-2.5 px-4 font-medium text-green-700">{(parseFloat(b.total_days) - parseFloat(b.used_days)).toFixed(1)}</td>
+                        <td className="py-2.5 px-4">
+                          {editingBalance === b.employee_id ? (
+                            <div className="flex gap-1">
+                              <button onClick={async () => {
+                                try { await setVacationBalance(b.employee_id, { year, total_days: parseFloat(editDays) }); setEditingBalance(null); loadBalances(); } catch (e: any) { alert(e.message); }
+                              }} className="px-2 py-1 text-xs bg-blue-600 text-white rounded">저장</button>
+                              <button onClick={() => setEditingBalance(null)} className="px-2 py-1 text-xs bg-gray-100 rounded">취소</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setEditingBalance(b.employee_id); setEditDays(String(parseFloat(b.total_days))); }}
+                              className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100">수정</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

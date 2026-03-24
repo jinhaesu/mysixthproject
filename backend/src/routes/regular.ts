@@ -523,4 +523,122 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
   }
 });
 
+// ===== Vacation Management =====
+
+// GET /api/regular/vacations - List all vacation requests
+router.get('/vacations', async (req: AuthRequest, res: Response) => {
+  try {
+    const { status, employee_id } = req.query as Record<string, string>;
+    let where = 'WHERE 1=1';
+    const params: any[] = [];
+    if (status) { where += ' AND vr.status = ?'; params.push(status); }
+    if (employee_id) { where += ' AND vr.employee_id = ?'; params.push(employee_id); }
+
+    const requests = await dbAll(`
+      SELECT vr.*, re.name as employee_name, re.department, re.team, re.phone
+      FROM regular_vacation_requests vr
+      JOIN regular_employees re ON vr.employee_id = re.id
+      ${where}
+      ORDER BY vr.created_at DESC
+    `, ...params);
+    res.json(requests);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/regular/vacations/:id/approve - Approve vacation
+router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { admin_memo } = req.body;
+    const request = await dbGet('SELECT * FROM regular_vacation_requests WHERE id = ?', id) as any;
+    if (!request) { res.status(404).json({ error: '휴가 신청을 찾을 수 없습니다.' }); return; }
+    if (request.status !== 'pending') { res.status(400).json({ error: '이미 처리된 신청입니다.' }); return; }
+
+    await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'approved', admin_memo || '', id);
+
+    // Update used_days in balance
+    const year = parseInt(request.start_date.slice(0, 4));
+    const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
+    if (balance) {
+      await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', request.days, balance.id);
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/regular/vacations/:id/reject - Reject vacation
+router.put('/vacations/:id/reject', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { admin_memo } = req.body;
+    await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'rejected', admin_memo || '', id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/vacation-balances - List all balances
+router.get('/vacation-balances', async (req: AuthRequest, res: Response) => {
+  try {
+    const year = (req.query.year as string) || new Date().getFullYear().toString();
+    const balances = await dbAll(`
+      SELECT vb.*, re.name as employee_name, re.department, re.team, re.phone
+      FROM regular_vacation_balances vb
+      JOIN regular_employees re ON vb.employee_id = re.id
+      WHERE vb.year = ? AND re.is_active = 1
+      ORDER BY re.department, re.team, re.name
+    `, year);
+    res.json(balances);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/regular/vacation-balances/:employeeId - Set vacation balance
+router.put('/vacation-balances/:employeeId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employeeId } = req.params;
+    const { year, total_days } = req.body;
+    const y = year || new Date().getFullYear();
+
+    const existing = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employeeId, y) as any;
+    if (existing) {
+      await dbRun('UPDATE regular_vacation_balances SET total_days = ?, updated_at = NOW() WHERE id = ?', total_days, existing.id);
+    } else {
+      await dbRun('INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)', employeeId, y, total_days);
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/vacation-balances/init - Initialize balances for all active employees
+router.post('/vacation-balances/init', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year, total_days } = req.body;
+    const y = year || new Date().getFullYear();
+    const days = total_days || 15;
+
+    const employees = await dbAll('SELECT id FROM regular_employees WHERE is_active = 1');
+    let count = 0;
+    for (const emp of employees as any[]) {
+      const existing = await dbGet('SELECT id FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', emp.id, y);
+      if (!existing) {
+        await dbRun('INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)', emp.id, y, days);
+        count++;
+      }
+    }
+    res.json({ success: true, initialized: count });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

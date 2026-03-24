@@ -8,6 +8,71 @@ const router = Router();
 // In-memory OTP store: key = token, value = { code, phone, expiresAt }
 const otpStore = new Map<string, { code: string; phone: string; expiresAt: number }>();
 
+// POST /api/regular-public/:token/vacation - Request vacation (no GPS needed)
+router.post('/:token/vacation', async (req: Request, res: Response) => {
+  try {
+    const token = req.params.token as string;
+    const { start_date, end_date, days, reason } = req.body;
+
+    if (!start_date || !end_date || !days) {
+      res.status(400).json({ error: '휴가 시작일, 종료일, 일수는 필수입니다.' });
+      return;
+    }
+
+    const employee = await dbGet('SELECT * FROM regular_employees WHERE token = ? AND is_active = 1', token) as any;
+    if (!employee) {
+      res.status(403).json({ error: '접근 권한이 없습니다.' });
+      return;
+    }
+
+    // Check remaining balance
+    const year = parseInt(start_date.slice(0, 4));
+    const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employee.id, year) as any;
+    const remaining = balance ? (parseFloat(balance.total_days) - parseFloat(balance.used_days)) : 0;
+
+    // Count pending requests too
+    const pendingResult = await dbGet(
+      "SELECT COALESCE(SUM(days), 0) as pending_days FROM regular_vacation_requests WHERE employee_id = ? AND status = 'pending' AND start_date LIKE ?",
+      employee.id, `${year}%`
+    ) as any;
+    const pendingDays = parseFloat(pendingResult?.pending_days || 0);
+
+    if (parseFloat(days) > (remaining - pendingDays)) {
+      res.status(400).json({ error: `잔여 휴가가 부족합니다. (잔여: ${remaining - pendingDays}일)` });
+      return;
+    }
+
+    await dbRun(
+      'INSERT INTO regular_vacation_requests (employee_id, start_date, end_date, days, reason) VALUES (?, ?, ?, ?, ?)',
+      employee.id, start_date, end_date, days, reason || ''
+    );
+
+    res.json({ success: true, message: '휴가 신청이 완료되었습니다. 관리자 승인을 기다려주세요.' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular-public/:token/vacations - Get my vacation requests
+router.get('/:token/vacations', async (req: Request, res: Response) => {
+  try {
+    const token = req.params.token as string;
+    const employee = await dbGet('SELECT * FROM regular_employees WHERE token = ? AND is_active = 1', token) as any;
+    if (!employee) { res.status(403).json({ error: '접근 권한이 없습니다.' }); return; }
+
+    const year = new Date().getFullYear();
+    const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employee.id, year) as any;
+    const requests = await dbAll('SELECT * FROM regular_vacation_requests WHERE employee_id = ? ORDER BY created_at DESC', employee.id);
+
+    res.json({
+      balance: balance ? { total: parseFloat(balance.total_days), used: parseFloat(balance.used_days) } : { total: 0, used: 0 },
+      requests,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/regular-public/:token - Get employee info + today's state
 router.get('/:token', async (req: Request, res: Response) => {
   try {

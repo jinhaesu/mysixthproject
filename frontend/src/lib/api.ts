@@ -492,3 +492,24 @@ export async function submitClockOut(token: string, data: any) {
   }
   return res.json();
 }
+
+// ===== Regular Vacation =====
+export async function getRegularVacations(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return fetchAPI<any[]>(`/api/regular/vacations${qs}`);
+}
+export async function approveVacation(id: number, admin_memo?: string) {
+  return fetchAPI<any>(`/api/regular/vacations/${id}/approve`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ admin_memo }) });
+}
+export async function rejectVacation(id: number, admin_memo?: string) {
+  return fetchAPI<any>(`/api/regular/vacations/${id}/reject`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ admin_memo }) });
+}
+export async function getVacationBalances(year?: string) {
+  return fetchAPI<any[]>(`/api/regular/vacation-balances${year ? '?year=' + year : ''}`);
+}
+export async function setVacationBalance(employeeId: number, data: { year: number; total_days: number }) {
+  return fetchAPI<any>(`/api/regular/vacation-balances/${employeeId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function initVacationBalances(data: { year: number; total_days: number }) {
+  return fetchAPI<any>('/api/regular/vacation-balances/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}

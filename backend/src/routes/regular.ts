@@ -72,9 +72,17 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Remove any previously soft-deleted record with the same phone
-    await dbRun('DELETE FROM regular_attendance WHERE employee_id IN (SELECT id FROM regular_employees WHERE phone = ? AND is_active = 0)', phone);
-    await dbRun('DELETE FROM regular_employees WHERE phone = ? AND is_active = 0', phone);
+    // Check if phone already exists
+    const existing = await dbGet('SELECT id, is_active FROM regular_employees WHERE phone = ?', phone) as any;
+    if (existing) {
+      if (existing.is_active === 1 || existing.is_active === true) {
+        res.status(400).json({ error: '이미 등록된 전화번호입니다.' });
+        return;
+      }
+      // Hard delete the inactive record so we can re-register
+      await dbRun('DELETE FROM regular_attendance WHERE employee_id = ?', existing.id);
+      await dbRun('DELETE FROM regular_employees WHERE id = ?', existing.id);
+    }
 
     const token = uuidv4();
 

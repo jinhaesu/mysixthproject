@@ -1213,6 +1213,29 @@ function VacationTab() {
 
   return (
     <div className="space-y-4">
+      {/* 연차 규칙 안내 */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+        <h4 className="text-sm font-semibold text-indigo-900 mb-2">연차휴가 기준 (근로기준법 제60조)</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-indigo-800">
+          <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+            <p className="font-semibold text-indigo-700">1년 미만</p>
+            <p>1개월 개근 시 <b>1일</b> 발생 (최대 11일)</p>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+            <p className="font-semibold text-indigo-700">1년 이상 ~ 3년 미만</p>
+            <p>연 <b>15일</b></p>
+          </div>
+          <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+            <p className="font-semibold text-indigo-700">3년 이상</p>
+            <p>15일 + 2년마다 <b>1일 추가</b> (최대 25일)</p>
+          </div>
+        </div>
+        <p className="text-xs text-indigo-600 mt-2.5 flex items-center gap-1">
+          <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+          입사일자 등록 및 초기 사용일수 세팅 이후, 매일 서버에서 자동으로 입사일 기준 보유 연차가 갱신됩니다.
+        </p>
+      </div>
+
       {/* Sub tabs */}
       <div className="flex gap-2">
         <button onClick={() => setSubTab('requests')}

@@ -1083,4 +1083,78 @@ router.get('/weekly-holiday-status', async (req: AuthRequest, res: Response) => 
   }
 });
 
+// POST /api/survey/fix-timestamps - Fix +9h timestamp issue (one-time use)
+router.post('/fix-timestamps', async (_req: AuthRequest, res: Response) => {
+  try {
+    // Fix survey_responses: clock_in_time and clock_out_time that were stored with +9h offset
+    // Only fix records from 2026-03-24 onwards (when getKSTTimestamp was introduced)
+    const responses = await dbAll(`
+      SELECT id, clock_in_time, clock_out_time FROM survey_responses
+      WHERE (clock_in_time IS NOT NULL OR clock_out_time IS NOT NULL)
+        AND created_at >= '2026-03-24'
+    `) as any[];
+
+    let fixed = 0;
+    for (const r of responses) {
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (r.clock_in_time) {
+        const t = new Date(r.clock_in_time);
+        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
+        updates.push('clock_in_time = ?');
+        params.push(corrected);
+      }
+      if (r.clock_out_time) {
+        const t = new Date(r.clock_out_time);
+        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
+        updates.push('clock_out_time = ?');
+        params.push(corrected);
+      }
+
+      if (updates.length > 0) {
+        params.push(r.id);
+        await dbRun(`UPDATE survey_responses SET ${updates.join(', ')} WHERE id = ?`, ...params);
+        fixed++;
+      }
+    }
+
+    // Fix regular_attendance too
+    const attendances = await dbAll(`
+      SELECT id, clock_in_time, clock_out_time FROM regular_attendance
+      WHERE (clock_in_time IS NOT NULL OR clock_out_time IS NOT NULL)
+        AND date >= '2026-03-24'
+    `) as any[];
+
+    let fixedRegular = 0;
+    for (const a of attendances) {
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (a.clock_in_time) {
+        const t = new Date(a.clock_in_time);
+        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
+        updates.push('clock_in_time = ?');
+        params.push(corrected);
+      }
+      if (a.clock_out_time) {
+        const t = new Date(a.clock_out_time);
+        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
+        updates.push('clock_out_time = ?');
+        params.push(corrected);
+      }
+
+      if (updates.length > 0) {
+        params.push(a.id);
+        await dbRun(`UPDATE regular_attendance SET ${updates.join(', ')} WHERE id = ?`, ...params);
+        fixedRegular++;
+      }
+    }
+
+    res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedRegular });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

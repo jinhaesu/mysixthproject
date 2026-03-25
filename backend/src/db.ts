@@ -532,7 +532,6 @@ export function getKSTDate(): string {
 }
 
 export function getKSTTimestamp(): string {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString();
+  // Store as plain UTC - frontend converts to local time for display
+  return new Date().toISOString();
 }

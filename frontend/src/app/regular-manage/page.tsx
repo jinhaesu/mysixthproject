@@ -1163,6 +1163,7 @@ function VacationTab() {
   const [initDays, setInitDays] = useState("15");
   const [editingBalance, setEditingBalance] = useState<number | null>(null);
   const [editDays, setEditDays] = useState("");
+  const [editUsedDays, setEditUsedDays] = useState("");
   const [selectedEmpIds, setSelectedEmpIds] = useState<Set<number>>(new Set());
   const [batchDays, setBatchDays] = useState("15");
   const [balanceSearch, setBalanceSearch] = useState("");
@@ -1394,18 +1395,25 @@ function VacationTab() {
                             <span className="font-medium text-blue-700">{parseFloat(b.total_days)}</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-4 text-amber-600">{parseFloat(b.used_days)}</td>
+                        <td className="py-2.5 px-4">
+                          {editingBalance === b.employee_id ? (
+                            <input type="number" step="0.5" min="0" value={editUsedDays} onChange={(e) => setEditUsedDays(e.target.value)}
+                              className="w-16 px-2 py-1 border border-amber-300 rounded text-sm" />
+                          ) : (
+                            <span className="text-amber-600">{parseFloat(b.used_days)}</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-4 font-medium text-green-700">{(parseFloat(b.total_days) - parseFloat(b.used_days)).toFixed(1)}</td>
                         <td className="py-2.5 px-4">
                           {editingBalance === b.employee_id ? (
                             <div className="flex gap-1">
                               <button onClick={async () => {
-                                try { await setVacationBalance(b.employee_id, { year, total_days: parseFloat(editDays) }); setEditingBalance(null); loadBalances(); } catch (e: any) { alert(e.message); }
+                                try { await setVacationBalance(b.employee_id, { year, total_days: parseFloat(editDays), used_days: parseFloat(editUsedDays) } as any); setEditingBalance(null); loadBalances(); } catch (e: any) { alert(e.message); }
                               }} className="px-2 py-1 text-xs bg-blue-600 text-white rounded">저장</button>
                               <button onClick={() => setEditingBalance(null)} className="px-2 py-1 text-xs bg-gray-100 rounded">취소</button>
                             </div>
                           ) : (
-                            <button onClick={() => { setEditingBalance(b.employee_id); setEditDays(String(parseFloat(b.total_days))); }}
+                            <button onClick={() => { setEditingBalance(b.employee_id); setEditDays(String(parseFloat(b.total_days))); setEditUsedDays(String(parseFloat(b.used_days))); }}
                               className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100">수정</button>
                           )}
                         </td>

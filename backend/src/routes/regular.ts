@@ -615,14 +615,21 @@ router.get('/vacation-balances', async (req: AuthRequest, res: Response) => {
 router.put('/vacation-balances/:employeeId', async (req: AuthRequest, res: Response) => {
   try {
     const { employeeId } = req.params;
-    const { year, total_days } = req.body;
+    const { year, total_days, used_days } = req.body;
     const y = year || new Date().getFullYear();
 
     const existing = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employeeId, y) as any;
     if (existing) {
-      await dbRun('UPDATE regular_vacation_balances SET total_days = ?, updated_at = NOW() WHERE id = ?', total_days, existing.id);
+      const updates = ['total_days = ?', 'updated_at = NOW()'];
+      const params: any[] = [total_days];
+      if (used_days !== undefined && used_days !== null) {
+        updates.splice(1, 0, 'used_days = ?');
+        params.push(used_days);
+      }
+      params.push(existing.id);
+      await dbRun(`UPDATE regular_vacation_balances SET ${updates.join(', ')} WHERE id = ?`, ...params);
     } else {
-      await dbRun('INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)', employeeId, y, total_days);
+      await dbRun('INSERT INTO regular_vacation_balances (employee_id, year, total_days, used_days) VALUES (?, ?, ?, ?)', employeeId, y, total_days, used_days || 0);
     }
     res.json({ success: true });
   } catch (error: any) {

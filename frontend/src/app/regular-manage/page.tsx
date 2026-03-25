@@ -108,6 +108,7 @@ export default function RegularManagePage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [batchSending, setBatchSending] = useState(false);
+  const [empSearch, setEmpSearch] = useState("");
   const [empSaving, setEmpSaving] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
   const [editEmpForm, setEditEmpForm] = useState({ ...emptyEmployeeForm });
@@ -493,9 +494,18 @@ export default function RegularManagePage() {
             </div>
           </div>
 
-          {/* Batch Actions */}
+          {/* Search + Batch Actions */}
           {employees.length > 0 && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={empSearch}
+                  onChange={(e) => setEmpSearch(e.target.value)}
+                  placeholder="이름/연락처 검색..."
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
               <button
                 onClick={handleBatchSend}
                 disabled={batchSending || selectedIds.size === 0}
@@ -561,7 +571,7 @@ export default function RegularManagePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((emp) => (
+                    {employees.filter((emp) => !empSearch || emp.name.includes(empSearch) || emp.phone.includes(empSearch)).map((emp) => (
                       <tr key={emp.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <input

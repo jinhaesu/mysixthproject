@@ -24,6 +24,7 @@ import {
   getVacationBalances,
   setVacationBalance,
   initVacationBalances,
+  autoCalcVacationBalances,
 } from "@/lib/api";
 import {
   MessageSquare,
@@ -53,6 +54,7 @@ interface Employee {
   team: string;
   role: string;
   workplace_id: number | null;
+  hire_date?: string;
   token_link?: string;
 }
 
@@ -83,6 +85,7 @@ const emptyEmployeeForm = {
   team: TEAMS[0],
   role: ROLES[0],
   workplace_id: null as number | null,
+  hire_date: "",
 };
 
 const emptyNoticeForm = { title: "", content: "", date_type: "specific", end_date: "", target_department: "" };
@@ -241,7 +244,7 @@ export default function RegularManagePage() {
 
   function startEditEmp(emp: Employee) {
     setEditingEmp(emp);
-    setEditEmpForm({ name: emp.name, phone: emp.phone, department: emp.department, team: emp.team, role: emp.role, workplace_id: emp.workplace_id });
+    setEditEmpForm({ name: emp.name, phone: emp.phone, department: emp.department, team: emp.team, role: emp.role, workplace_id: emp.workplace_id, hire_date: (emp as any).hire_date || "" });
   }
 
   async function handleSaveEmp() {
@@ -468,6 +471,15 @@ export default function RegularManagePage() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">입사일자</label>
+                <input
+                  type="date"
+                  value={empForm.hire_date}
+                  onChange={(e) => setEmpForm({ ...empForm, hire_date: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+              </div>
             </div>
             <div className="mt-4 flex justify-end">
               <button
@@ -543,6 +555,7 @@ export default function RegularManagePage() {
                       <th className="px-4 py-3 text-left font-medium text-gray-600">부서</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600">조</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600">직책</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600">입사일</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600">토큰 링크</th>
                       <th className="px-4 py-3 text-right font-medium text-gray-600">관리</th>
                     </tr>
@@ -575,6 +588,7 @@ export default function RegularManagePage() {
                             {emp.role}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-gray-700 text-xs">{(emp as any).hire_date || "-"}</td>
                         <td className="px-4 py-3 text-xs text-gray-500 max-w-[200px] truncate">
                           {emp.token_link || "-"}
                         </td>
@@ -658,6 +672,11 @@ export default function RegularManagePage() {
                       <option value="">선택</option>
                       {workplaces.map((wp) => <option key={wp.id} value={wp.id}>{wp.name}</option>)}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">입사일자</label>
+                    <input type="date" value={(editEmpForm as any).hire_date || ""} onChange={(e) => setEditEmpForm({ ...editEmpForm, hire_date: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 </div>
                 <div className="flex gap-3 pt-2">
@@ -1294,6 +1313,14 @@ function VacationTab() {
                 if (!confirm(`${year}년 전체 직원에게 ${initDays}일을 일괄 설정하시겠습니까?`)) return;
                 try { await initVacationBalances({ year, total_days: parseFloat(initDays) }); loadBalances(); } catch (e: any) { alert(e.message); }
               }} className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium">일괄 초기화</button>
+              <button onClick={async () => {
+                if (!confirm(`${year}년 연차를 입사일자 기준 근로기준법으로 자동 계산하시겠습니까?`)) return;
+                try {
+                  const result = await autoCalcVacationBalances(year);
+                  alert(`${result.updated}명의 연차가 자동 계산되었습니다.`);
+                  loadBalances();
+                } catch (e: any) { alert(e.message); }
+              }} className="px-4 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700">자동 계산 (근로기준법)</button>
             </div>
           </div>
 

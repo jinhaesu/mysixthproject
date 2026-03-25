@@ -65,7 +65,7 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
 // POST /api/regular/employees - Create employee (v6 - bulletproof)
 router.post('/employees', async (req: AuthRequest, res: Response) => {
   try {
-    const { phone, name, department, team, role, workplace_id } = req.body;
+    const { phone, name, department, team, role, workplace_id, hire_date } = req.body;
 
     if (!phone || !name) {
       res.status(400).json({ error: '전화번호와 이름은 필수입니다.' });
@@ -81,16 +81,16 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
     // Strategy: try INSERT, if fails due to unique constraint, UPDATE instead
     try {
       const result = await dbRun(
-        'INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        phone, name, token, dept, tm, rl, wpId
+        'INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        phone, name, token, dept, tm, rl, wpId, hire_date || ''
       );
       const created = await dbGet('SELECT * FROM regular_employees WHERE id = ?', result.lastInsertRowid);
       res.status(201).json(created);
     } catch (insertErr: any) {
       // Unique constraint violation — record exists, just update it
       await dbRun(
-        'UPDATE regular_employees SET name = ?, token = ?, department = ?, team = ?, role = ?, workplace_id = ?, is_active = 1, updated_at = NOW() WHERE phone = ?',
-        name, token, dept, tm, rl, wpId, phone
+        'UPDATE regular_employees SET name = ?, token = ?, department = ?, team = ?, role = ?, workplace_id = ?, hire_date = ?, is_active = 1, updated_at = NOW() WHERE phone = ?',
+        name, token, dept, tm, rl, wpId, hire_date || '', phone
       );
       const updated = await dbGet('SELECT * FROM regular_employees WHERE phone = ?', phone);
       res.status(201).json(updated);
@@ -104,12 +104,12 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
 router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { phone, name, department, team, role, workplace_id } = req.body;
+    const { phone, name, department, team, role, workplace_id, hire_date } = req.body;
 
     await dbRun(`
-      UPDATE regular_employees SET phone = ?, name = ?, department = ?, team = ?, role = ?, workplace_id = ?
+      UPDATE regular_employees SET phone = ?, name = ?, department = ?, team = ?, role = ?, workplace_id = ?, hire_date = ?
       WHERE id = ?
-    `, phone, name, department || '', team || '', role || '', workplace_id || null, id);
+    `, phone, name, department || '', team || '', role || '', workplace_id || null, hire_date || '', id);
 
     const updated = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
     res.json(updated);
@@ -625,6 +625,70 @@ router.put('/vacation-balances/:employeeId', async (req: AuthRequest, res: Respo
       await dbRun('INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)', employeeId, y, total_days);
     }
     res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/vacation-balances/auto-calc - Auto-calculate based on Korean labor law
+router.post('/vacation-balances/auto-calc', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year } = req.body;
+    const targetYear = year || new Date().getFullYear();
+    const today = getKSTDate();
+
+    const employees = await dbAll('SELECT id, hire_date, name FROM regular_employees WHERE is_active = 1') as any[];
+    let updated = 0;
+
+    for (const emp of employees) {
+      if (!emp.hire_date) continue;
+
+      const hireDate = new Date(emp.hire_date);
+      const yearStart = new Date(`${targetYear}-01-01`);
+      const yearEnd = new Date(`${targetYear}-12-31`);
+
+      // Calculate months worked from hire_date to year start
+      const msFromHire = yearStart.getTime() - hireDate.getTime();
+      const yearsWorked = msFromHire / (365.25 * 24 * 60 * 60 * 1000);
+
+      let totalDays: number;
+
+      if (yearsWorked < 0) {
+        // Hired after year start - calculate monthly leave for first year
+        const hireMonth = hireDate.getMonth();
+        const monthsInYear = 12 - hireMonth;
+        totalDays = Math.min(monthsInYear, 11); // 1 day per month, max 11
+      } else if (yearsWorked < 1) {
+        // In first year of employment at year start
+        // Monthly leave: 1 day per completed month in this year
+        const monthsWorkedThisYear = Math.min(12, Math.floor((yearEnd.getTime() - hireDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
+        totalDays = Math.min(monthsWorkedThisYear, 11);
+      } else {
+        // 1+ years: Korean labor law Article 60
+        // Base: 15 days
+        // After 3 years: +1 day per 2 years over 1 year
+        const fullYears = Math.floor(yearsWorked);
+        if (fullYears < 1) {
+          totalDays = 11;
+        } else if (fullYears < 3) {
+          totalDays = 15;
+        } else {
+          const extraDays = Math.floor((fullYears - 1) / 2);
+          totalDays = Math.min(15 + extraDays, 25);
+        }
+      }
+
+      // Upsert balance
+      const existing = await dbGet('SELECT id, used_days FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', emp.id, targetYear) as any;
+      if (existing) {
+        await dbRun('UPDATE regular_vacation_balances SET total_days = ?, updated_at = NOW() WHERE id = ?', totalDays, existing.id);
+      } else {
+        await dbRun('INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)', emp.id, targetYear, totalDays);
+      }
+      updated++;
+    }
+
+    res.json({ success: true, updated, year: targetYear });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

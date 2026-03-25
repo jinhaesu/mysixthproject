@@ -513,3 +513,6 @@ export async function setVacationBalance(employeeId: number, data: { year: numbe
 export async function initVacationBalances(data: { year: number; total_days: number }) {
   return fetchAPI<any>('/api/regular/vacation-balances/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
+export async function autoCalcVacationBalances(year: number) {
+  return fetchAPI<any>('/api/regular/vacation-balances/auto-calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year }) });
+}

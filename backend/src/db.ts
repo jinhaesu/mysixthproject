@@ -498,6 +498,9 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Add hire_date column to regular_employees
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS hire_date TEXT DEFAULT ''"); } catch {}
+
   // Regular employee vacation requests
   try {
     await pool.query(`

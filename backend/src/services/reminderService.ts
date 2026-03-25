@@ -183,6 +183,84 @@ async function checkAndSendScheduledMessages() {
   }
 }
 
+// ===== Auto Vacation Balance Update (Korean Labor Law) =====
+let lastVacationCheckDate = '';
+
+async function checkAndUpdateVacationBalances() {
+  try {
+    const today = getKSTDate();
+    // Run once per day only
+    if (today === lastVacationCheckDate) return;
+    lastVacationCheckDate = today;
+
+    const currentYear = parseInt(today.slice(0, 4));
+    const todayDate = new Date(today + 'T00:00:00+09:00');
+
+    const employees = await dbAll('SELECT id, hire_date, name FROM regular_employees WHERE is_active = 1') as any[];
+    let updated = 0;
+
+    for (const emp of employees) {
+      if (!emp.hire_date) continue;
+
+      const hireDate = new Date(emp.hire_date + 'T00:00:00+09:00');
+      const msWorked = todayDate.getTime() - hireDate.getTime();
+      if (msWorked < 0) continue; // Not yet hired
+
+      const daysWorked = msWorked / (24 * 60 * 60 * 1000);
+      const yearsWorked = daysWorked / 365.25;
+      const monthsWorked = daysWorked / 30.44;
+
+      let totalDays: number;
+
+      if (yearsWorked < 1) {
+        // First year: 1 day per completed month (max 11)
+        totalDays = Math.min(Math.floor(monthsWorked), 11);
+      } else {
+        // 1+ years: Korean labor law Article 60
+        const fullYears = Math.floor(yearsWorked);
+        if (fullYears < 3) {
+          totalDays = 15;
+        } else {
+          const extraDays = Math.floor((fullYears - 1) / 2);
+          totalDays = Math.min(15 + extraDays, 25);
+        }
+      }
+
+      // Get current balance
+      const balance = await dbGet(
+        'SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?',
+        emp.id, currentYear
+      ) as any;
+
+      if (balance) {
+        // Only update if total_days changed (don't overwrite manual edits if same)
+        if (parseFloat(balance.total_days) !== totalDays) {
+          await dbRun(
+            'UPDATE regular_vacation_balances SET total_days = ?, updated_at = NOW() WHERE id = ?',
+            totalDays, balance.id
+          );
+          updated++;
+          console.log(`[Vacation] Updated ${emp.name}: ${balance.total_days} → ${totalDays} days`);
+        }
+      } else {
+        // Create new balance record
+        await dbRun(
+          'INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)',
+          emp.id, currentYear, totalDays
+        );
+        updated++;
+        console.log(`[Vacation] Created ${emp.name}: ${totalDays} days for ${currentYear}`);
+      }
+    }
+
+    if (updated > 0) {
+      console.log(`[Vacation] Auto-updated ${updated} employees for ${today}`);
+    }
+  } catch (err) {
+    console.error('[Vacation] Auto-update error:', err);
+  }
+}
+
 export function startReminderService() {
   console.log(`[Reminder] Service started (interval: ${REMINDER_INTERVAL_MS / 60000}min, threshold: ${THRESHOLD_HOURS}h)`);
   setInterval(checkAndSendReminders, REMINDER_INTERVAL_MS);
@@ -196,4 +274,7 @@ export function startReminderService() {
   // Check scheduled items every 5 minutes
   setInterval(checkAndSendScheduledSurveys, 5 * 60 * 1000);
   setInterval(checkAndSendScheduledMessages, 5 * 60 * 1000);
+  // Vacation balance auto-update: check every hour, runs once per day
+  setInterval(checkAndUpdateVacationBalances, 60 * 60 * 1000);
+  setTimeout(checkAndUpdateVacationBalances, 2 * 60 * 1000); // 2 min after startup
 }

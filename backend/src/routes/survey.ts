@@ -1189,4 +1189,46 @@ router.post('/fix-out-before-in', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/survey/fix-clockout-only - Fix only clock_out times that are > current time (future = +9h bug)
+router.post('/fix-clockout-only', async (_req: AuthRequest, res: Response) => {
+  try {
+    const now = new Date();
+    const NINE_H = 9 * 60 * 60 * 1000;
+
+    const responses = await dbAll(`
+      SELECT id, clock_out_time FROM survey_responses
+      WHERE clock_out_time IS NOT NULL AND created_at >= '2026-03-24'
+    `) as any[];
+
+    let fixed = 0;
+    for (const r of responses) {
+      const outTime = new Date(r.clock_out_time);
+      if (outTime.getTime() > now.getTime()) {
+        const corrected = new Date(outTime.getTime() - NINE_H).toISOString();
+        await dbRun('UPDATE survey_responses SET clock_out_time = ? WHERE id = ?', corrected, r.id);
+        fixed++;
+      }
+    }
+
+    const attendances = await dbAll(`
+      SELECT id, clock_out_time FROM regular_attendance
+      WHERE clock_out_time IS NOT NULL AND date >= '2026-03-24'
+    `) as any[];
+
+    let fixedRegular = 0;
+    for (const a of attendances) {
+      const outTime = new Date(a.clock_out_time);
+      if (outTime.getTime() > now.getTime()) {
+        const corrected = new Date(outTime.getTime() - NINE_H).toISOString();
+        await dbRun('UPDATE regular_attendance SET clock_out_time = ? WHERE id = ?', corrected, a.id);
+        fixedRegular++;
+      }
+    }
+
+    res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedRegular });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

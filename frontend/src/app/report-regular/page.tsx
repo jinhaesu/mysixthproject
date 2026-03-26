@@ -25,7 +25,8 @@ function getWorkerStatus(w: Worker): WorkerStatus {
 
 function ReportRegularContent() {
   const searchParams = useSearchParams();
-  const dateParam = searchParams.get("date") || new Date().toLocaleDateString('sv-SE');
+  const initialDate = searchParams.get("date") || new Date().toLocaleDateString('sv-SE');
+  const [dateParam, setDateParam] = useState(initialDate);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");
@@ -136,14 +137,23 @@ function ReportRegularContent() {
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 pt-6 pb-8">
         <div className="max-w-lg mx-auto">
-          <p className="text-green-200 text-xs">{data.date || dateParam}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <h1 className="text-xl font-bold">정규직 출퇴근 현황 리포트</h1>
-            <span className="shrink-0 text-[11px] font-bold bg-white text-green-700 px-2 py-0.5 rounded-full">
-              정규직
-            </span>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold">정규직 출퇴근 현황 리포트</h1>
+                <span className="shrink-0 text-[11px] font-bold bg-white text-green-700 px-2 py-0.5 rounded-full">
+                  정규직
+                </span>
+              </div>
+              <p className="text-green-200 text-xs mt-1">{lastUpdated} 업데이트 · 30초 자동 갱신</p>
+            </div>
+            <input
+              type="date"
+              value={dateParam}
+              onChange={(e) => setDateParam(e.target.value)}
+              className="px-2 py-1 rounded-lg text-sm bg-green-500/30 border border-green-400/40 text-white focus:outline-none"
+            />
           </div>
-          <p className="text-green-200 text-xs mt-1">{lastUpdated} 업데이트 · 30초 자동 갱신</p>
 
           {/* Big circle rate */}
           <div className="flex items-center justify-center mt-5">

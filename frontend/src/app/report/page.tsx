@@ -28,7 +28,8 @@ function formatPlannedTime(time: string | null): string {
 
 function ReportContent() {
   const searchParams = useSearchParams();
-  const dateParam = searchParams.get("date") || new Date().toLocaleDateString('sv-SE');
+  const initialDate = searchParams.get("date") || new Date().toLocaleDateString('sv-SE');
+  const [dateParam, setDateParam] = useState(initialDate);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");
@@ -107,9 +108,18 @@ function ReportContent() {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 pt-6 pb-8">
         <div className="max-w-lg mx-auto">
-          <p className="text-blue-200 text-xs">{data.date}</p>
-          <h1 className="text-xl font-bold mt-0.5">출퇴근 현황 리포트</h1>
-          <p className="text-blue-200 text-xs mt-1">{lastUpdated} 업데이트 · 30초 자동 갱신</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold">출퇴근 현황 리포트</h1>
+              <p className="text-blue-200 text-xs mt-1">{lastUpdated} 업데이트 · 30초 자동 갱신</p>
+            </div>
+            <input
+              type="date"
+              value={dateParam}
+              onChange={(e) => setDateParam(e.target.value)}
+              className="px-2 py-1 rounded-lg text-sm bg-blue-500/30 border border-blue-400/40 text-white focus:outline-none"
+            />
+          </div>
 
           {/* Big circle rate */}
           <div className="flex items-center justify-center mt-5">

@@ -1231,4 +1231,49 @@ router.post('/fix-clockout-only', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/survey/fix-long-shifts - Fix clock_out where work duration > 15h (likely +9h bug on clock_out)
+router.post('/fix-long-shifts', async (_req: AuthRequest, res: Response) => {
+  try {
+    const NINE_H = 9 * 60 * 60 * 1000;
+    const FIFTEEN_H = 15 * 60 * 60 * 1000;
+
+    const responses = await dbAll(`
+      SELECT id, clock_in_time, clock_out_time FROM survey_responses
+      WHERE clock_in_time IS NOT NULL AND clock_out_time IS NOT NULL
+        AND created_at >= '2026-03-24'
+    `) as any[];
+
+    let fixed = 0;
+    for (const r of responses) {
+      const inT = new Date(r.clock_in_time).getTime();
+      const outT = new Date(r.clock_out_time).getTime();
+      const duration = outT - inT;
+      if (duration > FIFTEEN_H) {
+        const corrected = new Date(outT - NINE_H).toISOString();
+        await dbRun('UPDATE survey_responses SET clock_out_time = ? WHERE id = ?', corrected, r.id);
+        fixed++;
+      }
+    }
+
+    const attendances = await dbAll(`
+      SELECT id, clock_in_time, clock_out_time FROM regular_attendance
+      WHERE clock_in_time IS NOT NULL AND clock_out_time IS NOT NULL AND date >= '2026-03-24'
+    `) as any[];
+
+    let fixedR = 0;
+    for (const a of attendances) {
+      const inT = new Date(a.clock_in_time).getTime();
+      const outT = new Date(a.clock_out_time).getTime();
+      if ((outT - inT) > FIFTEEN_H) {
+        await dbRun('UPDATE regular_attendance SET clock_out_time = ? WHERE id = ?', new Date(outT - NINE_H).toISOString(), a.id);
+        fixedR++;
+      }
+    }
+
+    res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedR });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

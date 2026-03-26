@@ -1083,11 +1083,17 @@ router.get('/weekly-holiday-status', async (req: AuthRequest, res: Response) => 
   }
 });
 
-// POST /api/survey/fix-timestamps - Fix +9h timestamp issue (one-time use)
-router.post('/fix-timestamps', async (_req: AuthRequest, res: Response) => {
+// POST /api/survey/fix-timestamps - Smart timestamp repair
+router.post('/fix-timestamps', async (req: AuthRequest, res: Response) => {
   try {
-    // Fix survey_responses: clock_in_time and clock_out_time that were stored with +9h offset
-    // Only fix records from 2026-03-24 onwards (when getKSTTimestamp was introduced)
+    const { action } = req.body || {};
+    const now = new Date();
+    const NINE_H = 9 * 60 * 60 * 1000;
+
+    // Step 1: Undo previous fixes (+9h per run)
+    // Step 2: Then only fix times that are in the future (clearly +9h bugged)
+    const undoHours = action === 'undo18' ? 18 : action === 'undo9' ? 9 : 0;
+
     const responses = await dbAll(`
       SELECT id, clock_in_time, clock_out_time FROM survey_responses
       WHERE (clock_in_time IS NOT NULL OR clock_out_time IS NOT NULL)
@@ -1095,21 +1101,33 @@ router.post('/fix-timestamps', async (_req: AuthRequest, res: Response) => {
     `) as any[];
 
     let fixed = 0;
+    const details: string[] = [];
     for (const r of responses) {
       const updates: string[] = [];
       const params: any[] = [];
 
       if (r.clock_in_time) {
-        const t = new Date(r.clock_in_time);
-        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
-        updates.push('clock_in_time = ?');
-        params.push(corrected);
+        let t = new Date(r.clock_in_time);
+        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
+        // If time is in the future, it's +9h bugged → subtract 9h
+        if (t.getTime() > now.getTime() + 60000) {
+          t = new Date(t.getTime() - NINE_H);
+        }
+        if (r.clock_in_time !== t.toISOString()) {
+          updates.push('clock_in_time = ?');
+          params.push(t.toISOString());
+        }
       }
       if (r.clock_out_time) {
-        const t = new Date(r.clock_out_time);
-        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
-        updates.push('clock_out_time = ?');
-        params.push(corrected);
+        let t = new Date(r.clock_out_time);
+        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
+        if (t.getTime() > now.getTime() + 60000) {
+          t = new Date(t.getTime() - NINE_H);
+        }
+        if (r.clock_out_time !== t.toISOString()) {
+          updates.push('clock_out_time = ?');
+          params.push(t.toISOString());
+        }
       }
 
       if (updates.length > 0) {
@@ -1119,7 +1137,7 @@ router.post('/fix-timestamps', async (_req: AuthRequest, res: Response) => {
       }
     }
 
-    // Fix regular_attendance too
+    // Regular attendance
     const attendances = await dbAll(`
       SELECT id, clock_in_time, clock_out_time FROM regular_attendance
       WHERE (clock_in_time IS NOT NULL OR clock_out_time IS NOT NULL)
@@ -1132,16 +1150,26 @@ router.post('/fix-timestamps', async (_req: AuthRequest, res: Response) => {
       const params: any[] = [];
 
       if (a.clock_in_time) {
-        const t = new Date(a.clock_in_time);
-        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
-        updates.push('clock_in_time = ?');
-        params.push(corrected);
+        let t = new Date(a.clock_in_time);
+        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
+        if (t.getTime() > now.getTime() + 60000) {
+          t = new Date(t.getTime() - NINE_H);
+        }
+        if (a.clock_in_time !== t.toISOString()) {
+          updates.push('clock_in_time = ?');
+          params.push(t.toISOString());
+        }
       }
       if (a.clock_out_time) {
-        const t = new Date(a.clock_out_time);
-        const corrected = new Date(t.getTime() - 9 * 60 * 60 * 1000).toISOString();
-        updates.push('clock_out_time = ?');
-        params.push(corrected);
+        let t = new Date(a.clock_out_time);
+        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
+        if (t.getTime() > now.getTime() + 60000) {
+          t = new Date(t.getTime() - NINE_H);
+        }
+        if (a.clock_out_time !== t.toISOString()) {
+          updates.push('clock_out_time = ?');
+          params.push(t.toISOString());
+        }
       }
 
       if (updates.length > 0) {
@@ -1151,7 +1179,7 @@ router.post('/fix-timestamps', async (_req: AuthRequest, res: Response) => {
       }
     }
 
-    res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedRegular });
+    res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedRegular, action: action || 'smart-fix' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

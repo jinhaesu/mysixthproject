@@ -1083,16 +1083,11 @@ router.get('/weekly-holiday-status', async (req: AuthRequest, res: Response) => 
   }
 });
 
-// POST /api/survey/fix-timestamps - Smart timestamp repair
+// POST /api/survey/fix-timestamps - Shift all timestamps by specified hours
 router.post('/fix-timestamps', async (req: AuthRequest, res: Response) => {
   try {
-    const { action } = req.body || {};
-    const now = new Date();
-    const NINE_H = 9 * 60 * 60 * 1000;
-
-    // Step 1: Undo previous fixes (+9h per run)
-    // Step 2: Then only fix times that are in the future (clearly +9h bugged)
-    const undoHours = action === 'undo18' ? 18 : action === 'undo9' ? 9 : 0;
+    const { hours } = req.body || {};  // positive = add, negative = subtract
+    const shift = (hours || 0) * 60 * 60 * 1000;
 
     const responses = await dbAll(`
       SELECT id, clock_in_time, clock_out_time FROM survey_responses
@@ -1101,35 +1096,17 @@ router.post('/fix-timestamps', async (req: AuthRequest, res: Response) => {
     `) as any[];
 
     let fixed = 0;
-    const details: string[] = [];
     for (const r of responses) {
       const updates: string[] = [];
       const params: any[] = [];
-
       if (r.clock_in_time) {
-        let t = new Date(r.clock_in_time);
-        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
-        // If time is in the future, it's +9h bugged → subtract 9h
-        if (t.getTime() > now.getTime() + 60000) {
-          t = new Date(t.getTime() - NINE_H);
-        }
-        if (r.clock_in_time !== t.toISOString()) {
-          updates.push('clock_in_time = ?');
-          params.push(t.toISOString());
-        }
+        updates.push('clock_in_time = ?');
+        params.push(new Date(new Date(r.clock_in_time).getTime() + shift).toISOString());
       }
       if (r.clock_out_time) {
-        let t = new Date(r.clock_out_time);
-        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
-        if (t.getTime() > now.getTime() + 60000) {
-          t = new Date(t.getTime() - NINE_H);
-        }
-        if (r.clock_out_time !== t.toISOString()) {
-          updates.push('clock_out_time = ?');
-          params.push(t.toISOString());
-        }
+        updates.push('clock_out_time = ?');
+        params.push(new Date(new Date(r.clock_out_time).getTime() + shift).toISOString());
       }
-
       if (updates.length > 0) {
         params.push(r.id);
         await dbRun(`UPDATE survey_responses SET ${updates.join(', ')} WHERE id = ?`, ...params);
@@ -1137,7 +1114,6 @@ router.post('/fix-timestamps', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Regular attendance
     const attendances = await dbAll(`
       SELECT id, clock_in_time, clock_out_time FROM regular_attendance
       WHERE (clock_in_time IS NOT NULL OR clock_out_time IS NOT NULL)
@@ -1148,30 +1124,14 @@ router.post('/fix-timestamps', async (req: AuthRequest, res: Response) => {
     for (const a of attendances) {
       const updates: string[] = [];
       const params: any[] = [];
-
       if (a.clock_in_time) {
-        let t = new Date(a.clock_in_time);
-        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
-        if (t.getTime() > now.getTime() + 60000) {
-          t = new Date(t.getTime() - NINE_H);
-        }
-        if (a.clock_in_time !== t.toISOString()) {
-          updates.push('clock_in_time = ?');
-          params.push(t.toISOString());
-        }
+        updates.push('clock_in_time = ?');
+        params.push(new Date(new Date(a.clock_in_time).getTime() + shift).toISOString());
       }
       if (a.clock_out_time) {
-        let t = new Date(a.clock_out_time);
-        if (undoHours > 0) t = new Date(t.getTime() + undoHours * 60 * 60 * 1000);
-        if (t.getTime() > now.getTime() + 60000) {
-          t = new Date(t.getTime() - NINE_H);
-        }
-        if (a.clock_out_time !== t.toISOString()) {
-          updates.push('clock_out_time = ?');
-          params.push(t.toISOString());
-        }
+        updates.push('clock_out_time = ?');
+        params.push(new Date(new Date(a.clock_out_time).getTime() + shift).toISOString());
       }
-
       if (updates.length > 0) {
         params.push(a.id);
         await dbRun(`UPDATE regular_attendance SET ${updates.join(', ')} WHERE id = ?`, ...params);
@@ -1179,7 +1139,7 @@ router.post('/fix-timestamps', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedRegular, action: action || 'smart-fix' });
+    res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedRegular, shift_hours: hours });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

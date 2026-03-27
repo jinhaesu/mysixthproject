@@ -516,3 +516,26 @@ export async function initVacationBalances(data: { year: number; total_days: num
 export async function autoCalcVacationBalances(year: number) {
   return fetchAPI<any>('/api/regular/vacation-balances/auto-calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year }) });
 }
+
+// ===== Regular Shifts =====
+export async function getRegularShifts() {
+  return fetchAPI<any[]>('/api/regular/shifts');
+}
+export async function createRegularShift(data: { name: string; week_number: number; day_of_week: number; planned_clock_in: string; planned_clock_out: string }) {
+  return fetchAPI<any>('/api/regular/shifts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function deleteRegularShift(id: number) {
+  return fetchAPI<any>(`/api/regular/shifts/${id}`, { method: 'DELETE' });
+}
+export async function getShiftAssignments(shiftId: number) {
+  return fetchAPI<any[]>(`/api/regular/shifts/${shiftId}/assignments`);
+}
+export async function assignEmployeesToShift(shiftId: number, employeeIds: number[]) {
+  return fetchAPI<any>(`/api/regular/shifts/${shiftId}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_ids: employeeIds }) });
+}
+export async function removeShiftAssignment(shiftId: number, employeeId: number) {
+  return fetchAPI<any>(`/api/regular/shifts/${shiftId}/assignments/${employeeId}`, { method: 'DELETE' });
+}
+export async function getShiftPlan(date: string) {
+  return fetchAPI<any>(`/api/regular/shift-plan?date=${date}`);
+}

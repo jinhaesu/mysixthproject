@@ -540,6 +540,35 @@ export async function initializeDB(): Promise<void> {
 
   try { await pool.query("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS worker_type TEXT DEFAULT ''"); } catch {}
 
+  // Regular employee shift schedules (계획 출퇴근 배치)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_shifts (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        week_number INTEGER NOT NULL,
+        day_of_week INTEGER NOT NULL,
+        planned_clock_in TEXT NOT NULL,
+        planned_clock_out TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch {}
+
+  // Regular employee shift assignments
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_shift_assignments (
+        id SERIAL PRIMARY KEY,
+        shift_id INTEGER NOT NULL REFERENCES regular_shifts(id) ON DELETE CASCADE,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(shift_id, employee_id)
+      )
+    `);
+  } catch {}
+
   console.log('Database initialized successfully');
 }
 

@@ -723,4 +723,123 @@ router.post('/vacation-balances/init', async (req: AuthRequest, res: Response) =
   }
 });
 
+// ===== Shift Scheduling (계획 출퇴근 배치) =====
+
+// GET /api/regular/shifts - List all shifts
+router.get('/shifts', async (_req: AuthRequest, res: Response) => {
+  try {
+    const shifts = await dbAll(`
+      SELECT rs.*,
+        (SELECT COUNT(*) FROM regular_shift_assignments rsa WHERE rsa.shift_id = rs.id) as assigned_count
+      FROM regular_shifts rs
+      WHERE rs.is_active = 1
+      ORDER BY rs.week_number, rs.day_of_week, rs.planned_clock_in
+    `);
+    res.json(shifts);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/shifts - Create shift
+router.post('/shifts', async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, week_number, day_of_week, planned_clock_in, planned_clock_out } = req.body;
+    if (!name || week_number === undefined || day_of_week === undefined || !planned_clock_in || !planned_clock_out) {
+      res.status(400).json({ error: '모든 필드를 입력해주세요.' });
+      return;
+    }
+    const result = await dbRun(
+      'INSERT INTO regular_shifts (name, week_number, day_of_week, planned_clock_in, planned_clock_out) VALUES (?, ?, ?, ?, ?)',
+      name, week_number, day_of_week, planned_clock_in, planned_clock_out
+    );
+    const created = await dbGet('SELECT * FROM regular_shifts WHERE id = ?', result.lastInsertRowid);
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/regular/shifts/:id
+router.delete('/shifts/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('UPDATE regular_shifts SET is_active = 0 WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/shifts/:id/assignments - Get assigned employees for a shift
+router.get('/shifts/:id/assignments', async (req: AuthRequest, res: Response) => {
+  try {
+    const assignments = await dbAll(`
+      SELECT rsa.id, rsa.employee_id, re.name, re.department, re.team, re.phone
+      FROM regular_shift_assignments rsa
+      JOIN regular_employees re ON rsa.employee_id = re.id
+      WHERE rsa.shift_id = ? AND re.is_active = 1
+      ORDER BY re.department, re.team, re.name
+    `, req.params.id);
+    res.json(assignments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/shifts/:id/assignments - Assign employees to shift
+router.post('/shifts/:id/assignments', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_ids } = req.body;
+    if (!employee_ids || !Array.isArray(employee_ids)) {
+      res.status(400).json({ error: '직원 ID 목록이 필요합니다.' });
+      return;
+    }
+    let added = 0;
+    for (const empId of employee_ids) {
+      try {
+        await dbRun('INSERT INTO regular_shift_assignments (shift_id, employee_id) VALUES (?, ?)', req.params.id, empId);
+        added++;
+      } catch { /* skip duplicates */ }
+    }
+    res.json({ success: true, added });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/regular/shifts/:shiftId/assignments/:employeeId - Remove assignment
+router.delete('/shifts/:shiftId/assignments/:employeeId', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM regular_shift_assignments WHERE shift_id = ? AND employee_id = ?', req.params.shiftId, req.params.employeeId);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/shift-plan?date=YYYY-MM-DD - Get planned shifts for a date (for attendance view)
+router.get('/shift-plan', async (req: AuthRequest, res: Response) => {
+  try {
+    const date = (req.query.date as string) || getKSTDate();
+    // Calculate week number and day of week from date
+    const d = new Date(date + 'T00:00:00+09:00');
+    const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+    // ISO week number
+    const jan1 = new Date(d.getFullYear(), 0, 1);
+    const weekNumber = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+
+    const plans = await dbAll(`
+      SELECT rsa.employee_id, rs.planned_clock_in, rs.planned_clock_out, rs.name as shift_name
+      FROM regular_shift_assignments rsa
+      JOIN regular_shifts rs ON rsa.shift_id = rs.id
+      WHERE rs.is_active = 1 AND rs.day_of_week = ?
+      ORDER BY rsa.employee_id
+    `, dayOfWeek);
+
+    res.json({ date, day_of_week: dayOfWeek, week_number: weekNumber, plans });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

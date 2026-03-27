@@ -190,6 +190,7 @@ function SendTab() {
   const handleSend = async () => {
     if (!phone.trim()) return alert("전화번호를 입력해주세요.");
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
+    if (!plannedClockIn || !plannedClockOut) return alert("계획 출퇴근 시간을 입력해주세요.");
     setSending(true);
     try {
       const schedParams: any = {};
@@ -223,6 +224,7 @@ function SendTab() {
     const phones = bulkPhones.split("\n").map((p) => p.trim()).filter(Boolean);
     if (phones.length === 0) return alert("전화번호를 입력해주세요.");
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
+    if (!plannedClockIn || !plannedClockOut) return alert("계획 출퇴근 시간을 입력해주세요.");
     setSending(true);
     try {
       const schedParams: any = {};
@@ -328,7 +330,7 @@ function SendTab() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 출근시간</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 출근시간 <span className="text-red-500">*</span></label>
               <input
                 type="time"
                 value={plannedClockIn}
@@ -337,7 +339,7 @@ function SendTab() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 퇴근시간</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 퇴근시간 <span className="text-red-500">*</span></label>
               <input
                 type="time"
                 value={plannedClockOut}

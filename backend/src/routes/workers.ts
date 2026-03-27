@@ -109,7 +109,12 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 // DELETE /api/workers/:id
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    // Get phone before deleting to also remove labor contracts
+    const worker = await dbGet('SELECT phone FROM workers WHERE id = ?', req.params.id) as any;
     await dbRun('DELETE FROM workers WHERE id = ?', req.params.id);
+    if (worker?.phone) {
+      await dbRun('DELETE FROM labor_contracts WHERE phone = ?', worker.phone);
+    }
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -73,6 +73,52 @@ router.get('/:token/vacations', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/regular-public/contract/:token - Get contract for signing
+router.get('/contract/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const contract = await dbGet(`
+      SELECT rlc.*, re.department, re.team, re.role
+      FROM regular_labor_contracts rlc
+      JOIN regular_employees re ON rlc.employee_id = re.id
+      WHERE rlc.token = ?
+    `, token) as any;
+    if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    res.json(contract);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular-public/contract/:token/sign - Sign the contract
+router.post('/contract/:token/sign', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { address, signature_data } = req.body;
+    if (!address || !signature_data) { res.status(400).json({ error: '주소와 서명은 필수입니다.' }); return; }
+
+    const contract = await dbGet('SELECT * FROM regular_labor_contracts WHERE token = ?', token) as any;
+    if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    if (contract.status === 'signed') { res.status(400).json({ error: '이미 서명된 계약서입니다.' }); return; }
+
+    await dbRun(
+      'UPDATE regular_labor_contracts SET address = ?, signature_data = ?, status = ? WHERE token = ?',
+      address, signature_data, 'signed', token
+    );
+
+    // Send confirmation SMS with contract view link
+    const frontendUrl = process.env.FRONTEND_URL || 'https://mysixthproject.vercel.app';
+    const viewLink = `${frontendUrl}/regular-contract?token=${token}`;
+    const message = `[조인앤조인 근로계약서]\n${contract.worker_name}님의 근로계약서가 체결되었습니다.\n계약기간: ${contract.contract_start} ~ ${contract.contract_end}\n\n계약서 확인: ${viewLink}`;
+    await sendGeneralSms(contract.phone, message);
+    await dbRun('UPDATE regular_labor_contracts SET sms_sent = 1 WHERE token = ?', token);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/regular-public/:token - Get employee info + today's state
 router.get('/:token', async (req: Request, res: Response) => {
   try {
@@ -126,6 +172,18 @@ router.get('/:token', async (req: Request, res: Response) => {
     }
     const orgChart = Array.from(deptMap.values());
 
+    // Check contract requirement (employees hired on/after 2026-03-27 must have signed contract)
+    const hireDate = employee.hire_date || '';
+    const needsContract = hireDate && hireDate >= '2026-03-27';
+    let contractMissing = false;
+    if (needsContract) {
+      const signedContract = await dbGet(
+        "SELECT id FROM regular_labor_contracts WHERE employee_id = ? AND status = 'signed' AND contract_end >= ?",
+        employee.id, today
+      );
+      if (!signedContract) contractMissing = true;
+    }
+
     // Determine status
     let status = 'ready'; // ready, clocked_in, completed
     if (attendance?.clock_out_time) status = 'completed';
@@ -133,6 +191,7 @@ router.get('/:token', async (req: Request, res: Response) => {
 
     res.json({
       status,
+      contractMissing,
       employee: {
         name: employee.name,
         department: employee.department,

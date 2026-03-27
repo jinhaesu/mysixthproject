@@ -7,6 +7,8 @@ import {
   updateRegularEmployee,
   deleteRegularEmployee,
   sendRegularLink,
+  sendRegularContract,
+  getRegularContracts,
 } from "@/lib/api";
 import {
   Contact,
@@ -17,6 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  FileText,
+  FileCheck,
 } from "lucide-react";
 
 const DEPARTMENTS = ["생산2층", "생산3층", "물류1층"];
@@ -72,6 +76,19 @@ export default function RegularWorkersPage() {
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [sendingContractId, setSendingContractId] = useState<number | null>(null);
+  const [contractMap, setContractMap] = useState<Record<number, string>>({});
+
+  const loadContracts = useCallback(async () => {
+    try {
+      const contracts = await getRegularContracts();
+      const map: Record<number, string> = {};
+      (contracts || []).forEach((c: any) => { map[c.employee_id] = c.status; });
+      setContractMap(map);
+    } catch {
+      // silent
+    }
+  }, []);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -102,7 +119,8 @@ export default function RegularWorkersPage() {
 
   useEffect(() => {
     loadEmployees();
-  }, [loadEmployees]);
+    loadContracts();
+  }, [loadEmployees, loadContracts]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -160,6 +178,19 @@ export default function RegularWorkersPage() {
       alert(err.message || "상태 변경 실패");
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function handleSendContract(id: number) {
+    setSendingContractId(id);
+    try {
+      await sendRegularContract(id);
+      alert("계약서가 발송되었습니다.");
+      loadContracts();
+    } catch (err: any) {
+      alert(err.message || "계약서 발송 실패");
+    } finally {
+      setSendingContractId(null);
     }
   }
 
@@ -288,6 +319,7 @@ export default function RegularWorkersPage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">조</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">직책</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">상태</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">계약서</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-600">관리</th>
                 </tr>
               </thead>
@@ -325,6 +357,21 @@ export default function RegularWorkersPage() {
                       >
                         {emp.status === "active" ? "활성" : "비활성"}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {contractMap[emp.id] === "signed" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                          <FileCheck size={11} /> 체결
+                        </span>
+                      ) : contractMap[emp.id] === "sent" ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700">
+                          <FileText size={11} /> 발송됨
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                          미체결
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div
@@ -368,6 +415,19 @@ export default function RegularWorkersPage() {
                             <Send size={12} />
                           )}
                           링크
+                        </button>
+                        <button
+                          onClick={() => handleSendContract(emp.id)}
+                          disabled={sendingContractId === emp.id}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-purple-50 text-purple-600 text-xs font-medium disabled:opacity-50"
+                          title="계약서 발송"
+                        >
+                          {sendingContractId === emp.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <FileText size={12} />
+                          )}
+                          계약서
                         </button>
                       </div>
                     </td>

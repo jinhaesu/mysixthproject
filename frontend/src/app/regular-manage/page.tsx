@@ -1556,46 +1556,75 @@ function VacationTab() {
 function ShiftsTab() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: "", week_number: 1, day_of_week: 1, planned_clock_in: "08:00", planned_clock_out: "17:00" });
+  const [form, setForm] = useState({ name: "", month: new Date().getMonth() + 1, week_number: 1, days_of_week: [] as number[], planned_clock_in: "08:00", planned_clock_out: "17:00" });
   const [selectedShift, setSelectedShift] = useState<any>(null);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
   const [assignIds, setAssignIds] = useState<Set<number>>(new Set());
+  const [assignSearch, setAssignSearch] = useState("");
+  const [editingShift, setEditingShift] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ name: "", month: 1, week_number: 1, days_of_week: [] as number[], planned_clock_in: "08:00", planned_clock_out: "17:00" });
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+  const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
 
   const loadShifts = useCallback(async () => {
     setLoading(true);
-    try {
-      const data = await getRegularShifts();
-      setShifts(data || []);
-    } catch {} finally { setLoading(false); }
+    try { const data = await getRegularShifts(); setShifts(data || []); } catch {} finally { setLoading(false); }
   }, []);
 
   useEffect(() => { loadShifts(); }, [loadShifts]);
 
+  const toggleDay = (day: number, target: 'form' | 'edit') => {
+    if (target === 'form') {
+      setForm(f => ({ ...f, days_of_week: f.days_of_week.includes(day) ? f.days_of_week.filter(d => d !== day) : [...f.days_of_week, day].sort() }));
+    } else {
+      setEditForm(f => ({ ...f, days_of_week: f.days_of_week.includes(day) ? f.days_of_week.filter(d => d !== day) : [...f.days_of_week, day].sort() }));
+    }
+  };
+
   const handleCreate = async () => {
-    if (!form.name.trim() || !form.planned_clock_in || !form.planned_clock_out) {
-      alert("이름과 출퇴근 시간을 입력해주세요.");
-      return;
+    if (!form.name.trim() || !form.planned_clock_in || !form.planned_clock_out || form.days_of_week.length === 0) {
+      alert("배치명, 요일, 출퇴근 시간을 입력해주세요."); return;
     }
     try {
-      await createRegularShift(form);
-      setForm({ ...form, name: "" });
-      loadShifts();
+      await createRegularShift({ ...form, days_of_week: form.days_of_week.join(','), day_of_week: form.days_of_week[0] } as any);
+      setForm({ ...form, name: "" }); loadShifts();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleCopy = async (shift: any) => {
+    const nextWeek = (shift.week_number || 1) + 1;
+    const newName = shift.name.replace(/\d+주차/, `${nextWeek}주차`) || `${shift.name} (복사)`;
+    try {
+      const created = await createRegularShift({ name: newName, month: shift.month || form.month, week_number: nextWeek, day_of_week: shift.day_of_week, planned_clock_in: shift.planned_clock_in, planned_clock_out: shift.planned_clock_out, days_of_week: shift.days_of_week || '' } as any);
+      // Copy assignments too
+      const assigned = await getShiftAssignments(shift.id);
+      if (assigned && assigned.length > 0) {
+        await assignEmployeesToShift(created.id, assigned.map((a: any) => a.employee_id));
+      }
+      loadShifts(); alert(`${nextWeek}주차로 복사 완료 (배정인원 포함)`);
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleEdit = async () => {
+    if (!editingShift) return;
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const token = localStorage.getItem('token');
+      await fetch(`${API_URL}/api/regular/shifts/${editingShift.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ ...editForm, days_of_week: editForm.days_of_week.join(','), day_of_week: editForm.days_of_week[0] || 0 })
+      });
+      setEditingShift(null); loadShifts();
     } catch (e: any) { alert(e.message); }
   };
 
   const openAssign = async (shift: any) => {
-    setSelectedShift(shift);
+    setSelectedShift(shift); setAssignSearch("");
     try {
-      const [assigned, emps] = await Promise.all([
-        getShiftAssignments(shift.id),
-        getRegularEmployees(),
-      ]);
-      setAssignments(assigned || []);
-      setAllEmployees((emps as any).employees || emps || []);
-      setAssignIds(new Set());
+      const [assigned, emps] = await Promise.all([getShiftAssignments(shift.id), getRegularEmployees()]);
+      setAssignments(assigned || []); setAllEmployees((emps as any).employees || emps || []); setAssignIds(new Set());
     } catch (e: any) { alert(e.message); }
   };
 
@@ -1604,24 +1633,20 @@ function ShiftsTab() {
     try {
       await assignEmployeesToShift(selectedShift.id, Array.from(assignIds));
       setAssignIds(new Set());
-      const assigned = await getShiftAssignments(selectedShift.id);
-      setAssignments(assigned || []);
-      loadShifts();
+      setAssignments(await getShiftAssignments(selectedShift.id)); loadShifts();
     } catch (e: any) { alert(e.message); }
   };
 
   const handleRemove = async (empId: number) => {
     if (!selectedShift) return;
-    try {
-      await removeShiftAssignment(selectedShift.id, empId);
-      setAssignments(assignments.filter(a => a.employee_id !== empId));
-      loadShifts();
-    } catch (e: any) { alert(e.message); }
+    try { await removeShiftAssignment(selectedShift.id, empId); setAssignments(assignments.filter(a => a.employee_id !== empId)); loadShifts(); } catch (e: any) { alert(e.message); }
   };
+
+  const parseDays = (s: string) => s ? s.split(',').map(Number).filter(n => !isNaN(n)) : [];
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">주차/요일별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
+      <p className="text-sm text-gray-500">월/주차별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
 
       {/* Create Form */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -1629,36 +1654,40 @@ function ShiftsTab() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs text-gray-500 mb-1">배치명 <span className="text-red-500">*</span></label>
-            <input type="text" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})}
-              placeholder="예: A조 오전" className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-32" />
+            <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="예: A조 오전 3월1주차" className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-44" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">주차</label>
-            <select value={form.week_number} onChange={(e) => setForm({...form, week_number: parseInt(e.target.value)})}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
-              {Array.from({length: 53}, (_, i) => <option key={i+1} value={i+1}>{i+1}주차</option>)}
+            <label className="block text-xs text-gray-500 mb-1">월</label>
+            <select value={form.month} onChange={e => setForm({...form, month: parseInt(e.target.value)})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+              {MONTHS.map(m => <option key={m} value={m}>{m}월</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">요일</label>
-            <select value={form.day_of_week} onChange={(e) => setForm({...form, day_of_week: parseInt(e.target.value)})}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
-              {DAY_NAMES.map((d, i) => <option key={i} value={i}>{d}요일</option>)}
+            <label className="block text-xs text-gray-500 mb-1">주차</label>
+            <select value={form.week_number} onChange={e => setForm({...form, week_number: parseInt(e.target.value)})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+              {[1,2,3,4,5].map(w => <option key={w} value={w}>{w}주차</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">출근 <span className="text-red-500">*</span></label>
-            <input type="time" value={form.planned_clock_in} onChange={(e) => setForm({...form, planned_clock_in: e.target.value})}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+            <input type="time" value={form.planned_clock_in} onChange={e => setForm({...form, planned_clock_in: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">퇴근 <span className="text-red-500">*</span></label>
-            <input type="time" value={form.planned_clock_out} onChange={(e) => setForm({...form, planned_clock_out: e.target.value})}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+            <input type="time" value={form.planned_clock_out} onChange={e => setForm({...form, planned_clock_out: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
           </div>
-          <button onClick={handleCreate} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1">
-            <Plus size={14} /> 추가
-          </button>
+        </div>
+        <div className="mt-3">
+          <label className="block text-xs text-gray-500 mb-1">요일 선택 <span className="text-red-500">*</span></label>
+          <div className="flex gap-1">
+            {DAY_NAMES.map((d, i) => (
+              <button key={i} type="button" onClick={() => toggleDay(i, 'form')}
+                className={`w-9 h-9 rounded-lg text-xs font-medium ${form.days_of_week.includes(i) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{d}</button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button onClick={handleCreate} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1"><Plus size={14} /> 추가</button>
         </div>
       </div>
 
@@ -1670,96 +1699,90 @@ function ShiftsTab() {
           <div className="py-12 text-center text-sm text-gray-400">등록된 배치가 없습니다.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left">
-                <th className="py-2 px-4 font-medium text-gray-600">배치명</th>
-                <th className="py-2 px-4 font-medium text-gray-600">주차</th>
-                <th className="py-2 px-4 font-medium text-gray-600">요일</th>
-                <th className="py-2 px-4 font-medium text-gray-600">출근</th>
-                <th className="py-2 px-4 font-medium text-gray-600">퇴근</th>
-                <th className="py-2 px-4 font-medium text-gray-600">배정인원</th>
-                <th className="py-2 px-4 font-medium text-gray-600">관리</th>
-              </tr>
-            </thead>
+            <thead><tr className="bg-gray-50 text-left">
+              <th className="py-2 px-4 font-medium text-gray-600">배치명</th>
+              <th className="py-2 px-4 font-medium text-gray-600">월/주차</th>
+              <th className="py-2 px-4 font-medium text-gray-600">요일</th>
+              <th className="py-2 px-4 font-medium text-gray-600">출근</th>
+              <th className="py-2 px-4 font-medium text-gray-600">퇴근</th>
+              <th className="py-2 px-4 font-medium text-gray-600">배정</th>
+              <th className="py-2 px-4 font-medium text-gray-600">관리</th>
+            </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {shifts.map((s: any) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="py-2.5 px-4 font-medium text-gray-900">{s.name}</td>
-                  <td className="py-2.5 px-4 text-gray-600">{s.week_number}주차</td>
-                  <td className="py-2.5 px-4">
-                    <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">{DAY_NAMES[s.day_of_week]}요일</span>
-                  </td>
-                  <td className="py-2.5 px-4 text-gray-700">{s.planned_clock_in}</td>
-                  <td className="py-2.5 px-4 text-gray-700">{s.planned_clock_out}</td>
-                  <td className="py-2.5 px-4 text-gray-700">{s.assigned_count || 0}명</td>
-                  <td className="py-2.5 px-4">
-                    <div className="flex gap-1">
-                      <button onClick={() => openAssign(s)}
-                        className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100">직원배정</button>
-                      <button onClick={async () => { await deleteRegularShift(s.id); loadShifts(); }}
-                        className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100">삭제</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {shifts.map((s: any) => {
+                const days = parseDays(s.days_of_week || String(s.day_of_week));
+                return (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="py-2.5 px-4 font-medium text-gray-900">{s.name}</td>
+                    <td className="py-2.5 px-4 text-gray-600">{s.month || '-'}월 {s.week_number}주차</td>
+                    <td className="py-2.5 px-4"><div className="flex gap-0.5">{days.map(d => <span key={d} className="inline-flex w-6 h-6 items-center justify-center rounded text-[10px] font-medium bg-blue-50 text-blue-700">{DAY_NAMES[d]}</span>)}</div></td>
+                    <td className="py-2.5 px-4 text-gray-700">{s.planned_clock_in}</td>
+                    <td className="py-2.5 px-4 text-gray-700">{s.planned_clock_out}</td>
+                    <td className="py-2.5 px-4 text-gray-700">{s.assigned_count || 0}명</td>
+                    <td className="py-2.5 px-4">
+                      <div className="flex gap-1 flex-wrap">
+                        <button onClick={() => openAssign(s)} className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100">배정</button>
+                        <button onClick={() => { setEditingShift(s); setEditForm({ name: s.name, month: s.month || 1, week_number: s.week_number, days_of_week: parseDays(s.days_of_week || String(s.day_of_week)), planned_clock_in: s.planned_clock_in, planned_clock_out: s.planned_clock_out }); }}
+                          className="px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100">수정</button>
+                        <button onClick={() => handleCopy(s)} className="px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100">복사</button>
+                        <button onClick={async () => { await deleteRegularShift(s.id); loadShifts(); }} className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100">삭제</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingShift && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold">배치 수정</h3>
+            <div className="space-y-3">
+              <div><label className="block text-xs text-gray-500 mb-1">배치명</label><input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs text-gray-500 mb-1">월</label><select value={editForm.month} onChange={e => setEditForm({...editForm, month: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">{MONTHS.map(m => <option key={m} value={m}>{m}월</option>)}</select></div>
+                <div><label className="block text-xs text-gray-500 mb-1">주차</label><select value={editForm.week_number} onChange={e => setEditForm({...editForm, week_number: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">{[1,2,3,4,5].map(w => <option key={w} value={w}>{w}주차</option>)}</select></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs text-gray-500 mb-1">출근</label><input type="time" value={editForm.planned_clock_in} onChange={e => setEditForm({...editForm, planned_clock_in: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                <div><label className="block text-xs text-gray-500 mb-1">퇴근</label><input type="time" value={editForm.planned_clock_out} onChange={e => setEditForm({...editForm, planned_clock_out: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+              </div>
+              <div><label className="block text-xs text-gray-500 mb-1">요일</label><div className="flex gap-1">{DAY_NAMES.map((d, i) => (<button key={i} type="button" onClick={() => toggleDay(i, 'edit')} className={`w-9 h-9 rounded-lg text-xs font-medium ${editForm.days_of_week.includes(i) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{d}</button>))}</div></div>
+            </div>
+            <div className="flex gap-3"><button onClick={() => setEditingShift(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">취소</button><button onClick={handleEdit} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">저장</button></div>
+          </div>
+        </div>
+      )}
 
       {/* Assignment Modal */}
       {selectedShift && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">직원 배정</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              {selectedShift.name} · {DAY_NAMES[selectedShift.day_of_week]}요일 · {selectedShift.planned_clock_in}~{selectedShift.planned_clock_out}
-            </p>
-
-            {/* Currently assigned */}
+            <p className="text-sm text-gray-500 mb-4">{selectedShift.name} · {parseDays(selectedShift.days_of_week || String(selectedShift.day_of_week)).map((d: number) => DAY_NAMES[d]).join('/')}요일 · {selectedShift.planned_clock_in}~{selectedShift.planned_clock_out}</p>
             {assignments.length > 0 && (
-              <div className="mb-4">
-                <h4 className="text-xs font-semibold text-gray-600 mb-2">배정된 직원 ({assignments.length}명)</h4>
-                <div className="space-y-1">
-                  {assignments.map((a: any) => (
-                    <div key={a.employee_id} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
-                      <span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-green-600">{a.department} {a.team}</span></span>
-                      <button onClick={() => handleRemove(a.employee_id)}
-                        className="text-xs text-red-600 hover:text-red-800">해제</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div className="mb-4"><h4 className="text-xs font-semibold text-gray-600 mb-2">배정된 직원 ({assignments.length}명)</h4><div className="space-y-1">{assignments.map((a: any) => (
+                <div key={a.employee_id} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2"><span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-green-600">{a.department} {a.team}</span></span><button onClick={() => handleRemove(a.employee_id)} className="text-xs text-red-600 hover:text-red-800">해제</button></div>
+              ))}</div></div>
             )}
-
-            {/* Add employees */}
             <div>
               <h4 className="text-xs font-semibold text-gray-600 mb-2">직원 추가</h4>
+              <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mb-2" />
               <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
-                {allEmployees
-                  .filter((e: any) => !assignments.find((a: any) => a.employee_id === e.id))
-                  .map((e: any) => (
+                {allEmployees.filter((e: any) => !assignments.find((a: any) => a.employee_id === e.id)).filter((e: any) => !assignSearch || e.name?.includes(assignSearch) || e.phone?.includes(assignSearch)).map((e: any) => (
                   <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
-                    <input type="checkbox" checked={assignIds.has(e.id)}
-                      onChange={(ev) => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }}
-                      className="rounded border-gray-300" />
-                    <span className="text-sm">{e.name}</span>
-                    <span className="text-xs text-gray-500">{e.department} {e.team}</span>
+                    <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-gray-300" />
+                    <span className="text-sm">{e.name}</span><span className="text-xs text-gray-500">{e.department} {e.team}</span>
                   </label>
                 ))}
               </div>
-              {assignIds.size > 0 && (
-                <button onClick={handleAssign}
-                  className="mt-2 w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-                  {assignIds.size}명 배정하기
-                </button>
-              )}
+              {assignIds.size > 0 && <button onClick={handleAssign} className="mt-2 w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">{assignIds.size}명 배정하기</button>}
             </div>
-
-            <button onClick={() => setSelectedShift(null)}
-              className="mt-4 w-full py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-              닫기
-            </button>
+            <button onClick={() => setSelectedShift(null)} className="mt-4 w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">닫기</button>
           </div>
         </div>
       )}

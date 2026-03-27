@@ -835,7 +835,8 @@ function RegularContent() {
     hasWorkplace && gpsStatus === "acquired" && !isWithinRadius;
   const gpsReady = gpsStatus === "acquired";
   const canAct = hasWorkplace && gpsReady && isWithinRadius;
-  const showForm = data.status === "ready" || data.status === "clocked_in";
+  const contractMissing = data && (data as any).contractMissing;
+  const showForm = (data.status === "ready" || data.status === "clocked_in") && !contractMissing;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -896,6 +897,16 @@ function RegularContent() {
             </button>
           ))}
         </div>
+
+        {/* ── Contract Missing Warning ───────────────────────────── */}
+        {contractMissing && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
+            <ShieldAlert className="w-10 h-10 text-red-500 mx-auto mb-2" />
+            <h2 className="font-semibold text-red-800">근로계약서 미체결</h2>
+            <p className="text-sm text-red-600 mt-2">근로계약서가 체결되지 않아 출근할 수 없습니다.</p>
+            <p className="text-xs text-red-500 mt-1">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
+          </div>
+        )}
 
         {/* ── GPS Status ─────────────────────────────────────────── */}
         {showForm && (

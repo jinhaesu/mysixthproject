@@ -571,6 +571,30 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Migrations for regular_shifts: month/week-based structure + multi-day support
+  try { await pool.query("ALTER TABLE regular_shifts ADD COLUMN IF NOT EXISTS month INTEGER DEFAULT 0"); } catch {}
+  try { await pool.query("ALTER TABLE regular_shifts ADD COLUMN IF NOT EXISTS days_of_week TEXT DEFAULT ''"); } catch {}
+
+  // Regular employee labor contracts
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_labor_contracts (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        phone TEXT NOT NULL,
+        worker_name TEXT NOT NULL,
+        contract_start TEXT NOT NULL,
+        contract_end TEXT NOT NULL,
+        address TEXT DEFAULT '',
+        signature_data TEXT DEFAULT '',
+        token TEXT NOT NULL UNIQUE,
+        status TEXT DEFAULT 'pending',
+        sms_sent INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch {}
+
   console.log('Database initialized successfully');
 }
 

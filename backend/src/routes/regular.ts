@@ -760,6 +760,21 @@ router.post('/shifts', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// PUT /api/regular/shifts/:id - Update shift
+router.put('/shifts/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, week_number, day_of_week, planned_clock_in, planned_clock_out, month, days_of_week } = req.body;
+    await dbRun(
+      'UPDATE regular_shifts SET name = ?, week_number = ?, day_of_week = ?, planned_clock_in = ?, planned_clock_out = ?, month = ?, days_of_week = ? WHERE id = ?',
+      name, week_number, day_of_week || 0, planned_clock_in, planned_clock_out, month || 0, days_of_week || '', req.params.id
+    );
+    const updated = await dbGet('SELECT * FROM regular_shifts WHERE id = ?', req.params.id);
+    res.json(updated);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/regular/shifts/:id
 router.delete('/shifts/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -872,6 +887,51 @@ router.get('/employees/resigned', async (_req: AuthRequest, res: Response) => {
       ORDER BY re.resign_date DESC
     `);
     res.json(employees);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== Regular Labor Contracts =====
+
+// POST /api/regular/contracts/send - Send contract link to employee
+router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_id } = req.body;
+    const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ?', employee_id) as any;
+    if (!employee) { res.status(404).json({ error: '직원을 찾을 수 없습니다.' }); return; }
+
+    const token = require('uuid').v4();
+    const today = getKSTDate();
+    const endYear = parseInt(today.slice(0, 4)) + 1;
+    const endDate = endYear + today.slice(4);
+
+    await dbRun(
+      'INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token) VALUES (?, ?, ?, ?, ?, ?)',
+      employee.id, employee.phone, employee.name, today, endDate, token
+    );
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://mysixthproject.vercel.app';
+    const contractLink = `${frontendUrl}/regular-contract?token=${token}`;
+    const message = `[조인앤조인 근로계약서]\n${employee.name}님, 근로계약서를 작성해주세요.\n아래 링크를 눌러 서명해주세요.\n${contractLink}`;
+    await sendGeneralSms(employee.phone, message);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/contracts - List all contracts
+router.get('/contracts', async (_req: AuthRequest, res: Response) => {
+  try {
+    const contracts = await dbAll(`
+      SELECT rlc.*, re.department, re.team
+      FROM regular_labor_contracts rlc
+      JOIN regular_employees re ON rlc.employee_id = re.id
+      ORDER BY rlc.created_at DESC
+    `);
+    res.json(contracts);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

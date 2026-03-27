@@ -302,6 +302,12 @@ export async function updateRegularEmployee(id: number, data: any) {
 export async function deleteRegularEmployee(id: number) {
   return fetchAPI<any>(`/api/regular/employees/${id}`, { method: 'DELETE' });
 }
+export async function resignRegularEmployee(id: number, resign_date: string) {
+  return fetchAPI<any>(`/api/regular/employees/${id}/resign`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resign_date }) });
+}
+export async function getResignedEmployees() {
+  return fetchAPI<any[]>('/api/regular/employees/resigned');
+}
 export async function sendRegularLink(id: number) {
   return fetchAPI<any>(`/api/regular/employees/${id}/send-link`, { method: 'POST' });
 }

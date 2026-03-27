@@ -842,4 +842,39 @@ router.get('/shift-plan', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// PUT /api/regular/employees/:id/resign - 퇴사처리
+router.put('/employees/:id/resign', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { resign_date } = req.body;
+    if (!resign_date) {
+      res.status(400).json({ error: '퇴사일자를 입력해주세요.' });
+      return;
+    }
+    await dbRun(
+      'UPDATE regular_employees SET is_active = 0, resign_date = ?, resigned_at = ?, updated_at = NOW() WHERE id = ?',
+      resign_date, getKSTTimestamp(), id
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/employees/resigned - 퇴사자 목록
+router.get('/employees/resigned', async (_req: AuthRequest, res: Response) => {
+  try {
+    const employees = await dbAll(`
+      SELECT re.*, sw.name as workplace_name
+      FROM regular_employees re
+      LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
+      WHERE re.is_active = 0 AND re.resign_date IS NOT NULL AND re.resign_date != ''
+      ORDER BY re.resign_date DESC
+    `);
+    res.json(employees);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

@@ -32,6 +32,8 @@ import {
   assignEmployeesToShift,
   removeShiftAssignment,
   getShiftPlan,
+  resignRegularEmployee,
+  getResignedEmployees,
 } from "@/lib/api";
 import {
   MessageSquare,
@@ -117,6 +119,8 @@ export default function RegularManagePage() {
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [batchSending, setBatchSending] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
+  const [showResigned, setShowResigned] = useState(false);
+  const [resignedEmployees, setResignedEmployees] = useState<any[]>([]);
   const [empSaving, setEmpSaving] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
   const [editEmpForm, setEditEmpForm] = useState({ ...emptyEmployeeForm });
@@ -504,7 +508,7 @@ export default function RegularManagePage() {
           </div>
 
           {/* Search + Batch Actions */}
-          {employees.length > 0 && (
+          {(employees.length > 0 || showResigned) && (
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <input
@@ -515,6 +519,18 @@ export default function RegularManagePage() {
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
+              <button
+                onClick={async () => {
+                  const next = !showResigned;
+                  setShowResigned(next);
+                  if (next) {
+                    try { const data = await getResignedEmployees(); setResignedEmployees(data || []); } catch {}
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg text-sm font-medium ${showResigned ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                {showResigned ? '재직자 보기' : '퇴사자 조회'}
+              </button>
               <button
                 onClick={handleBatchSend}
                 disabled={batchSending || selectedIds.size === 0}
@@ -629,6 +645,17 @@ export default function RegularManagePage() {
                               <Edit3 size={14} />
                             </button>
                             <button
+                              onClick={async () => {
+                                const date = prompt(`${emp.name}님의 퇴사일자를 입력해주세요 (YYYY-MM-DD)`, new Date().toLocaleDateString('sv-SE'));
+                                if (!date) return;
+                                try { await resignRegularEmployee(emp.id, date); loadEmployees(); } catch (e: any) { alert(e.message); }
+                              }}
+                              className="px-1.5 py-1 text-xs text-orange-600 hover:bg-orange-50 rounded font-medium"
+                              title="퇴사처리"
+                            >
+                              퇴사
+                            </button>
+                            <button
                               onClick={() => handleDeleteEmp(emp.id, emp.name)}
                               className="p-1.5 text-red-600 hover:bg-red-50 rounded"
                               title="삭제"
@@ -642,6 +669,45 @@ export default function RegularManagePage() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Resigned Employees */}
+          {showResigned && (
+            <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
+              <div className="px-4 py-3 bg-orange-50 border-b border-orange-200">
+                <h3 className="text-sm font-semibold text-orange-800">퇴사자 목록 ({resignedEmployees.filter(e => !empSearch || e.name?.includes(empSearch) || e.phone?.includes(empSearch)).length}명)</h3>
+              </div>
+              {resignedEmployees.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">퇴사자가 없습니다.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-orange-50/50 text-left">
+                        <th className="px-4 py-2 font-medium text-gray-600">이름</th>
+                        <th className="px-4 py-2 font-medium text-gray-600">연락처</th>
+                        <th className="px-4 py-2 font-medium text-gray-600">부서</th>
+                        <th className="px-4 py-2 font-medium text-gray-600">조</th>
+                        <th className="px-4 py-2 font-medium text-gray-600">입사일</th>
+                        <th className="px-4 py-2 font-medium text-gray-600">퇴사일</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {resignedEmployees.filter(e => !empSearch || e.name?.includes(empSearch) || e.phone?.includes(empSearch)).map((e: any) => (
+                        <tr key={e.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 font-medium text-gray-900">{e.name}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{e.phone}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{e.department}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{e.team}</td>
+                          <td className="px-4 py-2.5 text-gray-600 text-xs">{e.hire_date || '-'}</td>
+                          <td className="px-4 py-2.5 text-orange-600 font-medium text-xs">{e.resign_date}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 

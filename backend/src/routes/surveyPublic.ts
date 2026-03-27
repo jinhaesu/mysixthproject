@@ -1,8 +1,67 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTTimestamp } from '../db';
+import { dbGet, dbAll, dbRun, getKSTTimestamp, getKSTDate } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
+import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
+
+// POST /api/survey-public/:token/contract - Submit labor contract
+router.post('/:token/contract', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { worker_name, address, signature_data } = req.body;
+
+    if (!worker_name || !address || !signature_data) {
+      res.status(400).json({ error: '이름, 주소, 서명은 필수입니다.' });
+      return;
+    }
+
+    const request = await dbGet('SELECT * FROM survey_requests WHERE token = ?', token) as any;
+    if (!request) {
+      res.status(404).json({ error: '유효하지 않은 링크입니다.' });
+      return;
+    }
+
+    const today = getKSTDate();
+    const startDate = today;
+    // Contract period: 1 year from today
+    const endYear = parseInt(today.slice(0, 4)) + 1;
+    const endDate = endYear + today.slice(4);
+
+    const result = await dbRun(
+      'INSERT INTO labor_contracts (phone, worker_name, worker_type, contract_start, contract_end, address, signature_data, request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      request.phone, worker_name, 'alba', startDate, endDate, address, signature_data, request.id
+    );
+
+    // Send contract confirmation SMS to worker
+    const message = `[조인앤조인 근로계약서]\n${worker_name}님의 단시간 근로자 표준근로계약서가 체결되었습니다.\n계약기간: ${startDate} ~ ${endDate}\n본 계약서는 전자문서로 보관됩니다.`;
+    await sendGeneralSms(request.phone, message);
+
+    await dbRun('UPDATE labor_contracts SET sms_sent = 1 WHERE id = ?', result.lastInsertRowid);
+
+    res.json({ success: true, contract_id: result.lastInsertRowid, contract_start: startDate, contract_end: endDate });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/survey-public/:token/contract - Check if contract exists
+router.get('/:token/contract', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const request = await dbGet('SELECT * FROM survey_requests WHERE token = ?', token) as any;
+    if (!request) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+
+    const contract = await dbGet(
+      'SELECT * FROM labor_contracts WHERE phone = ? AND contract_end >= ? ORDER BY created_at DESC LIMIT 1',
+      request.phone, getKSTDate()
+    ) as any;
+
+    res.json({ has_contract: !!contract, contract: contract || null });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // GET /api/survey-public/:token - Get survey state (public, no auth)
 router.get('/:token', async (req: Request, res: Response) => {
@@ -63,7 +122,7 @@ router.get('/:token', async (req: Request, res: Response) => {
 // POST /api/survey-public/:token/clock-in - Submit clock-in
 router.post('/:token/clock-in', async (req: Request, res: Response) => {
   const { token } = req.params;
-  const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo, gender, birth_year, agreement_accepted, agreement_accepted_at, agency, overtime_willing } = req.body;
+  const { latitude, longitude, worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo, gender, birth_year, agreement_accepted, agreement_accepted_at, agency, overtime_willing, worker_type } = req.body;
 
   if (!worker_name_ko || !worker_name_en || !bank_name || !bank_account || !id_number || !emergency_contact || !gender || !birth_year || !agreement_accepted) {
     res.status(400).json({ error: '모든 필수 항목을 입력해주세요.' });
@@ -123,7 +182,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
         worker_name_ko = ?, worker_name_en = ?, bank_name = ?, bank_account = ?,
         id_number = ?, emergency_contact = ?, memo = ?,
         gender = ?, birth_year = ?, agreement_accepted = ?, agreement_accepted_at = ?,
-        agency = ?, overtime_willing = ?,
+        agency = ?, overtime_willing = ?, worker_type = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE request_id = ?
     `,
@@ -131,21 +190,21 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
       id_number || '', emergency_contact || '', memo || '',
       gender || '', birth_year || null, agreement_accepted ? 1 : 0, agreement_accepted_at || null,
-      agency || '', overtime_willing || '',
+      agency || '', overtime_willing || '', worker_type || '',
       request.id
     );
   } else {
     await dbRun(`
       INSERT INTO survey_responses (request_id, clock_in_time, clock_in_lat, clock_in_lng, clock_in_gps_valid,
         worker_name_ko, worker_name_en, bank_name, bank_account, id_number, emergency_contact, memo,
-        gender, birth_year, agreement_accepted, agreement_accepted_at, agency, overtime_willing)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        gender, birth_year, agreement_accepted, agreement_accepted_at, agency, overtime_willing, worker_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       request.id, clockInTime, latitude || null, longitude || null, gpsValid,
       worker_name_ko, worker_name_en, bank_name || '', bank_account || '',
       id_number || '', emergency_contact || '', memo || '',
       gender || '', birth_year || null, agreement_accepted ? 1 : 0, agreement_accepted_at || null,
-      agency || '', overtime_willing || ''
+      agency || '', overtime_willing || '', worker_type || ''
     );
   }
 

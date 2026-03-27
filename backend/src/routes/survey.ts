@@ -648,7 +648,7 @@ router.get('/responses', async (req: AuthRequest, res: Response) => {
            resp.clock_in_time, resp.clock_in_gps_valid, resp.clock_out_time, resp.clock_out_gps_valid,
            resp.worker_name_ko, resp.worker_name_en, resp.bank_name, resp.bank_account,
            resp.id_number, resp.emergency_contact, resp.memo,
-           resp.gender, resp.birth_year, resp.agency, resp.overtime_willing,
+           resp.gender, resp.birth_year, resp.agency, resp.overtime_willing, resp.worker_type,
            sw.name as workplace_name, sw.address as workplace_address,
            sr.planned_clock_in, sr.planned_clock_out, sr.department
     FROM survey_requests sr
@@ -1271,6 +1271,16 @@ router.post('/fix-long-shifts', async (_req: AuthRequest, res: Response) => {
     }
 
     res.json({ success: true, fixed_survey: fixed, fixed_regular: fixedR });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/survey/contracts - List all contracts
+router.get('/contracts', async (_req: AuthRequest, res: Response) => {
+  try {
+    const contracts = await dbAll('SELECT * FROM labor_contracts ORDER BY created_at DESC');
+    res.json(contracts);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -66,6 +66,15 @@ function SurveyContent() {
   // Safety agreement (F5)
   const [agreementAccepted, setAgreementAccepted] = useState(false);
 
+  // Worker type selection
+  const [workerType, setWorkerType] = useState<"" | "dispatch" | "alba">("");
+  // Contract
+  const [contractDone, setContractDone] = useState(false);
+  const [contractAddress, setContractAddress] = useState("");
+  const [contractSubmitting, setContractSubmitting] = useState(false);
+  const [signatureRef, setSignatureRef] = useState<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
   const loadSurvey = useCallback(async () => {
     if (!token) {
       setError("유효하지 않은 설문 링크입니다.");
@@ -139,6 +148,88 @@ function SurveyContent() {
     loadSurvey();
   }, [loadSurvey]);
 
+  const checkContract = useCallback(async () => {
+    if (!token) return;
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${API_URL}/api/survey-public/${token}/contract`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.has_contract) setContractDone(true);
+      }
+    } catch {}
+  }, [token]);
+
+  useEffect(() => { checkContract(); }, [checkContract]);
+
+  const startDrawing = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!signatureRef) return;
+    setIsDrawing(true);
+    const ctx = signatureRef.getContext('2d');
+    if (!ctx) return;
+    const rect = signatureRef.getBoundingClientRect();
+    const x = 'touches' in e ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
+    const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!isDrawing || !signatureRef) return;
+    const ctx = signatureRef.getContext('2d');
+    if (!ctx) return;
+    const rect = signatureRef.getBoundingClientRect();
+    const x = 'touches' in e ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
+    const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#000';
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => setIsDrawing(false);
+
+  const clearSignature = () => {
+    if (!signatureRef) return;
+    const ctx = signatureRef.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, signatureRef.width, signatureRef.height);
+  };
+
+  const handleContractSubmit = async () => {
+    if (!nameKo.trim() || !contractAddress.trim()) {
+      alert('이름과 주소를 입력해주세요.');
+      return;
+    }
+    if (!signatureRef) return;
+    const signatureData = signatureRef.toDataURL();
+    const blankCanvas = document.createElement('canvas');
+    blankCanvas.width = signatureRef.width;
+    blankCanvas.height = signatureRef.height;
+    if (signatureData === blankCanvas.toDataURL()) {
+      alert('서명을 해주세요.');
+      return;
+    }
+
+    setContractSubmitting(true);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+      const res = await fetch(`${API_URL}/api/survey-public/${token}/contract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worker_name: nameKo.trim(), address: contractAddress.trim(), signature_data: signatureData }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error);
+      setContractDone(true);
+      alert('근로계약서가 체결되었습니다. 문자로 확인서가 발송됩니다.');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setContractSubmitting(false);
+    }
+  };
+
   const handleClockIn = async () => {
     if (!nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted || !agency.trim() || !overtimeWilling) {
       alert(t(lang, 'allFieldsRequired'));
@@ -162,6 +253,7 @@ function SurveyContent() {
         agreement_accepted_at: new Date().toISOString(),
         agency,
         overtime_willing: overtimeWilling,
+        worker_type: workerType,
       });
       await loadSurvey();
     } catch (err: any) {
@@ -426,8 +518,120 @@ function SurveyContent() {
           </div>
         )}
 
+        {/* Worker Type Selection */}
+        {data.status === "sent" && agreementAccepted && !workerType && (
+          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <h2 className="font-semibold text-gray-900 text-center">근무 유형을 선택해주세요</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setWorkerType("dispatch")}
+                className="py-6 bg-blue-50 border-2 border-blue-200 rounded-xl text-center hover:bg-blue-100 hover:border-blue-400 transition-all"
+              >
+                <p className="text-2xl mb-1">🏢</p>
+                <p className="font-bold text-blue-800">파견</p>
+                <p className="text-xs text-blue-600 mt-1">파견업체 소속</p>
+              </button>
+              <button
+                onClick={() => setWorkerType("alba")}
+                className="py-6 bg-orange-50 border-2 border-orange-200 rounded-xl text-center hover:bg-orange-100 hover:border-orange-400 transition-all"
+              >
+                <p className="text-2xl mb-1">📋</p>
+                <p className="font-bold text-orange-800">알바</p>
+                <p className="text-xs text-orange-600 mt-1">단기 근로계약</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Labor Contract (Alba only) */}
+        {data.status === "sent" && agreementAccepted && workerType === "alba" && !contractDone && (
+          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              📋 단시간 근로자 표준근로계약서
+            </h2>
+
+            {/* Contract Content */}
+            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50 text-xs text-gray-700 space-y-2">
+              <p className="font-bold text-center text-sm text-gray-900">단시간 근로자 표준근로계약서</p>
+              <p>조인앤조인 (이하 &quot;사업주&quot;라 함)과 <span className="font-bold text-blue-700">{nameKo || '______'}</span> (이하 &quot;근로자&quot;이라 함)은 다음과 같이 근로계약을 체결한다.</p>
+              <p><b>1. 근로계약기간:</b> {new Date().toLocaleDateString('sv-SE')} ~ {(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toLocaleDateString('sv-SE'); })()}</p>
+              <p>- 본 계약은 위 기간 내에서 사업주의 업무 지시가 있는 날에 한하여 근로를 제공하는 호출형 단시간 근로계약이다.</p>
+              <p><b>2. 근무 장소:</b> 경기도 안산시 단원구 신길동 1122</p>
+              <p><b>3. 업무의 내용(직종):</b> 제조, 포장 및 이에 부수하는 업무</p>
+              <p><b>4. 근로일 및 근로시간</b></p>
+              <p>① 근로일은 사업주가 업무량·생산일정 등을 고려하여 결정하며, 근로 전일 18:00까지 또는 당일 근로 개시 1시간 전까지 근로자에게 통보한다.</p>
+              <p>② 휴게시간: 4시간 근로 시 30분, 8시간 근로 시 1시간을 부여한다.</p>
+              <p><b>5. 임금</b></p>
+              <p>① 시급: 10,320원</p>
+              <p>② 임금은 실제 근로한 시간을 기준으로 산정한다.</p>
+              <p>③ 임금지급일: 매월 15일</p>
+              <p>④ 지급방법: 근로자 명의 예금통장에 입금</p>
+              <p><b>7. 근로시간 기록 및 확인</b> - 근로자는 매 근무 시작 및 종료 시 출퇴근 시간을 기록하여야 한다.</p>
+              <p><b>8. 계약의 해지</b> - 사업주는 정당한 사유가 있는 경우 본 계약을 해지할 수 있다.</p>
+              <p><b>9. 비밀유지</b> - 근로자는 근로 기간 중 알게 된 영업비밀을 제3자에게 누설하여서는 아니 된다.</p>
+              <p><b>10. 기타</b> - 이 계약에 정함이 없는 사항은 근로기준법에 의한다.</p>
+            </div>
+
+            {/* Date */}
+            <div className="text-center text-sm text-gray-700 font-medium">
+              {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+
+            {/* Employer info (fixed) */}
+            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800">
+              <p className="font-bold">(사업주)</p>
+              <p>사업체명: (주)조인앤조인</p>
+              <p>주소: 전북특별자치도 전주시 덕진구 기린대로 458</p>
+              <p>대표자: 진해수</p>
+            </div>
+
+            {/* Worker info (editable) */}
+            <div className="space-y-3">
+              <p className="font-bold text-sm text-gray-800">(근로자)</p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">성명 <span className="text-red-500">*</span></label>
+                <input type="text" value={nameKo} onChange={(e) => setNameKo(e.target.value)} placeholder="홍길동"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">주소 <span className="text-red-500">*</span></label>
+                <input type="text" value={contractAddress} onChange={(e) => setContractAddress(e.target.value)} placeholder="서울시 강남구..."
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">서명 <span className="text-red-500">*</span></label>
+                <div className="border-2 border-gray-300 rounded-lg bg-white relative" style={{ touchAction: 'none' }}>
+                  <canvas
+                    ref={(el) => setSignatureRef(el)}
+                    width={320}
+                    height={150}
+                    className="w-full cursor-crosshair"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                  />
+                  <button onClick={clearSignature}
+                    className="absolute top-1 right-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200">
+                    지우기
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">위 영역에 서명해주세요</p>
+              </div>
+            </div>
+
+            <button onClick={handleContractSubmit} disabled={contractSubmitting || !nameKo.trim() || !contractAddress.trim()}
+              className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 hover:bg-orange-700 transition-colors">
+              {contractSubmitting ? "처리 중..." : "근로계약서 서명 및 제출"}
+            </button>
+          </div>
+        )}
+
         {/* Clock-in Form (F3) - GPS confirmed + within range + agreement accepted */}
-        {data.status === "sent" && canAct && agreementAccepted && (
+        {data.status === "sent" && canAct && agreementAccepted && workerType && (workerType === "dispatch" || contractDone) && (
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2 text-blue-700 mb-2">
               <LogIn className="w-5 h-5" />

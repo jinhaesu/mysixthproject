@@ -833,6 +833,7 @@ function ResponsesTab() {
                       className="accent-blue-600" />
                   </th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무일</th>
+                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">유형</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">전화번호</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">한글이름</th>
                   <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">영문이름</th>
@@ -864,6 +865,15 @@ function ResponsesTab() {
                         className="accent-blue-600" />
                     </td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.date}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                        r.worker_type === 'alba' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
+                        r.worker_type === 'dispatch' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                        'bg-gray-50 text-gray-500'
+                      }`}>
+                        {r.worker_type === 'alba' ? '알바' : r.worker_type === 'dispatch' ? '파견' : '-'}
+                      </span>
+                    </td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.phone}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap font-medium text-gray-900">{r.worker_name_ko || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.worker_name_en || "-"}</td>

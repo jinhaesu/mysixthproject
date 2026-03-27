@@ -519,6 +519,27 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Short-term labor contracts
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS labor_contracts (
+        id SERIAL PRIMARY KEY,
+        phone TEXT NOT NULL,
+        worker_name TEXT NOT NULL,
+        worker_type TEXT NOT NULL DEFAULT 'alba',
+        contract_start TEXT NOT NULL,
+        contract_end TEXT NOT NULL,
+        address TEXT DEFAULT '',
+        signature_data TEXT DEFAULT '',
+        sms_sent INTEGER DEFAULT 0,
+        request_id INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch {}
+
+  try { await pool.query("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS worker_type TEXT DEFAULT ''"); } catch {}
+
   console.log('Database initialized successfully');
 }
 

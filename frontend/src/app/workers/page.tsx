@@ -354,12 +354,13 @@ export default function WorkersPage() {
                     <td className="px-4 py-3 text-gray-700">
                       {worker.emergency_contact || "-"}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       {(worker as any).contract_id ? (
-                        <div>
-                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">체결</span>
-                          <p className="text-[10px] text-gray-500 mt-0.5">{(worker as any).contract_start}~{(worker as any).contract_end}</p>
-                        </div>
+                        <a href={`/contract?id=${(worker as any).contract_id}`} target="_blank" rel="noopener noreferrer"
+                          className="block hover:opacity-80 transition-opacity" title="클릭하여 계약서 보기">
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 cursor-pointer">📋 체결</span>
+                          <p className="text-[10px] text-blue-500 mt-0.5 underline">{(worker as any).contract_start}~{(worker as any).contract_end}</p>
+                        </a>
                       ) : (
                         <span className="text-xs text-gray-400">미체결</span>
                       )}

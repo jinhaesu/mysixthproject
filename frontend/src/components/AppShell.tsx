@@ -5,7 +5,7 @@ import Sidebar from "@/components/Sidebar";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const publicPages = ["/login", "/s", "/r", "/report", "/report-regular"];
+  const publicPages = ["/login", "/s", "/r", "/report", "/report-regular", "/contract"];
   const isPublicPage = publicPages.includes(pathname);
 
   if (isPublicPage) {

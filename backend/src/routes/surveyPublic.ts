@@ -34,7 +34,9 @@ router.post('/:token/contract', async (req: Request, res: Response) => {
     );
 
     // Send contract confirmation SMS to worker
-    const message = `[조인앤조인 근로계약서]\n${worker_name}님의 단시간 근로자 표준근로계약서가 체결되었습니다.\n계약기간: ${startDate} ~ ${endDate}\n본 계약서는 전자문서로 보관됩니다.`;
+    const frontendUrl = process.env.FRONTEND_URL || process.env.SURVEY_BASE_URL?.replace('/s', '') || 'https://mysixthproject.vercel.app';
+    const contractLink = `${frontendUrl}/contract?id=${result.lastInsertRowid}`;
+    const message = `[조인앤조인 근로계약서]\n${worker_name}님의 단시간 근로자 표준근로계약서가 체결되었습니다.\n계약기간: ${startDate} ~ ${endDate}\n\n계약서 확인: ${contractLink}`;
     await sendGeneralSms(request.phone, message);
 
     await dbRun('UPDATE labor_contracts SET sms_sent = 1 WHERE id = ?', result.lastInsertRowid);
@@ -58,6 +60,21 @@ router.get('/:token/contract', async (req: Request, res: Response) => {
     ) as any;
 
     res.json({ has_contract: !!contract, contract: contract || null });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/survey-public/contract/:id - View contract (public)
+router.get('/contract/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const contract = await dbGet('SELECT * FROM labor_contracts WHERE id = ?', id) as any;
+    if (!contract) {
+      res.status(404).json({ error: '계약서를 찾을 수 없습니다.' });
+      return;
+    }
+    res.json(contract);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -92,6 +109,14 @@ router.get('/:token', async (req: Request, res: Response) => {
   // Look up worker profile for pre-fill
   const worker = await dbGet('SELECT * FROM workers WHERE phone = ?', request.phone);
 
+  // Look up last response from same phone for additional pre-fill
+  const lastResponse = await dbGet(`
+    SELECT resp.* FROM survey_responses resp
+    JOIN survey_requests sr ON resp.request_id = sr.id
+    WHERE sr.phone = ? AND resp.id_number IS NOT NULL AND resp.id_number != ''
+    ORDER BY resp.created_at DESC LIMIT 1
+  `, request.phone) as any;
+
   res.json({
     status: request.status,
     date: request.date,
@@ -115,6 +140,18 @@ router.get('/:token', async (req: Request, res: Response) => {
       bank_name: worker.bank_name,
       bank_account: worker.bank_account,
       emergency_contact: worker.emergency_contact,
+    } : null,
+    lastResponse: lastResponse ? {
+      id_number: lastResponse.id_number,
+      gender: lastResponse.gender,
+      birth_year: lastResponse.birth_year,
+      agency: lastResponse.agency,
+      overtime_willing: lastResponse.overtime_willing,
+      bank_name: lastResponse.bank_name,
+      bank_account: lastResponse.bank_account,
+      emergency_contact: lastResponse.emergency_contact,
+      worker_name_ko: lastResponse.worker_name_ko,
+      worker_name_en: lastResponse.worker_name_en,
     } : null,
   });
 });

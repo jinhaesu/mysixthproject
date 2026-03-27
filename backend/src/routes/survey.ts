@@ -650,10 +650,12 @@ router.get('/responses', async (req: AuthRequest, res: Response) => {
            resp.id_number, resp.emergency_contact, resp.memo,
            resp.gender, resp.birth_year, resp.agency, resp.overtime_willing, resp.worker_type,
            sw.name as workplace_name, sw.address as workplace_address,
-           sr.planned_clock_in, sr.planned_clock_out, sr.department
+           sr.planned_clock_in, sr.planned_clock_out, sr.department,
+           lc.id as contract_id, lc.contract_start, lc.contract_end, lc.worker_type as contract_type
     FROM survey_requests sr
     LEFT JOIN survey_responses resp ON sr.id = resp.request_id
     LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
+    LEFT JOIN labor_contracts lc ON sr.phone = lc.phone AND lc.contract_end >= CURRENT_DATE
     ${where}
     ORDER BY sr.date DESC, sr.created_at DESC
     LIMIT ? OFFSET ?

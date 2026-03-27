@@ -95,6 +95,20 @@ function SurveyContent() {
         if (result.worker.bank_account) setBankAccount(result.worker.bank_account);
         if (result.worker.emergency_contact) setEmergencyContact(result.worker.emergency_contact);
       }
+      // Pre-fill from last response (same phone)
+      if (result.lastResponse) {
+        const lr = result.lastResponse;
+        if (lr.worker_name_ko && !result.response?.worker_name_ko && !result.worker?.name_ko) setNameKo(lr.worker_name_ko);
+        if (lr.worker_name_en && !result.response?.worker_name_en && !result.worker?.name_en) setNameEn(lr.worker_name_en);
+        if (lr.id_number) setIdNumber(lr.id_number);
+        if (lr.gender) setGender(lr.gender);
+        if (lr.birth_year) setBirthYear(String(lr.birth_year));
+        if (lr.agency) setAgency(lr.agency);
+        if (lr.overtime_willing) setOvertimeWilling(lr.overtime_willing);
+        if (lr.bank_name && !result.worker?.bank_name) setBankName(lr.bank_name);
+        if (lr.bank_account && !result.worker?.bank_account) setBankAccount(lr.bank_account);
+        if (lr.emergency_contact && !result.worker?.emergency_contact) setEmergencyContact(lr.emergency_contact);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

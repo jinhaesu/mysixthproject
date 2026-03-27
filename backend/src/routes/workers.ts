@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { dbGet, dbAll, dbRun } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -27,8 +27,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const limitNum = Math.min(parseInt(limit), 500);
     const offset = (pageNum - 1) * limitNum;
 
+    const today = getKSTDate();
     const workers = await dbAll(`
-      SELECT * FROM workers ${where} ORDER BY name_ko ASC LIMIT ? OFFSET ?
+      SELECT w.*,
+        (SELECT lc.id FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_id,
+        (SELECT lc.contract_start FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_start,
+        (SELECT lc.contract_end FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_end
+      FROM workers w ${where} ORDER BY w.name_ko ASC LIMIT ? OFFSET ?
     `, ...params, limitNum, offset);
 
     res.json({

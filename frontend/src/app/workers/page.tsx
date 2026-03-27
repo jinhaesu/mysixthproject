@@ -309,6 +309,9 @@ export default function WorkersPage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">
                     비상연락처
                   </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                    근로계약
+                  </th>
                   <th className="px-4 py-3 text-right font-medium text-gray-600">
                     관리
                   </th>
@@ -350,6 +353,16 @@ export default function WorkersPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {worker.emergency_contact || "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(worker as any).contract_id ? (
+                        <div>
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">체결</span>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{(worker as any).contract_start}~{(worker as any).contract_end}</p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">미체결</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div

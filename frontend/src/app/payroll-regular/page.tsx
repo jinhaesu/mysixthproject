@@ -304,7 +304,7 @@ export default function PayrollRegularPage() {
                     <td className="px-4 py-3 text-right text-gray-900 font-medium">{fmt.format(r.base_pay)}</td>
                     <td className="px-4 py-3 text-right text-orange-600 font-medium">{fmt.format(r.overtime_pay)}</td>
                     <td className="px-4 py-3 text-right text-purple-600 font-medium">{fmt.format(r.night_pay)}</td>
-                    <td className="px-4 py-3 text-right text-green-600 font-medium">{fmt.format(r.weekly_holiday_pay)}</td>
+                    <td className="px-4 py-3 text-right text-green-600 font-medium">{fmt.format(r.weekly_holiday_pay || 0)}</td>
                     <td className="px-4 py-3 text-right text-indigo-700 font-bold whitespace-nowrap">{fmt.format(r.total_pay)}</td>
                   </tr>
                 ))}
@@ -318,7 +318,7 @@ export default function PayrollRegularPage() {
                     <td className="px-4 py-3 text-right text-gray-900">{fmt.format(grandTotal.base_pay)}</td>
                     <td className="px-4 py-3 text-right text-orange-700">{fmt.format(grandTotal.overtime_pay)}</td>
                     <td className="px-4 py-3 text-right text-purple-700">{fmt.format(grandTotal.night_pay)}</td>
-                    <td className="px-4 py-3 text-right text-green-700">{fmt.format(grandTotal.weekly_holiday_pay)}</td>
+                    <td className="px-4 py-3 text-right text-green-700">{fmt.format(grandTotal.weekly_holiday_pay || 0)}</td>
                     <td className="px-4 py-3 text-right text-indigo-800 whitespace-nowrap">{fmt.format(grandTotal.total_pay)}</td>
                   </tr>
                 </tfoot>

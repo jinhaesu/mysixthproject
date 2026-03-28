@@ -216,7 +216,42 @@ function DashboardContent() {
       }
       const dailyRows = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
-      setSummaryData({ current: mergedCurrent, previous: mergedPrevious, year, month, prevYear: prevY, prevMonth: prevM, weeklyHolidayHours: { current: {}, previous: {} } });
+      // Calculate weekly holiday hours (주휴수당) from confirmed data
+      // Condition: 15h+/week AND 5 days worked in the week → 8h weekly holiday per week
+      const calcWeeklyHoliday = (employees: any[]): Record<string, number> => {
+        const catHours: Record<string, number> = {};
+        for (const emp of (employees || [])) {
+          if (isRegular && emp.type !== '정규직') continue;
+          if (!isRegular && emp.type === '정규직') continue;
+          const cat = emp.type || '파견';
+          // Group records by ISO week
+          const weekMap = new Map<string, { days: number; hours: number }>();
+          for (const rec of (emp.records || [])) {
+            const d = new Date(rec.date + 'T00:00:00+09:00');
+            const weekStart = new Date(d);
+            weekStart.setDate(d.getDate() - d.getDay()); // Sunday start
+            const weekKey = weekStart.toISOString().slice(0, 10);
+            if (!weekMap.has(weekKey)) weekMap.set(weekKey, { days: 0, hours: 0 });
+            const w = weekMap.get(weekKey)!;
+            w.days++;
+            w.hours += (parseFloat(rec.regular_hours) || 0) + (parseFloat(rec.overtime_hours) || 0);
+          }
+          // Count qualifying weeks
+          let holidayHours = 0;
+          for (const [, w] of weekMap) {
+            if (w.hours >= 15 && w.days >= 5) {
+              holidayHours += 8; // 8 hours per qualifying week
+            }
+          }
+          catHours[cat] = (catHours[cat] || 0) + holidayHours;
+        }
+        return catHours;
+      };
+
+      const currentWHH = calcWeeklyHoliday(currentConfirmed || []);
+      const prevWHH = calcWeeklyHoliday(prevConfirmed || []);
+
+      setSummaryData({ current: mergedCurrent, previous: mergedPrevious, year, month, prevYear: prevY, prevMonth: prevM, weeklyHolidayHours: { current: currentWHH, previous: prevWHH } });
       setDailyData({ data: dailyRows, groups: [], categories: [], year, month } as DailyResponse);
       setTwoMonthsAgoData([]);
       setTwoMonthsAgoWHH({});

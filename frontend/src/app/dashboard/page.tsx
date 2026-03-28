@@ -95,16 +95,22 @@ const isWeekend = (d: string) => { const day = new Date(d + "T00:00:00").getDay(
 const gk = (dept: string, wp: string) => wp ? `${dept}-${wp}` : dept;
 const pct = (cur: number, prev: number) => prev === 0 ? (cur > 0 ? 100 : 0) : Math.round(((cur - prev) / prev) * 1000) / 10;
 
+// 30분 단위 내림 (전역)
+const floor30g = (h: number) => Math.floor(h * 2) / 2;
+
 function sumTotals(rows: SummaryRow[]): Totals {
-  return rows.reduce((a, r) => ({
+  const raw = rows.reduce((a, r) => ({
     attendance_count: a.attendance_count + r.attendance_count,
     unique_workers: a.unique_workers + r.unique_workers,
-    total_hours: a.total_hours + r.total_hours,
+    total_hours: 0, // recalculate below
     regular_hours: a.regular_hours + r.regular_hours,
     overtime_hours: a.overtime_hours + r.overtime_hours,
     night_hours: a.night_hours + (r.night_hours || 0),
     annual_leave_days: a.annual_leave_days + r.annual_leave_days,
   }), { ...ZERO_TOTALS });
+  // total = regular + floor30(overtime) + night
+  raw.total_hours = raw.regular_hours + floor30g(raw.overtime_hours) + raw.night_hours;
+  return raw;
 }
 
 function processSummaryGroups(data: SummaryRow[]): ProcessedGroup[] {
@@ -309,9 +315,9 @@ function DashboardContent() {
         const cat = r.category || "미분류";
         const prev = map.get(cat) || { total_hours: 0, daytime_ot: 0, night_total: 0 };
         map.set(cat, {
-          total_hours: prev.total_hours + r.total_hours,
-          daytime_ot: prev.daytime_ot + (r.shift !== "야간" ? r.overtime_hours : 0),
-          night_total: prev.night_total + (r.shift === "야간" ? r.total_hours : 0),
+          total_hours: prev.total_hours + r.regular_hours + floor30(r.overtime_hours) + (r.night_hours || 0),
+          daytime_ot: prev.daytime_ot + (r.shift !== "야간" ? floor30(r.overtime_hours) : 0),
+          night_total: prev.night_total + (r.shift === "야간" ? r.regular_hours + floor30(r.overtime_hours) + (r.night_hours || 0) : 0),
         });
       }
       return map;
@@ -442,7 +448,7 @@ function DashboardContent() {
         출근횟수: twoMonthsAgoTotal.attendance_count,
         정규시간: Math.round(twoMonthsAgoTotal.regular_hours * 10) / 10,
         연장시간: Math.round(twoMonthsAgoTotal.overtime_hours * 10) / 10,
-        총근로시간: Math.round((twoMonthsAgoTotal.regular_hours + twoMonthsAgoTotal.overtime_hours) * 10) / 10,
+        총근로시간: Math.round((twoMonthsAgoTotal.regular_hours + floor30(twoMonthsAgoTotal.overtime_hours) + twoMonthsAgoTotal.night_hours) * 10) / 10,
         추정급여: twoMonthsAgoSalary,
       },
       {
@@ -450,7 +456,7 @@ function DashboardContent() {
         출근횟수: prevTotal.attendance_count,
         정규시간: Math.round(prevTotal.regular_hours * 10) / 10,
         연장시간: Math.round(prevTotal.overtime_hours * 10) / 10,
-        총근로시간: Math.round((prevTotal.regular_hours + prevTotal.overtime_hours) * 10) / 10,
+        총근로시간: Math.round((prevTotal.regular_hours + floor30(prevTotal.overtime_hours) + prevTotal.night_hours) * 10) / 10,
         추정급여: prevSalary,
       },
       {
@@ -458,7 +464,7 @@ function DashboardContent() {
         출근횟수: grandTotal.attendance_count,
         정규시간: Math.round(grandTotal.regular_hours * 10) / 10,
         연장시간: Math.round(grandTotal.overtime_hours * 10) / 10,
-        총근로시간: Math.round((grandTotal.regular_hours + grandTotal.overtime_hours) * 10) / 10,
+        총근로시간: Math.round((grandTotal.regular_hours + floor30(grandTotal.overtime_hours) + grandTotal.night_hours) * 10) / 10,
         추정급여: curSalary,
       },
     ];
@@ -644,11 +650,11 @@ function DashboardContent() {
                                 <td className="px-3 py-2 text-gray-700">{r.category || "-"}</td>
                                 <td className="px-3 py-2 text-gray-700">{r.shift}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.attendance_count}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.total_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours + floor30(r.overtime_hours) + (r.night_hours || 0))}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30(r.overtime_hours))}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.total_hours / r.unique_workers) : "-"}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt((r.regular_hours + floor30(r.overtime_hours) + (r.night_hours || 0)) / r.unique_workers) : "-"}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(floor30(r.overtime_hours) / r.unique_workers) : "-"}</td>
                               </tr>
                             );
@@ -657,11 +663,11 @@ function DashboardContent() {
                             <tr key={`sub-${gi}`} className="bg-blue-50 border-b border-blue-200 font-semibold text-blue-900">
                               <td className="px-3 py-2" colSpan={4}>{g.key} 소계</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.attendance_count}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.total_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours + floor30(g.subtotal.overtime_hours) + g.subtotal.night_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30(g.subtotal.overtime_hours))}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.total_hours / g.subtotal.unique_workers) : "-"}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt((g.subtotal.regular_hours + floor30(g.subtotal.overtime_hours) + g.subtotal.night_hours) / g.subtotal.unique_workers) : "-"}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(floor30(g.subtotal.overtime_hours) / g.subtotal.unique_workers) : "-"}</td>
                             </tr>
                           );
@@ -680,8 +686,8 @@ function DashboardContent() {
                               </div>
                             );
                           };
-                          const avgHoursCur = gt.unique_workers > 0 ? gt.total_hours / gt.unique_workers : 0;
-                          const avgHoursPrev = pt.unique_workers > 0 ? pt.total_hours / pt.unique_workers : 0;
+                          const avgHoursCur = gt.unique_workers > 0 ? (gt.regular_hours + floor30(gt.overtime_hours) + gt.night_hours) / gt.unique_workers : 0;
+                          const avgHoursPrev = pt.unique_workers > 0 ? (pt.regular_hours + floor30(pt.overtime_hours) + pt.night_hours) / pt.unique_workers : 0;
                           const avgOtCur = gt.unique_workers > 0 ? floor30(gt.overtime_hours) / gt.unique_workers : 0;
                           const avgOtPrev = pt.unique_workers > 0 ? floor30(pt.overtime_hours) / pt.unique_workers : 0;
 
@@ -693,7 +699,7 @@ function DashboardContent() {
                                 {momBadge(gt.attendance_count, pt.attendance_count)}
                               </td>
                               <td className="text-right px-3 py-2 tabular-nums">
-                                {fmt(gt.total_hours)}
+                                {fmt(gt.regular_hours + floor30(gt.overtime_hours) + gt.night_hours)}
                                 {momBadge(gt.total_hours, pt.total_hours)}
                               </td>
                               <td className="text-right px-3 py-2 tabular-nums">

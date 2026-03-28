@@ -360,11 +360,15 @@ export default function AttendanceSummaryDispatchPage() {
                               <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualIn}</td>
                               <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualOut}</td>
                               <td className="py-1.5 px-3">
-                                <select value={source} onChange={e => setSelectedSource({...selectedSource, [key]: e.target.value as any})}
-                                  className="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-white">
-                                  <option value="planned">계획</option>
-                                  <option value="actual">실제</option>
-                                </select>
+                                {isDayConfirmed ? (
+                                  <span className="text-[10px] text-green-600 font-medium">확정됨</span>
+                                ) : (
+                                  <select value={source} onChange={e => setSelectedSource({...selectedSource, [key]: e.target.value as any})}
+                                    className="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-white">
+                                    <option value="planned">계획</option>
+                                    <option value="actual">실제</option>
+                                  </select>
+                                )}
                               </td>
                             </tr>
                           );

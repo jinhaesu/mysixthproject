@@ -1301,7 +1301,7 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
     const workers = await dbAll(`
       SELECT DISTINCT ON (sr.phone) sr.phone, resp.worker_name_ko as name, sr.department,
              sr.planned_clock_in, sr.planned_clock_out,
-             COALESCE(NULLIF(resp.worker_type, ''), sr.department) as worker_type
+             COALESCE(NULLIF(resp.worker_type, ''), '') as worker_type
       FROM survey_requests sr
       LEFT JOIN survey_responses resp ON sr.id = resp.request_id
       WHERE sr.date >= ? AND sr.date <= ?
@@ -1317,7 +1317,7 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
         let type = (w as any).worker_type || '';
         if (type === 'dispatch' || type.includes('파견')) type = '파견';
         else if (type === 'alba' || type.includes('알바') || type.includes('사업소득')) type = '알바';
-        else if (!type) type = ''; // unknown
+        else type = ''; // 파견/알바 외 모든 값은 정보없음 처리
         phoneMap.set(w.phone, { phone: w.phone, name: w.name || w.phone, department: w.department || '', type, actuals: [], shifts: [] });
       }
       // Store planned times as shift-like data

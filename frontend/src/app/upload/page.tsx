@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { UploadCloud, FileSpreadsheet, AlertTriangle, AlertCircle, CheckCircle2, Info } from "lucide-react";
-import { uploadFile } from "@/lib/api";
+import { useState, useCallback, useEffect } from "react";
+import { UploadCloud, FileSpreadsheet, AlertTriangle, AlertCircle, CheckCircle2, Info, Trash2 } from "lucide-react";
+import { uploadFile, getUploads, deleteUpload } from "@/lib/api";
 import type { UploadResponse } from "@/types/attendance";
 
 export default function UploadPage() {
@@ -10,6 +10,13 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<UploadResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploads, setUploads] = useState<any[]>([]);
+
+  const loadUploads = useCallback(async () => {
+    try { const data = await getUploads(); setUploads(data || []); } catch {}
+  }, []);
+
+  useEffect(() => { loadUploads(); }, [loadUploads]);
 
   const handleFile = useCallback(async (file: File) => {
     setError(null);
@@ -25,6 +32,7 @@ export default function UploadPage() {
     try {
       const res = await uploadFile(file, { exclude_category: '정규직' });
       setResult(res);
+      loadUploads();
     } catch (err: any) {
       setError(err.message || "업로드 중 오류가 발생했습니다.");
     } finally {
@@ -184,6 +192,48 @@ export default function UploadPage() {
           </div>
         </div>
       )}
+
+      {/* Upload History */}
+      <div className="mt-8 bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">업로드 기록</h3>
+        </div>
+        {uploads.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">업로드된 파일이 없습니다.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="py-2 px-4 font-medium text-gray-600">파일명</th>
+                  <th className="py-2 px-4 font-medium text-gray-600 text-right">레코드 수</th>
+                  <th className="py-2 px-4 font-medium text-gray-600">업로드 일시</th>
+                  <th className="py-2 px-4 font-medium text-gray-600 text-center">관리</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {uploads.map((u: any) => (
+                  <tr key={u.id} className="hover:bg-gray-50">
+                    <td className="py-2.5 px-4 font-medium text-gray-900">{u.original_filename || u.filename}</td>
+                    <td className="py-2.5 px-4 text-right text-gray-700">{u.record_count}건</td>
+                    <td className="py-2.5 px-4 text-gray-500 text-xs">{u.uploaded_at ? new Date(u.uploaded_at).toLocaleString('ko-KR') : '-'}</td>
+                    <td className="py-2.5 px-4 text-center">
+                      <button
+                        onClick={async () => {
+                          if (!confirm('이 업로드를 삭제하시겠습니까? 관련 데이터도 함께 삭제됩니다.')) return;
+                          try { await deleteUpload(u.id); loadUploads(); } catch (e: any) { alert(e.message); }
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="삭제">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

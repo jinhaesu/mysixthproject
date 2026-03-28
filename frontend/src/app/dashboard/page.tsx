@@ -9,6 +9,9 @@ import {
 import { Calendar, TrendingUp, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
 import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList } from "@/lib/api";
 
+const REGULAR_CATS = ['정규직'];
+const DISPATCH_CATS = ['파견', '알바', '사업소득', '직원'];
+
 // --- Types ---
 interface SummaryRow {
   department: string;
@@ -159,20 +162,31 @@ function DashboardContent() {
       const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
       const [prevY, prevM] = getPrevYearMonth(year, month);
       const prevYearMonth = `${prevY}-${String(prevM).padStart(2, '0')}`;
+      const allowedCats = isRegular ? REGULAR_CATS : DISPATCH_CATS;
 
-      // Fetch confirmed list data (non-정규직 only)
-      const [currentConfirmed, prevConfirmed] = await Promise.all([
+      // Fetch both: confirmed list (priority) + excel data (fallback)
+      const [currentConfirmed, prevConfirmed, excelSummary, excelDaily, prevExcelSummary] = await Promise.all([
         getConfirmedList(yearMonth, '').catch(() => []),
         getConfirmedList(prevYearMonth, '').catch(() => []),
+        getReportSummary(year, month).catch(() => ({ current: [], previous: [] })),
+        getReportDaily(year, month).catch(() => ({ data: [] })),
+        getReportSummary(prevY, prevM).catch(() => ({ current: [], previous: [] })),
       ]);
 
-      // Convert confirmed list to SummaryRow format
+      // Parse excel numbers
+      const parseRow = (r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, regular_hours: parseFloat(r.regular_hours) || 0, overtime_hours: parseFloat(r.overtime_hours) || 0, night_hours: parseFloat(r.night_hours) || 0, attendance_count: parseInt(r.attendance_count) || 0, unique_workers: parseInt(r.unique_workers) || 0, annual_leave_days: parseInt(r.annual_leave_days) || 0 });
+
+      // Filter excel data by category
+      const filterCat = (rows: any[]) => (rows || []).filter((r: any) => allowedCats.some(c => (r.category || '').includes(c))).map(parseRow);
+
+      // Build confirmed summary rows
+      const confirmedNames = new Set<string>();
       const toSummaryRows = (employees: any[]): SummaryRow[] => {
         const groupMap = new Map<string, SummaryRow>();
         for (const emp of (employees || [])) {
-          // Filter by type
           if (isRegular && emp.type !== '정규직') continue;
           if (!isRegular && emp.type === '정규직') continue;
+          confirmedNames.add(emp.name);
           const category = emp.type || '파견';
           const key = `${category}`;
           if (!groupMap.has(key)) {
@@ -189,48 +203,46 @@ function DashboardContent() {
         return Array.from(groupMap.values());
       };
 
-      // Convert to daily data format
-      const toDailyRows = (employees: any[]): DailyRow[] => {
+      const confirmedRows = toSummaryRows(currentConfirmed || []);
+      const prevConfirmedRows = toSummaryRows(prevConfirmed || []);
+
+      // Merge: confirmed rows + filtered excel rows (confirmed takes priority)
+      const excelFiltered = filterCat(excelSummary.current || []);
+      const mergedCurrent = confirmedRows.length > 0 ? confirmedRows : excelFiltered;
+      const excelPrevFiltered = filterCat(excelSummary.previous || []);
+      const mergedPrevious = prevConfirmedRows.length > 0 ? prevConfirmedRows : excelPrevFiltered;
+
+      // Daily data: use confirmed if available, else excel
+      let dailyRows: DailyRow[] = [];
+      if ((currentConfirmed || []).length > 0) {
         const dayMap = new Map<string, DailyRow>();
-        for (const emp of (employees || [])) {
+        for (const emp of (currentConfirmed || [])) {
           if (isRegular && emp.type !== '정규직') continue;
           if (!isRegular && emp.type === '정규직') continue;
           for (const rec of (emp.records || [])) {
             const key = rec.date;
-            if (!dayMap.has(key)) {
-              dayMap.set(key, { date: key, department: '', workplace: '', category: emp.type || '파견', count: 0, total_hours: 0 });
-            }
+            if (!dayMap.has(key)) dayMap.set(key, { date: key, department: '', workplace: '', category: emp.type || '파견', count: 0, total_hours: 0 });
             const d = dayMap.get(key)!;
             d.count += 1;
             d.total_hours += (parseFloat(rec.regular_hours) || 0) + (parseFloat(rec.overtime_hours) || 0);
           }
         }
-        return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-      };
+        dailyRows = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      } else if (excelDaily?.data) {
+        dailyRows = (excelDaily.data || []).filter((r: any) => allowedCats.some(c => (r.category || '').includes(c))).map((r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, count: parseInt(r.count) || 0 }));
+      }
 
-      const currentRows = toSummaryRows(currentConfirmed || []);
-      const previousRows = toSummaryRows(prevConfirmed || []);
-      const dailyRows = toDailyRows(currentConfirmed || []);
-
-      setSummaryData({
-        current: currentRows,
-        previous: previousRows,
-        year, month,
-        prevYear: prevY, prevMonth: prevM,
-        weeklyHolidayHours: { current: {}, previous: {} },
-      });
+      setSummaryData({ current: mergedCurrent, previous: mergedPrevious, year, month, prevYear: prevY, prevMonth: prevM, weeklyHolidayHours: { current: {}, previous: {} } });
       setDailyData({ data: dailyRows, groups: [], categories: [], year, month } as DailyResponse);
-      setTwoMonthsAgoData([]);
+      setTwoMonthsAgoData(filterCat(prevExcelSummary.previous || []));
       setTwoMonthsAgoWHH({});
 
-      // Anomalies from confirmed data
+      // Anomalies
       const anomalyList: any[] = [];
       for (const emp of (currentConfirmed || [])) {
         if (isRegular && emp.type !== '정규직') continue;
         if (!isRegular && emp.type === '정규직') continue;
-        if (emp.overtime_hours > 52) {
-          anomalyList.push({ type: 'overtime', severity: 'high', message: `${emp.name}: 월 연장근로 ${emp.overtime_hours.toFixed(1)}시간 (52시간 초과)` });
-        }
+        if (emp.overtime_hours > 52) anomalyList.push({ type: 'overtime', severity: 'high', message: `${emp.name}: 월 연장근로 ${emp.overtime_hours.toFixed(1)}시간 (52시간 초과)` });
       }
       setAnomalies(anomalyList);
       setAnomalyCount(anomalyList.length);

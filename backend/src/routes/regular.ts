@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms } from '../services/smsService';
 
@@ -1176,18 +1176,38 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
   try {
     const yearMonth = (req.query.year_month as string) || getKSTDate().slice(0, 7);
 
-    // Get confirmed attendance grouped by employee
-    const confirmed = await dbAll(`
-      SELECT employee_name, employee_phone,
-        SUM(regular_hours) as total_regular,
-        SUM(overtime_hours) as total_overtime,
-        SUM(night_hours) as total_night,
-        COUNT(*) as work_days,
-        SUM(CASE WHEN holiday_work = 1 THEN 1 ELSE 0 END) as holiday_days
-      FROM confirmed_attendance
+    // Get all confirmed attendance records (not grouped, need per-day for holiday check)
+    const allRecords = await dbAll(`
+      SELECT * FROM confirmed_attendance
       WHERE year_month = ? AND employee_type = '정규직'
-      GROUP BY employee_name, employee_phone
-    `, yearMonth);
+      ORDER BY employee_name, date
+    `, yearMonth) as any[];
+
+    // Group by employee, reclassify holiday/weekend hours as overtime
+    const empMap = new Map<string, { employee_name: string; employee_phone: string; total_regular: number; total_overtime: number; total_night: number; work_days: number; holiday_days: number; holiday_hours: number }>();
+    for (const rec of allRecords) {
+      if (!empMap.has(rec.employee_name)) {
+        empMap.set(rec.employee_name, { employee_name: rec.employee_name, employee_phone: rec.employee_phone, total_regular: 0, total_overtime: 0, total_night: 0, work_days: 0, holiday_days: 0, holiday_hours: 0 });
+      }
+      const emp = empMap.get(rec.employee_name)!;
+      emp.work_days++;
+      const regH = parseFloat(rec.regular_hours) || 0;
+      const otH = parseFloat(rec.overtime_hours) || 0;
+      const nightH = parseFloat(rec.night_hours) || 0;
+      const totalH = regH + otH;
+
+      if (isHolidayOrWeekend(rec.date)) {
+        // All hours on holidays/weekends count as overtime
+        emp.total_overtime += totalH;
+        emp.holiday_days++;
+        emp.holiday_hours += totalH;
+      } else {
+        emp.total_regular += regH;
+        emp.total_overtime += otH;
+      }
+      emp.total_night += nightH;
+    }
+    const confirmed = Array.from(empMap.values());
 
     // Get salary settings
     const salaries = await dbAll(`
@@ -1203,20 +1223,11 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       WHERE re.is_active = 1
     `) as any[];
 
-    // Get holiday hours (actual hours worked on holidays, not fixed 8h)
-    const holidayDetails = await dbAll(`
-      SELECT employee_name, SUM(regular_hours + overtime_hours) as holiday_hours, COUNT(*) as holiday_days
-      FROM confirmed_attendance
-      WHERE year_month = ? AND employee_type = '정규직' AND holiday_work = 1
-      GROUP BY employee_name
-    `, yearMonth) as any[];
-
     const results = [];
     for (const sal of salaries) {
-      const att = (confirmed as any[]).find(c => c.employee_name === sal.name);
-      const hol = holidayDetails.find(h => h.employee_name === sal.name);
-      const overtimeHours = parseFloat(att?.total_overtime || 0);
-      const holidayHours = parseFloat(hol?.holiday_hours || 0);
+      const att = confirmed.find(c => c.employee_name === sal.name);
+      const overtimeHours = att?.total_overtime || 0;
+      const holidayHours = att?.holiday_hours || 0;
       const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;
       const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
@@ -1242,9 +1253,9 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),
         other_allowance: parseFloat(sal.other_allowance),
         overtime_hourly_rate: hourlyRate,
-        work_days: parseInt(att?.work_days || 0),
+        work_days: att?.work_days || 0,
         overtime_hours: overtimeHours,
-        holiday_days: parseInt(hol?.holiday_days || 0),
+        holiday_days: att?.holiday_days || 0,
         holiday_hours: holidayHours,
         overtime_pay: overtimePay,
         holiday_pay: holidayPay,

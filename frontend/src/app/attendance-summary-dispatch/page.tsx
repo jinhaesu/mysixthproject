@@ -4,6 +4,18 @@ import { useState, useCallback, useEffect } from "react";
 import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2 } from "lucide-react";
 import { getAttendanceSummaryDispatch, confirmAttendance } from "@/lib/api";
 
+const HOLIDAYS: Record<number, string[]> = {
+  2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
+  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-05','2026-05-24','2026-06-06','2026-08-15','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25'],
+  2027: ['2027-01-01','2027-02-05','2027-02-06','2027-02-07','2027-03-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-10-03','2027-10-09','2027-10-14','2027-10-15','2027-10-16','2027-12-25'],
+};
+function isHolidayOrWeekend(dateStr: string): boolean {
+  const d = new Date(dateStr + 'T00:00:00+09:00');
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true;
+  return (HOLIDAYS[d.getFullYear()] || []).includes(dateStr);
+}
+
 const _cache: Record<string, { data: any; time: number }> = {};
 const CACHE_TTL = 3 * 60 * 60 * 1000;
 
@@ -87,10 +99,14 @@ export default function AttendanceSummaryDispatchPage() {
       if (clockIn === '-' && clockOut === '-') continue;
       days++;
       const h = calcHoursFromTimes(clockIn, clockOut);
-      regular += h.regular;
-      overtime += h.overtime;
-      const dow = new Date(date + 'T00:00:00+09:00').getDay();
-      if (dow === 0 || dow === 6) weekend += h.regular + h.overtime;
+      const totalH = h.regular + h.overtime;
+      if (isHolidayOrWeekend(date)) {
+        overtime += totalH;
+        weekend += totalH;
+      } else {
+        regular += h.regular;
+        overtime += h.overtime;
+      }
     }
     return { regular: Math.round(regular*10)/10, overtime: Math.round(overtime*10)/10, weekend: Math.round(weekend*10)/10, days };
   };

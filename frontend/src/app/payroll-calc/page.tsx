@@ -20,10 +20,15 @@ export default function PayrollCalcPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // 30분 단위 내림: 0.1~0.4 → 0, 0.5~0.9 → 0.5
+  const floor30 = (h: number) => Math.floor(h * 2) / 2;
+
   // Recalculate with custom overtime rate
   const results = (data?.results || []).map((r: any) => {
-    const otPay = Math.round((r.overtime_hours || 0) * overtimeRate * 1.5);
-    const holPay = Math.round((r.holiday_hours || 0) * overtimeRate * 1.5);
+    const otHours = floor30(r.overtime_hours || 0);
+    const holHours = floor30(r.holiday_hours || 0);
+    const otPay = Math.round(otHours * overtimeRate * 1.5);
+    const holPay = Math.round(holHours * overtimeRate * 1.5);
     const gross = (r.base_pay || 0) + (r.meal_allowance || 0) + (r.bonus || 0) + (r.position_allowance || 0) + (r.other_allowance || 0) + otPay + holPay;
     const taxBase = (r.base_pay || 0) + (r.meal_allowance || 0);
     const np = Math.round(taxBase * 0.045);
@@ -56,6 +61,9 @@ export default function PayrollCalcPage() {
           정규직 급여 계산
         </h1>
         <p className="text-sm text-gray-500 mt-1">확정 근태 + 기본급 설정 기반 급여 자동 계산</p>
+        <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-xs text-indigo-800">
+          <b>연장/휴일 수당 계산 기준:</b> 시급 × 1.5배 | 연장/휴일 시간은 <b>30분 단위 내림</b> 적용 (0.1~0.4h → 0h, 0.5h = 30분) | 토/일/공휴일 근무 → 전량 연장
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">

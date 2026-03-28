@@ -358,14 +358,18 @@ function DashboardContent() {
     return rates[normCat(category)];
   }, [rates]);
 
+  // 30분 단위 내림
+  const floor30 = (h: number) => Math.floor(h * 2) / 2;
+
   const calcSalary = useCallback((rows: SummaryRow[]) => {
     let total = 0;
     for (const r of rows) {
       const rate = getRateForCategory(r.category);
+      const otH = floor30(r.overtime_hours);
       if (r.shift === "야간") {
-        total += r.regular_hours * rate * 1.5 + r.overtime_hours * rate * 2.0;
+        total += r.regular_hours * rate * 1.5 + otH * rate * 2.0;
       } else {
-        total += r.regular_hours * rate + r.overtime_hours * rate * 1.5;
+        total += r.regular_hours * rate + otH * rate * 1.5;
       }
     }
     return total;
@@ -396,9 +400,10 @@ function DashboardContent() {
         const key = `${catKey}|${r.shift === "야간" ? "야간" : "주간"}`;
         const prev = map.get(key) || { regular_hours: 0, overtime_hours: 0, salary: 0 };
         const rate = getRateForCategory(r.category);
+        const otH = floor30(r.overtime_hours);
         const sal = r.shift === "야간"
-          ? r.regular_hours * rate * 1.5 + r.overtime_hours * rate * 2.0
-          : r.regular_hours * rate + r.overtime_hours * rate * 1.5;
+          ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
+          : r.regular_hours * rate + otH * rate * 1.5;
         map.set(key, {
           regular_hours: prev.regular_hours + r.regular_hours,
           overtime_hours: prev.overtime_hours + r.overtime_hours,
@@ -419,9 +424,10 @@ function DashboardContent() {
     for (const r of summaryData.current) {
       const dept = r.department || "미분류";
       const rate = getRateForCategory(r.category);
+      const otH = floor30(r.overtime_hours);
       const s = r.shift === "야간"
-        ? r.regular_hours * rate * 1.5 + r.overtime_hours * rate * 2.0
-        : r.regular_hours * rate + r.overtime_hours * rate * 1.5;
+        ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
+        : r.regular_hours * rate + otH * rate * 1.5;
       map.set(dept, (map.get(dept) || 0) + s);
     }
     return Array.from(map.entries()).map(([dept, cost]) => ({ dept, cost }));
@@ -467,6 +473,9 @@ function DashboardContent() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{isRegular ? '정규직' : '사업소득(알바)/파견'} 대시보드</h2>
           <p className="text-gray-500 mt-1">근태 데이터를 다양한 관점에서 분석합니다.</p>
+          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-[10px] text-gray-600">
+            연장/휴일 시간: <b>30분 단위 내림</b> (0.1~0.4h → 0h, 0.5h = 30분) | 토/일/공휴일 → 전량 연장 | 수당 = 시급 × 1.5배
+          </div>
         </div>
         <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 px-4 py-2">
           <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft size={20} /></button>

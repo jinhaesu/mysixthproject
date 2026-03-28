@@ -33,9 +33,13 @@ export default function SettlementDispatchPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // 30분 단위 내림: 0.1~0.4 → 0, 0.5~0.9 → 0.5
+  const floor30 = (h: number) => Math.floor(h * 2) / 2;
+
   const calcEmp = (r: any, idx: number) => {
+    const otHours = floor30(r.overtime_hours);
     const basePay = Math.round(r.regular_hours * hourlyRate);
-    const overtimePay = Math.round(r.overtime_hours * hourlyRate * 1.5);
+    const overtimePay = Math.round(otHours * hourlyRate * 1.5);
     const whPay = Math.round(r.weekly_holiday_hours * hourlyRate);
     const grossPay = basePay + overtimePay + whPay;
     const meal = mealDeductions[idx] || 0;
@@ -66,6 +70,9 @@ export default function SettlementDispatchPage() {
           <Calculator className="w-6 h-6 text-blue-600" />
           파견 정산관리
         </h1>
+        <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+          <b>연장/휴일 수당 계산 기준:</b> 시간당 급여 × 1.5배 | 연장시간은 <b>30분 단위 내림</b> 적용 (0.1~0.4h → 0h, 0.5h = 30분)
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">

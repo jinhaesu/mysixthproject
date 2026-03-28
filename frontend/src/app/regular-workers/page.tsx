@@ -36,6 +36,10 @@ interface Employee {
   role: string;
   status: string;
   workplace_id: number | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  id_number?: string | null;
+  name_en?: string | null;
 }
 
 interface Pagination {
@@ -349,6 +353,9 @@ export default function RegularWorkersPage() {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">부서</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">조</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">직책</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">은행</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">계좌번호</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">주민번호</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">상태</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">계약서</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-600">관리</th>
@@ -378,6 +385,9 @@ export default function RegularWorkersPage() {
                         {emp.role || "-"}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-gray-700">{emp.bank_name || "-"}</td>
+                    <td className="px-4 py-3 text-gray-700">{emp.bank_account || "-"}</td>
+                    <td className="px-4 py-3 text-gray-700">{emp.id_number ? "●●●●●●-●●●●●●●" : "-"}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${

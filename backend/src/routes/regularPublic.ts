@@ -119,6 +119,31 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/regular-public/:token/personal-info - Save personal info
+router.post('/:token/personal-info', async (req: Request, res: Response) => {
+  try {
+    const token = req.params.token as string;
+    const { name_en, id_number, bank_name, bank_account } = req.body;
+
+    if (!id_number || !bank_name || !bank_account) {
+      res.status(400).json({ error: '주민번호, 은행명, 계좌번호는 필수입니다.' });
+      return;
+    }
+
+    const employee = await dbGet('SELECT * FROM regular_employees WHERE token = ? AND is_active = 1', token) as any;
+    if (!employee) { res.status(403).json({ error: '접근 권한이 없습니다.' }); return; }
+
+    await dbRun(
+      'UPDATE regular_employees SET name_en = ?, id_number = ?, bank_name = ?, bank_account = ?, personal_info_completed = 1, updated_at = NOW() WHERE token = ?',
+      name_en || '', id_number, bank_name, bank_account, token
+    );
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/regular-public/:token - Get employee info + today's state
 router.get('/:token', async (req: Request, res: Response) => {
   try {
@@ -197,6 +222,11 @@ router.get('/:token', async (req: Request, res: Response) => {
         department: employee.department,
         team: employee.team,
         role: employee.role,
+        name_en: employee.name_en || '',
+        id_number: employee.id_number || '',
+        bank_name: employee.bank_name || '',
+        bank_account: employee.bank_account || '',
+        personal_info_completed: employee.personal_info_completed || 0,
       },
       workplace: employee.workplace_id ? {
         name: employee.workplace_name,

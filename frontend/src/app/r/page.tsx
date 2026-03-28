@@ -519,6 +519,14 @@ function RegularContent() {
   // Safety agreement (daily)
   const [agreementAccepted, setAgreementAccepted] = useState(false);
 
+  // Personal info gate
+  const [personalInfoDone, setPersonalInfoDone] = useState(false);
+  const [piNameEn, setPiNameEn] = useState("");
+  const [piIdNumber, setPiIdNumber] = useState("");
+  const [piBankName, setPiBankName] = useState("");
+  const [piBankAccount, setPiBankAccount] = useState("");
+  const [piSaving, setPiSaving] = useState(false);
+
   // Phone verification
   const [phoneInput, setPhoneInput] = useState("");
   const [otpSent, setOtpSent] = useState(false);
@@ -571,6 +579,8 @@ function RegularContent() {
         result.role = result.employee.role;
       }
       setData(result as RegularPublicData);
+      if (result.employee?.personal_info_completed) setPersonalInfoDone(true);
+      if (result.employee?.name_en) setPiNameEn(result.employee.name_en);
 
       // Auto-expand all departments for org chart
       if (result.org_chart && result.org_chart.length) {
@@ -722,6 +732,25 @@ function RegularContent() {
     }
   };
 
+  // ── Personal info save ─────────────────────────────────────────
+  const handleSavePersonalInfo = async () => {
+    if (!piIdNumber.trim() || !piBankName || !piBankAccount.trim()) {
+      alert("주민번호, 은행명, 계좌번호를 입력해주세요.");
+      return;
+    }
+    setPiSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/personal-info`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name_en: piNameEn, id_number: piIdNumber, bank_name: piBankName, bank_account: piBankAccount }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error);
+      setPersonalInfoDone(true);
+    } catch (err: any) { alert(err.message); }
+    finally { setPiSaving(false); }
+  };
+
   // ── Clock-in (simple, no personal info form) ──────────────────
   const handleClockIn = async () => {
     if (!agreementAccepted) return;
@@ -836,7 +865,7 @@ function RegularContent() {
   const gpsReady = gpsStatus === "acquired";
   const canAct = hasWorkplace && gpsReady && isWithinRadius;
   const contractMissing = data && (data as any).contractMissing;
-  const showForm = (data.status === "ready" || data.status === "clocked_in") && !contractMissing;
+  const showForm = (data.status === "ready" || data.status === "clocked_in") && !contractMissing && personalInfoDone;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -906,6 +935,46 @@ function RegularContent() {
             <p className="text-sm text-red-600 mt-2">근로계약서가 체결되지 않아 출근할 수 없습니다.</p>
             <p className="text-sm text-red-600 mt-1">근로계약서 작성 후 출퇴근을 시작할 수 있습니다.</p>
             <p className="text-xs text-red-500 mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
+          </div>
+        )}
+
+        {/* Personal Info Required */}
+        {data && !personalInfoDone && (data.status as string) !== "deactivated" && !(data as any).contractMissing && (
+          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <div className="flex items-center gap-2 text-indigo-700 mb-2">
+              <Users className="w-5 h-5" />
+              <h2 className="font-semibold">{t(lang, "personalInfo") || "개인정보 입력"}</h2>
+            </div>
+            <p className="text-sm text-gray-600">출퇴근 기록을 위해 개인정보를 먼저 입력해주세요. (최초 1회)</p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">영문이름</label>
+              <input type="text" value={piNameEn} onChange={e => setPiNameEn(e.target.value)} placeholder="Hong Gildong"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">주민번호 <span className="text-red-500">*</span></label>
+              <input type="password" value={piIdNumber} onChange={e => setPiIdNumber(e.target.value)} placeholder="000000-0000000"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" inputMode="numeric" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">은행명 <span className="text-red-500">*</span></label>
+              <select value={piBankName} onChange={e => setPiBankName(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base bg-white">
+                <option value="">은행 선택</option>
+                {["국민은행","신한은행","우리은행","하나은행","농협은행","기업은행","카카오뱅크","토스뱅크","SC제일은행","대구은행","부산은행","경남은행","광주은행","전북은행","제주은행","새마을금고","신협","우체국","수협은행"].map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">계좌번호 <span className="text-red-500">*</span></label>
+              <input type="text" value={piBankAccount} onChange={e => setPiBankAccount(e.target.value)} placeholder="계좌번호 입력"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" inputMode="numeric" />
+            </div>
+
+            <button onClick={handleSavePersonalInfo} disabled={piSaving || !piIdNumber.trim() || !piBankName || !piBankAccount.trim()}
+              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-gray-300">
+              {piSaving ? "저장 중..." : "개인정보 저장"}
+            </button>
           </div>
         )}
 

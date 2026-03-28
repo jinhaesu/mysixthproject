@@ -505,6 +505,8 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS bank_name TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS bank_account TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS id_number TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS name_en TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS personal_info_completed INTEGER DEFAULT 0"); } catch {}
 
   // Regular employee vacation requests
   try {

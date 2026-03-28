@@ -436,7 +436,7 @@ async function calcWeeklyHolidayHours(monthStart: string, monthEnd: string): Pro
   const records = await dbAll(`
     SELECT name, category, date
     FROM attendance_records
-    WHERE date >= ? AND date <= ?
+    WHERE date >= ? AND date <= ? AND upload_id NOT LIKE 'survey-%'
   `, queryStart, queryEnd) as { name: string; category: string; date: string }[];
 
   const normCat = (c: string): string => {
@@ -505,7 +505,7 @@ router.get('/report/summary', async (req: Request, res: Response) => {
         ROUND(SUM(COALESCE(night_hours, 0))::numeric, 1) as night_hours,
         SUM(CASE WHEN annual_leave IS NOT NULL AND annual_leave != '' AND annual_leave != '0' AND annual_leave != '미사용' THEN 1 ELSE 0 END) as annual_leave_days
       FROM attendance_records
-      WHERE date >= ? AND date <= ?
+      WHERE date >= ? AND date <= ? AND upload_id NOT LIKE 'survey-%'
       GROUP BY department, workplace, category, COALESCE(NULLIF(shift, ''), '주간')
       ORDER BY department, workplace, category, COALESCE(NULLIF(shift, ''), '주간')
     `;
@@ -548,7 +548,7 @@ router.get('/report/daily', async (req: Request, res: Response) => {
         COUNT(*) as count,
         ROUND(SUM(total_hours)::numeric, 1) as total_hours
       FROM attendance_records
-      WHERE date >= ? AND date <= ?
+      WHERE date >= ? AND date <= ? AND upload_id NOT LIKE 'survey-%'
       GROUP BY date, department, workplace, category
       ORDER BY date, department, workplace, category
     `;

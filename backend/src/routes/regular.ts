@@ -940,4 +940,53 @@ router.get('/contracts', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// ===== Password Management =====
+
+// GET /api/regular/admin-password - Check if password is set
+router.get('/admin-password', async (req: AuthRequest, res: Response) => {
+  try {
+    const setting = await dbGet("SELECT value FROM admin_settings WHERE key = 'contract_password'") as any;
+    res.json({ has_password: !!(setting?.value) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/admin-password - Set password (only lion9080@joinandjoin.com)
+router.post('/admin-password', async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.email !== 'lion9080@joinandjoin.com') {
+      res.status(403).json({ error: '권한이 없습니다. lion9080@joinandjoin.com만 접근 가능합니다.' });
+      return;
+    }
+    const { password } = req.body;
+    if (!password) { res.status(400).json({ error: '비밀번호를 입력해주세요.' }); return; }
+
+    const existing = await dbGet("SELECT id FROM admin_settings WHERE key = 'contract_password'");
+    if (existing) {
+      await dbRun("UPDATE admin_settings SET value = ?, updated_at = NOW() WHERE key = 'contract_password'", password);
+    } else {
+      await dbRun("INSERT INTO admin_settings (key, value) VALUES ('contract_password', ?)", password);
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/verify-password - Verify contract password
+router.post('/verify-password', async (req: AuthRequest, res: Response) => {
+  try {
+    const { password } = req.body;
+    const setting = await dbGet("SELECT value FROM admin_settings WHERE key = 'contract_password'") as any;
+    if (!setting?.value) {
+      res.json({ verified: true }); // No password set, allow access
+      return;
+    }
+    res.json({ verified: setting.value === password });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

@@ -79,6 +79,8 @@ export default function RegularWorkersPage() {
   const [sendingContractId, setSendingContractId] = useState<number | null>(null);
   const [contractMap, setContractMap] = useState<Record<number, { status: string; token: string }>>({});
   const [contractModal, setContractModal] = useState<any>(null);
+  const [contractPassword, setContractPassword] = useState("");
+  const [passwordVerified, setPasswordVerified] = useState(false);
   const [contractForm, setContractForm] = useState({
     work_start_date: new Date().toLocaleDateString('sv-SE'),
     department: '',
@@ -220,6 +222,23 @@ export default function RegularWorkersPage() {
   function updateForm(field: string, value: string | number | null) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
+
+  const verifyContractPassword = async (): Promise<boolean> => {
+    if (passwordVerified) return true;
+    const pw = prompt("계약서 접근 비밀번호를 입력해주세요:");
+    if (!pw) return false;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || '')}/api/regular/verify-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password: pw }),
+      });
+      const body = await res.json();
+      if (body.verified) { setPasswordVerified(true); return true; }
+      alert("비밀번호가 일치하지 않습니다.");
+      return false;
+    } catch { return false; }
+  };
 
   return (
     <div>
@@ -371,11 +390,11 @@ export default function RegularWorkersPage() {
                     </td>
                     <td className="px-4 py-3">
                       {contractMap[emp.id]?.status === "signed" ? (
-                        <a href={`/regular-contract?token=${contractMap[emp.id].token}`} target="_blank" rel="noopener noreferrer"
+                        <button onClick={async (e) => { e.stopPropagation(); if (!(await verifyContractPassword())) return; window.open(`/regular-contract?token=${contractMap[emp.id].token}`, '_blank'); }}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer transition-colors"
                           title="클릭하여 계약서 열람">
                           <FileCheck size={11} /> 체결 (열람)
-                        </a>
+                        </button>
                       ) : contractMap[emp.id]?.status === "pending" ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700">
                           <FileText size={11} /> 발송됨
@@ -430,7 +449,7 @@ export default function RegularWorkersPage() {
                           링크
                         </button>
                         <button
-                          onClick={() => { setContractModal(emp); setContractForm({...contractForm, department: emp.department || ''}); }}
+                          onClick={async () => { if (!(await verifyContractPassword())) return; setContractModal(emp); setContractForm({...contractForm, department: emp.department || ''}); }}
                           disabled={sendingContractId === emp.id}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-purple-50 text-purple-600 text-xs font-medium disabled:opacity-50"
                           title="계약서 발송"

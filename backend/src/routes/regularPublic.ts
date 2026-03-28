@@ -94,7 +94,7 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
 router.post('/contract/:token/sign', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const { address, signature_data, birth_date, id_number, consent_signed } = req.body;
+    const { address, signature_data, birth_date, id_number, consent_signed, consent_signature_data } = req.body;
     if (!address || !signature_data) { res.status(400).json({ error: '주소와 서명은 필수입니다.' }); return; }
 
     const contract = await dbGet('SELECT * FROM regular_labor_contracts WHERE token = ?', token) as any;
@@ -102,8 +102,8 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
     if (contract.status === 'signed') { res.status(400).json({ error: '이미 서명된 계약서입니다.' }); return; }
 
     await dbRun(
-      'UPDATE regular_labor_contracts SET address = ?, signature_data = ?, birth_date = ?, id_number = ?, consent_signed = ?, status = ? WHERE token = ?',
-      address, signature_data, birth_date || '', id_number || '', consent_signed ? 1 : 0, 'signed', token
+      'UPDATE regular_labor_contracts SET address = ?, signature_data = ?, birth_date = ?, id_number = ?, consent_signed = ?, consent_signature_data = ?, status = ? WHERE token = ?',
+      address, signature_data, birth_date || '', id_number || '', consent_signed ? 1 : 0, consent_signature_data || '', 'signed', token
     );
 
     // Send confirmation SMS with contract view link

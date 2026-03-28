@@ -23,6 +23,7 @@ import {
   UserCheck,
   Shield,
   HardHat,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -78,6 +79,7 @@ const bottomItems: NavItem[] = [
   { href: "/org-chart", label: "조직도", icon: Network },
   { href: "/payroll", label: "급여 계산", icon: Calculator },
   { href: "/manage", label: "데이터 관리", icon: Database },
+  { href: "/password-manage", label: "비밀번호 관리", icon: Lock },
 ];
 
 export default function Sidebar() {

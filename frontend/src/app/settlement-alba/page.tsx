@@ -97,7 +97,25 @@ export default function SettlementAlbaPage() {
       ) : rows.length > 0 ? (
         <div className="bg-white rounded-xl border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-[10px]">
+            <table className="w-full text-[10px] table-fixed">
+              <colgroup>
+                <col className="w-[70px]" />{/* 이름 */}
+                <col className="w-[55px]" />{/* 은행 */}
+                <col className="w-[90px]" />{/* 계좌 */}
+                <col className="w-[80px]" />{/* 주민번호 */}
+                <col className="w-[28px]" />{/* 일 */}
+                <col className="w-[38px]" />{/* 기본h */}
+                <col className="w-[38px]" />{/* 연장h */}
+                <col className="w-[38px]" />{/* 주휴h */}
+                <col className="w-[65px]" />{/* 기본급 */}
+                <col className="w-[65px]" />{/* 연장수당 */}
+                <col className="w-[65px]" />{/* 주휴수당 */}
+                <col className="w-[70px]" />{/* 급여계 */}
+                <col className="w-[65px]" />{/* 식대 */}
+                <col className="w-[60px]" />{/* 소득세 */}
+                <col className="w-[55px]" />{/* 지방세 */}
+                <col className="w-[75px]" />{/* 실지급 */}
+              </colgroup>
               <thead>
                 <tr className="bg-gray-50 text-left">
                   <th className="py-2 px-1.5">이름</th>
@@ -112,19 +130,19 @@ export default function SettlementAlbaPage() {
                   <th className="py-2 px-1.5 text-right">연장수당</th>
                   <th className="py-2 px-1.5 text-right">주휴수당</th>
                   <th className="py-2 px-1.5 text-right">급여계</th>
-                  <th className="py-2 px-1.5 text-right w-20">식대공제</th>
-                  <th className="py-2 px-1.5 text-right">소득세 3.3%</th>
-                  <th className="py-2 px-1.5 text-right">지방세 0.33%</th>
+                  <th className="py-2 px-1.5 text-right">식대공제</th>
+                  <th className="py-2 px-1.5 text-right">소득세</th>
+                  <th className="py-2 px-1.5 text-right">지방세</th>
                   <th className="py-2 px-1.5 text-right font-bold text-green-700">실지급</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {rows.map((r: any) => (
                   <tr key={r.idx} className="hover:bg-gray-50">
-                    <td className="py-1.5 px-1.5 font-medium text-gray-900 whitespace-nowrap">{r.name}</td>
-                    <td className="py-1.5 px-1.5 text-gray-500">{r.bank_name || '-'}</td>
-                    <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px]">{r.bank_account || '-'}</td>
-                    <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px]">{r.id_number || '-'}</td>
+                    <td className="py-1.5 px-1.5 font-medium text-gray-900 truncate">{r.name}</td>
+                    <td className="py-1.5 px-1.5 text-gray-500 truncate">{r.bank_name || '-'}</td>
+                    <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px] truncate">{r.bank_account || '-'}</td>
+                    <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px] truncate">{r.id_number || '-'}</td>
                     <td className="py-1.5 px-1.5 text-right">{r.work_days}</td>
                     <td className="py-1.5 px-1.5 text-right">{r.regular_hours}</td>
                     <td className="py-1.5 px-1.5 text-right text-amber-700">{r.overtime_hours}</td>
@@ -135,7 +153,7 @@ export default function SettlementAlbaPage() {
                     <td className="py-1.5 px-1.5 text-right font-medium">{fmt.format(r.grossPay)}</td>
                     <td className="py-1.5 px-1.5">
                       <input type="number" value={mealDeductions[r.idx] || ''} onChange={e => setMealDeductions({...mealDeductions, [r.idx]: parseInt(e.target.value) || 0})}
-                        className="w-16 px-1 py-0.5 border border-gray-200 rounded text-[10px] text-right" placeholder="0" />
+                        className="w-full px-1 py-0.5 border border-gray-200 rounded text-[10px] text-right" placeholder="0" />
                     </td>
                     <td className="py-1.5 px-1.5 text-right text-red-500">{fmt.format(r.incomeTax)}</td>
                     <td className="py-1.5 px-1.5 text-right text-red-500">{fmt.format(r.localTax)}</td>
@@ -145,19 +163,19 @@ export default function SettlementAlbaPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-orange-50 border-t-2 border-orange-200 font-bold text-[10px]">
-                  <td className="py-2 px-1.5 text-orange-900" colSpan={3}>합계 ({rows.length}명)</td>
+                  <td className="py-2 px-1.5 text-orange-900" colSpan={4}>합계 ({rows.length}명)</td>
                   <td className="py-2 px-1.5 text-right">{totals.work_days}</td>
                   <td className="py-2 px-1.5 text-right">{(totals.regular_hours || 0).toFixed(1)}</td>
                   <td className="py-2 px-1.5 text-right">{(totals.overtime_hours || 0).toFixed(1)}</td>
                   <td className="py-2 px-1.5 text-right">{totals.weekly_holiday_hours || 0}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.basePay)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.overtimePay)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.whPay)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.grossPay)}</td>
-                  <td className="py-2 px-1.5 text-right text-red-600">{fmt.format(totals.meal)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.incomeTax)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.localTax)}</td>
-                  <td className="py-2 px-1.5 text-right text-green-800">{fmt.format(totals.netPay)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.basePay || 0)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.overtimePay || 0)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.whPay || 0)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.grossPay || 0)}</td>
+                  <td className="py-2 px-1.5 text-right text-red-600">{fmt.format(totals.meal || 0)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.incomeTax || 0)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.localTax || 0)}</td>
+                  <td className="py-2 px-1.5 text-right text-green-800">{fmt.format(totals.netPay || 0)}</td>
                 </tr>
               </tfoot>
             </table>

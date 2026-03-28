@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
-import { dbGet, dbAll, dbRun, getKSTDate } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, isHolidayOrWeekend, isKoreanHoliday } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendSurveyMessage, sendGeneralSms } from '../services/smsService';
 
@@ -1432,21 +1432,29 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       emp.work_days++;
       const regH = parseFloat(r.regular_hours) || 0;
       const otH = parseFloat(r.overtime_hours) || 0;
+      const nightH = parseFloat(r.night_hours) || 0;
+      const totalH = regH + otH;
+
+      // Check if holiday (공휴일 or 주말)
+      const isHoliday = isHolidayOrWeekend(r.date);
+      const isPublicHoliday = isKoreanHoliday(r.date);
+
       emp.regular_hours += regH;
       emp.overtime_hours += otH;
-      emp.night_hours += parseFloat(r.night_hours) || 0;
-      if (r.holiday_work) emp.holiday_hours += regH + otH;
-      emp.records.push(r);
+      emp.night_hours += nightH;
+      emp.records.push({ ...r, isHoliday, isPublicHoliday });
 
-      // Weekly tracking for 주휴수당
+      // Weekly tracking for 주휴수당 and holiday pay rules
       const d = new Date(r.date + 'T00:00:00+09:00');
       const weekStart = new Date(d);
       weekStart.setDate(d.getDate() - d.getDay());
       const weekKey = weekStart.toISOString().slice(0, 10);
-      if (!emp.weekly_data.has(weekKey)) emp.weekly_data.set(weekKey, { days: 0, hours: 0 });
+      if (!emp.weekly_data.has(weekKey)) emp.weekly_data.set(weekKey, { days: 0, hours: 0, hasHoliday: false, holidayHours: 0, publicHolidayHours: 0 });
       const w = emp.weekly_data.get(weekKey)!;
       w.days++;
-      w.hours += regH + otH;
+      w.hours += totalH;
+      if (isHoliday) { w.hasHoliday = true; w.holidayHours += totalH; }
+      if (isPublicHoliday) w.publicHolidayHours += totalH;
     }
 
     // Get bank info + id_number + category from workers table
@@ -1462,8 +1470,15 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
     for (const [, emp] of empMap) {
       // 주휴수당 qualifying weeks: 15h+ and 5+ days
       let weeklyHolidayWeeks = 0;
+      let holidayPayHours = 0; // 휴일수당 시간
       for (const [, w] of emp.weekly_data) {
         if (w.hours >= 15 && w.days >= 5) weeklyHolidayWeeks++;
+        // 공휴일은 무조건 휴일수당
+        holidayPayHours += w.publicHolidayHours || 0;
+        // 주 5일 초과 + 휴일 포함 시 → 주말 근무 전체가 휴일수당 (공휴일 제외, 이미 포함)
+        if (w.days > 5 && w.hasHoliday) {
+          holidayPayHours += Math.max((w.holidayHours || 0) - (w.publicHolidayHours || 0), 0);
+        }
       }
       const weeklyHolidayHours = weeklyHolidayWeeks * 8;
 
@@ -1483,6 +1498,7 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
         night_hours: Math.round(emp.night_hours * 100) / 100,
         weekly_holiday_weeks: weeklyHolidayWeeks,
         weekly_holiday_hours: weeklyHolidayHours,
+        holiday_pay_hours: Math.round(holidayPayHours * 100) / 100,
       });
     }
 

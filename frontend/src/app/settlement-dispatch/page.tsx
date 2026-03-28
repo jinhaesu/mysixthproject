@@ -56,10 +56,14 @@ export default function SettlementDispatchPage() {
 
   const calcEmp = (r: any, idx: number) => {
     const otHours = floor30(r.overtime_hours);
+    const holHours = floor30(r.holiday_pay_hours || 0);
+    const nightHours = floor30(r.night_hours || 0);
     const basePay = Math.round(r.regular_hours * hourlyRate);
     const overtimePay = Math.round(otHours * hourlyRate * 1.5);
+    const holidayPay = Math.round(holHours * hourlyRate * 1.5);
+    const nightPay = Math.round(nightHours * hourlyRate * 1.5);
     const whPay = Math.round(r.weekly_holiday_hours * hourlyRate);
-    const grossPay = basePay + overtimePay + whPay;
+    const grossPay = basePay + overtimePay + holidayPay + nightPay + whPay;
     const meal = mealDeductions[idx] || 0;
     const net = grossPay - meal;
     const np = Math.round(net * 0.0475);
@@ -91,7 +95,7 @@ export default function SettlementDispatchPage() {
           파견 정산관리
         </h1>
         <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
-          <b>연장/휴일 수당 계산 기준:</b> 시간당 급여 × 1.5배 | 연장시간은 <b>30분 단위 내림</b> 적용 (0.1~0.4h → 0h, 0.5h = 30분)
+          <b>수당 계산 기준:</b> 시급 × 1.5배 | <b>30분 단위 내림</b> (0.1~0.4h→0, 0.5h=30분) | 주5일 이하 휴일근무→휴일수당 없음 | 주5일 초과+휴일→휴일수당 | 공휴일→무조건 휴일수당 | 야간(22~06시)→연장수당
         </div>
       </div>
 

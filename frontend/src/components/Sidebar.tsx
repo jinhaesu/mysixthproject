@@ -93,6 +93,7 @@ const bottomItems: NavItem[] = [
   { href: "/org-chart", label: "조직도", icon: Network },
   { href: "/manage", label: "데이터 관리", icon: Database },
   { href: "/password-manage", label: "비밀번호 관리", icon: Lock },
+  { href: "/policy", label: "반영기준", icon: ClipboardList },
 ];
 
 export default function Sidebar() {

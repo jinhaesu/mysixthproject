@@ -989,4 +989,138 @@ router.post('/verify-password', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ===== Attendance Summary =====
+
+// GET /api/regular/attendance-summary - Monthly attendance summary (planned vs actual)
+router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year, month } = req.query as Record<string, string>;
+    if (!year || !month) { res.status(400).json({ error: 'year, month 필요' }); return; }
+
+    const startDate = `${year}-${month.padStart(2,'0')}-01`;
+    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    const endDate = `${year}-${month.padStart(2,'0')}-${lastDay}`;
+
+    // Get all active employees with their attendance
+    const employees = await dbAll('SELECT id, name, phone, department, team FROM regular_employees WHERE is_active = 1 ORDER BY department, team, name') as any[];
+
+    const result = [];
+    for (const emp of employees) {
+      // Actual attendance
+      const actuals = await dbAll(
+        'SELECT date, clock_in_time, clock_out_time FROM regular_attendance WHERE employee_id = ? AND date >= ? AND date <= ? ORDER BY date',
+        emp.id, startDate, endDate
+      );
+
+      // Planned shifts
+      const shifts = await dbAll(`
+        SELECT rs.planned_clock_in, rs.planned_clock_out, rs.days_of_week, rs.day_of_week
+        FROM regular_shift_assignments rsa
+        JOIN regular_shifts rs ON rsa.shift_id = rs.id
+        WHERE rsa.employee_id = ? AND rs.is_active = 1
+      `, emp.id);
+
+      result.push({
+        id: emp.id,
+        name: emp.name,
+        phone: emp.phone,
+        department: emp.department,
+        team: emp.team,
+        actuals: actuals,
+        shifts: shifts,
+        actual_days: actuals.length,
+      });
+    }
+
+    res.json({ employees: result, startDate, endDate });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/attendance-confirm - Confirm attendance records
+router.post('/attendance-confirm', async (req: AuthRequest, res: Response) => {
+  try {
+    const { records } = req.body;
+    if (!records || !Array.isArray(records)) { res.status(400).json({ error: 'records 배열 필요' }); return; }
+
+    let confirmed = 0;
+    for (const r of records) {
+      try {
+        const existing = await dbGet(
+          "SELECT id FROM confirmed_attendance WHERE employee_type = ? AND employee_name = ? AND date = ?",
+          r.employee_type || '정규직', r.employee_name, r.date
+        );
+        if (existing) {
+          await dbRun(
+            `UPDATE confirmed_attendance SET confirmed_clock_in = ?, confirmed_clock_out = ?, source = ?, regular_hours = ?, overtime_hours = ?, night_hours = ?, break_hours = ?, holiday_work = ?, memo = ?, confirmed_at = NOW() WHERE id = ?`,
+            r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours || 1, r.holiday_work || 0, r.memo || '', (existing as any).id
+          );
+        } else {
+          await dbRun(
+            `INSERT INTO confirmed_attendance (employee_type, employee_name, employee_phone, date, confirmed_clock_in, confirmed_clock_out, source, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo, year_month)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            r.employee_type || '정규직', r.employee_name, r.employee_phone || '', r.date, r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours || 1, r.holiday_work || 0, r.memo || '', r.year_month || r.date.slice(0, 7)
+          );
+        }
+        confirmed++;
+      } catch {}
+    }
+    res.json({ success: true, confirmed });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/confirmed-list - Get confirmed attendance list
+router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year_month, employee_type } = req.query as Record<string, string>;
+    let where = 'WHERE 1=1';
+    const params: any[] = [];
+    if (year_month) { where += ' AND year_month = ?'; params.push(year_month); }
+    if (employee_type) { where += ' AND employee_type = ?'; params.push(employee_type); }
+
+    const records = await dbAll(`SELECT * FROM confirmed_attendance ${where} ORDER BY employee_name, date`, ...params);
+
+    // Summarize by employee
+    const empMap = new Map<string, any>();
+    for (const r of records as any[]) {
+      if (!empMap.has(r.employee_name)) {
+        empMap.set(r.employee_name, {
+          name: r.employee_name, phone: r.employee_phone, type: r.employee_type,
+          days: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, break_hours: 0, holiday_days: 0,
+          records: []
+        });
+      }
+      const emp = empMap.get(r.employee_name)!;
+      emp.days++;
+      emp.regular_hours += parseFloat(r.regular_hours) || 0;
+      emp.overtime_hours += parseFloat(r.overtime_hours) || 0;
+      emp.night_hours += parseFloat(r.night_hours) || 0;
+      emp.break_hours += parseFloat(r.break_hours) || 0;
+      emp.holiday_days += r.holiday_work ? 1 : 0;
+      emp.records.push(r);
+    }
+
+    res.json(Array.from(empMap.values()));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/regular/confirmed-list/:id - Update single confirmed record
+router.put('/confirmed-list/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { confirmed_clock_in, confirmed_clock_out, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo } = req.body;
+    await dbRun(
+      `UPDATE confirmed_attendance SET confirmed_clock_in = ?, confirmed_clock_out = ?, regular_hours = ?, overtime_hours = ?, night_hours = ?, break_hours = ?, holiday_work = ?, memo = ?, confirmed_at = NOW() WHERE id = ?`,
+      confirmed_clock_in, confirmed_clock_out, regular_hours || 0, overtime_hours || 0, night_hours || 0, break_hours || 1, holiday_work || 0, memo || '', req.params.id
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

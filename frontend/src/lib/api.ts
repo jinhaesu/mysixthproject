@@ -557,3 +557,19 @@ export async function sendRegularContract(employeeId: number, data?: any) {
 export async function getRegularContracts() {
   return fetchAPI<any[]>('/api/regular/contracts');
 }
+
+// ===== Attendance Summary =====
+export async function getAttendanceSummaryRegular(year: number, month: number) {
+  return fetchAPI<any>(`/api/regular/attendance-summary?year=${year}&month=${month}`);
+}
+export async function confirmAttendance(records: any[]) {
+  return fetchAPI<any>('/api/regular/attendance-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ records }) });
+}
+export async function getConfirmedList(yearMonth: string, employeeType?: string) {
+  const params = new URLSearchParams({ year_month: yearMonth });
+  if (employeeType) params.set('employee_type', employeeType);
+  return fetchAPI<any[]>(`/api/regular/confirmed-list?${params}`);
+}
+export async function updateConfirmedRecord(id: number, data: any) {
+  return fetchAPI<any>(`/api/regular/confirmed-list/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}

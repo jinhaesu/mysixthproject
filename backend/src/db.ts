@@ -622,6 +622,31 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Confirmed attendance records
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS confirmed_attendance (
+        id SERIAL PRIMARY KEY,
+        employee_type TEXT NOT NULL,
+        employee_name TEXT NOT NULL,
+        employee_phone TEXT DEFAULT '',
+        date TEXT NOT NULL,
+        confirmed_clock_in TEXT DEFAULT '',
+        confirmed_clock_out TEXT DEFAULT '',
+        source TEXT DEFAULT 'planned',
+        regular_hours NUMERIC(5,2) DEFAULT 0,
+        overtime_hours NUMERIC(5,2) DEFAULT 0,
+        night_hours NUMERIC(5,2) DEFAULT 0,
+        break_hours NUMERIC(5,2) DEFAULT 1,
+        holiday_work INTEGER DEFAULT 0,
+        memo TEXT DEFAULT '',
+        confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+        year_month TEXT NOT NULL,
+        UNIQUE(employee_type, employee_name, date)
+      )
+    `);
+  } catch {}
+
   console.log('Database initialized successfully');
 }
 

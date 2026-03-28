@@ -620,7 +620,7 @@ router.post('/remind', async (req: AuthRequest, res: Response) => {
 
 // GET /api/survey/responses
 router.get('/responses', async (req: AuthRequest, res: Response) => {
-  const { startDate, endDate, phone, status, workplace, page = '1', limit = '50' } = req.query as Record<string, string>;
+  const { startDate, endDate, phone, name, status, workplace, page = '1', limit = '50' } = req.query as Record<string, string>;
 
   let where = 'WHERE 1=1';
   const params: any[] = [];
@@ -628,6 +628,7 @@ router.get('/responses', async (req: AuthRequest, res: Response) => {
   if (startDate) { where += ' AND sr.date >= ?'; params.push(startDate); }
   if (endDate) { where += ' AND sr.date <= ?'; params.push(endDate); }
   if (phone) { where += ' AND sr.phone LIKE ?'; params.push(`%${phone}%`); }
+  if (name) { where += ' AND resp.worker_name_ko LIKE ?'; params.push(`%${name}%`); }
   if (status) { where += ' AND sr.status = ?'; params.push(status); }
   if (workplace) { where += ' AND sr.workplace_id = ?'; params.push(workplace); }
 

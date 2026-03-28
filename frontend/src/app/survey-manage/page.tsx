@@ -729,6 +729,16 @@ function ResponsesTab() {
             />
           </div>
           <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">이름</label>
+            <input
+              type="text"
+              value={filters.name}
+              onChange={(e) => setFilters({ ...filters, name: e.target.value })}
+              placeholder="이름 검색..."
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">상태</label>
             <select
               value={filters.status}

@@ -1222,6 +1222,9 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     // Get salary settings
     const salaries = await dbAll(`
       SELECT re.name, re.phone, re.department, re.team, re.hire_date,
+             COALESCE(re.bank_name, '') as bank_name,
+             COALESCE(re.bank_account, '') as bank_account,
+             COALESCE(re.id_number, '') as id_number,
              COALESCE(ss.base_pay, 0) as base_pay,
              COALESCE(ss.meal_allowance, 0) as meal_allowance,
              COALESCE(ss.bonus, 0) as bonus,
@@ -1259,6 +1262,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
 
       results.push({
         name: sal.name, phone: sal.phone, department: sal.department, team: sal.team, hire_date: sal.hire_date,
+        bank_name: sal.bank_name || '', bank_account: sal.bank_account || '', id_number: sal.id_number || '',
         base_pay: parseFloat(sal.base_pay), meal_allowance: parseFloat(sal.meal_allowance),
         bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),
         other_allowance: parseFloat(sal.other_allowance),

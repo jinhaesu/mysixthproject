@@ -218,118 +218,96 @@ export default function AttendanceSummaryRegularPage() {
       {loading ? (
         <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
       ) : data?.employees?.length > 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left">
-                <th className="py-2 px-3 w-8">
-                  <input type="checkbox"
-                    checked={checkedEmps.size === data.employees.length}
-                    onChange={e => setCheckedEmps(e.target.checked ? new Set(data.employees.map((e: any) => e.id)) : new Set())}
-                    className="rounded border-gray-300" />
-                </th>
-                <th className="py-2 px-4 font-medium text-gray-600">이름</th>
-                <th className="py-2 px-4 font-medium text-gray-600">부서</th>
-                <th className="py-2 px-4 font-medium text-gray-600 text-right">출근일</th>
-                <th className="py-2 px-4 font-medium text-gray-600 text-right">기본(h)</th>
-                <th className="py-2 px-4 font-medium text-gray-600 text-right">연장(h)</th>
-                <th className="py-2 px-4 font-medium text-gray-600 text-right">주말(h)</th>
-                <th className="py-2 px-3 w-8"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {data.employees.map((emp: any) => {
-                const summary = getEmpSummary(emp);
-                const expanded = expandedEmp === emp.id;
-                return (
-                  <tr key={emp.id} className={`${checkedEmps.has(emp.id) ? 'bg-indigo-50/50' : ''}`}>
-                    <td className="py-2.5 px-3" onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={checkedEmps.has(emp.id)}
-                        onChange={e => { const n = new Set(checkedEmps); if (e.target.checked) n.add(emp.id); else n.delete(emp.id); setCheckedEmps(n); }}
-                        className="rounded border-gray-300" />
-                    </td>
-                    <td className="py-2.5 px-4 font-medium text-gray-900 cursor-pointer" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>{emp.name}</td>
-                    <td className="py-2.5 px-4 text-gray-500 text-xs">{emp.department} {emp.team}</td>
-                    <td className="py-2.5 px-4 text-right text-gray-700">{summary.days}</td>
-                    <td className="py-2.5 px-4 text-right text-blue-700 font-medium">{summary.regular}</td>
-                    <td className="py-2.5 px-4 text-right text-amber-700 font-medium">{summary.overtime}</td>
-                    <td className="py-2.5 px-4 text-right text-red-600 font-medium">{summary.weekend}</td>
-                    <td className="py-2.5 px-3 cursor-pointer" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>
-                      {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Expanded detail */}
-          {expandedEmp && (() => {
-            const emp = data.employees.find((e: any) => e.id === expandedEmp);
-            if (!emp) return null;
+        <div className="space-y-2">
+          {data.employees.map((emp: any) => {
+            const summary = getEmpSummary(emp);
+            const expanded = expandedEmp === emp.id;
             return (
-              <div className="border-t-2 border-indigo-200 bg-indigo-50/30">
-                <div className="px-4 py-2 bg-indigo-100/50">
-                  <span className="text-sm font-semibold text-indigo-800">{emp.name} 일별 상세</span>
+              <div key={emp.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {/* Employee Row */}
+                <div className={`flex items-center px-4 py-3 hover:bg-gray-50 ${checkedEmps.has(emp.id) ? 'bg-indigo-50/50' : ''}`}>
+                  <div className="mr-3" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={checkedEmps.has(emp.id)}
+                      onChange={e => { const n = new Set(checkedEmps); if (e.target.checked) n.add(emp.id); else n.delete(emp.id); setCheckedEmps(n); }}
+                      className="rounded border-gray-300" />
+                  </div>
+                  <button className="flex-1 flex items-center justify-between" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-gray-900">{emp.name}</span>
+                      <span className="text-xs text-gray-500">{emp.department} {emp.team}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-gray-600">{summary.days}일</span>
+                      <span className="text-blue-700 font-medium">기본 {summary.regular}h</span>
+                      <span className="text-amber-700 font-medium">연장 {summary.overtime}h</span>
+                      <span className="text-red-600 font-medium">주말 {summary.weekend}h</span>
+                      {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    </div>
+                  </button>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 text-left">
-                        <th className="py-2 px-3 w-8"></th>
-                        <th className="py-2 px-3">날짜</th>
-                        <th className="py-2 px-3">요일</th>
-                        <th className="py-2 px-3 text-blue-600">계획출근</th>
-                        <th className="py-2 px-3 text-blue-600">계획퇴근</th>
-                        <th className="py-2 px-3 text-green-600">실제출근</th>
-                        <th className="py-2 px-3 text-green-600">실제퇴근</th>
-                        <th className="py-2 px-3">기준</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {allDates.map(date => {
-                        const actual = emp.actuals.find((a: any) => a.date === date);
-                        const planned = getPlannedForDay(emp.shifts, date);
-                        if (!actual && !planned) return null;
-                        const key = `${emp.id}|${date}`;
-                        const actualIn = formatTime(actual?.clock_in_time);
-                        const actualOut = formatTime(actual?.clock_out_time);
-                        const plannedIn = planned?.in || '-';
-                        const plannedOut = planned?.out || '-';
-                        const diffIn = timeDiffHours(plannedIn, actualIn);
-                        const diffOut = timeDiffHours(plannedOut, actualOut);
-                        const isAnomaly = (diffIn >= 3 || diffOut >= 3) && actual;
-                        const dow = ['일','월','화','수','목','금','토'][new Date(date + 'T00:00:00+09:00').getDay()];
-                        const source = selectedSource[key] || 'planned';
-                        return (
-                          <tr key={date} className={isAnomaly ? 'bg-red-50' : 'bg-white'}>
-                            <td className="py-1.5 px-3">
-                              <input type="checkbox" checked={checkedRows.has(key)}
-                                onChange={e => { const n = new Set(checkedRows); if (e.target.checked) n.add(key); else n.delete(key); setCheckedRows(n); }}
-                                className="rounded border-gray-300" />
-                            </td>
-                            <td className="py-1.5 px-3 text-gray-700">{date.slice(5)}</td>
-                            <td className={`py-1.5 px-3 ${new Date(date+'T00:00:00+09:00').getDay() === 0 ? 'text-red-500' : new Date(date+'T00:00:00+09:00').getDay() === 6 ? 'text-blue-500' : 'text-gray-500'}`}>{dow}</td>
-                            <td className="py-1.5 px-3 text-blue-700">{plannedIn}</td>
-                            <td className="py-1.5 px-3 text-blue-700">{plannedOut}</td>
-                            <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualIn}</td>
-                            <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualOut}</td>
-                            <td className="py-1.5 px-3">
-                              <select value={source} onChange={e => setSelectedSource({...selectedSource, [key]: e.target.value as any})}
-                                className="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-white">
-                                <option value="planned">계획</option>
-                                <option value="actual">실제</option>
-                              </select>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+
+                {/* Expanded Detail */}
+                {expanded && (
+                  <div className="border-t border-indigo-200 bg-indigo-50/20 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 text-left">
+                          <th className="py-2 px-3 w-8"></th>
+                          <th className="py-2 px-3">날짜</th>
+                          <th className="py-2 px-3">요일</th>
+                          <th className="py-2 px-3 text-blue-600">계획출근</th>
+                          <th className="py-2 px-3 text-blue-600">계획퇴근</th>
+                          <th className="py-2 px-3 text-green-600">실제출근</th>
+                          <th className="py-2 px-3 text-green-600">실제퇴근</th>
+                          <th className="py-2 px-3">기준</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {allDates.map(date => {
+                          const actual = emp.actuals.find((a: any) => a.date === date);
+                          const planned = getPlannedForDay(emp.shifts, date);
+                          if (!actual && !planned) return null;
+                          const key = `${emp.id}|${date}`;
+                          const actualIn = formatTime(actual?.clock_in_time);
+                          const actualOut = formatTime(actual?.clock_out_time);
+                          const plannedIn = planned?.in || '-';
+                          const plannedOut = planned?.out || '-';
+                          const diffIn = timeDiffHours(plannedIn, actualIn);
+                          const diffOut = timeDiffHours(plannedOut, actualOut);
+                          const isAnomaly = (diffIn >= 3 || diffOut >= 3) && actual;
+                          const dowNum = new Date(date + 'T00:00:00+09:00').getDay();
+                          const dow = ['일','월','화','수','목','금','토'][dowNum];
+                          const source = selectedSource[key] || 'planned';
+                          return (
+                            <tr key={date} className={isAnomaly ? 'bg-red-50' : 'bg-white'}>
+                              <td className="py-1.5 px-3">
+                                <input type="checkbox" checked={checkedRows.has(key)}
+                                  onChange={e => { const n = new Set(checkedRows); if (e.target.checked) n.add(key); else n.delete(key); setCheckedRows(n); }}
+                                  className="rounded border-gray-300" />
+                              </td>
+                              <td className="py-1.5 px-3 text-gray-700">{date.slice(5)}</td>
+                              <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-red-500 font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-gray-500'}`}>{dow}</td>
+                              <td className="py-1.5 px-3 text-blue-700">{plannedIn}</td>
+                              <td className="py-1.5 px-3 text-blue-700">{plannedOut}</td>
+                              <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualIn}</td>
+                              <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualOut}</td>
+                              <td className="py-1.5 px-3">
+                                <select value={source} onChange={e => setSelectedSource({...selectedSource, [key]: e.target.value as any})}
+                                  className="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-white">
+                                  <option value="planned">계획</option>
+                                  <option value="actual">실제</option>
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             );
-          })()}
+          })}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">데이터가 없습니다.</div>

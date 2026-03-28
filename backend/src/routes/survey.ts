@@ -1343,4 +1343,111 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ===== Settlement (정산) =====
+
+// GET /api/survey/settlement - Calculate settlement for dispatch or alba
+router.get('/settlement', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year_month, type, division } = req.query as Record<string, string>;
+    if (!year_month) { res.status(400).json({ error: 'year_month 필요' }); return; }
+
+    // type: 'dispatch' (파견) or 'alba' (알바/사업소득)
+    const targetTypes = type === 'alba' ? ['알바', '사업소득'] : ['파견'];
+
+    // Get all confirmed records for the month
+    const allRecords = await dbAll(
+      'SELECT * FROM confirmed_attendance WHERE year_month = ? ORDER BY employee_name, date',
+      year_month
+    ) as any[];
+
+    // Filter by type
+    let records = allRecords.filter(r => targetTypes.some(t => (r.employee_type || '').includes(t)));
+
+    // Filter by division (생산/물류) if specified
+    if (division && division !== 'all') {
+      // We need worker info - check if there's department/workplace info
+      // For now, filter by memo or employee data from survey responses
+      // Simple approach: check if employee_name has division info stored
+    }
+
+    // Group by employee
+    const empMap = new Map<string, any>();
+    for (const r of records) {
+      if (!empMap.has(r.employee_name)) {
+        empMap.set(r.employee_name, {
+          name: r.employee_name,
+          phone: r.employee_phone || '',
+          type: r.employee_type || '',
+          work_days: 0,
+          regular_hours: 0,
+          overtime_hours: 0,
+          night_hours: 0,
+          holiday_hours: 0,
+          records: [],
+          weekly_data: new Map<string, { days: number; hours: number }>(),
+        });
+      }
+      const emp = empMap.get(r.employee_name)!;
+      emp.work_days++;
+      const regH = parseFloat(r.regular_hours) || 0;
+      const otH = parseFloat(r.overtime_hours) || 0;
+      emp.regular_hours += regH;
+      emp.overtime_hours += otH;
+      emp.night_hours += parseFloat(r.night_hours) || 0;
+      if (r.holiday_work) emp.holiday_hours += regH + otH;
+      emp.records.push(r);
+
+      // Weekly tracking for 주휴수당
+      const d = new Date(r.date + 'T00:00:00+09:00');
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - d.getDay());
+      const weekKey = weekStart.toISOString().slice(0, 10);
+      if (!emp.weekly_data.has(weekKey)) emp.weekly_data.set(weekKey, { days: 0, hours: 0 });
+      const w = emp.weekly_data.get(weekKey)!;
+      w.days++;
+      w.hours += regH + otH;
+    }
+
+    // Get bank info from workers table
+    const workers = await dbAll('SELECT phone, bank_name, bank_account, name_ko FROM workers') as any[];
+    const workerMap = new Map<string, any>();
+    for (const w of workers) {
+      workerMap.set(w.phone, w);
+      if (w.name_ko) workerMap.set(w.name_ko, w);
+    }
+
+    // Calculate settlement per employee
+    const results = [];
+    for (const [, emp] of empMap) {
+      // 주휴수당 qualifying weeks: 15h+ and 5+ days
+      let weeklyHolidayWeeks = 0;
+      for (const [, w] of emp.weekly_data) {
+        if (w.hours >= 15 && w.days >= 5) weeklyHolidayWeeks++;
+      }
+      const weeklyHolidayHours = weeklyHolidayWeeks * 8;
+
+      // Bank info
+      const workerInfo = workerMap.get(emp.phone) || workerMap.get(emp.name) || {};
+
+      results.push({
+        name: emp.name,
+        phone: emp.phone,
+        type: emp.type,
+        bank_name: workerInfo.bank_name || '',
+        bank_account: workerInfo.bank_account || '',
+        work_days: emp.work_days,
+        regular_hours: Math.round(emp.regular_hours * 100) / 100,
+        overtime_hours: Math.round(emp.overtime_hours * 100) / 100,
+        night_hours: Math.round(emp.night_hours * 100) / 100,
+        weekly_holiday_weeks: weeklyHolidayWeeks,
+        weekly_holiday_hours: weeklyHolidayHours,
+      });
+    }
+
+    res.json({ year_month, type, results });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

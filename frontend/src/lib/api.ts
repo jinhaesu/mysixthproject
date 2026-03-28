@@ -587,3 +587,7 @@ export async function updateSalarySettings(employeeId: number, data: any) {
 export async function getPayrollCalc(yearMonth: string) {
   return fetchAPI<any>(`/api/regular/payroll-calc?year_month=${yearMonth}`);
 }
+
+export async function getSettlement(yearMonth: string, type: string) {
+  return fetchAPI<any>(`/api/survey/settlement?year_month=${yearMonth}&type=${type}`);
+}

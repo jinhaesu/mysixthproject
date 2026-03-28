@@ -71,6 +71,8 @@ const groups: NavGroup[] = [
       { href: "/confirmed-list-dispatch", label: "근태 정보 확정 리스트", icon: Table2 },
       { href: "/dashboard?type=dispatch", label: "대시보드", icon: BarChart3 },
       { href: "/upload", label: "엑셀 업로드", icon: UploadCloud },
+      { href: "/settlement-dispatch", label: "파견 정산관리", icon: Calculator },
+      { href: "/settlement-alba", label: "알바(사업소득) 정산관리", icon: Calculator },
     ],
   },
   {

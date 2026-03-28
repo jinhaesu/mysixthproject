@@ -164,20 +164,11 @@ function DashboardContent() {
       const prevYearMonth = `${prevY}-${String(prevM).padStart(2, '0')}`;
       const allowedCats = isRegular ? REGULAR_CATS : DISPATCH_CATS;
 
-      // Fetch both: confirmed list (priority) + excel data (fallback)
-      const [currentConfirmed, prevConfirmed, excelSummary, excelDaily, prevExcelSummary] = await Promise.all([
+      // Fetch confirmed list data only
+      const [currentConfirmed, prevConfirmed] = await Promise.all([
         getConfirmedList(yearMonth, '').catch(() => []),
         getConfirmedList(prevYearMonth, '').catch(() => []),
-        getReportSummary(year, month).catch(() => ({ current: [], previous: [] })),
-        getReportDaily(year, month).catch(() => ({ data: [] })),
-        getReportSummary(prevY, prevM).catch(() => ({ current: [], previous: [] })),
       ]);
-
-      // Parse excel numbers
-      const parseRow = (r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, regular_hours: parseFloat(r.regular_hours) || 0, overtime_hours: parseFloat(r.overtime_hours) || 0, night_hours: parseFloat(r.night_hours) || 0, attendance_count: parseInt(r.attendance_count) || 0, unique_workers: parseInt(r.unique_workers) || 0, annual_leave_days: parseInt(r.annual_leave_days) || 0 });
-
-      // Filter excel data by category
-      const filterCat = (rows: any[]) => (rows || []).filter((r: any) => allowedCats.some(c => (r.category || '').includes(c))).map(parseRow);
 
       // Build confirmed summary rows
       const confirmedNames = new Set<string>();
@@ -206,35 +197,28 @@ function DashboardContent() {
       const confirmedRows = toSummaryRows(currentConfirmed || []);
       const prevConfirmedRows = toSummaryRows(prevConfirmed || []);
 
-      // Merge: confirmed rows + filtered excel rows (confirmed takes priority)
-      const excelFiltered = filterCat(excelSummary.current || []);
-      const mergedCurrent = confirmedRows.length > 0 ? confirmedRows : excelFiltered;
-      const excelPrevFiltered = filterCat(excelSummary.previous || []);
-      const mergedPrevious = prevConfirmedRows.length > 0 ? prevConfirmedRows : excelPrevFiltered;
+      // Use confirmed data only
+      const mergedCurrent = confirmedRows;
+      const mergedPrevious = prevConfirmedRows;
 
-      // Daily data: use confirmed if available, else excel
-      let dailyRows: DailyRow[] = [];
-      if ((currentConfirmed || []).length > 0) {
-        const dayMap = new Map<string, DailyRow>();
-        for (const emp of (currentConfirmed || [])) {
-          if (isRegular && emp.type !== '정규직') continue;
-          if (!isRegular && emp.type === '정규직') continue;
-          for (const rec of (emp.records || [])) {
-            const key = rec.date;
-            if (!dayMap.has(key)) dayMap.set(key, { date: key, department: '', workplace: '', category: emp.type || '파견', count: 0, total_hours: 0 });
-            const d = dayMap.get(key)!;
-            d.count += 1;
-            d.total_hours += (parseFloat(rec.regular_hours) || 0) + (parseFloat(rec.overtime_hours) || 0);
-          }
+      // Daily data from confirmed only
+      const dayMap = new Map<string, DailyRow>();
+      for (const emp of (currentConfirmed || [])) {
+        if (isRegular && emp.type !== '정규직') continue;
+        if (!isRegular && emp.type === '정규직') continue;
+        for (const rec of (emp.records || [])) {
+          const key = rec.date;
+          if (!dayMap.has(key)) dayMap.set(key, { date: key, department: '', workplace: '', category: emp.type || '파견', count: 0, total_hours: 0 });
+          const d = dayMap.get(key)!;
+          d.count += 1;
+          d.total_hours += (parseFloat(rec.regular_hours) || 0) + (parseFloat(rec.overtime_hours) || 0);
         }
-        dailyRows = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-      } else if (excelDaily?.data) {
-        dailyRows = (excelDaily.data || []).filter((r: any) => allowedCats.some(c => (r.category || '').includes(c))).map((r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, count: parseInt(r.count) || 0 }));
       }
+      const dailyRows = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
       setSummaryData({ current: mergedCurrent, previous: mergedPrevious, year, month, prevYear: prevY, prevMonth: prevM, weeklyHolidayHours: { current: {}, previous: {} } });
       setDailyData({ data: dailyRows, groups: [], categories: [], year, month } as DailyResponse);
-      setTwoMonthsAgoData(filterCat(prevExcelSummary.previous || []));
+      setTwoMonthsAgoData([]);
       setTwoMonthsAgoWHH({});
 
       // Anomalies

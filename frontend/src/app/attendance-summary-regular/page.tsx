@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2 } from "lucide-react";
 import { getAttendanceSummaryRegular, confirmAttendance } from "@/lib/api";
 
 export default function AttendanceSummaryRegularPage() {
@@ -13,15 +13,24 @@ export default function AttendanceSummaryRegularPage() {
   const [selectedSource, setSelectedSource] = useState<Record<string, 'planned' | 'actual'>>({});
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
-  // Batch controls
   const [checkedEmps, setCheckedEmps] = useState<Set<number>>(new Set());
   const [batchSource, setBatchSource] = useState<'planned' | 'actual'>('planned');
   const [rangeStart, setRangeStart] = useState(1);
   const [rangeEnd, setRangeEnd] = useState(31);
+  const [viewMode, setViewMode] = useState<'actual' | 'planned'>('actual');
+  const [hiddenEmps, setHiddenEmps] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const d = await getAttendanceSummaryRegular(year, month); setData(d); } catch (e: any) { alert(e.message); }
+    try {
+      const d = await getAttendanceSummaryRegular(year, month);
+      // Filter: only keep employees who have actual attendance
+      if (d?.employees) {
+        d.employees = d.employees.filter((e: any) => e.actuals && e.actuals.length > 0);
+      }
+      setData(d);
+      setHiddenEmps(new Set());
+    } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [year, month]);
 
@@ -50,27 +59,24 @@ export default function AttendanceSummaryRegularPage() {
   };
 
   const calcHoursFromTimes = (clockIn: string, clockOut: string) => {
-    if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return { regular: 0, overtime: 0, weekend: 0 };
+    if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return { regular: 0, overtime: 0 };
     const [h1,m1] = clockIn.split(':').map(Number);
     const [h2,m2] = clockOut.split(':').map(Number);
-    if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0, weekend: 0 };
+    if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0 };
     const total = Math.max(((h2*60+(m2||0)) - (h1*60+(m1||0))) / 60 - 1, 0);
-    return { regular: Math.min(total, 8), overtime: Math.max(total - 8, 0), weekend: 0 };
+    return { regular: Math.min(total, 8), overtime: Math.max(total - 8, 0) };
   };
 
-  // Calculate employee summary
-  const getEmpSummary = (emp: any) => {
+  const getEmpSummary = (emp: any, mode: 'actual' | 'planned') => {
     let regular = 0, overtime = 0, weekend = 0, days = 0;
-    for (const date of allDates) {
-      const actual = emp.actuals.find((a: any) => a.date === date);
+    for (const actual of emp.actuals) {
+      const date = actual.date;
       const planned = getPlannedForDay(emp.shifts, date);
-      if (!actual && !planned) continue;
+      const clockIn = mode === 'planned' && planned ? planned.in : formatTime(actual.clock_in_time);
+      const clockOut = mode === 'planned' && planned ? planned.out : formatTime(actual.clock_out_time);
+      if (clockIn === '-' && clockOut === '-') continue;
       days++;
-      const plannedIn = planned?.in || '-';
-      const plannedOut = planned?.out || '-';
-      const actualIn = formatTime(actual?.clock_in_time);
-      const actualOut = formatTime(actual?.clock_out_time);
-      const h = calcHoursFromTimes(actual ? actualIn : plannedIn, actual ? actualOut : plannedOut);
+      const h = calcHoursFromTimes(clockIn, clockOut);
       regular += h.regular;
       overtime += h.overtime;
       const dow = new Date(date + 'T00:00:00+09:00').getDay();
@@ -101,12 +107,7 @@ export default function AttendanceSummaryRegularPage() {
         const clockIn = source === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
         const clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
         const h = calcHoursFromTimes(clockIn, clockOut);
-        records.push({
-          employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone,
-          date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut,
-          source, regular_hours: h.regular, overtime_hours: h.overtime,
-          break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}`
-        });
+        records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
       }
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
@@ -115,7 +116,6 @@ export default function AttendanceSummaryRegularPage() {
     finally { setConfirming(false); }
   };
 
-  // Batch confirm for selected employees
   const handleBatchConfirm = async () => {
     if (checkedEmps.size === 0) return alert("직원을 선택해주세요.");
     setConfirming(true);
@@ -123,28 +123,20 @@ export default function AttendanceSummaryRegularPage() {
       const records: any[] = [];
       const startDate = `${year}-${String(month).padStart(2,'0')}-${String(rangeStart).padStart(2,'0')}`;
       const endDate = `${year}-${String(month).padStart(2,'0')}-${String(rangeEnd).padStart(2,'0')}`;
-
       for (const empId of Array.from(checkedEmps)) {
         const emp = data?.employees?.find((e: any) => e.id === empId);
         if (!emp) continue;
-        for (const date of allDates) {
-          if (date < startDate || date > endDate) continue;
-          const actual = emp.actuals.find((a: any) => a.date === date);
-          const planned = getPlannedForDay(emp.shifts, date);
-          if (!actual && !planned) continue;
-          const clockIn = batchSource === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
-          const clockOut = batchSource === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
+        for (const actual of emp.actuals) {
+          if (actual.date < startDate || actual.date > endDate) continue;
+          const planned = getPlannedForDay(emp.shifts, actual.date);
+          const clockIn = batchSource === 'actual' ? formatTime(actual.clock_in_time) : (planned?.in || formatTime(actual.clock_in_time));
+          const clockOut = batchSource === 'actual' ? formatTime(actual.clock_out_time) : (planned?.out || formatTime(actual.clock_out_time));
           if (clockIn === '-' && clockOut === '-') continue;
           const h = calcHoursFromTimes(clockIn, clockOut);
-          records.push({
-            employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone,
-            date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut,
-            source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime,
-            break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}`
-          });
+          records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
         }
       }
-      if (records.length === 0) return alert("해당 기간에 데이터가 없습니다.");
+      if (records.length === 0) return alert("해당 기간에 출근 데이터가 없습니다.");
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
       setCheckedEmps(new Set());
@@ -152,6 +144,7 @@ export default function AttendanceSummaryRegularPage() {
     finally { setConfirming(false); }
   };
 
+  const visibleEmployees = data?.employees?.filter((e: any) => !hiddenEmps.has(e.id)) || [];
   const lastDay = new Date(year, month, 0).getDate();
 
   return (
@@ -161,10 +154,9 @@ export default function AttendanceSummaryRegularPage() {
           <ClipboardList className="w-6 h-6 text-indigo-600" />
           정규직 근태 정보 종합 요약
         </h1>
-        <p className="text-sm text-gray-500 mt-1">계획 출퇴근과 실제 출퇴근을 비교하고 확정합니다.</p>
+        <p className="text-sm text-gray-500 mt-1">실제 출퇴근 기록이 있는 직원만 표시됩니다.</p>
       </div>
 
-      {/* Controls */}
       <div className="flex flex-wrap gap-3 items-end mb-4">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
@@ -176,34 +168,43 @@ export default function AttendanceSummaryRegularPage() {
             {Array.from({length:12}, (_,i) => <option key={i+1} value={i+1}>{i+1}월</option>)}
           </select>
         </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">시간 보기</label>
+          <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value="actual">실제 기준</option>
+            <option value="planned">계획 기준</option>
+          </select>
+        </div>
         <button onClick={load} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
 
-      {/* Batch Actions */}
-      {data?.employees?.length > 0 && (
+      {visibleEmployees.length > 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4 flex flex-wrap gap-3 items-end">
+          <button onClick={() => {
+            if (checkedEmps.size === visibleEmployees.length) setCheckedEmps(new Set());
+            else setCheckedEmps(new Set(visibleEmployees.map((e: any) => e.id)));
+          }} className="px-3 py-1.5 bg-white border border-indigo-300 rounded-lg text-xs font-medium text-indigo-700 hover:bg-indigo-100">
+            {checkedEmps.size === visibleEmployees.length ? '전체 해제' : '전체 선택'}
+          </button>
           <div>
             <label className="block text-xs font-medium text-indigo-700 mb-1">기간</label>
             <div className="flex items-center gap-1">
-              <input type="number" min={1} max={lastDay} value={rangeStart} onChange={e => setRangeStart(parseInt(e.target.value) || 1)}
-                className="px-2 py-1.5 border border-indigo-300 rounded text-sm w-14 text-center" />
+              <input type="number" min={1} max={lastDay} value={rangeStart} onChange={e => setRangeStart(parseInt(e.target.value) || 1)} className="px-2 py-1.5 border border-indigo-300 rounded text-sm w-14 text-center" />
               <span className="text-indigo-600">~</span>
-              <input type="number" min={1} max={lastDay} value={rangeEnd} onChange={e => setRangeEnd(parseInt(e.target.value) || lastDay)}
-                className="px-2 py-1.5 border border-indigo-300 rounded text-sm w-14 text-center" />
+              <input type="number" min={1} max={lastDay} value={rangeEnd} onChange={e => setRangeEnd(parseInt(e.target.value) || lastDay)} className="px-2 py-1.5 border border-indigo-300 rounded text-sm w-14 text-center" />
               <span className="text-xs text-indigo-500">일</span>
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-indigo-700 mb-1">기준</label>
-            <select value={batchSource} onChange={e => setBatchSource(e.target.value as any)}
-              className="px-3 py-1.5 border border-indigo-300 rounded-lg text-sm bg-white">
+            <select value={batchSource} onChange={e => setBatchSource(e.target.value as any)} className="px-3 py-1.5 border border-indigo-300 rounded-lg text-sm bg-white">
               <option value="planned">계획 출퇴근</option>
               <option value="actual">실제 출퇴근</option>
             </select>
           </div>
           <button onClick={handleBatchConfirm} disabled={confirming || checkedEmps.size === 0}
             className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 flex items-center gap-1">
-            <Check className="w-4 h-4" /> 선택 {checkedEmps.size}명 일괄 확정
+            <Check className="w-4 h-4" /> {checkedEmps.size}명 일괄 확정
           </button>
           {checkedRows.size > 0 && (
             <button onClick={handleConfirmRows} disabled={confirming}
@@ -214,17 +215,15 @@ export default function AttendanceSummaryRegularPage() {
         </div>
       )}
 
-      {/* Employee List */}
       {loading ? (
         <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
-      ) : data?.employees?.length > 0 ? (
+      ) : visibleEmployees.length > 0 ? (
         <div className="space-y-2">
-          {data.employees.map((emp: any) => {
-            const summary = getEmpSummary(emp);
+          {visibleEmployees.map((emp: any) => {
+            const summary = getEmpSummary(emp, viewMode);
             const expanded = expandedEmp === emp.id;
             return (
               <div key={emp.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                {/* Employee Row */}
                 <div className={`flex items-center px-4 py-3 hover:bg-gray-50 ${checkedEmps.has(emp.id) ? 'bg-indigo-50/50' : ''}`}>
                   <div className="mr-3" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checkedEmps.has(emp.id)}
@@ -244,9 +243,12 @@ export default function AttendanceSummaryRegularPage() {
                       {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                     </div>
                   </button>
+                  <button onClick={(e) => { e.stopPropagation(); setHiddenEmps(new Set([...hiddenEmps, emp.id])); }}
+                    className="ml-2 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                {/* Expanded Detail */}
                 {expanded && (
                   <div className="border-t border-indigo-200 bg-indigo-50/20 overflow-x-auto">
                     <table className="w-full text-xs">
@@ -263,18 +265,17 @@ export default function AttendanceSummaryRegularPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {allDates.map(date => {
-                          const actual = emp.actuals.find((a: any) => a.date === date);
+                        {emp.actuals.map((actual: any) => {
+                          const date = actual.date;
                           const planned = getPlannedForDay(emp.shifts, date);
-                          if (!actual && !planned) return null;
                           const key = `${emp.id}|${date}`;
-                          const actualIn = formatTime(actual?.clock_in_time);
-                          const actualOut = formatTime(actual?.clock_out_time);
+                          const actualIn = formatTime(actual.clock_in_time);
+                          const actualOut = formatTime(actual.clock_out_time);
                           const plannedIn = planned?.in || '-';
                           const plannedOut = planned?.out || '-';
                           const diffIn = timeDiffHours(plannedIn, actualIn);
                           const diffOut = timeDiffHours(plannedOut, actualOut);
-                          const isAnomaly = (diffIn >= 3 || diffOut >= 3) && actual;
+                          const isAnomaly = (diffIn >= 3 || diffOut >= 3) && plannedIn !== '-';
                           const dowNum = new Date(date + 'T00:00:00+09:00').getDay();
                           const dow = ['일','월','화','수','목','금','토'][dowNum];
                           const source = selectedSource[key] || 'planned';
@@ -310,7 +311,7 @@ export default function AttendanceSummaryRegularPage() {
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">데이터가 없습니다.</div>
+        <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">해당 월에 출근 기록이 있는 직원이 없습니다.</div>
       )}
     </div>
   );

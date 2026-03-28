@@ -576,6 +576,9 @@ export async function getConfirmedList(yearMonth: string, employeeType?: string)
 export async function updateConfirmedRecord(id: number, data: any) {
   return fetchAPI<any>(`/api/regular/confirmed-list/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
+export async function deleteConfirmedRecord(id: number) {
+  return fetchAPI<any>(`/api/regular/confirmed-list/${id}`, { method: 'DELETE' });
+}
 
 // ===== Salary Settings =====
 export async function getSalarySettings() {

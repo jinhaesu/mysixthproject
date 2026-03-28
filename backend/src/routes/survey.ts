@@ -1359,16 +1359,19 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
     if (!year_month) { res.status(400).json({ error: 'year_month 필요' }); return; }
 
     // type: 'dispatch' (파견) or 'alba' (알바/사업소득)
-    const targetTypes = type === 'alba' ? ['알바', '사업소득'] : ['파견'];
-
     // Get all confirmed records for the month
     const allRecords = await dbAll(
       'SELECT * FROM confirmed_attendance WHERE year_month = ? ORDER BY employee_name, date',
       year_month
     ) as any[];
 
-    // Filter by type
-    let records = allRecords.filter(r => targetTypes.some(t => (r.employee_type || '').includes(t)));
+    // Strict filter by type - exact match
+    let records: any[];
+    if (type === 'alba') {
+      records = allRecords.filter(r => r.employee_type === '알바' || r.employee_type === '사업소득');
+    } else {
+      records = allRecords.filter(r => r.employee_type === '파견');
+    }
 
     // Filter by division (생산/물류) if specified
     if (division && division !== 'all') {

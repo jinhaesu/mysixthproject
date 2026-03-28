@@ -1123,6 +1123,16 @@ router.put('/confirmed-list/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// DELETE /api/regular/confirmed-list/:id - Delete single confirmed record
+router.delete('/confirmed-list/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM confirmed_attendance WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== Salary Settings =====
 
 // GET /api/regular/salary-settings - List all salary settings with employee info

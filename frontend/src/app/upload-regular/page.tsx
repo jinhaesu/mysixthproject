@@ -23,7 +23,7 @@ export default function UploadPage() {
 
     setIsUploading(true);
     try {
-      const res = await uploadFile(file, { exclude_category: '정규직' });
+      const res = await uploadFile(file, { only_category: '정규직' });
       setResult(res);
     } catch (err: any) {
       setError(err.message || "업로드 중 오류가 발생했습니다.");
@@ -58,7 +58,7 @@ export default function UploadPage() {
 
   return (
     <div className="max-w-4xl">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">엑셀 업로드</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">정규직 엑셀 업로드</h2>
       <p className="text-gray-500 mb-8">
         근태 엑셀 파일을 업로드하면 자동으로 데이터를 파싱하고 AI가 분석합니다.
       </p>

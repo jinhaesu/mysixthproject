@@ -51,15 +51,35 @@ router.post('/', upload.single('file'), async (req: Request, res: Response): Pro
     const originalFilename = req.file.originalname;
 
     // Parse Excel
-    const records = parseExcelFile(filePath);
+    const allRecords = parseExcelFile(filePath);
 
-    if (records.length === 0) {
+    if (allRecords.length === 0) {
       res.status(400).json({ error: '유효한 근태 데이터가 없습니다.' });
       return;
     }
 
-    // Analyze with AI
-    const analysis = await analyzeAttendance(records);
+    // Filter by type if specified (exclude_category or only_category)
+    const excludeCategory = (req.query.exclude_category as string) || (req.body?.exclude_category as string) || '';
+    const onlyCategory = (req.query.only_category as string) || (req.body?.only_category as string) || '';
+    let records = allRecords;
+    if (excludeCategory) {
+      records = allRecords.filter(r => !r.category.includes(excludeCategory));
+    } else if (onlyCategory) {
+      records = allRecords.filter(r => r.category.includes(onlyCategory));
+    }
+
+    if (records.length === 0) {
+      res.status(400).json({ error: `필터 적용 후 유효한 데이터가 없습니다. (전체: ${allRecords.length}건)` });
+      return;
+    }
+
+    // Analyze with AI (skip for large files to avoid timeout)
+    let analysis;
+    if (records.length > 1000) {
+      analysis = { duplicates: [], warnings: [], summary: `${records.length}건의 데이터가 업로드되었습니다. (대용량으로 AI 분석 생략)` };
+    } else {
+      analysis = await analyzeAttendance(records);
+    }
 
     // Save upload record
     await dbRun(

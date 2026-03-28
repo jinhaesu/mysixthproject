@@ -79,6 +79,7 @@ const groups: NavGroup[] = [
     icon: Briefcase,
     items: [
       { href: "/payroll-regular", label: "노무비 관리", icon: Calculator },
+      { href: "/upload-regular", label: "엑셀 업로드", icon: UploadCloud },
     ],
   },
 ];

@@ -42,11 +42,17 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // Upload
-export async function uploadFile(file: File): Promise<UploadResponse> {
+export async function uploadFile(file: File, options?: { exclude_category?: string; only_category?: string }): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append('file', file);
 
-  return fetchAPI<UploadResponse>('/api/upload', {
+  let url = '/api/upload';
+  const params = new URLSearchParams();
+  if (options?.exclude_category) params.set('exclude_category', options.exclude_category);
+  if (options?.only_category) params.set('only_category', options.only_category);
+  if (params.toString()) url += '?' + params.toString();
+
+  return fetchAPI<UploadResponse>(url, {
     method: 'POST',
     body: formData,
   });

@@ -904,7 +904,8 @@ function RegularContent() {
             <ShieldAlert className="w-10 h-10 text-red-500 mx-auto mb-2" />
             <h2 className="font-semibold text-red-800">근로계약서 미체결</h2>
             <p className="text-sm text-red-600 mt-2">근로계약서가 체결되지 않아 출근할 수 없습니다.</p>
-            <p className="text-xs text-red-500 mt-1">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
+            <p className="text-sm text-red-600 mt-1">근로계약서 작성 후 출퇴근을 시작할 수 있습니다.</p>
+            <p className="text-xs text-red-500 mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
           </div>
         )}
 

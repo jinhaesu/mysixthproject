@@ -545,8 +545,8 @@ export async function removeShiftAssignment(shiftId: number, employeeId: number)
 export async function getShiftPlan(date: string) {
   return fetchAPI<any>(`/api/regular/shift-plan?date=${date}`);
 }
-export async function sendRegularContract(employeeId: number) {
-  return fetchAPI<any>('/api/regular/contracts/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_id: employeeId }) });
+export async function sendRegularContract(employeeId: number, data?: any) {
+  return fetchAPI<any>('/api/regular/contracts/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_id: employeeId, ...data }) });
 }
 export async function getRegularContracts() {
   return fetchAPI<any[]>('/api/regular/contracts');

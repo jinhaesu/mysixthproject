@@ -78,6 +78,18 @@ export default function RegularWorkersPage() {
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [sendingContractId, setSendingContractId] = useState<number | null>(null);
   const [contractMap, setContractMap] = useState<Record<number, string>>({});
+  const [contractModal, setContractModal] = useState<any>(null);
+  const [contractForm, setContractForm] = useState({
+    work_start_date: new Date().toLocaleDateString('sv-SE'),
+    department: '',
+    position_title: '사원',
+    annual_salary: '',
+    base_pay: '',
+    meal_allowance: '',
+    other_allowance: '',
+    pay_day: '10',
+    work_hours: '09:00~18:00',
+  });
 
   const loadContracts = useCallback(async () => {
     try {
@@ -181,18 +193,17 @@ export default function RegularWorkersPage() {
     }
   }
 
-  async function handleSendContract(id: number) {
-    setSendingContractId(id);
+  const handleSendContract = async () => {
+    if (!contractModal) return;
+    setSendingContractId(contractModal.id);
     try {
-      await sendRegularContract(id);
-      alert("계약서가 발송되었습니다.");
+      await sendRegularContract(contractModal.id, contractForm);
+      alert('근로계약서가 발송되었습니다.');
+      setContractModal(null);
       loadContracts();
-    } catch (err: any) {
-      alert(err.message || "계약서 발송 실패");
-    } finally {
-      setSendingContractId(null);
-    }
-  }
+    } catch (e: any) { alert(e.message); }
+    finally { setSendingContractId(null); }
+  };
 
   async function handleSendLink(id: number) {
     setSendingId(id);
@@ -417,7 +428,7 @@ export default function RegularWorkersPage() {
                           링크
                         </button>
                         <button
-                          onClick={() => handleSendContract(emp.id)}
+                          onClick={() => { setContractModal(emp); setContractForm({...contractForm, department: emp.department || ''}); }}
                           disabled={sendingContractId === emp.id}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-purple-50 text-purple-600 text-xs font-medium disabled:opacity-50"
                           title="계약서 발송"
@@ -466,6 +477,76 @@ export default function RegularWorkersPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Contract Send Modal */}
+      {contractModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto space-y-3">
+            <h3 className="text-lg font-semibold text-gray-900">근로계약서 발송</h3>
+            <p className="text-sm text-gray-500">{contractModal.name} ({contractModal.phone})에게 근로계약서를 발송합니다.</p>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">근로 개시일</label>
+              <input type="date" value={contractForm.work_start_date} onChange={e => setContractForm({...contractForm, work_start_date: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">근무부서</label>
+                <input type="text" value={contractForm.department} onChange={e => setContractForm({...contractForm, department: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">직책</label>
+                <input type="text" value={contractForm.position_title} onChange={e => setContractForm({...contractForm, position_title: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">연봉총액 (원)</label>
+              <input type="text" value={contractForm.annual_salary} onChange={e => setContractForm({...contractForm, annual_salary: e.target.value})}
+                placeholder="예: 30,000,000" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">기본급</label>
+                <input type="text" value={contractForm.base_pay} onChange={e => setContractForm({...contractForm, base_pay: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">식대</label>
+                <input type="text" value={contractForm.meal_allowance} onChange={e => setContractForm({...contractForm, meal_allowance: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">기타수당</label>
+                <input type="text" value={contractForm.other_allowance} onChange={e => setContractForm({...contractForm, other_allowance: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">급여일</label>
+                <input type="text" value={contractForm.pay_day} onChange={e => setContractForm({...contractForm, pay_day: e.target.value})}
+                  placeholder="10" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">근무시간</label>
+                <input type="text" value={contractForm.work_hours} onChange={e => setContractForm({...contractForm, work_hours: e.target.value})}
+                  placeholder="09:00~18:00" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setContractModal(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">취소</button>
+              <button onClick={handleSendContract} disabled={sendingContractId !== null}
+                className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300">
+                {sendingContractId ? '발송 중...' : '계약서 발송'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

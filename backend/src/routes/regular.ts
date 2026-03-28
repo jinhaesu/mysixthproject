@@ -897,7 +897,7 @@ router.get('/employees/resigned', async (_req: AuthRequest, res: Response) => {
 // POST /api/regular/contracts/send - Send contract link to employee
 router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
   try {
-    const { employee_id } = req.body;
+    const { employee_id, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours } = req.body;
     const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ?', employee_id) as any;
     if (!employee) { res.status(404).json({ error: '직원을 찾을 수 없습니다.' }); return; }
 
@@ -907,8 +907,11 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
     const endDate = endYear + today.slice(4);
 
     await dbRun(
-      'INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token) VALUES (?, ?, ?, ?, ?, ?)',
-      employee.id, employee.phone, employee.name, today, endDate, token
+      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      employee.id, employee.phone, employee.name, today, endDate, token,
+      work_start_date || '', department || employee.department || '', position_title || '사원',
+      annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00'
     );
 
     const frontendUrl = process.env.FRONTEND_URL || 'https://mysixthproject.vercel.app';

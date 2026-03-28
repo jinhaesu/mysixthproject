@@ -52,7 +52,6 @@ const groups: NavGroup[] = [
       { href: "/survey-manage", label: "설문 출퇴근", icon: MessageSquare },
       { href: "/workers", label: "근무자 DB", icon: Contact },
       { href: "/weekly-holiday", label: "주휴수당 관리", icon: Shield },
-      { href: "/payroll-dispatch", label: "노무비 관리", icon: Calculator },
     ],
   },
   {
@@ -62,6 +61,23 @@ const groups: NavGroup[] = [
       { href: "/regular-live", label: "실시간 현황판", icon: Activity },
       { href: "/regular-manage", label: "설문 출퇴근", icon: MessageSquare },
       { href: "/regular-workers", label: "근무자 DB", icon: Contact },
+    ],
+  },
+  {
+    label: "사업소득(알바)/파견 노무비",
+    icon: Briefcase,
+    items: [
+      { href: "/payroll-dispatch", label: "노무비 관리", icon: Calculator },
+      { href: "/upload", label: "엑셀 업로드", icon: UploadCloud },
+      { href: "/dashboard", label: "대시보드", icon: BarChart3 },
+      { href: "/pivot", label: "피벗 테이블", icon: Table2 },
+      { href: "/records", label: "기록 조회", icon: ClipboardList },
+    ],
+  },
+  {
+    label: "정규직 노무비",
+    icon: Briefcase,
+    items: [
       { href: "/payroll-regular", label: "노무비 관리", icon: Calculator },
     ],
   },

@@ -504,38 +504,42 @@ export default function RegularWorkersPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">연봉총액 (원)</label>
-              <input type="text" value={contractForm.annual_salary} onChange={e => setContractForm({...contractForm, annual_salary: e.target.value})}
-                placeholder="예: 30,000,000" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">기본급 (월) <span className="text-red-500">*</span></label>
+                <input type="text" value={contractForm.base_pay} onChange={e => {
+                  const bp = e.target.value;
+                  const meal = contractForm.meal_allowance;
+                  const bpNum = parseInt(bp.replace(/[^0-9]/g, '')) || 0;
+                  const mealNum = parseInt(meal.replace(/[^0-9]/g, '')) || 0;
+                  setContractForm({...contractForm, base_pay: bp, annual_salary: ((bpNum + mealNum) * 12).toLocaleString()});
+                }} placeholder="예: 2,000,000" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">식대 (월)</label>
+                <input type="text" value={contractForm.meal_allowance} onChange={e => {
+                  const meal = e.target.value;
+                  const bp = contractForm.base_pay;
+                  const bpNum = parseInt(bp.replace(/[^0-9]/g, '')) || 0;
+                  const mealNum = parseInt(meal.replace(/[^0-9]/g, '')) || 0;
+                  setContractForm({...contractForm, meal_allowance: meal, annual_salary: ((bpNum + mealNum) * 12).toLocaleString()});
+                }} placeholder="예: 200,000" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">기본급</label>
-                <input type="text" value={contractForm.base_pay} onChange={e => setContractForm({...contractForm, base_pay: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">식대</label>
-                <input type="text" value={contractForm.meal_allowance} onChange={e => setContractForm({...contractForm, meal_allowance: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">기타수당</label>
-                <input type="text" value={contractForm.other_allowance} onChange={e => setContractForm({...contractForm, other_allowance: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">연봉총액 (자동계산)</label>
+              <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-medium">
+                {contractForm.annual_salary ? `${contractForm.annual_salary}원` : '기본급+식대 입력 시 자동 계산'}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">급여일</label>
-                <input type="text" value={contractForm.pay_day} onChange={e => setContractForm({...contractForm, pay_day: e.target.value})}
-                  placeholder="10" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">매월 10일</div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">근무시간</label>
-                <input type="text" value={contractForm.work_hours} onChange={e => setContractForm({...contractForm, work_hours: e.target.value})}
-                  placeholder="09:00~18:00" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">09:00 ~ 18:00</div>
               </div>
             </div>
 

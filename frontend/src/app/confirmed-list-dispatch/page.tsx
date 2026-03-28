@@ -69,7 +69,10 @@ export default function ConfirmedListDispatchPage() {
               <tbody className="divide-y divide-gray-100">
                 {data.map((emp: any) => (
                   <tr key={emp.name} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedEmp(expandedEmp === emp.name ? null : emp.name)}>
-                    <td className="py-2.5 px-4 font-medium text-gray-900">{emp.name}</td>
+                    <td className="py-2.5 px-4 font-medium text-gray-900">
+                      {emp.name}
+                      <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-blue-50 text-blue-700' : emp.type === '알바' ? 'bg-orange-50 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{emp.type || '?'}</span>
+                    </td>
                     <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
                     <td className="py-2.5 px-4 text-right">{emp.days}</td>
                     <td className="py-2.5 px-4 text-right text-blue-700">{emp.regular_hours.toFixed(1)}</td>

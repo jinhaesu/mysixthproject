@@ -158,7 +158,7 @@ export default function AttendanceSummaryDispatchPage() {
         const clockIn = source === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
         const clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
         const h = calcHoursFromTimes(clockIn, clockOut);
-        records.push({ employee_type: '파견', employee_name: emp.name, employee_phone: emp.phone, date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
+        records.push({ employee_type: emp.type || '파견', employee_name: emp.name, employee_phone: emp.phone, date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
       }
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
@@ -184,7 +184,7 @@ export default function AttendanceSummaryDispatchPage() {
           const clockOut = batchSource === 'actual' ? formatTime(actual.clock_out_time) : (planned?.out || formatTime(actual.clock_out_time));
           if (clockIn === '-' && clockOut === '-') continue;
           const h = calcHoursFromTimes(clockIn, clockOut);
-          records.push({ employee_type: '파견', employee_name: emp.name, employee_phone: emp.phone, date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
+          records.push({ employee_type: emp.type || '파견', employee_name: emp.name, employee_phone: emp.phone, date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
         }
       }
       if (records.length === 0) return alert("해당 기간에 출근 데이터가 없습니다.");

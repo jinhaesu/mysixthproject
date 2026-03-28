@@ -197,6 +197,8 @@ export default function RegularWorkersPage() {
 
   const handleSendContract = async () => {
     if (!contractModal) return;
+    if (!contractForm.base_pay.trim()) return alert("기본급(월)을 입력해주세요.");
+    if (!contractForm.meal_allowance.trim()) return alert("식대를 입력해주세요.");
     setSendingContractId(contractModal.id);
     try {
       await sendRegularContract(contractModal.id, contractForm);
@@ -224,7 +226,6 @@ export default function RegularWorkersPage() {
   }
 
   const verifyContractPassword = async (): Promise<boolean> => {
-    if (passwordVerified) return true;
     const pw = prompt("계약서 접근 비밀번호를 입력해주세요:");
     if (!pw) return false;
     try {
@@ -234,7 +235,7 @@ export default function RegularWorkersPage() {
         body: JSON.stringify({ password: pw }),
       });
       const body = await res.json();
-      if (body.verified) { setPasswordVerified(true); return true; }
+      if (body.verified) return true;
       alert("비밀번호가 일치하지 않습니다.");
       return false;
     } catch { return false; }

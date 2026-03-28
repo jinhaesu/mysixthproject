@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
 } from "recharts";
-import { Calendar, TrendingUp, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
+import { Calendar, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
 import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList } from "@/lib/api";
 
 const REGULAR_CATS = ['정규직'];
@@ -75,12 +75,11 @@ interface ProcessedGroup {
   subtotal: Totals;
 }
 
-type TabId = "summary" | "daily" | "salary" | "labor";
+type TabId = "summary" | "salary" | "labor";
 
 // --- Constants ---
 const TABS: { id: TabId; label: string; icon: typeof Calendar }[] = [
   { id: "summary", label: "월별 근태 요약", icon: Calendar },
-  { id: "daily", label: "일자별 출근 현황", icon: TrendingUp },
   { id: "salary", label: "급여 추정", icon: DollarSign },
   { id: "labor", label: "인건비 분석", icon: BarChart3 },
 ];
@@ -647,10 +646,10 @@ function DashboardContent() {
                                 <td className="text-right px-3 py-2 tabular-nums">{r.attendance_count}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.total_hours)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.overtime_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30(r.overtime_hours))}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.total_hours / r.unique_workers) : "-"}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(r.overtime_hours / r.unique_workers) : "-"}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(floor30(r.overtime_hours) / r.unique_workers) : "-"}</td>
                               </tr>
                             );
                           });
@@ -660,10 +659,10 @@ function DashboardContent() {
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.attendance_count}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.total_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.overtime_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30(g.subtotal.overtime_hours))}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.total_hours / g.subtotal.unique_workers) : "-"}</td>
-                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(g.subtotal.overtime_hours / g.subtotal.unique_workers) : "-"}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(floor30(g.subtotal.overtime_hours) / g.subtotal.unique_workers) : "-"}</td>
                             </tr>
                           );
                           return fragment;
@@ -683,8 +682,8 @@ function DashboardContent() {
                           };
                           const avgHoursCur = gt.unique_workers > 0 ? gt.total_hours / gt.unique_workers : 0;
                           const avgHoursPrev = pt.unique_workers > 0 ? pt.total_hours / pt.unique_workers : 0;
-                          const avgOtCur = gt.unique_workers > 0 ? gt.overtime_hours / gt.unique_workers : 0;
-                          const avgOtPrev = pt.unique_workers > 0 ? pt.overtime_hours / pt.unique_workers : 0;
+                          const avgOtCur = gt.unique_workers > 0 ? floor30(gt.overtime_hours) / gt.unique_workers : 0;
+                          const avgOtPrev = pt.unique_workers > 0 ? floor30(pt.overtime_hours) / pt.unique_workers : 0;
 
                           return (
                             <tr className="bg-blue-900 text-white font-bold">
@@ -702,8 +701,8 @@ function DashboardContent() {
                                 {momBadge(gt.regular_hours, pt.regular_hours)}
                               </td>
                               <td className="text-right px-3 py-2 tabular-nums">
-                                {fmt(gt.overtime_hours)}
-                                {momBadge(gt.overtime_hours, pt.overtime_hours)}
+                                {fmt(floor30(gt.overtime_hours))}
+                                {momBadge(floor30(gt.overtime_hours), floor30(pt.overtime_hours))}
                               </td>
                               <td className="text-right px-3 py-2 tabular-nums">{gt.annual_leave_days}</td>
                               <td className="text-right px-3 py-2 tabular-nums">
@@ -725,122 +724,7 @@ function DashboardContent() {
             </div>
           )}
 
-          {/* ============ TAB 2: 일자별 출근 현황 ============ */}
-          {activeTab === "daily" && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">{year}년 {month}월 일자별 출근 현황</h3>
-              </div>
-              {!dailyData || dailyData.groups.length === 0 ? (
-                <div className="p-12 text-center text-gray-400">데이터가 없습니다.</div>
-              ) : (() => {
-                const dGroups = dailyData.groups;
-                const cats = dailyData.categories;
-                const allDates = getDatesInMonth(year, month);
-                const workDays = allDates.filter(d => !isWeekend(d)).length;
-
-                return (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-blue-900 text-white">
-                          <th className="px-2 py-2 text-center font-medium sticky left-0 bg-blue-900 z-10" rowSpan={2}>날짜</th>
-                          <th className="px-2 py-2 text-center font-medium" rowSpan={2}>요일</th>
-                          {dGroups.map((g, i) => (
-                            <th key={i} className="px-1 py-2 text-center font-medium border-l border-blue-700" colSpan={cats.length + 1}>
-                              {gk(g.department, g.workplace) || "미분류"}
-                            </th>
-                          ))}
-                          <th className="px-2 py-2 text-center font-medium border-l border-blue-700" rowSpan={2}>합계</th>
-                        </tr>
-                        <tr className="bg-blue-800 text-blue-100">
-                          {dGroups.map((_, gi) =>
-                            cats.map((c, ci) => (
-                              <th key={`${gi}-${ci}`} className={`px-1 py-1.5 text-center font-medium ${ci === 0 ? "border-l border-blue-600" : ""}`}>{c}</th>
-                            )).concat(
-                              <th key={`${gi}-sub`} className="px-1 py-1.5 text-center font-medium bg-blue-700 border-l border-blue-600">소계</th>
-                            )
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allDates.map((date) => {
-                          const dayName = getDayName(date);
-                          const weekend = isWeekend(date);
-                          let dateTotal = 0;
-
-                          return (
-                            <tr key={date} className={`border-b border-gray-100 ${weekend ? "bg-orange-50" : "hover:bg-gray-50"}`}>
-                              <td className="px-2 py-1.5 text-center text-gray-700 whitespace-nowrap sticky left-0 bg-inherit">{date.slice(5)}</td>
-                              <td className={`px-2 py-1.5 text-center font-medium ${dayName === "일" ? "text-red-500" : dayName === "토" ? "text-blue-500" : "text-gray-600"}`}>{dayName}</td>
-                              {dGroups.map((g, gi) => {
-                                let groupTotal = 0;
-                                const cells = cats.map((c, ci) => {
-                                  const cnt = getCount(date, g.department, g.workplace, c);
-                                  groupTotal += cnt;
-                                  dateTotal += cnt;
-                                  return (
-                                    <td key={`${gi}-${ci}`} className={`px-1 py-1.5 text-center tabular-nums ${ci === 0 ? "border-l border-gray-200" : ""} ${cnt === 0 ? "text-gray-300" : "text-gray-700"}`}>
-                                      {cnt || "-"}
-                                    </td>
-                                  );
-                                });
-                                cells.push(
-                                  <td key={`${gi}-sub`} className="px-1 py-1.5 text-center font-semibold tabular-nums bg-blue-50 border-l border-blue-100">
-                                    {groupTotal || "-"}
-                                  </td>
-                                );
-                                return cells;
-                              })}
-                              <td className="px-2 py-1.5 text-center font-bold tabular-nums border-l border-gray-300 bg-gray-50">
-                                {dateTotal || "-"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {/* Total row */}
-                        <tr className="bg-blue-900 text-white font-bold">
-                          <td className="px-2 py-2 text-center sticky left-0 bg-blue-900" colSpan={2}>합계</td>
-                          {dGroups.map((g, gi) => {
-                            let gTotal = 0;
-                            const cells = cats.map((c, ci) => {
-                              const catTotal = allDates.reduce((s, d) => s + getCount(d, g.department, g.workplace, c), 0);
-                              gTotal += catTotal;
-                              return <td key={`t-${gi}-${ci}`} className={`px-1 py-2 text-center tabular-nums ${ci === 0 ? "border-l border-blue-700" : ""}`}>{catTotal}</td>;
-                            });
-                            cells.push(<td key={`t-${gi}-sub`} className="px-1 py-2 text-center tabular-nums border-l border-blue-700">{gTotal}</td>);
-                            return cells;
-                          })}
-                          <td className="px-2 py-2 text-center tabular-nums border-l border-blue-700">
-                            {allDates.reduce((s, d) => s + dGroups.reduce((gs, g) => gs + cats.reduce((cs, c) => cs + getCount(d, g.department, g.workplace, c), 0), 0), 0)}
-                          </td>
-                        </tr>
-                        {/* Average row */}
-                        <tr className="bg-gray-100 font-medium text-gray-700">
-                          <td className="px-2 py-2 text-center sticky left-0 bg-gray-100" colSpan={2}>평균(평일)</td>
-                          {dGroups.map((g, gi) => {
-                            let gTotal = 0;
-                            const cells = cats.map((c, ci) => {
-                              const catTotal = allDates.reduce((s, d) => s + getCount(d, g.department, g.workplace, c), 0);
-                              gTotal += catTotal;
-                              return <td key={`a-${gi}-${ci}`} className={`px-1 py-2 text-center tabular-nums ${ci === 0 ? "border-l border-gray-300" : ""}`}>{workDays > 0 ? (catTotal / workDays).toFixed(1) : "0"}</td>;
-                            });
-                            cells.push(<td key={`a-${gi}-sub`} className="px-1 py-2 text-center tabular-nums border-l border-gray-300 bg-blue-50">{workDays > 0 ? (gTotal / workDays).toFixed(1) : "0"}</td>);
-                            return cells;
-                          })}
-                          <td className="px-2 py-2 text-center tabular-nums border-l border-gray-300">
-                            {workDays > 0 ? (allDates.reduce((s, d) => s + dGroups.reduce((gs, g) => gs + cats.reduce((cs, c) => cs + getCount(d, g.department, g.workplace, c), 0), 0), 0) / workDays).toFixed(1) : "0"}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* ============ TAB 3: 급여 추정 ============ */}
+          {/* ============ TAB 2: 급여 추정 ============ */}
           {activeTab === "salary" && (
             <div className="space-y-6">
               <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -857,7 +741,7 @@ function DashboardContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(["정규직", "파견", "알바"] as const).map(cat => (
+                      {(["정규직", "파견", "알바"] as const).filter(cat => isRegular ? cat === "정규직" : cat !== "정규직").map(cat => (
                         <tr key={cat} className="border-b border-gray-100">
                           <td className="px-4 py-2.5 font-medium text-gray-900">{cat === "알바" ? "알바(사업소득)" : cat}</td>
                           <td className="px-4 py-2.5 text-right">
@@ -906,7 +790,7 @@ function DashboardContent() {
                     </thead>
                     <tbody>
                       {(() => {
-                        const cats = ["정규직", "파견", "알바(사업소득)"] as const;
+                        const cats = (["정규직", "파견", "알바(사업소득)"] as const).filter(cat => isRegular ? cat === "정규직" : cat !== "정규직");
                         const shifts = ["주간", "야간"] as const;
                         const z = { regular_hours: 0, overtime_hours: 0, salary: 0 };
                         const getS = (map: Map<string, typeof z>, cat: string, shift: string) => map.get(`${cat}|${shift}`) || z;
@@ -1084,7 +968,7 @@ function DashboardContent() {
             </div>
           )}
 
-          {/* ============ TAB 4: 인건비 분석 ============ */}
+          {/* ============ TAB 3: 인건비 분석 ============ */}
           {activeTab === "labor" && (
             <div className="space-y-6">
               <div className="bg-white rounded-xl border border-gray-200 p-5">

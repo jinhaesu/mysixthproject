@@ -7,6 +7,7 @@ import { getSalarySettings, updateSalarySettings } from "@/lib/api";
 const fmt = new Intl.NumberFormat('ko-KR');
 
 export default function SalaryManagePage() {
+  const [authorized, setAuthorized] = useState(false);
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -22,6 +23,23 @@ export default function SalaryManagePage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const checkPw = async () => {
+      const pw = prompt("접근 비밀번호를 입력해주세요:");
+      if (!pw) { window.history.back(); return; }
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ password: pw }),
+        });
+        const body = await res.json();
+        if (body.verified) { setAuthorized(true); } else { alert("비밀번호가 일치하지 않습니다."); window.history.back(); }
+      } catch { window.history.back(); }
+    };
+    checkPw();
+  }, []);
+
   const handleSave = async (empId: number) => {
     setSaving(true);
     try {
@@ -33,6 +51,8 @@ export default function SalaryManagePage() {
   };
 
   const filtered = data.filter(e => !search || e.name?.includes(search) || e.phone?.includes(search));
+
+  if (!authorized) return <div className="py-20 text-center text-gray-400">인증 중...</div>;
 
   return (
     <div className="min-w-0">

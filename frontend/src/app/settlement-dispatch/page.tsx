@@ -7,6 +7,7 @@ import { getSettlement } from "@/lib/api";
 const fmt = new Intl.NumberFormat('ko-KR');
 
 export default function SettlementDispatchPage() {
+  const [authorized, setAuthorized] = useState(false);
   const [yearMonth, setYearMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -32,6 +33,23 @@ export default function SettlementDispatchPage() {
   }, [yearMonth]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const checkPw = async () => {
+      const pw = prompt("접근 비밀번호를 입력해주세요:");
+      if (!pw) { window.history.back(); return; }
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ password: pw }),
+        });
+        const body = await res.json();
+        if (body.verified) { setAuthorized(true); } else { alert("비밀번호가 일치하지 않습니다."); window.history.back(); }
+      } catch { window.history.back(); }
+    };
+    checkPw();
+  }, []);
 
   // 30분 단위 내림: 0.1~0.4 → 0, 0.5~0.9 → 0.5
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
@@ -62,6 +80,8 @@ export default function SettlementDispatchPage() {
   const totals: any = {};
   const numKeys = ['work_days','regular_hours','overtime_hours','weekly_holiday_hours','basePay','overtimePay','whPay','grossPay','meal','net','np','hi','ia','ei','ltc','ins','fee','bv','vat','total'];
   numKeys.forEach(k => { totals[k] = rows.reduce((s: number, r: any) => s + (r[k] || 0), 0); });
+
+  if (!authorized) return <div className="py-20 text-center text-gray-400">인증 중...</div>;
 
   return (
     <div className="min-w-0">

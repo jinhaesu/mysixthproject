@@ -492,11 +492,7 @@ router.get('/report/summary', async (req: Request, res: Response) => {
         COALESCE(department, '') as department,
         COALESCE(workplace, '') as workplace,
         COALESCE(category, '') as category,
-        CASE
-          WHEN shift IS NOT NULL AND shift != '' THEN shift
-          WHEN clock_in IS NOT NULL AND clock_in != '' AND CAST(SUBSTR(clock_in, 1, 2) AS INTEGER) >= 14
-          THEN '야간' ELSE '주간'
-        END as shift,
+        COALESCE(NULLIF(shift, ''), '주간') as shift,
         COUNT(*) as attendance_count,
         COUNT(DISTINCT name) as unique_workers,
         ROUND(SUM(regular_hours + overtime_hours)::numeric, 1) as total_hours,
@@ -506,8 +502,8 @@ router.get('/report/summary', async (req: Request, res: Response) => {
         SUM(CASE WHEN annual_leave IS NOT NULL AND annual_leave != '' AND annual_leave != '0' AND annual_leave != '미사용' THEN 1 ELSE 0 END) as annual_leave_days
       FROM attendance_records
       WHERE date >= ? AND date <= ?
-      GROUP BY department, workplace, category, shift
-      ORDER BY department, workplace, category, shift
+      GROUP BY department, workplace, category, COALESCE(NULLIF(shift, ''), '주간')
+      ORDER BY department, workplace, category, COALESCE(NULLIF(shift, ''), '주간')
     `;
 
     const current = await dbAll(summaryQuery, startDate, endDate);

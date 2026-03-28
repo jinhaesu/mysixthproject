@@ -19,6 +19,8 @@ export default function PayrollCalcPage() {
 
   const totalGross = data?.results?.reduce((s: number, r: any) => s + (r.gross_pay || 0), 0) || 0;
   const totalOvertime = data?.results?.reduce((s: number, r: any) => s + (r.overtime_pay || 0), 0) || 0;
+  const totalDeductions = data?.results?.reduce((s: number, r: any) => s + (r.total_deductions || 0), 0) || 0;
+  const totalNet = data?.results?.reduce((s: number, r: any) => s + (r.net_pay || 0), 0) || 0;
 
   return (
     <div className="min-w-0">
@@ -40,18 +42,26 @@ export default function PayrollCalcPage() {
 
       {/* Summary */}
       {data?.results?.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
           <div className="bg-white rounded-xl border p-4 text-center">
             <p className="text-2xl font-bold text-gray-900">{data.results.length}</p>
             <p className="text-xs text-gray-500">인원</p>
+          </div>
+          <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 text-center">
+            <p className="text-lg font-bold text-blue-700">{fmt.format(totalGross)}</p>
+            <p className="text-xs text-blue-600">총 지급액</p>
           </div>
           <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 text-center">
             <p className="text-lg font-bold text-amber-700">{fmt.format(totalOvertime)}</p>
             <p className="text-xs text-amber-600">총 연장수당</p>
           </div>
+          <div className="bg-red-50 rounded-xl border border-red-200 p-4 text-center">
+            <p className="text-lg font-bold text-red-700">{fmt.format(totalDeductions)}</p>
+            <p className="text-xs text-red-600">총 공제액</p>
+          </div>
           <div className="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
-            <p className="text-lg font-bold text-green-700">{fmt.format(totalGross)}</p>
-            <p className="text-xs text-green-600">총 지급액</p>
+            <p className="text-lg font-bold text-green-700">{fmt.format(totalNet)}</p>
+            <p className="text-xs text-green-600">총 실지급액</p>
           </div>
         </div>
       )}
@@ -77,6 +87,14 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-3 font-medium text-gray-600 text-right">휴일</th>
                   <th className="py-2 px-3 font-medium text-gray-600 text-right">휴일수당</th>
                   <th className="py-2 px-3 font-medium text-gray-600 text-right font-bold">지급액</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right">국민연금</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right">건강보험</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right">장기요양</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right">고용보험</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right">소득세</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right">주민세</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right text-red-600">공제계</th>
+                  <th className="py-2 px-3 font-medium text-gray-600 text-right font-bold text-green-700">실지급액</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -95,6 +113,14 @@ export default function PayrollCalcPage() {
                     <td className="py-2 px-3 text-right text-red-600">{r.holiday_days}</td>
                     <td className="py-2 px-3 text-right text-red-600">{fmt.format(r.holiday_pay)}</td>
                     <td className="py-2 px-3 text-right text-indigo-800 font-bold">{fmt.format(r.gross_pay)}</td>
+                    <td className="py-2 px-3 text-right text-gray-500">{fmt.format(r.national_pension || 0)}</td>
+                    <td className="py-2 px-3 text-right text-gray-500">{fmt.format(r.health_insurance || 0)}</td>
+                    <td className="py-2 px-3 text-right text-gray-500">{fmt.format(r.long_term_care || 0)}</td>
+                    <td className="py-2 px-3 text-right text-gray-500">{fmt.format(r.employment_insurance || 0)}</td>
+                    <td className="py-2 px-3 text-right text-gray-500">{fmt.format(r.income_tax || 0)}</td>
+                    <td className="py-2 px-3 text-right text-gray-500">{fmt.format(r.local_tax || 0)}</td>
+                    <td className="py-2 px-3 text-right text-red-600 font-medium">{fmt.format(r.total_deductions || 0)}</td>
+                    <td className="py-2 px-3 text-right text-green-700 font-bold">{fmt.format(r.net_pay || 0)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -104,6 +130,9 @@ export default function PayrollCalcPage() {
                   <td className="py-2 px-3 text-right text-amber-800">{fmt.format(totalOvertime)}</td>
                   <td colSpan={2}></td>
                   <td className="py-2 px-3 text-right text-indigo-900">{fmt.format(totalGross)}</td>
+                  <td colSpan={6}></td>
+                  <td className="py-2 px-3 text-right text-red-700">{fmt.format(totalDeductions)}</td>
+                  <td className="py-2 px-3 text-right text-green-800">{fmt.format(totalNet)}</td>
                 </tr>
               </tfoot>
             </table>

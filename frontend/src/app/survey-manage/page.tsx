@@ -620,6 +620,7 @@ function ResponsesTab() {
     startDate: "",
     endDate: "",
     phone: "",
+    name: "",
     status: "",
     workplace: "",
   });
@@ -655,6 +656,7 @@ function ResponsesTab() {
       if (filters.startDate) params.startDate = filters.startDate;
       if (filters.endDate) params.endDate = filters.endDate;
       if (filters.phone) params.phone = filters.phone;
+      if (filters.name) params.name = filters.name;
       if (filters.status) params.status = filters.status;
       if (filters.workplace) params.workplace = filters.workplace;
 

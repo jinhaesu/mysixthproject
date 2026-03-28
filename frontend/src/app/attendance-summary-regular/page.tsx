@@ -20,25 +20,37 @@ export default function AttendanceSummaryRegularPage() {
   const [viewMode, setViewMode] = useState<'actual' | 'planned'>('actual');
   const [hiddenEmps, setHiddenEmps] = useState<Set<number>>(new Set());
 
+  const [cache, setCache] = useState<Record<string, { data: any; time: number }>>({});
+  const CACHE_TTL = 3 * 60 * 60 * 1000; // 3 hours
+
   const load = useCallback(async () => {
+    const key = `${year}-${month}`;
+    const cached = cache[key];
+    if (cached && Date.now() - cached.time < CACHE_TTL) {
+      setData(cached.data);
+      return;
+    }
     setLoading(true);
     try {
       const d = await getAttendanceSummaryRegular(year, month);
-      // Filter: only keep employees who have actual attendance
       if (d?.employees) {
         d.employees = d.employees.filter((e: any) => e.actuals && e.actuals.length > 0);
       }
       setData(d);
+      setCache(prev => ({ ...prev, [key]: { data: d, time: Date.now() } }));
       setHiddenEmps(new Set());
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
-  }, [year, month]);
+  }, [year, month, cache]);
 
   useEffect(() => { load(); }, [load]);
 
   const formatTime = (t: string | null) => {
     if (!t) return '-';
-    try { return new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }); } catch { return t; }
+    try {
+      const d = new Date(t);
+      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    } catch { return t; }
   };
 
   const getPlannedForDay = (shifts: any[], date: string) => {

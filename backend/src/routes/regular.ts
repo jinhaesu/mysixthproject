@@ -1203,15 +1203,38 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       WHERE re.is_active = 1
     `) as any[];
 
+    // Get holiday hours (actual hours worked on holidays, not fixed 8h)
+    const holidayDetails = await dbAll(`
+      SELECT employee_name, SUM(regular_hours + overtime_hours) as holiday_hours, COUNT(*) as holiday_days
+      FROM confirmed_attendance
+      WHERE year_month = ? AND employee_type = '정규직' AND holiday_work = 1
+      GROUP BY employee_name
+    `, yearMonth) as any[];
+
     const results = [];
     for (const sal of salaries) {
       const att = (confirmed as any[]).find(c => c.employee_name === sal.name);
+      const hol = holidayDetails.find(h => h.employee_name === sal.name);
       const overtimeHours = parseFloat(att?.total_overtime || 0);
-      const holidayHours = parseFloat(att?.holiday_days || 0) * 8;
+      const holidayHours = parseFloat(hol?.holiday_hours || 0);
       const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;
       const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
       const grossPay = parseFloat(sal.base_pay) + parseFloat(sal.meal_allowance) + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
+
+      // 4대보험 계산 (근로자 부담분)
+      const taxBase = parseFloat(sal.base_pay) + parseFloat(sal.meal_allowance);
+      const nationalPension = Math.round(taxBase * 0.045);      // 국민연금 4.5%
+      const healthInsurance = Math.round(taxBase * 0.03545);     // 건강보험 3.545%
+      const longTermCare = Math.round(healthInsurance * 0.1281); // 장기요양 12.81%
+      const employmentInsurance = Math.round(taxBase * 0.009);   // 고용보험 0.9%
+      const totalDeductions = nationalPension + healthInsurance + longTermCare + employmentInsurance;
+
+      // 소득세 (간이세액표 기준 근사)
+      const incomeTax = Math.round(grossPay * 0.03);  // 약 3% 근사
+      const localTax = Math.round(incomeTax * 0.1);   // 지방세 10%
+
+      const netPay = grossPay - totalDeductions - incomeTax - localTax;
 
       results.push({
         name: sal.name, phone: sal.phone, department: sal.department, team: sal.team, hire_date: sal.hire_date,
@@ -1221,10 +1244,19 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         overtime_hourly_rate: hourlyRate,
         work_days: parseInt(att?.work_days || 0),
         overtime_hours: overtimeHours,
-        holiday_days: parseInt(att?.holiday_days || 0),
+        holiday_days: parseInt(hol?.holiday_days || 0),
+        holiday_hours: holidayHours,
         overtime_pay: overtimePay,
         holiday_pay: holidayPay,
         gross_pay: grossPay,
+        national_pension: nationalPension,
+        health_insurance: healthInsurance,
+        long_term_care: longTermCare,
+        employment_insurance: employmentInsurance,
+        income_tax: incomeTax,
+        local_tax: localTax,
+        total_deductions: totalDeductions + incomeTax + localTax,
+        net_pay: netPay,
       });
     }
 

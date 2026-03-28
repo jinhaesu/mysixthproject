@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2 } from "lucide-react";
-import { getAttendanceSummaryRegular, confirmAttendance } from "@/lib/api";
+import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2, CheckCircle2 } from "lucide-react";
+import { getAttendanceSummaryRegular, confirmAttendance, getConfirmedList } from "@/lib/api";
 
 // Korean public holidays
 const HOLIDAYS: Record<number, string[]> = {
@@ -36,6 +36,8 @@ export default function AttendanceSummaryRegularPage() {
   const [rangeEnd, setRangeEnd] = useState(31);
   const [viewMode, setViewMode] = useState<'actual' | 'planned'>('actual');
   const [hiddenEmps, setHiddenEmps] = useState<Set<number>>(new Set());
+  const [confirmedSet, setConfirmedSet] = useState<Set<string>>(new Set()); // "name|date"
+  const [confirmedEmpSet, setConfirmedEmpSet] = useState<Set<string>>(new Set()); // employee names fully confirmed
 
   const load = useCallback(async () => {
     const key = `reg-${year}-${month}`;
@@ -53,6 +55,33 @@ export default function AttendanceSummaryRegularPage() {
       setData(d);
       _cache[key] = { data: d, time: Date.now() };
       setHiddenEmps(new Set());
+
+      // Load confirmed data
+      const ym = `${year}-${String(month).padStart(2,'0')}`;
+      try {
+        const confirmed = await getConfirmedList(ym, '정규직');
+        const cSet = new Set<string>();
+        const cEmpDates = new Map<string, number>();
+        for (const emp of (confirmed || [])) {
+          let allDays = 0;
+          for (const rec of (emp.records || [])) {
+            cSet.add(`${emp.name}|${rec.date}`);
+            allDays++;
+          }
+          cEmpDates.set(emp.name, allDays);
+        }
+        setConfirmedSet(cSet);
+        // Mark fully confirmed employees
+        const cEmpSet = new Set<string>();
+        if (d?.employees) {
+          for (const emp of d.employees) {
+            const totalDays = emp.actuals?.length || 0;
+            const confirmedDays = cEmpDates.get(emp.name) || 0;
+            if (totalDays > 0 && confirmedDays >= totalDays) cEmpSet.add(emp.name);
+          }
+        }
+        setConfirmedEmpSet(cEmpSet);
+      } catch {}
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [year, month]);
@@ -253,8 +282,9 @@ export default function AttendanceSummaryRegularPage() {
           {visibleEmployees.map((emp: any) => {
             const summary = getEmpSummary(emp, viewMode);
             const expanded = expandedEmp === emp.id;
+            const isFullyConfirmed = confirmedEmpSet.has(emp.name);
             return (
-              <div key={emp.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={emp.id} className={`rounded-xl border overflow-hidden ${isFullyConfirmed ? 'border-green-300 bg-green-50/30' : 'border-gray-200 bg-white'}`}>
                 <div className={`flex items-center px-4 py-3 hover:bg-gray-50 ${checkedEmps.has(emp.id) ? 'bg-indigo-50/50' : ''}`}>
                   <div className="mr-3" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checkedEmps.has(emp.id)}
@@ -264,6 +294,7 @@ export default function AttendanceSummaryRegularPage() {
                   <button className="flex-1 flex items-center justify-between" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>
                     <div className="flex items-center gap-3">
                       <span className="font-medium text-gray-900">{emp.name}</span>
+                      {isFullyConfirmed && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-3 h-3" />확정</span>}
                       <span className="text-xs text-gray-500">{emp.department} {emp.team}</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs">
@@ -310,14 +341,19 @@ export default function AttendanceSummaryRegularPage() {
                           const dowNum = new Date(date + 'T00:00:00+09:00').getDay();
                           const dow = ['일','월','화','수','목','금','토'][dowNum];
                           const source = selectedSource[key] || 'planned';
+                          const isDayConfirmed = confirmedSet.has(`${emp.name}|${date}`);
                           return (
-                            <tr key={date} className={isAnomaly ? 'bg-red-50' : 'bg-white'}>
+                            <tr key={date} className={isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
                               <td className="py-1.5 px-3">
-                                <input type="checkbox" checked={checkedRows.has(key)}
-                                  onChange={e => { const n = new Set(checkedRows); if (e.target.checked) n.add(key); else n.delete(key); setCheckedRows(n); }}
-                                  className="rounded border-gray-300" />
+                                {isDayConfirmed ? (
+                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                ) : (
+                                  <input type="checkbox" checked={checkedRows.has(key)}
+                                    onChange={e => { const n = new Set(checkedRows); if (e.target.checked) n.add(key); else n.delete(key); setCheckedRows(n); }}
+                                    className="rounded border-gray-300" />
+                                )}
                               </td>
-                              <td className="py-1.5 px-3 text-gray-700">{date.slice(5)}</td>
+                              <td className="py-1.5 px-3 text-gray-700">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-green-600">확정</span>}</td>
                               <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-red-500 font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-gray-500'}`}>{dow}</td>
                               <td className="py-1.5 px-3 text-blue-700">{plannedIn}</td>
                               <td className="py-1.5 px-3 text-blue-700">{plannedOut}</td>

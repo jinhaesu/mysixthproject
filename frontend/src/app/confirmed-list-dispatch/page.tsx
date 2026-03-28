@@ -50,7 +50,11 @@ export default function ConfirmedListDispatchPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const d = await getConfirmedList(yearMonth, ''); setData(d || []); } catch (e: any) { alert(e.message); }
+    try {
+      const d = await getConfirmedList(yearMonth, '');
+      // Filter out 정규직
+      setData((d || []).filter((e: any) => e.type !== '정규직'));
+    } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [yearMonth]);
 

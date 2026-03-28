@@ -576,3 +576,14 @@ export async function getConfirmedList(yearMonth: string, employeeType?: string)
 export async function updateConfirmedRecord(id: number, data: any) {
   return fetchAPI<any>(`/api/regular/confirmed-list/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
+
+// ===== Salary Settings =====
+export async function getSalarySettings() {
+  return fetchAPI<any[]>('/api/regular/salary-settings');
+}
+export async function updateSalarySettings(employeeId: number, data: any) {
+  return fetchAPI<any>(`/api/regular/salary-settings/${employeeId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function getPayrollCalc(yearMonth: string) {
+  return fetchAPI<any>(`/api/regular/payroll-calc?year_month=${yearMonth}`);
+}

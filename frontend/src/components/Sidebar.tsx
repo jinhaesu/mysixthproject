@@ -84,6 +84,8 @@ const groups: NavGroup[] = [
       { href: "/upload-regular", label: "엑셀 업로드", icon: UploadCloud },
       { href: "/attendance-summary-regular", label: "근태 정보 종합 요약", icon: ClipboardList },
       { href: "/confirmed-list-regular", label: "근태 정보 확정 리스트", icon: Table2 },
+      { href: "/salary-manage", label: "기본급 관리", icon: Calculator },
+      { href: "/payroll-calc", label: "급여 계산", icon: Calculator },
     ],
   },
 ];

@@ -1123,4 +1123,115 @@ router.put('/confirmed-list/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ===== Salary Settings =====
+
+// GET /api/regular/salary-settings - List all salary settings with employee info
+router.get('/salary-settings', async (_req: AuthRequest, res: Response) => {
+  try {
+    const settings = await dbAll(`
+      SELECT re.id as employee_id, re.name, re.department, re.team, re.role, re.hire_date, re.phone,
+             COALESCE(ss.base_pay, 0) as base_pay,
+             COALESCE(ss.meal_allowance, 0) as meal_allowance,
+             COALESCE(ss.bonus, 0) as bonus,
+             COALESCE(ss.position_allowance, 0) as position_allowance,
+             COALESCE(ss.other_allowance, 0) as other_allowance,
+             COALESCE(ss.overtime_hourly_rate, 0) as overtime_hourly_rate
+      FROM regular_employees re
+      LEFT JOIN regular_salary_settings ss ON re.id = ss.employee_id
+      WHERE re.is_active = 1
+      ORDER BY re.department, re.team, re.name
+    `);
+    res.json(settings);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/regular/salary-settings/:employeeId - Update salary settings
+router.put('/salary-settings/:employeeId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employeeId } = req.params;
+    const { base_pay, meal_allowance, bonus, position_allowance, other_allowance, overtime_hourly_rate } = req.body;
+
+    const existing = await dbGet('SELECT id FROM regular_salary_settings WHERE employee_id = ?', employeeId);
+    if (existing) {
+      await dbRun(
+        'UPDATE regular_salary_settings SET base_pay = ?, meal_allowance = ?, bonus = ?, position_allowance = ?, other_allowance = ?, overtime_hourly_rate = ?, updated_at = NOW() WHERE employee_id = ?',
+        base_pay || 0, meal_allowance || 0, bonus || 0, position_allowance || 0, other_allowance || 0, overtime_hourly_rate || 0, employeeId
+      );
+    } else {
+      await dbRun(
+        'INSERT INTO regular_salary_settings (employee_id, base_pay, meal_allowance, bonus, position_allowance, other_allowance, overtime_hourly_rate) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        employeeId, base_pay || 0, meal_allowance || 0, bonus || 0, position_allowance || 0, other_allowance || 0, overtime_hourly_rate || 0
+      );
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/payroll-calc - Calculate payroll based on confirmed attendance + salary settings
+router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
+  try {
+    const yearMonth = (req.query.year_month as string) || getKSTDate().slice(0, 7);
+
+    // Get confirmed attendance grouped by employee
+    const confirmed = await dbAll(`
+      SELECT employee_name, employee_phone,
+        SUM(regular_hours) as total_regular,
+        SUM(overtime_hours) as total_overtime,
+        SUM(night_hours) as total_night,
+        COUNT(*) as work_days,
+        SUM(CASE WHEN holiday_work = 1 THEN 1 ELSE 0 END) as holiday_days
+      FROM confirmed_attendance
+      WHERE year_month = ? AND employee_type = '정규직'
+      GROUP BY employee_name, employee_phone
+    `, yearMonth);
+
+    // Get salary settings
+    const salaries = await dbAll(`
+      SELECT re.name, re.phone, re.department, re.team, re.hire_date,
+             COALESCE(ss.base_pay, 0) as base_pay,
+             COALESCE(ss.meal_allowance, 0) as meal_allowance,
+             COALESCE(ss.bonus, 0) as bonus,
+             COALESCE(ss.position_allowance, 0) as position_allowance,
+             COALESCE(ss.other_allowance, 0) as other_allowance,
+             COALESCE(ss.overtime_hourly_rate, 0) as overtime_hourly_rate
+      FROM regular_employees re
+      LEFT JOIN regular_salary_settings ss ON re.id = ss.employee_id
+      WHERE re.is_active = 1
+    `) as any[];
+
+    const results = [];
+    for (const sal of salaries) {
+      const att = (confirmed as any[]).find(c => c.employee_name === sal.name);
+      const overtimeHours = parseFloat(att?.total_overtime || 0);
+      const holidayHours = parseFloat(att?.holiday_days || 0) * 8;
+      const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;
+      const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
+      const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
+      const grossPay = parseFloat(sal.base_pay) + parseFloat(sal.meal_allowance) + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
+
+      results.push({
+        name: sal.name, phone: sal.phone, department: sal.department, team: sal.team, hire_date: sal.hire_date,
+        base_pay: parseFloat(sal.base_pay), meal_allowance: parseFloat(sal.meal_allowance),
+        bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),
+        other_allowance: parseFloat(sal.other_allowance),
+        overtime_hourly_rate: hourlyRate,
+        work_days: parseInt(att?.work_days || 0),
+        overtime_hours: overtimeHours,
+        holiday_days: parseInt(att?.holiday_days || 0),
+        overtime_pay: overtimePay,
+        holiday_pay: holidayPay,
+        gross_pay: grossPay,
+      });
+    }
+
+    res.json({ year_month: yearMonth, results });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

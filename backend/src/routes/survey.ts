@@ -1303,6 +1303,7 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
       FROM survey_requests sr
       LEFT JOIN survey_responses resp ON sr.id = resp.request_id
       WHERE sr.date >= ? AND sr.date <= ?
+        AND resp.worker_name_ko IS NOT NULL AND resp.worker_name_ko != ''
       ORDER BY resp.worker_name_ko
     `, startDate, endDate);
 
@@ -1328,6 +1329,7 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
         FROM survey_requests sr
         JOIN survey_responses resp ON sr.id = resp.request_id
         WHERE sr.phone = ? AND sr.date >= ? AND sr.date <= ? AND resp.clock_in_time IS NOT NULL
+          AND resp.worker_name_ko IS NOT NULL AND resp.worker_name_ko != ''
         ORDER BY sr.date
       `, phone, startDate, endDate);
       emp.actuals = actuals;

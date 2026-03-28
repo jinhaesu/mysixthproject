@@ -647,6 +647,24 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Regular employee salary settings
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_salary_settings (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        base_pay NUMERIC(12,0) DEFAULT 0,
+        meal_allowance NUMERIC(12,0) DEFAULT 0,
+        bonus NUMERIC(12,0) DEFAULT 0,
+        position_allowance NUMERIC(12,0) DEFAULT 0,
+        other_allowance NUMERIC(12,0) DEFAULT 0,
+        overtime_hourly_rate NUMERIC(10,0) DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(employee_id)
+      )
+    `);
+  } catch {}
+
   console.log('Database initialized successfully');
 }
 

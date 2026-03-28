@@ -6,7 +6,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { Calendar, TrendingUp, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
-import { getReportSummary, getReportDaily, getAttendanceAnomalies } from "@/lib/api";
+import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList } from "@/lib/api";
 
 // --- Types ---
 interface SummaryRow {
@@ -152,25 +152,81 @@ export default function DashboardPage() {
     setLoading(true);
     setError("");
     try {
+      const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
       const [prevY, prevM] = getPrevYearMonth(year, month);
-      const [summary, daily, twoMonthsAgoSummary] = await Promise.all([
-        getReportSummary(year, month),
-        getReportDaily(year, month),
-        getReportSummary(prevY, prevM),
+      const prevYearMonth = `${prevY}-${String(prevM).padStart(2, '0')}`;
+
+      // Fetch confirmed list data (non-정규직 only)
+      const [currentConfirmed, prevConfirmed] = await Promise.all([
+        getConfirmedList(yearMonth, '').catch(() => []),
+        getConfirmedList(prevYearMonth, '').catch(() => []),
       ]);
-      // Parse string numbers to actual numbers
-      const parseRow = (r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, regular_hours: parseFloat(r.regular_hours) || 0, overtime_hours: parseFloat(r.overtime_hours) || 0, night_hours: parseFloat(r.night_hours) || 0, attendance_count: parseInt(r.attendance_count) || 0, unique_workers: parseInt(r.unique_workers) || 0, annual_leave_days: parseInt(r.annual_leave_days) || 0 });
-      if (summary.current) summary.current = summary.current.map(parseRow);
-      if (summary.previous) summary.previous = summary.previous.map(parseRow);
-      if (daily?.data) daily.data = daily.data.map((r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, count: parseInt(r.count) || 0 }));
-      setSummaryData(summary);
-      setDailyData(daily);
-      setTwoMonthsAgoData(twoMonthsAgoSummary.previous || []);
-      setTwoMonthsAgoWHH(twoMonthsAgoSummary.weeklyHolidayHours?.previous || {});
-      getAttendanceAnomalies(year, month).then(data => {
-        setAnomalies(data.anomalies || []);
-        setAnomalyCount(data.total || 0);
-      }).catch(console.error);
+
+      // Convert confirmed list to SummaryRow format
+      const toSummaryRows = (employees: any[]): SummaryRow[] => {
+        const groupMap = new Map<string, SummaryRow>();
+        for (const emp of (employees || [])) {
+          // Skip 정규직 for this dashboard
+          if (emp.type === '정규직') continue;
+          const category = emp.type || '파견';
+          const key = `${category}`;
+          if (!groupMap.has(key)) {
+            groupMap.set(key, { department: '', workplace: '', category, shift: '주간', attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, annual_leave_days: 0 });
+          }
+          const row = groupMap.get(key)!;
+          row.attendance_count += emp.days || 0;
+          row.unique_workers += 1;
+          row.regular_hours += emp.regular_hours || 0;
+          row.overtime_hours += emp.overtime_hours || 0;
+          row.night_hours += emp.night_hours || 0;
+          row.total_hours += (emp.regular_hours || 0) + (emp.overtime_hours || 0);
+        }
+        return Array.from(groupMap.values());
+      };
+
+      // Convert to daily data format
+      const toDailyRows = (employees: any[]): DailyRow[] => {
+        const dayMap = new Map<string, DailyRow>();
+        for (const emp of (employees || [])) {
+          if (emp.type === '정규직') continue;
+          for (const rec of (emp.records || [])) {
+            const key = rec.date;
+            if (!dayMap.has(key)) {
+              dayMap.set(key, { date: key, department: '', workplace: '', category: emp.type || '파견', count: 0, total_hours: 0 });
+            }
+            const d = dayMap.get(key)!;
+            d.count += 1;
+            d.total_hours += (parseFloat(rec.regular_hours) || 0) + (parseFloat(rec.overtime_hours) || 0);
+          }
+        }
+        return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      };
+
+      const currentRows = toSummaryRows(currentConfirmed || []);
+      const previousRows = toSummaryRows(prevConfirmed || []);
+      const dailyRows = toDailyRows(currentConfirmed || []);
+
+      setSummaryData({
+        current: currentRows,
+        previous: previousRows,
+        year, month,
+        prevYear: prevY, prevMonth: prevM,
+        weeklyHolidayHours: { current: {}, previous: {} },
+      });
+      setDailyData({ data: dailyRows, groups: [], categories: [], year, month } as DailyResponse);
+      setTwoMonthsAgoData([]);
+      setTwoMonthsAgoWHH({});
+
+      // Anomalies from confirmed data
+      const anomalyList: any[] = [];
+      for (const emp of (currentConfirmed || [])) {
+        if (emp.type === '정규직') continue;
+        if (emp.overtime_hours > 52) {
+          anomalyList.push({ type: 'overtime', severity: 'high', message: `${emp.name}: 월 연장근로 ${emp.overtime_hours.toFixed(1)}시간 (52시간 초과)` });
+        }
+      }
+      setAnomalies(anomalyList);
+      setAnomalyCount(anomalyList.length);
     } catch (err: any) {
       setError(err.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
@@ -492,7 +548,17 @@ export default function DashboardPage() {
                   <h3 className="font-semibold text-gray-900">{year}년 {month}월 근태 요약</h3>
                 </div>
                 {groups.length === 0 ? (
-                  <div className="p-12 text-center text-gray-400">데이터가 없습니다. 먼저 엑셀 파일을 업로드해주세요.</div>
+                  <div className="p-8 text-center text-gray-500">
+                    <p className="text-lg font-semibold">{year}년 {month}월</p>
+                    <p className="mt-2">확정된 근태 데이터가 없습니다.</p>
+                    <p className="text-xs text-gray-400 mt-1">근태 정보 종합 요약에서 데이터를 확정해주세요.</p>
+                    <div className="grid grid-cols-4 gap-3 mt-4 max-w-md mx-auto">
+                      <div className="bg-gray-50 rounded-lg p-3 text-center"><p className="text-xl font-bold text-gray-400">0</p><p className="text-[10px] text-gray-400">인원</p></div>
+                      <div className="bg-gray-50 rounded-lg p-3 text-center"><p className="text-xl font-bold text-gray-400">0h</p><p className="text-[10px] text-gray-400">총 근로</p></div>
+                      <div className="bg-gray-50 rounded-lg p-3 text-center"><p className="text-xl font-bold text-gray-400">0h</p><p className="text-[10px] text-gray-400">연장</p></div>
+                      <div className="bg-gray-50 rounded-lg p-3 text-center"><p className="text-xl font-bold text-gray-400">0h</p><p className="text-[10px] text-gray-400">야간</p></div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">

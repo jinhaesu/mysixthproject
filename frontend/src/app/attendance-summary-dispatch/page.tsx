@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2, CheckCircle2 } from "lucide-react";
-import { getAttendanceSummaryDispatch, confirmAttendance, getConfirmedList } from "@/lib/api";
+import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2, CheckCircle2, XCircle } from "lucide-react";
+import { getAttendanceSummaryDispatch, confirmAttendance, getConfirmedList, deleteConfirmedRecord } from "@/lib/api";
 
 const HOLIDAYS: Record<number, string[]> = {
   2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
@@ -325,8 +325,32 @@ export default function AttendanceSummaryDispatchPage() {
                       {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                     </div>
                   </button>
+                  {isFullyConfirmed && (
+                    <button onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`${emp.name}의 확정을 취소하시겠습니까?`)) return;
+                      try {
+                        const ym = `${year}-${String(month).padStart(2,'0')}`;
+                        const confirmed = await getConfirmedList(ym, '');
+                        const empData = (confirmed || []).find((c: any) => c.name === emp.name);
+                        if (empData?.records) {
+                          for (const rec of empData.records) { await deleteConfirmedRecord(rec.id); }
+                        }
+                        // Refresh confirmed state
+                        const cSet = new Set(confirmedSet);
+                        const cEmpSet = new Set(confirmedEmpSet);
+                        cEmpSet.delete(emp.name);
+                        emp.actuals.forEach((a: any) => cSet.delete(`${emp.name}|${a.date}`));
+                        setConfirmedSet(cSet);
+                        setConfirmedEmpSet(cEmpSet);
+                        alert('확정 취소 완료');
+                      } catch (err: any) { alert(err.message); }
+                    }} className="ml-1 px-1.5 py-0.5 text-[10px] font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded" title="확정 취소">
+                      <XCircle className="w-3.5 h-3.5 inline mr-0.5" />취소
+                    </button>
+                  )}
                   <button onClick={(e) => { e.stopPropagation(); setHiddenEmps(new Set([...hiddenEmps, emp.id])); }}
-                    className="ml-2 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거">
+                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

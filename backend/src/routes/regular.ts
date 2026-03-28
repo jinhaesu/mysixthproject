@@ -1048,13 +1048,13 @@ router.post('/attendance-confirm', async (req: AuthRequest, res: Response) => {
     for (const r of records) {
       try {
         const existing = await dbGet(
-          "SELECT id FROM confirmed_attendance WHERE employee_type = ? AND employee_name = ? AND date = ?",
-          r.employee_type || '정규직', r.employee_name, r.date
+          "SELECT id FROM confirmed_attendance WHERE employee_name = ? AND date = ?",
+          r.employee_name, r.date
         );
         if (existing) {
           await dbRun(
-            `UPDATE confirmed_attendance SET confirmed_clock_in = ?, confirmed_clock_out = ?, source = ?, regular_hours = ?, overtime_hours = ?, night_hours = ?, break_hours = ?, holiday_work = ?, memo = ?, confirmed_at = NOW() WHERE id = ?`,
-            r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours || 1, r.holiday_work || 0, r.memo || '', (existing as any).id
+            `UPDATE confirmed_attendance SET employee_type = ?, confirmed_clock_in = ?, confirmed_clock_out = ?, source = ?, regular_hours = ?, overtime_hours = ?, night_hours = ?, break_hours = ?, holiday_work = ?, memo = ?, confirmed_at = NOW() WHERE id = ?`,
+            r.employee_type || '정규직', r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours || 1, r.holiday_work || 0, r.memo || '', (existing as any).id
           );
         } else {
           await dbRun(

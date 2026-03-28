@@ -6,6 +6,40 @@ import { getConfirmedList, updateConfirmedRecord } from "@/lib/api";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
+const HOLIDAYS: Record<number, string[]> = {
+  2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
+  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-05','2026-05-24','2026-06-06','2026-08-15','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25'],
+  2027: ['2027-01-01','2027-02-05','2027-02-06','2027-02-07','2027-03-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-10-03','2027-10-09','2027-10-14','2027-10-15','2027-10-16','2027-12-25'],
+};
+function isHolidayOrWeekend(dateStr: string): boolean {
+  const d = new Date(dateStr + 'T00:00:00+09:00');
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true;
+  return (HOLIDAYS[d.getFullYear()] || []).includes(dateStr);
+}
+function calcFromTimes(clockIn: string, clockOut: string, date: string) {
+  if (!clockIn || !clockOut) return { regular: 0, overtime: 0, night: 0, breakH: 0 };
+  const [h1, m1] = clockIn.split(':').map(Number);
+  const [h2, m2] = clockOut.split(':').map(Number);
+  if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0, night: 0, breakH: 0 };
+  const startMin = h1 * 60 + (m1 || 0);
+  const endMin = h2 * 60 + (m2 || 0);
+  const totalMin = endMin > startMin ? endMin - startMin : 0;
+  const totalH = totalMin / 60;
+  let breakH = 0;
+  if (totalH >= 8) breakH = 1;
+  else if (totalH >= 4) breakH = 0.5;
+  const workH = Math.max(totalH - breakH, 0);
+  let nightMin = 0;
+  for (let min = startMin; min < endMin; min++) {
+    const h = Math.floor(min / 60) % 24;
+    if (h >= 22 || h < 6) nightMin++;
+  }
+  const nightH = Math.round(nightMin / 60 * 10) / 10;
+  if (isHolidayOrWeekend(date)) return { regular: 0, overtime: Math.round(workH * 10) / 10, night: nightH, breakH };
+  return { regular: Math.round(Math.min(workH, 8) * 10) / 10, overtime: Math.round(Math.max(workH - 8, 0) * 10) / 10, night: nightH, breakH };
+}
+
 export default function ConfirmedListDispatchPage() {
   const [yearMonth, setYearMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [data, setData] = useState<any[]>([]);
@@ -114,13 +148,21 @@ export default function ConfirmedListDispatchPage() {
                       {emp.records.map((r: any) => (
                         <tr key={r.id} className="hover:bg-gray-50">
                           <td className="py-2 px-3">{r.date}</td>
-                          <td className="py-2 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => setEditForm({...editForm, confirmed_clock_in: e.target.value})} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_in}</td>
-                          <td className="py-2 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_out} onChange={e => setEditForm({...editForm, confirmed_clock_out: e.target.value})} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_out}</td>
+                          <td className="py-2 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
+                            const ci = e.target.value;
+                            const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);
+                            setEditForm({...editForm, confirmed_clock_in: ci, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
+                          }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_in}</td>
+                          <td className="py-2 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_out} onChange={e => {
+                            const co = e.target.value;
+                            const calc = calcFromTimes(editForm.confirmed_clock_in, co, r.date);
+                            setEditForm({...editForm, confirmed_clock_out: co, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
+                          }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_out}</td>
                           <td className="py-2 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
-                          <td className="py-2 px-3 text-right">{editingId === r.id ? <input type="number" step="0.5" value={editForm.regular_hours} onChange={e => setEditForm({...editForm, regular_hours: parseFloat(e.target.value)})} className="w-14 px-1 py-0.5 border rounded text-xs text-right" /> : parseFloat(r.regular_hours).toFixed(1)}</td>
-                          <td className="py-2 px-3 text-right">{editingId === r.id ? <input type="number" step="0.5" value={editForm.overtime_hours} onChange={e => setEditForm({...editForm, overtime_hours: parseFloat(e.target.value)})} className="w-14 px-1 py-0.5 border rounded text-xs text-right" /> : parseFloat(r.overtime_hours).toFixed(1)}</td>
-                          <td className="py-2 px-3 text-right">{parseFloat(r.night_hours).toFixed(1)}</td>
-                          <td className="py-2 px-3 text-right">{parseFloat(r.break_hours).toFixed(1)}</td>
+                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-blue-700 font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1)}</td>
+                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-amber-700 font-medium">{editForm.overtime_hours}</span> : parseFloat(r.overtime_hours).toFixed(1)}</td>
+                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-purple-700 font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
+                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-gray-500">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
                           <td className="py-2 px-3">
                             {editingId === r.id ? (
                               <div className="flex gap-1">

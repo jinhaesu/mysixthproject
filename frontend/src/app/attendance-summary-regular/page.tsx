@@ -44,6 +44,25 @@ export default function AttendanceSummaryRegularPage() {
     const cached = _cache[key];
     if (cached && Date.now() - cached.time < CACHE_TTL) {
       setData(cached.data);
+      // Still load confirmed data even from cache
+      const ym = `${year}-${String(month).padStart(2,'0')}`;
+      try {
+        const confirmed = await getConfirmedList(ym, '정규직');
+        const cSet = new Set<string>();
+        const cEmpDates = new Map<string, number>();
+        for (const emp of (confirmed || [])) {
+          for (const rec of (emp.records || [])) { cSet.add(`${emp.name}|${rec.date}`); }
+          cEmpDates.set(emp.name, (cEmpDates.get(emp.name) || 0) + (emp.records?.length || 0));
+        }
+        setConfirmedSet(cSet);
+        const cEmpSet = new Set<string>();
+        for (const emp of cached.data.employees || []) {
+          const total = emp.actuals?.length || 0;
+          const done = cEmpDates.get(emp.name) || 0;
+          if (total > 0 && done >= total) cEmpSet.add(emp.name);
+        }
+        setConfirmedEmpSet(cEmpSet);
+      } catch {}
       return;
     }
     setLoading(true);

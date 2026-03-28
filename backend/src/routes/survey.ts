@@ -1316,7 +1316,7 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
         let type = (w as any).worker_type || '';
         if (type === 'dispatch' || type.includes('파견')) type = '파견';
         else if (type === 'alba' || type.includes('알바') || type.includes('사업소득')) type = '알바';
-        else if (!type) type = '파견'; // default
+        else if (!type) type = ''; // unknown
         phoneMap.set(w.phone, { phone: w.phone, name: w.name || w.phone, department: w.department || '', type, actuals: [], shifts: [] });
       }
       // Store planned times as shift-like data

@@ -85,6 +85,17 @@ export default function SettlementDispatchPage() {
           <button onClick={() => setCheckedEmps(new Set(results.map((_: any, i: number) => i)))} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium">전체 선택</button>
           <button onClick={() => setCheckedEmps(new Set())} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium">전체 해제</button>
         </div>
+        {rows.length > 0 && (
+          <button onClick={() => {
+            const header = ['이름','근무일','기본h','연장h','주휴h','기본급','연장수당','주휴수당','급여계','식대공제','국민연금','건강보험','산재보험','고용보험','장기요양','보험계','수수료','VAT','최종액'];
+            const csvRows = rows.map((r: any) => [r.name,r.work_days,r.regular_hours,r.overtime_hours,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.whPay,r.grossPay,r.meal,r.np,r.hi,r.ia,r.ei,r.ltc,r.ins,r.fee,r.vat,r.total]);
+            const csv = [header,...csvRows].map(r => r.join(',')).join('\n');
+            const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`파견정산_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
+          }} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium flex items-center gap-1 ml-auto">
+            <Download className="w-4 h-4" /> 엑셀 다운로드
+          </button>
+        )}
       </div>
 
       {rows.length > 0 && (

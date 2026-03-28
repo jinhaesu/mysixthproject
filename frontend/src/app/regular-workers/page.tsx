@@ -77,7 +77,7 @@ export default function RegularWorkersPage() {
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [sendingContractId, setSendingContractId] = useState<number | null>(null);
-  const [contractMap, setContractMap] = useState<Record<number, string>>({});
+  const [contractMap, setContractMap] = useState<Record<number, { status: string; token: string }>>({});
   const [contractModal, setContractModal] = useState<any>(null);
   const [contractForm, setContractForm] = useState({
     work_start_date: new Date().toLocaleDateString('sv-SE'),
@@ -94,8 +94,8 @@ export default function RegularWorkersPage() {
   const loadContracts = useCallback(async () => {
     try {
       const contracts = await getRegularContracts();
-      const map: Record<number, string> = {};
-      (contracts || []).forEach((c: any) => { map[c.employee_id] = c.status; });
+      const map: Record<number, { status: string; token: string }> = {};
+      (contracts || []).forEach((c: any) => { map[c.employee_id] = { status: c.status, token: c.token }; });
       setContractMap(map);
     } catch {
       // silent
@@ -316,7 +316,7 @@ export default function RegularWorkersPage() {
         </div>
       ) : employees.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-          등록된 정규직 직원이 없습니다.
+          {search ? `"${search}" 검색 결과가 없습니다.` : '등록된 정규직 직원이 없습니다.'}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -370,11 +370,13 @@ export default function RegularWorkersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {contractMap[emp.id] === "signed" ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                          <FileCheck size={11} /> 체결
-                        </span>
-                      ) : contractMap[emp.id] === "sent" ? (
+                      {contractMap[emp.id]?.status === "signed" ? (
+                        <a href={`/regular-contract?token=${contractMap[emp.id].token}`} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer transition-colors"
+                          title="클릭하여 계약서 열람">
+                          <FileCheck size={11} /> 체결 (열람)
+                        </a>
+                      ) : contractMap[emp.id]?.status === "pending" ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700">
                           <FileText size={11} /> 발송됨
                         </span>
@@ -539,7 +541,8 @@ export default function RegularWorkersPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">근무시간</label>
-                <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">09:00 ~ 18:00</div>
+                <input type="text" value={contractForm.work_hours} onChange={e => setContractForm({...contractForm, work_hours: e.target.value})}
+                  placeholder="09:00~18:00" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
               </div>
             </div>
 

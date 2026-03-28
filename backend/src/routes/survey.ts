@@ -1298,20 +1298,26 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
 
     // Get unique workers from survey_requests for this month
     const workers = await dbAll(`
-      SELECT DISTINCT sr.phone, resp.worker_name_ko as name, sr.department,
-             sr.planned_clock_in, sr.planned_clock_out
+      SELECT DISTINCT ON (sr.phone) sr.phone, resp.worker_name_ko as name, sr.department,
+             sr.planned_clock_in, sr.planned_clock_out,
+             COALESCE(NULLIF(resp.worker_type, ''), sr.department) as worker_type
       FROM survey_requests sr
       LEFT JOIN survey_responses resp ON sr.id = resp.request_id
       WHERE sr.date >= ? AND sr.date <= ?
         AND resp.worker_name_ko IS NOT NULL AND resp.worker_name_ko != ''
-      ORDER BY resp.worker_name_ko
+      ORDER BY sr.phone, resp.created_at DESC
     `, startDate, endDate);
 
     // Group by phone to get unique workers
     const phoneMap = new Map<string, any>();
     for (const w of workers as any[]) {
       if (!phoneMap.has(w.phone)) {
-        phoneMap.set(w.phone, { phone: w.phone, name: w.name || w.phone, department: w.department || '', actuals: [], shifts: [] });
+        // Determine type from worker_type or category field
+        let type = (w as any).worker_type || '';
+        if (type === 'dispatch' || type.includes('파견')) type = '파견';
+        else if (type === 'alba' || type.includes('알바') || type.includes('사업소득')) type = '알바';
+        else if (!type) type = '파견'; // default
+        phoneMap.set(w.phone, { phone: w.phone, name: w.name || w.phone, department: w.department || '', type, actuals: [], shifts: [] });
       }
       // Store planned times as shift-like data
       if (w.planned_clock_in) {

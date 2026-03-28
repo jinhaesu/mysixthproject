@@ -268,7 +268,7 @@ export default function AttendanceSummaryDispatchPage() {
                   <button className="flex-1 flex items-center justify-between" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>
                     <div className="flex items-center gap-3">
                       <span className="font-medium text-gray-900">{emp.name}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${(emp.type || '').includes('파견') ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}`}>{(emp.type || '').includes('파견') ? '파견' : '알바'}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}`}>{emp.type || '파견'}</span>
                       <span className="text-xs text-gray-500">{emp.department} {emp.team}</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs">

@@ -111,7 +111,7 @@ export default function SettlementAlbaPage() {
                   <th className="py-2 px-1.5 text-right">연장수당</th>
                   <th className="py-2 px-1.5 text-right">주휴수당</th>
                   <th className="py-2 px-1.5 text-right">급여계</th>
-                  <th className="py-2 px-1.5 text-right">식대공제</th>
+                  <th className="py-2 px-1.5 text-right w-20">식대공제</th>
                   <th className="py-2 px-1.5 text-right">소득세 3.3%</th>
                   <th className="py-2 px-1.5 text-right">지방세 0.33%</th>
                   <th className="py-2 px-1.5 text-right font-bold text-green-700">실지급</th>

@@ -114,7 +114,7 @@ export default function SettlementDispatchPage() {
                   <th className="py-2 px-1.5 text-right">연장수당</th>
                   <th className="py-2 px-1.5 text-right">주휴수당</th>
                   <th className="py-2 px-1.5 text-right">급여계</th>
-                  <th className="py-2 px-1.5 text-right">식대공제</th>
+                  <th className="py-2 px-1.5 text-right w-20">식대공제</th>
                   <th className="py-2 px-1.5 text-right" title="4.75%">국민연금</th>
                   <th className="py-2 px-1.5 text-right" title="3.595%">건강보험</th>
                   <th className="py-2 px-1.5 text-right" title="1.436%">산재보험</th>

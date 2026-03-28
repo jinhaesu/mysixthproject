@@ -69,7 +69,7 @@ const groups: NavGroup[] = [
     items: [
       { href: "/attendance-summary-dispatch", label: "근태 정보 종합 요약", icon: ClipboardList },
       { href: "/confirmed-list-dispatch", label: "근태 정보 확정 리스트", icon: Table2 },
-      { href: "/dashboard", label: "대시보드", icon: BarChart3 },
+      { href: "/dashboard?type=dispatch", label: "대시보드", icon: BarChart3 },
       { href: "/upload", label: "엑셀 업로드", icon: UploadCloud },
       { href: "/pivot?type=dispatch", label: "피벗 테이블", icon: Table2 },
       { href: "/records?type=dispatch", label: "기록 조회", icon: ClipboardList },
@@ -81,6 +81,7 @@ const groups: NavGroup[] = [
     items: [
       { href: "/attendance-summary-regular", label: "근태 정보 종합 요약", icon: ClipboardList },
       { href: "/confirmed-list-regular", label: "근태 정보 확정 리스트", icon: Table2 },
+      { href: "/dashboard?type=regular", label: "대시보드", icon: BarChart3 },
       { href: "/upload-regular", label: "엑셀 업로드", icon: UploadCloud },
       { href: "/pivot?type=regular", label: "피벗 테이블", icon: Table2 },
       { href: "/records?type=regular", label: "기록 조회", icon: ClipboardList },

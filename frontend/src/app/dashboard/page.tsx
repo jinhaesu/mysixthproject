@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
@@ -130,7 +131,10 @@ function getPrevYearMonth(y: number, m: number): [number, number] {
 }
 
 // --- Component ---
-export default function DashboardPage() {
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const dashboardType = searchParams.get("type") || "dispatch"; // "dispatch" or "regular"
+  const isRegular = dashboardType === "regular";
   const [activeTab, setActiveTab] = useState<TabId>("summary");
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -166,8 +170,9 @@ export default function DashboardPage() {
       const toSummaryRows = (employees: any[]): SummaryRow[] => {
         const groupMap = new Map<string, SummaryRow>();
         for (const emp of (employees || [])) {
-          // Skip 정규직 for this dashboard
-          if (emp.type === '정규직') continue;
+          // Filter by type
+          if (isRegular && emp.type !== '정규직') continue;
+          if (!isRegular && emp.type === '정규직') continue;
           const category = emp.type || '파견';
           const key = `${category}`;
           if (!groupMap.has(key)) {
@@ -188,7 +193,8 @@ export default function DashboardPage() {
       const toDailyRows = (employees: any[]): DailyRow[] => {
         const dayMap = new Map<string, DailyRow>();
         for (const emp of (employees || [])) {
-          if (emp.type === '정규직') continue;
+          if (isRegular && emp.type !== '정규직') continue;
+          if (!isRegular && emp.type === '정규직') continue;
           for (const rec of (emp.records || [])) {
             const key = rec.date;
             if (!dayMap.has(key)) {
@@ -220,7 +226,8 @@ export default function DashboardPage() {
       // Anomalies from confirmed data
       const anomalyList: any[] = [];
       for (const emp of (currentConfirmed || [])) {
-        if (emp.type === '정규직') continue;
+        if (isRegular && emp.type !== '정규직') continue;
+        if (!isRegular && emp.type === '정규직') continue;
         if (emp.overtime_hours > 52) {
           anomalyList.push({ type: 'overtime', severity: 'high', message: `${emp.name}: 월 연장근로 ${emp.overtime_hours.toFixed(1)}시간 (52시간 초과)` });
         }
@@ -232,7 +239,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [year, month, isRegular]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -408,7 +415,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">대시보드</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{isRegular ? '정규직' : '사업소득(알바)/파견'} 대시보드</h2>
           <p className="text-gray-500 mt-1">근태 데이터를 다양한 관점에서 분석합니다.</p>
         </div>
         <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 px-4 py-2">
@@ -1151,5 +1158,13 @@ export default function DashboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-gray-400">로딩 중...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

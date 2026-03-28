@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check } from "lucide-react";
-import { getAttendanceSummaryRegular, confirmAttendance } from "@/lib/api";
+import { getAttendanceSummaryDispatch, confirmAttendance } from "@/lib/api";
 
 export default function AttendanceSummaryDispatchPage() {
   const [year, setYear] = useState(new Date().getFullYear());
@@ -21,7 +21,7 @@ export default function AttendanceSummaryDispatchPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const d = await getAttendanceSummaryRegular(year, month); setData(d); } catch (e: any) { alert(e.message); }
+    try { const d = await getAttendanceSummaryDispatch(year, month); setData(d); } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [year, month]);
 
@@ -32,11 +32,10 @@ export default function AttendanceSummaryDispatchPage() {
     try { return new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }); } catch { return t; }
   };
 
-  const getPlannedForDay = (shifts: any[], date: string) => {
-    const dow = new Date(date + 'T00:00:00+09:00').getDay();
-    for (const s of shifts) {
-      const days = (s.days_of_week || String(s.day_of_week)).split(',').map(Number);
-      if (days.includes(dow)) return { in: s.planned_clock_in, out: s.planned_clock_out };
+  const getPlannedForDay = (shifts: any[], _date: string) => {
+    // For dispatch workers, shifts contain the planned times from survey_requests
+    if (shifts && shifts.length > 0) {
+      return { in: shifts[0].planned_clock_in, out: shifts[0].planned_clock_out };
     }
     return null;
   };

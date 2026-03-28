@@ -1286,4 +1286,59 @@ router.get('/contracts', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/survey/attendance-summary - Monthly attendance summary for dispatch/alba workers
+router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year, month } = req.query as Record<string, string>;
+    if (!year || !month) { res.status(400).json({ error: 'year, month 필요' }); return; }
+
+    const startDate = `${year}-${month.padStart(2,'0')}-01`;
+    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    const endDate = `${year}-${month.padStart(2,'0')}-${lastDay}`;
+
+    // Get unique workers from survey_requests for this month
+    const workers = await dbAll(`
+      SELECT DISTINCT sr.phone, resp.worker_name_ko as name, sr.department,
+             sr.planned_clock_in, sr.planned_clock_out
+      FROM survey_requests sr
+      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.date >= ? AND sr.date <= ?
+      ORDER BY resp.worker_name_ko
+    `, startDate, endDate);
+
+    // Group by phone to get unique workers
+    const phoneMap = new Map<string, any>();
+    for (const w of workers as any[]) {
+      if (!phoneMap.has(w.phone)) {
+        phoneMap.set(w.phone, { phone: w.phone, name: w.name || w.phone, department: w.department || '', actuals: [], shifts: [] });
+      }
+      // Store planned times as shift-like data
+      if (w.planned_clock_in) {
+        const emp = phoneMap.get(w.phone)!;
+        if (!emp.shifts.find((s: any) => s.planned_clock_in === w.planned_clock_in)) {
+          emp.shifts.push({ planned_clock_in: w.planned_clock_in, planned_clock_out: w.planned_clock_out || '', days_of_week: '1,2,3,4,5', day_of_week: 1 });
+        }
+      }
+    }
+
+    // Get actual attendance per worker
+    for (const [phone, emp] of phoneMap) {
+      const actuals = await dbAll(`
+        SELECT sr.date, resp.clock_in_time, resp.clock_out_time
+        FROM survey_requests sr
+        JOIN survey_responses resp ON sr.id = resp.request_id
+        WHERE sr.phone = ? AND sr.date >= ? AND sr.date <= ? AND resp.clock_in_time IS NOT NULL
+        ORDER BY sr.date
+      `, phone, startDate, endDate);
+      emp.actuals = actuals;
+      emp.actual_days = actuals.length;
+      emp.id = phone; // use phone as ID for dispatch workers
+    }
+
+    res.json({ employees: Array.from(phoneMap.values()), startDate, endDate });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

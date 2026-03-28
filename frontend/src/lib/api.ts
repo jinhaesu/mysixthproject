@@ -562,6 +562,9 @@ export async function getRegularContracts() {
 export async function getAttendanceSummaryRegular(year: number, month: number) {
   return fetchAPI<any>(`/api/regular/attendance-summary?year=${year}&month=${month}`);
 }
+export async function getAttendanceSummaryDispatch(year: number, month: number) {
+  return fetchAPI<any>(`/api/survey/attendance-summary?year=${year}&month=${month}`);
+}
 export async function confirmAttendance(records: any[]) {
   return fetchAPI<any>('/api/regular/attendance-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ records }) });
 }

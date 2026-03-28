@@ -103,6 +103,7 @@ export default function SettlementAlbaPage() {
                   <th className="py-2 px-1.5">이름</th>
                   <th className="py-2 px-1.5">은행</th>
                   <th className="py-2 px-1.5">계좌번호</th>
+                  <th className="py-2 px-1.5">주민번호</th>
                   <th className="py-2 px-1.5 text-right">일</th>
                   <th className="py-2 px-1.5 text-right">기본h</th>
                   <th className="py-2 px-1.5 text-right">연장h</th>
@@ -123,6 +124,7 @@ export default function SettlementAlbaPage() {
                     <td className="py-1.5 px-1.5 font-medium text-gray-900 whitespace-nowrap">{r.name}</td>
                     <td className="py-1.5 px-1.5 text-gray-500">{r.bank_name || '-'}</td>
                     <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px]">{r.bank_account || '-'}</td>
+                    <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px]">{r.id_number || '-'}</td>
                     <td className="py-1.5 px-1.5 text-right">{r.work_days}</td>
                     <td className="py-1.5 px-1.5 text-right">{r.regular_hours}</td>
                     <td className="py-1.5 px-1.5 text-right text-amber-700">{r.overtime_hours}</td>

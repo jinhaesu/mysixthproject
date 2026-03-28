@@ -1309,15 +1309,29 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
       ORDER BY sr.phone, resp.created_at DESC
     `, startDate, endDate);
 
+    // Get workers DB category as fallback
+    const workerCategories = await dbAll('SELECT phone, category, name_ko FROM workers') as any[];
+    const catMap = new Map<string, string>();
+    for (const wk of workerCategories) {
+      if (wk.category) catMap.set(wk.phone, wk.category);
+      if (wk.category && wk.name_ko) catMap.set(wk.name_ko, wk.category);
+    }
+
     // Group by phone to get unique workers
     const phoneMap = new Map<string, any>();
     for (const w of workers as any[]) {
       if (!phoneMap.has(w.phone)) {
-        // Determine type from worker_type or category field
+        // Determine type: survey_responses.worker_type > workers.category
         let type = (w as any).worker_type || '';
         if (type === 'dispatch' || type.includes('파견')) type = '파견';
         else if (type === 'alba' || type.includes('알바') || type.includes('사업소득')) type = '알바';
-        else type = ''; // 파견/알바 외 모든 값은 정보없음 처리
+        else {
+          // Fallback to workers DB category
+          const dbCat = catMap.get(w.phone) || catMap.get(w.name) || '';
+          if (dbCat.includes('파견')) type = '파견';
+          else if (dbCat.includes('알바') || dbCat.includes('사업소득')) type = '알바';
+          else type = '';
+        }
         phoneMap.set(w.phone, { phone: w.phone, name: w.name || w.phone, department: w.department || '', type, actuals: [], shifts: [] });
       }
       // Store planned times as shift-like data
@@ -1365,12 +1379,29 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       year_month
     ) as any[];
 
-    // Strict filter by type - exact match
+    // Get workers category for fallback
+    const wCats = await dbAll('SELECT phone, category, name_ko FROM workers') as any[];
+    const wCatMap = new Map<string, string>();
+    for (const wc of wCats) {
+      if (wc.category) { wCatMap.set(wc.phone, wc.category); if (wc.name_ko) wCatMap.set(wc.name_ko, wc.category); }
+    }
+
+    // Filter: use employee_type first, fallback to workers.category
+    const getEffectiveType = (r: any): string => {
+      let t = r.employee_type || '';
+      if (!t || (t !== '파견' && t !== '알바' && t !== '사업소득')) {
+        t = wCatMap.get(r.employee_phone) || wCatMap.get(r.employee_name) || '';
+      }
+      if (t.includes('파견')) return '파견';
+      if (t.includes('알바') || t.includes('사업소득')) return '알바';
+      return t;
+    };
+
     let records: any[];
     if (type === 'alba') {
-      records = allRecords.filter(r => r.employee_type === '알바' || r.employee_type === '사업소득');
+      records = allRecords.filter(r => getEffectiveType(r) === '알바');
     } else {
-      records = allRecords.filter(r => r.employee_type === '파견');
+      records = allRecords.filter(r => getEffectiveType(r) === '파견');
     }
 
     // Filter by division (생산/물류) if specified
@@ -1387,7 +1418,7 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
         empMap.set(r.employee_name, {
           name: r.employee_name,
           phone: r.employee_phone || '',
-          type: r.employee_type || '',
+          type: getEffectiveType(r),
           work_days: 0,
           regular_hours: 0,
           overtime_hours: 0,
@@ -1418,8 +1449,8 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       w.hours += regH + otH;
     }
 
-    // Get bank info from workers table
-    const workers = await dbAll('SELECT phone, bank_name, bank_account, name_ko FROM workers') as any[];
+    // Get bank info + id_number + category from workers table
+    const workers = await dbAll('SELECT phone, bank_name, bank_account, name_ko, id_number, category FROM workers') as any[];
     const workerMap = new Map<string, any>();
     for (const w of workers) {
       workerMap.set(w.phone, w);
@@ -1445,6 +1476,7 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
         type: emp.type,
         bank_name: workerInfo.bank_name || '',
         bank_account: workerInfo.bank_account || '',
+        id_number: workerInfo.id_number || '',
         work_days: emp.work_days,
         regular_hours: Math.round(emp.regular_hours * 100) / 100,
         overtime_hours: Math.round(emp.overtime_hours * 100) / 100,

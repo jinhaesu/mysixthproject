@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { getRecords, getFilters } from "@/lib/api";
 import type { AttendanceRecord, FilterOptions } from "@/types/attendance";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
-export default function RecordsPage() {
+function RecordsContent() {
+  const searchParams = useSearchParams();
+  const pageType = searchParams.get("type") || ""; // "regular" or "dispatch" or ""
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [filters, setFilters] = useState<FilterOptions | null>(null);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 0 });
@@ -28,8 +31,19 @@ export default function RecordsPage() {
   }, []);
 
   useEffect(() => {
-    Promise.all([loadRecords({ page: "1" }), getFilters().then(setFilters)]);
-  }, [loadRecords]);
+    const initQuery: Record<string, string> = { page: "1" };
+    if (pageType === "regular") initQuery.category = "정규직";
+    else if (pageType === "dispatch") initQuery.exclude_regular = "1";
+    setQuery(initQuery);
+    Promise.all([loadRecords(initQuery), getFilters().then(f => {
+      if (f && pageType === "regular") {
+        f.categories = f.categories.filter(c => c === "정규직");
+      } else if (f && pageType === "dispatch") {
+        f.categories = f.categories.filter(c => c !== "정규직");
+      }
+      setFilters(f);
+    })]);
+  }, [loadRecords, pageType]);
 
   function handleFilterChange(key: string, value: string) {
     const newQuery = { ...query };
@@ -241,5 +255,13 @@ export default function RecordsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function RecordsPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-gray-400">로딩 중...</div>}>
+      <RecordsContent />
+    </Suspense>
   );
 }

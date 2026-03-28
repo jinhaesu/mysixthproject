@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2 } from "lucide-react";
 import { getAttendanceSummaryDispatch, confirmAttendance } from "@/lib/api";
+
+const _cache: Record<string, { data: any; time: number }> = {};
+const CACHE_TTL = 3 * 60 * 60 * 1000;
 
 export default function AttendanceSummaryDispatchPage() {
   const [year, setYear] = useState(new Date().getFullYear());
@@ -20,12 +23,9 @@ export default function AttendanceSummaryDispatchPage() {
   const [viewMode, setViewMode] = useState<'actual' | 'planned'>('actual');
   const [hiddenEmps, setHiddenEmps] = useState<Set<number>>(new Set());
 
-  const cacheRef = useRef<Record<string, { data: any; time: number }>>({});
-  const CACHE_TTL = 3 * 60 * 60 * 1000;
-
   const load = useCallback(async () => {
-    const key = `${year}-${month}`;
-    const cached = cacheRef.current[key];
+    const key = `disp-${year}-${month}`;
+    const cached = _cache[key];
     if (cached && Date.now() - cached.time < CACHE_TTL) {
       setData(cached.data);
       return;
@@ -37,7 +37,7 @@ export default function AttendanceSummaryDispatchPage() {
         d.employees = d.employees.filter((e: any) => e.actuals && e.actuals.length > 0);
       }
       setData(d);
-      cacheRef.current[key] = { data: d, time: Date.now() };
+      _cache[key] = { data: d, time: Date.now() };
       setHiddenEmps(new Set());
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }

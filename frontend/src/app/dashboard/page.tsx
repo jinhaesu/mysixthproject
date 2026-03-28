@@ -158,6 +158,11 @@ export default function DashboardPage() {
         getReportDaily(year, month),
         getReportSummary(prevY, prevM),
       ]);
+      // Parse string numbers to actual numbers
+      const parseRow = (r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, regular_hours: parseFloat(r.regular_hours) || 0, overtime_hours: parseFloat(r.overtime_hours) || 0, night_hours: parseFloat(r.night_hours) || 0, attendance_count: parseInt(r.attendance_count) || 0, unique_workers: parseInt(r.unique_workers) || 0, annual_leave_days: parseInt(r.annual_leave_days) || 0 });
+      if (summary.current) summary.current = summary.current.map(parseRow);
+      if (summary.previous) summary.previous = summary.previous.map(parseRow);
+      if (daily?.data) daily.data = daily.data.map((r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, count: parseInt(r.count) || 0 }));
       setSummaryData(summary);
       setDailyData(daily);
       setTwoMonthsAgoData(twoMonthsAgoSummary.previous || []);

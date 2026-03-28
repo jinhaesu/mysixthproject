@@ -9,6 +9,7 @@ router.get('/', async (req: Request, res: Response) => {
     const {
       startDate, endDate, name, category,
       department, workplace, uploadId,
+      exclude_regular,
       page = '1', limit = '100',
     } = req.query;
 
@@ -30,6 +31,9 @@ router.get('/', async (req: Request, res: Response) => {
     if (category) {
       query += ' AND category = ?';
       params.push(category);
+    }
+    if (exclude_regular) {
+      query += " AND category != '정규직'";
     }
     if (department) {
       query += ' AND department = ?';

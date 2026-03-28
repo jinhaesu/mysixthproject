@@ -7,7 +7,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { Calendar, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
-import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList } from "@/lib/api";
+import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList, getSalarySettings } from "@/lib/api";
 
 const REGULAR_CATS = ['정규직'];
 const DISPATCH_CATS = ['파견', '알바', '사업소득', '직원'];
@@ -156,7 +156,8 @@ function DashboardContent() {
   const [anomalies, setAnomalies] = useState<any[]>([]);
   const [anomalyCount, setAnomalyCount] = useState(0);
 
-  const [rates, setRates] = useState<Record<string, number>>({ "정규직": 9860, "파견": 9860, "알바": 9860 });
+  const [rates, setRates] = useState<Record<string, number>>({ "정규직": 10030, "파견": 9860, "알바": 9860 });
+  const [salaryData, setSalaryData] = useState<any[]>([]); // 정규직 기본급 데이터
   const [revenue, setRevenue] = useState(0);
   const [targetRatio, setTargetRatio] = useState(30);
 
@@ -289,6 +290,11 @@ function DashboardContent() {
       }
       setAnomalies(anomalyList);
       setAnomalyCount(anomalyList.length);
+
+      // Load salary settings for regular dashboard
+      if (isRegular) {
+        try { const sd = await getSalarySettings(); setSalaryData(sd || []); } catch {}
+      }
     } catch (err: any) {
       setError(err.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
@@ -366,23 +372,49 @@ function DashboardContent() {
   // 30분 단위 내림
 
   const calcSalary = useCallback((rows: SummaryRow[]) => {
-    let total = 0;
-    for (const r of rows) {
-      const rate = getRateForCategory(r.category);
-      const otH = floor30g(r.overtime_hours);
-      if (r.shift === "야간") {
-        total += r.regular_hours * rate * 1.5 + otH * rate * 2.0;
-      } else {
-        total += r.regular_hours * rate + otH * rate * 1.5;
-      }
-    }
-    return total;
-  }, [getRateForCategory]);
+    if (isRegular) {
+      // 정규직: 기본급 합계를 일할 계산 + 연장/야간/휴일 수당
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const today = new Date();
+      const currentDay = (today.getFullYear() === year && today.getMonth() + 1 === month)
+        ? today.getDate() : daysInMonth;
+      const dayRatio = currentDay / daysInMonth;
 
-  // Weekly holiday bonus (주휴수당): hours × base rate per category
+      let total = 0;
+      // 기본급 일할 계산
+      for (const s of salaryData) {
+        const monthlyPay = parseFloat(s.base_pay || 0) + parseFloat(s.meal_allowance || 0) + parseFloat(s.bonus || 0) + parseFloat(s.position_allowance || 0) + parseFloat(s.other_allowance || 0);
+        total += monthlyPay * dayRatio;
+      }
+      // 연장/야간 수당 추가
+      for (const r of rows) {
+        const rate = rates["정규직"] || 10030;
+        const otH = floor30g(r.overtime_hours);
+        total += otH * rate * 1.5;
+        total += (r.night_hours || 0) * rate * 0.5; // 야간 가산 50%
+      }
+      return total;
+    } else {
+      // 파견/알바: 시간당 단가 계산
+      let total = 0;
+      for (const r of rows) {
+        const rate = getRateForCategory(r.category);
+        const otH = floor30g(r.overtime_hours);
+        if (r.shift === "야간") {
+          total += r.regular_hours * rate * 1.5 + otH * rate * 2.0;
+        } else {
+          total += r.regular_hours * rate + otH * rate * 1.5;
+        }
+      }
+      return total;
+    }
+  }, [getRateForCategory, isRegular, year, month, salaryData, rates]);
+
+  // Weekly holiday bonus (주휴수당): hours × base rate per category (파견/알바만)
   const calcWHBonus = useCallback((whh: Record<string, number>) => {
+    if (isRegular) return 0;
     return (whh["파견"] || 0) * rates["파견"] + (whh["알바"] || 0) * rates["알바"];
-  }, [rates]);
+  }, [rates, isRegular]);
 
   const curSalary = useMemo(() =>
     calcSalary(summaryData?.current || []) + calcWHBonus(summaryData?.weeklyHolidayHours?.current || {}),
@@ -405,12 +437,17 @@ function DashboardContent() {
         const prev = map.get(key) || { regular_hours: 0, overtime_hours: 0, salary: 0 };
         const rate = getRateForCategory(r.category);
         const otH = floor30g(r.overtime_hours);
-        const sal = r.shift === "야간"
-          ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
-          : r.regular_hours * rate + otH * rate * 1.5;
+        let sal: number;
+        if (isRegular) {
+          sal = otH * (rates["정규직"] || 10030) * 1.5; // 정규직은 연장수당만
+        } else {
+          sal = r.shift === "야간"
+            ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
+            : r.regular_hours * rate + otH * rate * 1.5;
+        }
         map.set(key, {
           regular_hours: prev.regular_hours + r.regular_hours,
-          overtime_hours: prev.overtime_hours + r.overtime_hours,
+          overtime_hours: prev.overtime_hours + floor30g(r.overtime_hours),
           salary: prev.salary + sal,
         });
       }
@@ -420,22 +457,40 @@ function DashboardContent() {
       current: compute(summaryData?.current || []),
       previous: compute(summaryData?.previous || []),
     };
-  }, [summaryData, getRateForCategory]);
+  }, [summaryData, getRateForCategory, isRegular, rates]);
 
   const deptSalary = useMemo(() => {
     if (!summaryData) return [];
     const map = new Map<string, number>();
-    for (const r of summaryData.current) {
-      const dept = r.department || "미분류";
-      const rate = getRateForCategory(r.category);
-      const otH = floor30g(r.overtime_hours);
-      const s = r.shift === "야간"
-        ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
-        : r.regular_hours * rate + otH * rate * 1.5;
-      map.set(dept, (map.get(dept) || 0) + s);
+    if (isRegular) {
+      // 정규직: 부서별 기본급 합계 + 연장수당
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const today = new Date();
+      const currentDay = (today.getFullYear() === year && today.getMonth() + 1 === month) ? today.getDate() : daysInMonth;
+      const dayRatio = currentDay / daysInMonth;
+      for (const s of salaryData) {
+        const dept = s.department || "미분류";
+        const mp = parseFloat(s.base_pay || 0) + parseFloat(s.meal_allowance || 0) + parseFloat(s.bonus || 0) + parseFloat(s.position_allowance || 0) + parseFloat(s.other_allowance || 0);
+        map.set(dept, (map.get(dept) || 0) + mp * dayRatio);
+      }
+      for (const r of summaryData.current) {
+        const dept = r.department || "미분류";
+        const otH = floor30g(r.overtime_hours);
+        map.set(dept, (map.get(dept) || 0) + otH * (rates["정규직"] || 10030) * 1.5);
+      }
+    } else {
+      for (const r of summaryData.current) {
+        const dept = r.department || "미분류";
+        const rate = getRateForCategory(r.category);
+        const otH = floor30g(r.overtime_hours);
+        const s = r.shift === "야간"
+          ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
+          : r.regular_hours * rate + otH * rate * 1.5;
+        map.set(dept, (map.get(dept) || 0) + s);
+      }
     }
     return Array.from(map.entries()).map(([dept, cost]) => ({ dept, cost }));
-  }, [summaryData, getRateForCategory]);
+  }, [summaryData, getRateForCategory, isRegular, year, month, salaryData, rates]);
 
   // 3-month trend data for chart
   const threeMonthTrend = useMemo(() => {

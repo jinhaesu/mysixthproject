@@ -25,6 +25,7 @@ export default function AttendanceSummaryDispatchPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [expandedEmp, setExpandedEmp] = useState<number | null>(null);
+  const [typeFilter, setTypeFilter] = useState<'all' | '파견' | '알바'>('all');
   const [selectedSource, setSelectedSource] = useState<Record<string, 'planned' | 'actual'>>({});
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
@@ -170,7 +171,7 @@ export default function AttendanceSummaryDispatchPage() {
     finally { setConfirming(false); }
   };
 
-  const visibleEmployees = data?.employees?.filter((e: any) => !hiddenEmps.has(e.id)) || [];
+  const visibleEmployees = (data?.employees || []).filter((e: any) => !hiddenEmps.has(e.id) && (typeFilter === 'all' || (e.type || '').includes(typeFilter)));
   const lastDay = new Date(year, month, 0).getDate();
 
   return (
@@ -199,6 +200,14 @@ export default function AttendanceSummaryDispatchPage() {
           <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
             <option value="actual">실제 기준</option>
             <option value="planned">계획 기준</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">유형</label>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value="all">전체</option>
+            <option value="파견">파견</option>
+            <option value="알바">알바(사업소득)</option>
           </select>
         </div>
         <button onClick={load} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
@@ -259,6 +268,7 @@ export default function AttendanceSummaryDispatchPage() {
                   <button className="flex-1 flex items-center justify-between" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>
                     <div className="flex items-center gap-3">
                       <span className="font-medium text-gray-900">{emp.name}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${(emp.type || '').includes('파견') ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}`}>{(emp.type || '').includes('파견') ? '파견' : '알바'}</span>
                       <span className="text-xs text-gray-500">{emp.department} {emp.team}</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs">

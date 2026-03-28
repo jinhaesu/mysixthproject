@@ -499,10 +499,10 @@ router.get('/report/summary', async (req: Request, res: Response) => {
         END as shift,
         COUNT(*) as attendance_count,
         COUNT(DISTINCT name) as unique_workers,
-        ROUND(SUM(regular_hours + overtime_hours), 1) as total_hours,
-        ROUND(SUM(regular_hours), 1) as regular_hours,
-        ROUND(SUM(overtime_hours), 1) as overtime_hours,
-        ROUND(SUM(COALESCE(night_hours, 0)), 1) as night_hours,
+        ROUND(SUM(regular_hours + overtime_hours)::numeric, 1) as total_hours,
+        ROUND(SUM(regular_hours)::numeric, 1) as regular_hours,
+        ROUND(SUM(overtime_hours)::numeric, 1) as overtime_hours,
+        ROUND(SUM(COALESCE(night_hours, 0))::numeric, 1) as night_hours,
         SUM(CASE WHEN annual_leave IS NOT NULL AND annual_leave != '' AND annual_leave != '0' AND annual_leave != '미사용' THEN 1 ELSE 0 END) as annual_leave_days
       FROM attendance_records
       WHERE date >= ? AND date <= ?
@@ -546,7 +546,7 @@ router.get('/report/daily', async (req: Request, res: Response) => {
         COALESCE(workplace, '') as workplace,
         COALESCE(category, '') as category,
         COUNT(*) as count,
-        ROUND(SUM(total_hours), 1) as total_hours
+        ROUND(SUM(total_hours)::numeric, 1) as total_hours
       FROM attendance_records
       WHERE date >= ? AND date <= ?
       GROUP BY date, department, workplace, category

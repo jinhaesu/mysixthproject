@@ -747,12 +747,19 @@ router.get('/responses/export', async (req: AuthRequest, res: Response) => {
 
 // GET /api/survey/requests - List sent requests (for recent sends view)
 router.get('/requests', async (req: AuthRequest, res: Response) => {
-  const { date, limit = '20' } = req.query as Record<string, string>;
+  const { date, startDate, endDate, department, search, limit = '200' } = req.query as Record<string, string>;
 
   let where = 'WHERE 1=1';
   const params: any[] = [];
 
   if (date) { where += ' AND sr.date = ?'; params.push(date); }
+  if (startDate) { where += ' AND sr.date >= ?'; params.push(startDate); }
+  if (endDate) { where += ' AND sr.date <= ?'; params.push(endDate); }
+  if (department) { where += ' AND sr.department = ?'; params.push(department); }
+  if (search) {
+    where += ' AND (sr.phone LIKE ? OR resp.worker_name_ko LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`);
+  }
 
   const rows = await dbAll(`
     SELECT sr.*, sw.name as workplace_name,

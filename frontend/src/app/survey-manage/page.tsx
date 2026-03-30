@@ -157,8 +157,8 @@ function SendTab() {
   const [mode, setMode] = useState<"single" | "batch">("single");
   const [department, setDepartment] = useState("");
   const [recentSearch, setRecentSearch] = useState("");
-  const [recentDateStart, setRecentDateStart] = useState("");
-  const [recentDateEnd, setRecentDateEnd] = useState("");
+  const [recentDateStart, setRecentDateStart] = useState(() => new Date().toLocaleDateString('sv-SE'));
+  const [recentDateEnd, setRecentDateEnd] = useState(() => new Date().toLocaleDateString('sv-SE'));
   const [recentDeptFilter, setRecentDeptFilter] = useState("");
   const [stats, setStats] = useState<any>(null);
   const [statsDeptFilter, setStatsDeptFilter] = useState("");

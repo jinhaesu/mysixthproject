@@ -156,7 +156,12 @@ function SendTab() {
   const [recentSends, setRecentSends] = useState<any[]>([]);
   const [mode, setMode] = useState<"single" | "batch">("single");
   const [department, setDepartment] = useState("");
+  const [recentSearch, setRecentSearch] = useState("");
+  const [recentDateStart, setRecentDateStart] = useState("");
+  const [recentDateEnd, setRecentDateEnd] = useState("");
+  const [recentDeptFilter, setRecentDeptFilter] = useState("");
   const [stats, setStats] = useState<any>(null);
+  const [statsDeptFilter, setStatsDeptFilter] = useState("");
   const [reminderHours, setReminderHours] = useState(2);
   const [reminding, setReminding] = useState(false);
   const [reminderResult, setReminderResult] = useState<any>(null);
@@ -180,9 +185,18 @@ function SendTab() {
     loadRecentSends();
   }, []);
 
+  useEffect(() => {
+    getSurveyStats(statsDeptFilter || undefined).then(setStats).catch(console.error);
+  }, [statsDeptFilter]);
+
   const loadRecentSends = async () => {
     try {
-      const data = await getSurveyRequests({ limit: "20" });
+      const params: Record<string, string> = { limit: "200" };
+      if (recentDateStart) params.startDate = recentDateStart;
+      if (recentDateEnd) params.endDate = recentDateEnd;
+      if (recentDeptFilter) params.department = recentDeptFilter;
+      if (recentSearch) params.search = recentSearch;
+      const data = await getSurveyRequests(params);
       setRecentSends(data);
     } catch {}
   };
@@ -190,6 +204,7 @@ function SendTab() {
   const handleSend = async () => {
     if (!phone.trim()) return alert("전화번호를 입력해주세요.");
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
+    if (!department) return alert("배정 파트를 선택해주세요.");
     if (!plannedClockIn || !plannedClockOut) return alert("계획 출퇴근 시간을 입력해주세요.");
     setSending(true);
     try {
@@ -224,6 +239,7 @@ function SendTab() {
     const phones = bulkPhones.split("\n").map((p) => p.trim()).filter(Boolean);
     if (phones.length === 0) return alert("전화번호를 입력해주세요.");
     if (workplaceId === null) return alert("근무지를 선택해주세요.");
+    if (!department) return alert("배정 파트를 선택해주세요.");
     if (!plannedClockIn || !plannedClockOut) return alert("계획 출퇴근 시간을 입력해주세요.");
     setSending(true);
     try {
@@ -266,22 +282,37 @@ function SendTab() {
     <div className="space-y-6">
       {/* Stats Summary */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{stats.today || 0}</p>
-            <p className="text-xs text-gray-500 mt-1">오늘 발송</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-gray-600">파트별 현황:</span>
+            <select
+              value={statsDeptFilter}
+              onChange={(e) => setStatsDeptFilter(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">전체</option>
+              <option value="물류">물류</option>
+              <option value="생산2층">생산2층</option>
+              <option value="생산3층">생산3층</option>
+            </select>
           </div>
-          <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600">{stats.todayByStatus?.sent || 0}</p>
-            <p className="text-xs text-gray-500 mt-1">대기중</p>
-          </div>
-          <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
-            <p className="text-2xl font-bold text-amber-600">{stats.todayByStatus?.clock_in || 0}</p>
-            <p className="text-xs text-gray-500 mt-1">출근완료</p>
-          </div>
-          <div className="bg-white rounded-xl border border-green-200 p-4 text-center">
-            <p className="text-2xl font-bold text-green-600">{stats.todayByStatus?.completed || 0}</p>
-            <p className="text-xs text-gray-500 mt-1">퇴근완료</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+              <p className="text-2xl font-bold text-gray-900">{stats.today || 0}</p>
+              <p className="text-xs text-gray-500 mt-1">오늘 발송</p>
+            </div>
+            <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
+              <p className="text-2xl font-bold text-blue-600">{stats.todayByStatus?.sent || 0}</p>
+              <p className="text-xs text-gray-500 mt-1">대기중</p>
+            </div>
+            <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
+              <p className="text-2xl font-bold text-amber-600">{stats.todayByStatus?.clock_in || 0}</p>
+              <p className="text-xs text-gray-500 mt-1">출근완료</p>
+            </div>
+            <div className="bg-white rounded-xl border border-green-200 p-4 text-center">
+              <p className="text-2xl font-bold text-green-600">{stats.todayByStatus?.completed || 0}</p>
+              <p className="text-xs text-gray-500 mt-1">퇴근완료</p>
+            </div>
           </div>
         </div>
       )}
@@ -315,18 +346,16 @@ function SendTab() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">배정 파트</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">배정 파트 <span className="text-red-500">*</span></label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
-                <option value="">파트 선택 (선택사항)</option>
-                <option value="생산팀">생산팀</option>
-                <option value="물류팀">물류팀</option>
-                <option value="포장팀">포장팀</option>
-                <option value="품질관리팀">품질관리팀</option>
-                <option value="기타">기타</option>
+                <option value="">파트 선택 (필수)</option>
+                <option value="물류">물류</option>
+                <option value="생산2층">생산2층</option>
+                <option value="생산3층">생산3층</option>
               </select>
             </div>
             <div>
@@ -491,15 +520,32 @@ function SendTab() {
 
       {/* Recent Sends */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">최근 발송 내역</h2>
-          <button
-            onClick={loadRecentSends}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-            title="새로고침"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+        <div className="px-5 py-4 border-b border-gray-100 space-y-3">
+          <h2 className="text-base font-semibold text-gray-900">발송 내역</h2>
+          <div className="flex flex-wrap gap-2 items-end">
+            <div>
+              <label className="block text-[10px] text-gray-500 mb-0.5">시작일</label>
+              <input type="date" value={recentDateStart} onChange={e => setRecentDateStart(e.target.value)} className="px-2 py-1 border border-gray-300 rounded text-xs" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-gray-500 mb-0.5">종료일</label>
+              <input type="date" value={recentDateEnd} onChange={e => setRecentDateEnd(e.target.value)} className="px-2 py-1 border border-gray-300 rounded text-xs" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-gray-500 mb-0.5">부서</label>
+              <select value={recentDeptFilter} onChange={e => setRecentDeptFilter(e.target.value)} className="px-2 py-1 border border-gray-300 rounded text-xs bg-white">
+                <option value="">전체</option>
+                <option value="물류">물류</option>
+                <option value="생산2층">생산2층</option>
+                <option value="생산3층">생산3층</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] text-gray-500 mb-0.5">검색</label>
+              <input type="text" value={recentSearch} onChange={e => setRecentSearch(e.target.value)} placeholder="이름/번호" className="px-2 py-1 border border-gray-300 rounded text-xs w-24" />
+            </div>
+            <button onClick={loadRecentSends} className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium">조회</button>
+          </div>
         </div>
 
         {recentSends.length === 0 ? (
@@ -544,23 +590,37 @@ function SendTab() {
                       <StatusBadge status={r.status} />
                     </td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
-                      {(r.status === 'sent' || r.status === 'expired') && (
+                      <div className="flex gap-1">
+                        {(r.status === 'sent' || r.status === 'expired') && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await resendSurvey(r.id);
+                                alert('재발송 완료');
+                                loadRecentSends();
+                                getSurveyStats().then(setStats);
+                              } catch (err: any) { alert(err.message); }
+                            }}
+                            className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                          >
+                            재발송
+                          </button>
+                        )}
                         <button
                           onClick={async () => {
+                            if (!confirm('삭제하시겠습니까?')) return;
                             try {
-                              await resendSurvey(r.id);
-                              alert('재발송 완료');
+                              const token = localStorage.getItem('token');
+                              await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/survey/requests/${r.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
                               loadRecentSends();
                               getSurveyStats().then(setStats);
-                            } catch (err: any) {
-                              alert(err.message);
-                            }
+                            } catch (err: any) { alert(err.message); }
                           }}
-                          className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                          className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100"
                         >
-                          재발송
+                          삭제
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}

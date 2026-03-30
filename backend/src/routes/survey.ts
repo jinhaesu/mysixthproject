@@ -521,23 +521,28 @@ router.post('/resend/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/survey/stats - Summary statistics
-router.get('/stats', async (_req: AuthRequest, res: Response) => {
+router.get('/stats', async (req: AuthRequest, res: Response) => {
   try {
     const today = getKSTDate();
+    const department = req.query.department as string || '';
 
-    const total = await dbGet('SELECT COUNT(*) as count FROM survey_requests');
-    const todayCount = await dbGet('SELECT COUNT(*) as count FROM survey_requests WHERE date = ?', today);
+    const deptWhere = department ? " AND department = ?" : "";
+    const deptParams = department ? [department] : [];
+
+    const total = await dbGet(`SELECT COUNT(*) as count FROM survey_requests WHERE 1=1${deptWhere}`, ...deptParams);
+    const todayCount = await dbGet(`SELECT COUNT(*) as count FROM survey_requests WHERE date = ?${deptWhere}`, today, ...deptParams);
     const byStatus = await dbAll(`
       SELECT status, COUNT(*) as count
       FROM survey_requests
+      WHERE 1=1${deptWhere}
       GROUP BY status
-    `);
+    `, ...deptParams);
     const todayByStatus = await dbAll(`
       SELECT status, COUNT(*) as count
       FROM survey_requests
-      WHERE date = ?
+      WHERE date = ?${deptWhere}
       GROUP BY status
-    `, today);
+    `, today, ...deptParams);
 
     res.json({
       total: total.count,
@@ -764,6 +769,17 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
   res.json(rows);
 });
 
+// DELETE /api/survey/requests/:id
+router.delete('/requests/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    // survey_responses has ON DELETE CASCADE, so it will be cleaned up automatically
+    await dbRun('DELETE FROM survey_requests WHERE id = ?', id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ===== Report Schedules =====
 

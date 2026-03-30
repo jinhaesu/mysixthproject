@@ -209,8 +209,9 @@ export async function sendSurveyBatch(data: { phones: string[]; date: string; wo
 }
 
 // Survey stats & resend
-export async function getSurveyStats() {
-  return fetchAPI<any>('/api/survey/stats');
+export async function getSurveyStats(department?: string) {
+  const query = department ? `?department=${encodeURIComponent(department)}` : '';
+  return fetchAPI<any>(`/api/survey/stats${query}`);
 }
 
 export async function resendSurvey(id: number) {

@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbAll, dbRun, dbTransaction } from '../db';
+import { dbGet, dbAll, dbRun, dbTransaction, isHolidayOrWeekend } from '../db';
 import { parseExcelFile } from '../services/excelParser';
 import { analyzeAttendance } from '../services/aiAnalysis';
 
@@ -86,6 +86,15 @@ router.post('/', upload.single('file'), async (req: Request, res: Response): Pro
       'INSERT INTO uploads (id, filename, original_filename, record_count, ai_analysis) VALUES (?, ?, ?, ?, ?)',
       uploadId, req.file.filename, originalFilename, records.length, JSON.stringify(analysis)
     );
+
+    // Reclassify weekend/holiday hours as overtime before saving
+    for (const r of records) {
+      if (r.date && isHolidayOrWeekend(r.date)) {
+        // All hours on holidays/weekends → overtime
+        r.overtime_hours = (r.regular_hours || 0) + (r.overtime_hours || 0);
+        r.regular_hours = 0;
+      }
+    }
 
     // Save attendance records
     await dbTransaction(async (tx) => {

@@ -744,14 +744,14 @@ router.get('/shifts', async (_req: AuthRequest, res: Response) => {
 // POST /api/regular/shifts - Create shift
 router.post('/shifts', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, week_number, day_of_week, planned_clock_in, planned_clock_out } = req.body;
-    if (!name || week_number === undefined || day_of_week === undefined || !planned_clock_in || !planned_clock_out) {
-      res.status(400).json({ error: '모든 필드를 입력해주세요.' });
+    const { name, week_number, day_of_week, planned_clock_in, planned_clock_out, month, days_of_week } = req.body;
+    if (!name || !planned_clock_in || !planned_clock_out) {
+      res.status(400).json({ error: '배치명과 출퇴근 시간을 입력해주세요.' });
       return;
     }
     const result = await dbRun(
-      'INSERT INTO regular_shifts (name, week_number, day_of_week, planned_clock_in, planned_clock_out) VALUES (?, ?, ?, ?, ?)',
-      name, week_number, day_of_week, planned_clock_in, planned_clock_out
+      'INSERT INTO regular_shifts (name, week_number, day_of_week, planned_clock_in, planned_clock_out, month, days_of_week) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      name, week_number || 1, day_of_week || 0, planned_clock_in, planned_clock_out, month || 0, days_of_week || ''
     );
     const created = await dbGet('SELECT * FROM regular_shifts WHERE id = ?', result.lastInsertRowid);
     res.status(201).json(created);

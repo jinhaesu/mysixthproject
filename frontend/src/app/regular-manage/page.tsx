@@ -150,7 +150,7 @@ export default function RegularManagePage() {
   const loadEmployees = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getRegularEmployees();
+      const data = await getRegularEmployees({ limit: '500' });
       const list = data?.employees || data || [];
       setEmployees(list);
     } catch (err: any) {

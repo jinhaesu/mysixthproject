@@ -628,6 +628,10 @@ function ResponsesTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editClockIn, setEditClockIn] = useState("");
   const [editClockOut, setEditClockOut] = useState("");
+  const [editAgency, setEditAgency] = useState("");
+  const [editGender, setEditGender] = useState("");
+  const [editBirthYear, setEditBirthYear] = useState("");
+  const [editOvertimeWilling, setEditOvertimeWilling] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [batchTimeType, setBatchTimeType] = useState<'clock_in' | 'clock_out'>('clock_in');
   const [batchTimeValue, setBatchTimeValue] = useState(() => {
@@ -641,7 +645,11 @@ function ResponsesTab() {
       await updateSurveyResponseTime(editingId, {
         clock_in_time: editClockIn || undefined,
         clock_out_time: editClockOut || undefined,
-      });
+        agency: editAgency || undefined,
+        gender: editGender || undefined,
+        birth_year: editBirthYear ? parseInt(editBirthYear) : undefined,
+        overtime_willing: editOvertimeWilling || undefined,
+      } as any);
       setEditingId(null);
       load(pagination.page);
     } catch (err: any) {
@@ -945,11 +953,19 @@ function ResponsesTab() {
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{formatPlannedTime(r.planned_clock_out)}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.department || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.gender || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.birth_year || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.agency || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">
+                      {editingId === r.id ? <select value={editGender} onChange={e => setEditGender(e.target.value)} className="px-1 py-0.5 border rounded text-xs"><option value="">-</option><option value="male">남</option><option value="female">여</option></select> : (r.gender === 'male' ? '남' : r.gender === 'female' ? '여' : r.gender || "-")}
+                    </td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">
+                      {editingId === r.id ? <input type="text" value={editBirthYear} onChange={e => setEditBirthYear(e.target.value)} className="w-14 px-1 py-0.5 border rounded text-xs" /> : (r.birth_year || "-")}
+                    </td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">
+                      {editingId === r.id ? <input type="text" value={editAgency} onChange={e => setEditAgency(e.target.value)} className="w-20 px-1 py-0.5 border rounded text-xs" /> : (r.agency || "-")}
+                    </td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
-                      {r.overtime_willing ? (
+                      {editingId === r.id ? (
+                        <select value={editOvertimeWilling} onChange={e => setEditOvertimeWilling(e.target.value)} className="px-1 py-0.5 border rounded text-xs"><option value="">-</option><option value="가능">가능</option><option value="불가">불가</option></select>
+                      ) : r.overtime_willing ? (
                         <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${r.overtime_willing === '가능' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-600'}`}>
                           {r.overtime_willing}
                         </span>
@@ -982,10 +998,14 @@ function ResponsesTab() {
                             setEditingId(r.id);
                             setEditClockIn(r.clock_in_time ? new Date(r.clock_in_time).toISOString().slice(0, 16) : "");
                             setEditClockOut(r.clock_out_time ? new Date(r.clock_out_time).toISOString().slice(0, 16) : "");
+                            setEditAgency(r.agency || "");
+                            setEditGender(r.gender || "");
+                            setEditBirthYear(r.birth_year ? String(r.birth_year) : "");
+                            setEditOvertimeWilling(r.overtime_willing || "");
                           }}
                           className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
                         >
-                          시간수정
+                          수정
                         </button>
                       )}
                     </td>

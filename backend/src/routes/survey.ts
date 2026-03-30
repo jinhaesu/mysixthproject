@@ -62,15 +62,15 @@ router.delete('/workplaces/:id', async (req: AuthRequest, res: Response) => {
 router.post('/edit-time/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { clock_in_time, clock_out_time } = req.body;
+    const { clock_in_time, clock_out_time, agency, gender, birth_year, overtime_willing } = req.body;
 
     const request = await dbGet(`
-      SELECT sr.id, sr.date, sr.status, resp.id as resp_id, resp.clock_in_time, resp.clock_out_time,
+      SELECT sr.id, sr.phone, sr.date, sr.status, resp.id as resp_id, resp.clock_in_time, resp.clock_out_time,
              resp.worker_name_ko
       FROM survey_requests sr
       LEFT JOIN survey_responses resp ON sr.id = resp.request_id
       WHERE sr.id = ?
-    `, id);
+    `, id) as any;
 
     if (!request || !request.resp_id) {
       res.status(404).json({ error: '응답을 찾을 수 없습니다.' });
@@ -124,6 +124,25 @@ router.post('/edit-time/:id', async (req: AuthRequest, res: Response) => {
             UPDATE attendance_records SET clock_in = ?, clock_out = ?, total_hours = ?, regular_hours = ?, overtime_hours = ?, break_time = ?
             WHERE id = ?
           `, clockInStr, clockOutStr, totalHours, regularHours, overtimeHours, breakTime, existing.id);
+        }
+      }
+    }
+
+    // Update additional fields if provided
+    if (agency !== undefined || gender !== undefined || birth_year !== undefined || overtime_willing !== undefined) {
+      const updates: string[] = [];
+      const params: any[] = [];
+      if (agency !== undefined) { updates.push('agency = ?'); params.push(agency); }
+      if (gender !== undefined) { updates.push('gender = ?'); params.push(gender); }
+      if (birth_year !== undefined) { updates.push('birth_year = ?'); params.push(birth_year); }
+      if (overtime_willing !== undefined) { updates.push('overtime_willing = ?'); params.push(overtime_willing); }
+      if (updates.length > 0) {
+        params.push(request.resp_id);
+        await dbRun(`UPDATE survey_responses SET ${updates.join(', ')} WHERE id = ?`, ...params);
+        // Also update all other responses for the same phone
+        if (request.phone) {
+          const otherParams = [...params.slice(0, -1), request.phone];
+          await dbRun(`UPDATE survey_responses SET ${updates.join(', ')} WHERE id IN (SELECT resp.id FROM survey_responses resp JOIN survey_requests sr ON resp.request_id = sr.id WHERE sr.phone = ?)`, ...otherParams);
         }
       }
     }

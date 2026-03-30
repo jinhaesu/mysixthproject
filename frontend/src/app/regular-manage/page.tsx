@@ -1568,6 +1568,7 @@ function ShiftsTab() {
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
   const [assignIds, setAssignIds] = useState<Set<number>>(new Set());
   const [assignSearch, setAssignSearch] = useState("");
+  const [assignDeptFilter, setAssignDeptFilter] = useState("all");
   const [editingShift, setEditingShift] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", month: 1, week_number: 1, days_of_week: [] as number[], planned_clock_in: "08:00", planned_clock_out: "17:00" });
 
@@ -1777,9 +1778,15 @@ function ShiftsTab() {
             )}
             <div>
               <h4 className="text-xs font-semibold text-gray-600 mb-2">직원 추가</h4>
-              <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mb-2" />
+              <div className="flex gap-2 mb-2">
+                <select value={assignDeptFilter} onChange={e => setAssignDeptFilter(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  <option value="all">전체 부서</option>
+                  {Array.from(new Set(allEmployees.map((e: any) => e.department).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+              </div>
               <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
-                {allEmployees.filter((e: any) => !assignments.find((a: any) => a.employee_id === e.id)).filter((e: any) => !assignSearch || e.name?.includes(assignSearch) || e.phone?.includes(assignSearch)).map((e: any) => (
+                {allEmployees.filter((e: any) => !assignments.find((a: any) => a.employee_id === e.id)).filter((e: any) => assignDeptFilter === 'all' || e.department === assignDeptFilter).filter((e: any) => !assignSearch || e.name?.includes(assignSearch) || e.phone?.includes(assignSearch)).map((e: any) => (
                   <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
                     <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-gray-300" />
                     <span className="text-sm">{e.name}</span><span className="text-xs text-gray-500">{e.department} {e.team}</span>

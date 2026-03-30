@@ -151,9 +151,10 @@ export default function RegularManagePage() {
     setLoading(true);
     try {
       const data = await getRegularEmployees();
-      setEmployees(data.employees || data || []);
-    } catch {
-      // silent
+      const list = data?.employees || data || [];
+      setEmployees(list);
+    } catch (err: any) {
+      console.error('loadEmployees error:', err);
     } finally {
       setLoading(false);
     }
@@ -199,9 +200,12 @@ export default function RegularManagePage() {
     }
     setEmpSaving(true);
     try {
-      await createRegularEmployee(empForm);
-      setEmpForm({ ...emptyEmployeeForm });
-      loadEmployees();
+      const result = await createRegularEmployee(empForm);
+      if (result) {
+        setEmpForm({ ...emptyEmployeeForm });
+        alert(`${empForm.name} 등록 완료`);
+        await loadEmployees();
+      }
     } catch (err: any) {
       alert(err.message || "등록 실패");
     } finally {

@@ -591,7 +591,9 @@ export default function RegularManagePage() {
                       <th className="px-4 py-3 text-left font-medium text-gray-600">조</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600">직책</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600">입사일</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">토큰 링크</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600">은행</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600">계좌번호</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600">주민번호</th>
                       <th className="px-4 py-3 text-right font-medium text-gray-600">관리</th>
                     </tr>
                   </thead>
@@ -624,9 +626,9 @@ export default function RegularManagePage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-gray-700 text-xs">{(emp as any).hire_date || "-"}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[200px] truncate">
-                          {emp.token_link || "-"}
-                        </td>
+                        <td className="px-4 py-3 text-gray-700 text-xs">{(emp as any).bank_name || "-"}</td>
+                        <td className="px-4 py-3 text-gray-700 text-xs font-mono">{(emp as any).bank_account || "-"}</td>
+                        <td className="px-4 py-3 text-gray-700 text-xs">{(emp as any).id_number ? "●●●●●●-●●●●●●●" : "-"}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button

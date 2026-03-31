@@ -37,6 +37,8 @@ export default function AttendanceSummaryDispatchPage() {
   const [hiddenEmps, setHiddenEmps] = useState<Set<number>>(new Set());
   const [confirmedSet, setConfirmedSet] = useState<Set<string>>(new Set());
   const [confirmedEmpSet, setConfirmedEmpSet] = useState<Set<string>>(new Set());
+  const [nameSearch, setNameSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("");
 
   const load = useCallback(async () => {
     const key = `disp-${year}-${month}`;
@@ -215,7 +217,26 @@ export default function AttendanceSummaryDispatchPage() {
     finally { setConfirming(false); }
   };
 
-  const visibleEmployees = (data?.employees || []).filter((e: any) => !hiddenEmps.has(e.id) && (typeFilter === 'all' || (e.type || '').includes(typeFilter)));
+  const getAnomalyCount = (emp: any) => {
+    let count = 0;
+    for (const actual of (emp.actuals || [])) {
+      const planned = getPlannedForDay(emp.shifts, actual.date);
+      if (!planned || planned.in === '-') continue;
+      const actualIn = formatTime(actual.clock_in_time);
+      const actualOut = formatTime(actual.clock_out_time);
+      const diffIn = timeDiffHours(planned.in, actualIn);
+      const diffOut = timeDiffHours(planned.out, actualOut);
+      if (diffIn >= 3 || diffOut >= 3) count++;
+    }
+    return count;
+  };
+
+  const visibleEmployees = (data?.employees || []).filter((e: any) =>
+    !hiddenEmps.has(e.id) &&
+    (typeFilter === 'all' || (e.type || '').includes(typeFilter)) &&
+    (!nameSearch || (e.name || '').includes(nameSearch)) &&
+    (!deptFilter || (e.department || '').includes(deptFilter))
+  );
   const lastDay = new Date(year, month, 0).getDate();
 
   return (
@@ -253,6 +274,20 @@ export default function AttendanceSummaryDispatchPage() {
             <option value="파견">파견</option>
             <option value="알바">알바(사업소득)</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">부서</label>
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value="">전체</option>
+            <option value="물류">물류</option>
+            <option value="생산2층">생산2층</option>
+            <option value="생산3층">생산3층</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
+          <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
         </div>
         <button onClick={load} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
@@ -311,11 +346,12 @@ export default function AttendanceSummaryDispatchPage() {
                       className="rounded border-gray-300" />
                   </div>
                   <button className="flex-1 flex items-center justify-between" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <span className="font-medium text-gray-900">{emp.name}</span>
                       {isFullyConfirmed && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-3 h-3" />확정</span>}
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-blue-50 text-blue-700' : emp.type === '알바' ? 'bg-orange-50 text-orange-700' : 'bg-red-50 text-red-600'}`}>{emp.type || '정보없음'}</span>
                       <span className="text-xs text-gray-500">{emp.department}</span>
+                      {(() => { const ac = getAnomalyCount(emp); return ac > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">차이 발생 {ac}건</span> : null; })()}
                     </div>
                     <div className="flex items-center gap-4 text-xs">
                       <span className="text-gray-600">{summary.days}일</span>

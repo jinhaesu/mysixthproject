@@ -163,7 +163,19 @@ router.get('/:token', async (req: Request, res: Response) => {
     }
 
     const today = getKSTDate();
-    const attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
+    // Check today first, then yesterday (for night shifts crossing midnight)
+    let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
+    let attendanceDate = today;
+    if (!attendance || (!attendance.clock_out_time && !attendance.clock_in_time)) {
+      // Check yesterday for an uncompleted night shift (clocked in but not out)
+      const yd = new Date(new Date(today + 'T00:00:00+09:00').getTime() - 86400000);
+      const yesterday = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
+      const yesterdayAtt = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL', employee.id, yesterday) as any;
+      if (yesterdayAtt) {
+        attendance = yesterdayAtt;
+        attendanceDate = yesterday;
+      }
+    }
 
     // Get today's notices (specific date, daily, or date range + department filter)
     const allNotices = await dbAll(`
@@ -446,8 +458,13 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     const today = getKSTDate();
     const clockOutTime = getKSTTimestamp();
 
-    // Must have clocked in first
-    const attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
+    // Must have clocked in first - check today, then yesterday (night shift crossing midnight)
+    let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL', employee.id, today) as any;
+    if (!attendance) {
+      const yd = new Date(new Date(today + 'T00:00:00+09:00').getTime() - 86400000);
+      const yesterday = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
+      attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL', employee.id, yesterday) as any;
+    }
     if (!attendance) {
       res.status(400).json({ error: '먼저 출근을 기록해주세요.' });
       return;

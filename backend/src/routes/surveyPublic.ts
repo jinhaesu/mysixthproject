@@ -97,8 +97,8 @@ router.get('/:token', async (req: Request, res: Response) => {
     return;
   }
 
-  // Check expiration
-  if (new Date(request.expires_at) < new Date()) {
+  // Check expiration (but allow if already clocked in - night shift crossing midnight)
+  if (new Date(request.expires_at) < new Date() && request.status !== 'clock_in') {
     await dbRun('UPDATE survey_requests SET status = ? WHERE id = ?', 'expired', request.id);
     res.status(410).json({ error: '설문 링크가 만료되었습니다.' });
     return;
@@ -300,13 +300,13 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     return;
   }
 
-  if (new Date(request.expires_at) < new Date()) {
-    await dbRun('UPDATE survey_requests SET status = ? WHERE id = ?', 'expired', request.id);
-    res.status(410).json({ error: '설문 링크가 만료되었습니다.' });
-    return;
-  }
-
+  // Allow clock-out even if token expired (night shifts crossing midnight)
   if (request.status !== 'clock_in') {
+    if (new Date(request.expires_at) < new Date()) {
+      await dbRun('UPDATE survey_requests SET status = ? WHERE id = ?', 'expired', request.id);
+      res.status(410).json({ error: '설문 링크가 만료되었습니다.' });
+      return;
+    }
     res.status(400).json({ error: '먼저 출근을 기록해주세요.' });
     return;
   }

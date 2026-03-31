@@ -37,6 +37,7 @@ export default function AttendanceSummaryDispatchPage() {
   const [hiddenEmps, setHiddenEmps] = useState<Set<number>>(new Set());
   const [confirmedSet, setConfirmedSet] = useState<Set<string>>(new Set());
   const [confirmedEmpSet, setConfirmedEmpSet] = useState<Set<string>>(new Set());
+  const [confirmedIdMap, setConfirmedIdMap] = useState<Record<string, number>>({});
   const [nameSearch, setNameSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [dinnerBreak, setDinnerBreak] = useState<Record<string, boolean>>({});
@@ -51,13 +52,15 @@ export default function AttendanceSummaryDispatchPage() {
       try {
         const confirmed = await getConfirmedList(ym, '');
         const cSet = new Set<string>();
+        const cIdMap: Record<string, number> = {};
         const cEmpDates = new Map<string, number>();
         for (const emp of (confirmed || [])) {
           if (emp.type === '정규직') continue;
-          for (const rec of (emp.records || [])) { cSet.add(`${emp.name}|${rec.date}`); }
+          for (const rec of (emp.records || [])) { const k = `${emp.name}|${rec.date}`; cSet.add(k); cIdMap[k] = rec.id; }
           cEmpDates.set(emp.name, (cEmpDates.get(emp.name) || 0) + (emp.records?.length || 0));
         }
         setConfirmedSet(cSet);
+        setConfirmedIdMap(cIdMap);
         const cEmpSet = new Set<string>();
         for (const emp of cached.data.employees || []) {
           const total = emp.actuals?.length || 0;
@@ -82,13 +85,15 @@ export default function AttendanceSummaryDispatchPage() {
       try {
         const confirmed = await getConfirmedList(ym, '');
         const cSet = new Set<string>();
+        const cIdMap: Record<string, number> = {};
         const cEmpDates = new Map<string, number>();
         for (const emp of (confirmed || [])) {
           if (emp.type === '정규직') continue;
-          for (const rec of (emp.records || [])) { cSet.add(`${emp.name}|${rec.date}`); }
+          for (const rec of (emp.records || [])) { const k = `${emp.name}|${rec.date}`; cSet.add(k); cIdMap[k] = rec.id; }
           cEmpDates.set(emp.name, (cEmpDates.get(emp.name) || 0) + (emp.records?.length || 0));
         }
         setConfirmedSet(cSet);
+        setConfirmedIdMap(cIdMap);
         const cEmpSet = new Set<string>();
         if (d?.employees) {
           for (const emp of d.employees) {
@@ -480,7 +485,26 @@ export default function AttendanceSummaryDispatchPage() {
                               </td>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
-                                  <span className="text-[10px] text-green-600 font-medium">확정됨</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-green-600 font-medium">확정됨</span>
+                                    <button onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const cKey = `${emp.name}|${date}`;
+                                      const recId = confirmedIdMap[cKey];
+                                      if (!recId) { alert('확정 레코드를 찾을 수 없습니다.'); return; }
+                                      if (!confirm(`${date} 확정을 취소하시겠습니까?`)) return;
+                                      try {
+                                        await deleteConfirmedRecord(recId);
+                                        const newSet = new Set(confirmedSet); newSet.delete(cKey); setConfirmedSet(newSet);
+                                        const newIdMap = {...confirmedIdMap}; delete newIdMap[cKey]; setConfirmedIdMap(newIdMap);
+                                        // Check if employee is still fully confirmed
+                                        const stillFull = emp.actuals.every((a: any) => a.date === date ? false : newSet.has(`${emp.name}|${a.date}`));
+                                        if (!stillFull) { const newEmpSet = new Set(confirmedEmpSet); newEmpSet.delete(emp.name); setConfirmedEmpSet(newEmpSet); }
+                                      } catch (err: any) { alert(err.message); }
+                                    }} className="px-1 py-0.5 text-[9px] text-red-600 bg-red-50 hover:bg-red-100 rounded font-medium">
+                                      취소
+                                    </button>
+                                  </div>
                                 ) : (
                                   <select value={source} onChange={e => setSelectedSource({...selectedSource, [key]: e.target.value as any})}
                                     className="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-white">

@@ -47,6 +47,8 @@ export default function ConfirmedListDispatchPage() {
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [nameSearch, setNameSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,10 +77,24 @@ export default function ConfirmedListDispatchPage() {
         <p className="text-sm text-gray-500 mt-1">확정된 근태 정보를 확인하고 최종 수정합니다.</p>
       </div>
 
-      <div className="flex gap-3 items-end mb-4">
+      <div className="flex flex-wrap gap-3 items-end mb-4">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">연월</label>
           <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">부서</label>
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value="">전체</option>
+            <option value="물류">물류</option>
+            <option value="생산2층">생산2층</option>
+            <option value="생산3층">생산3층</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
+          <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
         </div>
         <button onClick={load} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
@@ -87,7 +103,12 @@ export default function ConfirmedListDispatchPage() {
         <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
       ) : data.length === 0 ? (
         <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">확정된 데이터가 없습니다.</div>
-      ) : (
+      ) : (() => {
+        const filtered = data.filter((e: any) =>
+          (!nameSearch || (e.name || '').includes(nameSearch)) &&
+          (!deptFilter || (e.department || '').includes(deptFilter))
+        );
+        return (
         <>
           {/* Summary Table */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
@@ -105,11 +126,12 @@ export default function ConfirmedListDispatchPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {data.map((emp: any) => (
+                {filtered.map((emp: any) => (
                   <tr key={emp.name} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedEmp(expandedEmp === emp.name ? null : emp.name)}>
                     <td className="py-2.5 px-4 font-medium text-gray-900">
                       {emp.name}
                       <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-blue-50 text-blue-700' : emp.type === '알바' ? 'bg-orange-50 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{emp.type || '?'}</span>
+                      {emp.department && <span className="ml-1 text-[10px] text-gray-500">{emp.department}</span>}
                     </td>
                     <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
                     <td className="py-2.5 px-4 text-right">{emp.days}</td>
@@ -191,7 +213,8 @@ export default function ConfirmedListDispatchPage() {
             );
           })()}
         </>
-      )}
+        );
+      })()}
     </div>
   );
 }

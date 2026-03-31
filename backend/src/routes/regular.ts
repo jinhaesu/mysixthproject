@@ -1083,12 +1083,22 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
 
     const records = await dbAll(`SELECT * FROM confirmed_attendance ${where} ORDER BY employee_name, date`, ...params);
 
+    // Look up departments
+    const deptMap = new Map<string, string>();
+    try {
+      const workers = await dbAll("SELECT name_ko, department FROM workers WHERE name_ko IS NOT NULL AND name_ko != ''");
+      for (const w of workers as any[]) { if (w.name_ko) deptMap.set(w.name_ko, w.department || ''); }
+      const regs = await dbAll("SELECT name, department FROM regular_employees WHERE resigned = 0");
+      for (const r of regs as any[]) { if (r.name) deptMap.set(r.name, r.department || ''); }
+    } catch {}
+
     // Summarize by employee
     const empMap = new Map<string, any>();
     for (const r of records as any[]) {
       if (!empMap.has(r.employee_name)) {
         empMap.set(r.employee_name, {
           name: r.employee_name, phone: r.employee_phone, type: r.employee_type,
+          department: deptMap.get(r.employee_name) || '',
           days: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, break_hours: 0, holiday_days: 0,
           records: []
         });

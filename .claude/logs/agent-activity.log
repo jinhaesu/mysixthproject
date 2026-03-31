@@ -1,2 +1,3 @@
 [%Y-%m-%d %H:%M:%S] session start
 [%H:%M:%S] session stop
+[%H:%M:%S] session stop

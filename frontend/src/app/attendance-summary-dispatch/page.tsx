@@ -39,6 +39,7 @@ export default function AttendanceSummaryDispatchPage() {
   const [confirmedEmpSet, setConfirmedEmpSet] = useState<Set<string>>(new Set());
   const [nameSearch, setNameSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
+  const [dinnerBreak, setDinnerBreak] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     const key = `disp-${year}-${month}`;
@@ -127,13 +128,29 @@ export default function AttendanceSummaryDispatchPage() {
     return Math.abs((h1 * 60 + (m1||0)) - (h2 * 60 + (m2||0))) / 60;
   };
 
-  const calcHoursFromTimes = (clockIn: string, clockOut: string) => {
+  const isDinnerApplicable = (clockIn: string, clockOut: string) => {
+    if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return false;
+    const [h1] = clockIn.split(':').map(Number);
+    const [h2] = clockOut.split(':').map(Number);
+    if (isNaN(h1) || isNaN(h2)) return false;
+    return h1 >= 7 && h1 <= 9 && h2 >= 19 && h2 <= 20;
+  };
+
+  const calcHoursFromTimes = (clockIn: string, clockOut: string, breakH = 1) => {
     if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return { regular: 0, overtime: 0 };
     const [h1,m1] = clockIn.split(':').map(Number);
     const [h2,m2] = clockOut.split(':').map(Number);
     if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0 };
-    const total = Math.max(((h2*60+(m2||0)) - (h1*60+(m1||0))) / 60 - 1, 0);
+    const total = Math.max(((h2*60+(m2||0)) - (h1*60+(m1||0))) / 60 - breakH, 0);
     return { regular: Math.min(total, 8), overtime: Math.max(total - 8, 0) };
+  };
+
+  const getBreakHours = (empId: number, date: string, clockIn: string, clockOut: string) => {
+    const key = `${empId}|${date}`;
+    if (!isDinnerApplicable(clockIn, clockOut)) return 1;
+    // default is true (dinner break checked), unless explicitly unchecked
+    const hasDinner = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
+    return hasDinner ? 1.5 : 1;
   };
 
   const getEmpSummary = (emp: any, mode: 'actual' | 'planned') => {
@@ -145,7 +162,8 @@ export default function AttendanceSummaryDispatchPage() {
       const clockOut = mode === 'planned' && planned ? planned.out : formatTime(actual.clock_out_time);
       if (clockIn === '-' && clockOut === '-') continue;
       days++;
-      const h = calcHoursFromTimes(clockIn, clockOut);
+      const breakH = getBreakHours(emp.id, date, clockIn, clockOut);
+      const h = calcHoursFromTimes(clockIn, clockOut, breakH);
       const totalH = h.regular + h.overtime;
       if (isHolidayOrWeekend(date)) {
         overtime += totalH;
@@ -179,8 +197,9 @@ export default function AttendanceSummaryDispatchPage() {
         const planned = getPlannedForDay(emp.shifts, date);
         const clockIn = source === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
         const clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
-        const h = calcHoursFromTimes(clockIn, clockOut);
-        records.push({ employee_type: emp.type || '파견', employee_name: emp.name, employee_phone: emp.phone, date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
+        const breakH = getBreakHours(parseInt(empId), date, clockIn, clockOut);
+        const h = calcHoursFromTimes(clockIn, clockOut, breakH);
+        records.push({ employee_type: emp.type || '파견', employee_name: emp.name, employee_phone: emp.phone, date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
       }
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
@@ -205,8 +224,9 @@ export default function AttendanceSummaryDispatchPage() {
           const clockIn = batchSource === 'actual' ? formatTime(actual.clock_in_time) : (planned?.in || formatTime(actual.clock_in_time));
           const clockOut = batchSource === 'actual' ? formatTime(actual.clock_out_time) : (planned?.out || formatTime(actual.clock_out_time));
           if (clockIn === '-' && clockOut === '-') continue;
-          const h = calcHoursFromTimes(clockIn, clockOut);
-          records.push({ employee_type: emp.type || '파견', employee_name: emp.name, employee_phone: emp.phone, date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: 1, year_month: `${year}-${String(month).padStart(2, '0')}` });
+          const breakH = getBreakHours(emp.id, actual.date, clockIn, clockOut);
+          const h = calcHoursFromTimes(clockIn, clockOut, breakH);
+          records.push({ employee_type: emp.type || '파견', employee_name: emp.name, employee_phone: emp.phone, date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
         }
       }
       if (records.length === 0) return alert("해당 기간에 출근 데이터가 없습니다.");
@@ -403,6 +423,7 @@ export default function AttendanceSummaryDispatchPage() {
                           <th className="py-2 px-3 text-blue-600">계획퇴근</th>
                           <th className="py-2 px-3 text-green-600">실제출근</th>
                           <th className="py-2 px-3 text-green-600">실제퇴근</th>
+                          <th className="py-2 px-3">저녁식사</th>
                           <th className="py-2 px-3">기준</th>
                         </tr>
                       </thead>
@@ -422,6 +443,10 @@ export default function AttendanceSummaryDispatchPage() {
                           const dow = ['일','월','화','수','목','금','토'][dowNum];
                           const source = selectedSource[key] || 'planned';
                           const isDayConfirmed = confirmedSet.has(`${emp.name}|${date}`);
+                          const useClockIn = source === 'actual' ? actualIn : (plannedIn !== '-' ? plannedIn : actualIn);
+                          const useClockOut = source === 'actual' ? actualOut : (plannedOut !== '-' ? plannedOut : actualOut);
+                          const dinnerApplicable = isDinnerApplicable(useClockIn, useClockOut);
+                          const dinnerChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
                           return (
                             <tr key={date} className={isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
                               <td className="py-1.5 px-3">
@@ -439,6 +464,20 @@ export default function AttendanceSummaryDispatchPage() {
                               <td className="py-1.5 px-3 text-blue-700">{plannedOut}</td>
                               <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualIn}</td>
                               <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualOut}</td>
+                              <td className="py-1.5 px-3">
+                                {dinnerApplicable ? (
+                                  <label className="inline-flex items-center gap-1 cursor-pointer">
+                                    <input type="checkbox" checked={dinnerChecked}
+                                      onChange={e => setDinnerBreak({...dinnerBreak, [key]: e.target.checked})}
+                                      className="rounded border-gray-300" disabled={isDayConfirmed} />
+                                    <span className={`text-[10px] ${dinnerChecked ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
+                                      {dinnerChecked ? '30분 휴게' : '식사 안함'}
+                                    </span>
+                                  </label>
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">미해당</span>
+                                )}
+                              </td>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <span className="text-[10px] text-green-600 font-medium">확정됨</span>

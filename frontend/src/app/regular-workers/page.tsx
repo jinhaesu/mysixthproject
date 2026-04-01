@@ -23,7 +23,7 @@ import {
   FileCheck,
 } from "lucide-react";
 
-const DEPARTMENTS = ["생산2층", "생산3층", "물류1층"];
+const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간"];
 const TEAMS = ["1조", "2조", "3조"];
 const ROLES = ["일반", "조장", "반장"];
 

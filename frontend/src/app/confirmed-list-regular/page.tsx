@@ -96,9 +96,10 @@ export default function ConfirmedListRegularPage() {
           <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
             <option value="">전체</option>
             <option value="물류">물류</option>
-            <option value="생산">생산</option>
             <option value="생산2층">생산2층</option>
             <option value="생산3층">생산3층</option>
+            <option value="생산 야간">생산 야간</option>
+            <option value="물류 야간">물류 야간</option>
           </select>
         </div>
         <div>

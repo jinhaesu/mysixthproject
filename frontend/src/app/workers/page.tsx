@@ -77,6 +77,25 @@ export default function WorkersPage() {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
+
+  const handleRevealId = async (workerId: number) => {
+    const pw = prompt("주민번호 열람 비밀번호를 입력해주세요:");
+    if (!pw) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password: pw }),
+      });
+      const body = await res.json();
+      if (body.verified) {
+        setRevealedIds(prev => new Set([...prev, workerId]));
+      } else {
+        alert("비밀번호가 일치하지 않습니다.");
+      }
+    } catch { alert("확인 중 오류가 발생했습니다."); }
+  };
 
   const loadWorkers = useCallback(async () => {
     setLoading(true);
@@ -307,6 +326,9 @@ export default function WorkersPage() {
                     계좌
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">
+                    주민번호
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">
                     비상연락처
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">
@@ -350,6 +372,17 @@ export default function WorkersPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {worker.bank_account || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700" onClick={(e) => e.stopPropagation()}>
+                      {worker.id_number ? (
+                        revealedIds.has(worker.id) ? (
+                          <span className="text-xs font-mono">{worker.id_number}</span>
+                        ) : (
+                          <button onClick={() => handleRevealId(worker.id)} className="text-xs text-gray-400 hover:text-indigo-600 hover:underline cursor-pointer">
+                            ●●●●●●-●●●●●●●
+                          </button>
+                        )
+                      ) : "-"}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {worker.emergency_contact || "-"}

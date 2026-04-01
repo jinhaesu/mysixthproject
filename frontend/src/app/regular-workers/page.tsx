@@ -85,6 +85,25 @@ export default function RegularWorkersPage() {
   const [contractModal, setContractModal] = useState<any>(null);
   const [contractPassword, setContractPassword] = useState("");
   const [passwordVerified, setPasswordVerified] = useState(false);
+  const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
+
+  const handleRevealId = async (empId: number) => {
+    const pw = prompt("주민번호 열람 비밀번호를 입력해주세요:");
+    if (!pw) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password: pw }),
+      });
+      const body = await res.json();
+      if (body.verified) {
+        setRevealedIds(prev => new Set([...prev, empId]));
+      } else {
+        alert("비밀번호가 일치하지 않습니다.");
+      }
+    } catch { alert("확인 중 오류가 발생했습니다."); }
+  };
   const [contractForm, setContractForm] = useState({
     work_start_date: new Date().toLocaleDateString('sv-SE'),
     department: '',
@@ -387,7 +406,17 @@ export default function RegularWorkersPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-700">{emp.bank_name || "-"}</td>
                     <td className="px-4 py-3 text-gray-700">{emp.bank_account || "-"}</td>
-                    <td className="px-4 py-3 text-gray-700">{emp.id_number ? "●●●●●●-●●●●●●●" : "-"}</td>
+                    <td className="px-4 py-3 text-gray-700" onClick={(e) => e.stopPropagation()}>
+                      {emp.id_number ? (
+                        revealedIds.has(emp.id) ? (
+                          <span className="text-xs font-mono">{emp.id_number}</span>
+                        ) : (
+                          <button onClick={() => handleRevealId(emp.id)} className="text-xs text-gray-400 hover:text-indigo-600 hover:underline cursor-pointer">
+                            ●●●●●●-●●●●●●●
+                          </button>
+                        )
+                      ) : "-"}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${

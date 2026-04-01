@@ -18,14 +18,18 @@ function isHolidayOrWeekend(dateStr: string): boolean {
   return (HOLIDAYS[d.getFullYear()] || []).includes(dateStr);
 }
 
+// 출근: 30분 올림, 퇴근: 30분 내림
+const ceil30Min = (min: number) => Math.ceil(min / 30) * 30;
+const floor30Min = (min: number) => Math.floor(min / 30) * 30;
+
 function calcFromTimes(clockIn: string, clockOut: string, date: string) {
   if (!clockIn || !clockOut) return { regular: 0, overtime: 0, night: 0, breakH: 0 };
   const [h1, m1] = clockIn.split(':').map(Number);
   const [h2, m2] = clockOut.split(':').map(Number);
   if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0, night: 0, breakH: 0 };
 
-  const startMin = h1 * 60 + (m1 || 0);
-  const endMin = h2 * 60 + (m2 || 0);
+  const startMin = ceil30Min(h1 * 60 + (m1 || 0));
+  const endMin = floor30Min(h2 * 60 + (m2 || 0));
   const totalMin = endMin > startMin ? endMin - startMin : 0;
   const totalH = totalMin / 60;
 

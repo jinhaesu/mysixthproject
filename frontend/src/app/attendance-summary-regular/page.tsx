@@ -154,12 +154,18 @@ export default function AttendanceSummaryRegularPage() {
     return h1 >= 7 && h1 <= 9 && h2 >= 19 && h2 <= 20;
   };
 
+  // 출근: 30분 올림 (8:03→8:30), 퇴근: 30분 내림 (17:25→17:00)
+  const ceil30Min = (min: number) => Math.ceil(min / 30) * 30;
+  const floor30Min = (min: number) => Math.floor(min / 30) * 30;
+
   const calcHoursFromTimes = (clockIn: string, clockOut: string, breakH = 1) => {
     if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return { regular: 0, overtime: 0 };
     const [h1,m1] = clockIn.split(':').map(Number);
     const [h2,m2] = clockOut.split(':').map(Number);
     if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0 };
-    const total = Math.max(((h2*60+(m2||0)) - (h1*60+(m1||0))) / 60 - breakH, 0);
+    const startMin = ceil30Min(h1 * 60 + (m1 || 0));
+    const endMin = floor30Min(h2 * 60 + (m2 || 0));
+    const total = Math.max((endMin - startMin) / 60 - breakH, 0);
     return { regular: Math.min(total, 8), overtime: Math.max(total - 8, 0) };
   };
 

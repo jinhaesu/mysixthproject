@@ -48,6 +48,8 @@ import {
   Network,
   Calendar,
   Clock,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간"];
@@ -1733,6 +1735,11 @@ function ShiftsTab() {
   const [calAddDate, setCalAddDate] = useState<{ day: number; dow: number; weekNum: number } | null>(null);
   const [calAddForm, setCalAddForm] = useState({ name: "", planned_clock_in: "08:00", planned_clock_out: "17:00" });
   const [calExpandedDay, setCalExpandedDay] = useState<number | null>(null);
+  // Unassigned check
+  const [unassignedDate, setUnassignedDate] = useState(() => new Date().toLocaleDateString('sv-SE'));
+  const [unassignedDept, setUnassignedDept] = useState("");
+  const [unassignedOpen, setUnassignedOpen] = useState(false);
+  const [allEmpsLoaded, setAllEmpsLoaded] = useState(false);
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -1757,6 +1764,16 @@ function ShiftsTab() {
   }, []);
 
   useEffect(() => { loadShifts(); }, [loadShifts]);
+
+  // Load all employees once for unassigned check
+  useEffect(() => {
+    if (!allEmpsLoaded) {
+      getRegularEmployees({ limit: '500' }).then((data: any) => {
+        setAllEmployees((data as any).employees || data || []);
+        setAllEmpsLoaded(true);
+      }).catch(() => {});
+    }
+  }, [allEmpsLoaded]);
 
   useEffect(() => {
     if (shiftSubTab === 'calendar' && shifts.length > 0) {
@@ -1898,6 +1915,107 @@ function ShiftsTab() {
           </button>
         </div>
       </div>
+
+      {/* ── Unassigned Employees Panel ── */}
+      {(() => {
+        const d = new Date(unassignedDate + 'T00:00:00+09:00');
+        const dow = d.getDay();
+        const dayOfMonth = d.getDate();
+        const firstDow = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+        const so = (firstDow + 6) % 7;
+        const weekNum = Math.ceil((dayOfMonth + so) / 7);
+        const checkMonth = d.getMonth() + 1;
+
+        // Find all employees assigned on this date
+        const assignedIds = new Set<number>();
+        for (const s of shifts) {
+          if (s.month !== checkMonth) continue;
+          if (s.week_number !== weekNum) continue;
+          const daysArr = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
+          if (!daysArr.includes(dow)) continue;
+          const assgn = shiftCalAssignments.get(s.id) || [];
+          assgn.forEach((a: any) => assignedIds.add(a.employee_id));
+        }
+
+        const unassigned = allEmployees
+          .filter((e: any) => e.is_active !== 0 && !assignedIds.has(e.id))
+          .filter((e: any) => !unassignedDept || (e.department || '').includes(unassignedDept));
+
+        const dayNames = ['일','월','화','수','목','금','토'];
+        const isWeekend = dow === 0 || dow === 6;
+
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <button onClick={() => setUnassignedOpen(!unassignedOpen)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-orange-600" />
+                </div>
+                <div className="text-left">
+                  <span className="text-sm font-semibold text-gray-900">미배치 인력 확인</span>
+                  <span className="ml-2 text-xs text-gray-500">{unassignedDate} ({dayNames[dow]})</span>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${unassigned.length > 0 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                  {unassigned.length > 0 ? `${unassigned.length}명 미배치` : '전원 배치 완료'}
+                </span>
+              </div>
+              {unassignedOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            </button>
+
+            {unassignedOpen && (
+              <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+                <div className="flex flex-wrap gap-2 items-end">
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-0.5">날짜</label>
+                    <input type="date" value={unassignedDate} onChange={e => setUnassignedDate(e.target.value)}
+                      className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-0.5">부서</label>
+                    <select value={unassignedDept} onChange={e => setUnassignedDept(e.target.value)}
+                      className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                      <option value="">전체</option>
+                      {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+                    </select>
+                  </div>
+                  <div className="text-xs text-gray-500 py-1.5">
+                    총 {allEmployees.filter((e: any) => e.is_active !== 0 && (!unassignedDept || (e.department || '').includes(unassignedDept))).length}명 중{' '}
+                    <span className="font-semibold text-blue-700">{assignedIds.size}명 배치</span>,{' '}
+                    <span className={`font-semibold ${unassigned.length > 0 ? 'text-orange-700' : 'text-green-700'}`}>{unassigned.length}명 미배치</span>
+                  </div>
+                </div>
+
+                {isWeekend && (
+                  <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                    {dayNames[dow]}요일 (주말)입니다. 주말 근무 배치가 없는 것이 정상일 수 있습니다.
+                  </div>
+                )}
+
+                {unassigned.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                    {unassigned.map((e: any) => (
+                      <div key={e.id} className="flex items-center gap-2 bg-orange-50 rounded-lg px-2.5 py-2 border border-orange-100">
+                        <div className="w-6 h-6 rounded-full bg-orange-200 flex items-center justify-center text-[10px] font-bold text-orange-800">
+                          {(e.name || '?')[0]}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-900 truncate">{e.name}</p>
+                          <p className="text-[10px] text-gray-500 truncate">{e.department} {e.team}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-sm text-green-600 font-medium">
+                    해당 날짜에 모든 인원이 배치되었습니다.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {shiftSubTab === 'calendar' && (() => {
         const daysInMonth = new Date(shiftCalYear, shiftCalMonth, 0).getDate();

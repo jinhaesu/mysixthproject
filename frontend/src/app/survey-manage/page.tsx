@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { usePersistedState } from "@/lib/usePersistedState";
 import {
   getSurveyWorkplaces,
   createSurveyWorkplace,
@@ -88,7 +89,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function SurveyManagePage() {
-  const [tab, setTab] = useState<Tab>("send");
+  const [tab, setTab] = usePersistedState<Tab>("sm_tab", "send");
 
   const tabs: { key: Tab; label: string; icon: typeof Send }[] = [
     { key: "send", label: "설문 발송", icon: MessageSquare },

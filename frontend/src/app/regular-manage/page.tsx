@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { usePersistedState } from "@/lib/usePersistedState";
 import {
   getSurveyWorkplaces,
   getRegularEmployees,
@@ -108,7 +109,7 @@ const emptyOrgForm = {
 };
 
 export default function RegularManagePage() {
-  const [tab, setTab] = useState<Tab>("employees");
+  const [tab, setTab] = usePersistedState<Tab>("rm_tab", "employees");
   const [loading, setLoading] = useState(false);
 
   // ===== Employees Tab =====

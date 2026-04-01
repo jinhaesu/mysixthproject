@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { usePersistedState } from "@/lib/usePersistedState";
 import {
   getWorkers,
   createWorker,
@@ -65,9 +66,9 @@ export default function WorkersPage() {
     totalPages: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [page, setPage] = useState(1);
+  const [search, setSearch] = usePersistedState("w_search", "");
+  const [category, setCategory] = usePersistedState("w_category", "");
+  const [page, setPage] = usePersistedState("w_page", 1);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);

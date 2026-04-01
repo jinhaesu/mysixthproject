@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
+import { usePersistedState } from "@/lib/usePersistedState";
 import { Table2, Loader2, Edit3, Trash2 } from "lucide-react";
 import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord } from "@/lib/api";
 
@@ -58,14 +59,14 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
 }
 
 export default function ConfirmedListRegularPage() {
-  const [yearMonth, setYearMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [yearMonth, setYearMonth] = usePersistedState("clr_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<any>({});
-  const [nameSearch, setNameSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("");
+  const [nameSearch, setNameSearch] = usePersistedState("clr_nameSearch", "");
+  const [deptFilter, setDeptFilter] = usePersistedState("clr_deptFilter", "");
 
   const load = useCallback(async () => {
     setLoading(true);

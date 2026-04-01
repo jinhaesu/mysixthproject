@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Loader2, Download } from "lucide-react";
 import { getPayrollCalc } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
@@ -9,7 +10,7 @@ const fmt = new Intl.NumberFormat('ko-KR');
 
 export default function PayrollCalcPage() {
   const [authorized, setAuthorized] = useState(false);
-  const [yearMonth, setYearMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [yearMonth, setYearMonth] = usePersistedState("pc_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [overtimeRate, setOvertimeRate] = useState(10030);

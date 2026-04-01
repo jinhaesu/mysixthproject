@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { usePersistedState } from "@/lib/usePersistedState";
 import {
   getRegularEmployees,
   createRegularEmployee,
@@ -70,11 +71,11 @@ export default function RegularWorkersPage() {
     totalPages: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterDept, setFilterDept] = useState("");
-  const [filterTeam, setFilterTeam] = useState("");
-  const [filterRole, setFilterRole] = useState("");
-  const [page, setPage] = useState(1);
+  const [search, setSearch] = usePersistedState("rw_search", "");
+  const [filterDept, setFilterDept] = usePersistedState("rw_filterDept", "");
+  const [filterTeam, setFilterTeam] = usePersistedState("rw_filterTeam", "");
+  const [filterRole, setFilterRole] = usePersistedState("rw_filterRole", "");
+  const [page, setPage] = usePersistedState("rw_page", 1);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);

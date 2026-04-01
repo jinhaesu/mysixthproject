@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { usePersistedState } from "@/lib/usePersistedState";
 import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { getAttendanceSummaryDispatch, confirmAttendance, getConfirmedList, deleteConfirmedRecord } from "@/lib/api";
 
@@ -20,12 +21,12 @@ const _cache: Record<string, { data: any; time: number }> = {};
 const CACHE_TTL = 3 * 60 * 60 * 1000;
 
 export default function AttendanceSummaryDispatchPage() {
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [year, setYear] = usePersistedState("asd_year", new Date().getFullYear());
+  const [month, setMonth] = usePersistedState("asd_month", new Date().getMonth() + 1);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [expandedEmp, setExpandedEmp] = useState<number | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | '파견' | '알바'>('all');
+  const [typeFilter, setTypeFilter] = usePersistedState<'all' | '파견' | '알바'>("asd_typeFilter", 'all');
   const [selectedSource, setSelectedSource] = useState<Record<string, 'planned' | 'actual'>>({});
   const [checkedRows, setCheckedRows] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
@@ -33,13 +34,13 @@ export default function AttendanceSummaryDispatchPage() {
   const [batchSource, setBatchSource] = useState<'planned' | 'actual'>('planned');
   const [rangeStart, setRangeStart] = useState(1);
   const [rangeEnd, setRangeEnd] = useState(31);
-  const [viewMode, setViewMode] = useState<'actual' | 'planned'>('actual');
+  const [viewMode, setViewMode] = usePersistedState<'actual' | 'planned'>("asd_viewMode", 'actual');
   const [hiddenEmps, setHiddenEmps] = useState<Set<number>>(new Set());
   const [confirmedSet, setConfirmedSet] = useState<Set<string>>(new Set());
   const [confirmedEmpSet, setConfirmedEmpSet] = useState<Set<string>>(new Set());
   const [confirmedIdMap, setConfirmedIdMap] = useState<Record<string, number>>({});
-  const [nameSearch, setNameSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("");
+  const [nameSearch, setNameSearch] = usePersistedState("asd_nameSearch", "");
+  const [deptFilter, setDeptFilter] = usePersistedState("asd_deptFilter", "");
   const [dinnerBreak, setDinnerBreak] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {

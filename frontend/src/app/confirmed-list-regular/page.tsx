@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Table2, Loader2, Edit3, Trash2 } from "lucide-react";
 import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord } from "@/lib/api";
 
@@ -135,89 +135,88 @@ export default function ConfirmedListRegularPage() {
                   <th className="py-2 px-4 font-medium text-gray-600 text-right">휴일</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map((emp: any) => (
-                  <tr key={emp.name} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedEmp(expandedEmp === emp.name ? null : emp.name)}>
-                    <td className="py-2.5 px-4 font-medium text-gray-900">{emp.name}{emp.department && <span className="ml-1 text-[10px] text-gray-500">{emp.department}</span>}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
-                    <td className="py-2.5 px-4 text-right">{emp.days}</td>
-                    <td className="py-2.5 px-4 text-right text-blue-700">{emp.regular_hours.toFixed(1)}</td>
-                    <td className="py-2.5 px-4 text-right text-amber-700">{emp.overtime_hours.toFixed(1)}</td>
-                    <td className="py-2.5 px-4 text-right text-purple-700">{emp.night_hours.toFixed(1)}</td>
-                    <td className="py-2.5 px-4 text-right text-gray-500">{emp.break_hours.toFixed(1)}</td>
-                    <td className="py-2.5 px-4 text-right text-red-600">{emp.holiday_days}</td>
-                  </tr>
-                ))}
+              <tbody>
+                {filtered.map((emp: any) => {
+                  const isExpanded = expandedEmp === emp.name;
+                  return (
+                    <React.Fragment key={emp.name}>
+                      <tr className={`hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${isExpanded ? 'bg-indigo-50/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : emp.name)}>
+                        <td className="py-2.5 px-4 font-medium text-gray-900">{emp.name}{emp.department && <span className="ml-1 text-[10px] text-gray-500">{emp.department}</span>}</td>
+                        <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
+                        <td className="py-2.5 px-4 text-right">{emp.days}</td>
+                        <td className="py-2.5 px-4 text-right text-blue-700">{emp.regular_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-amber-700">{emp.overtime_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-purple-700">{emp.night_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-gray-500">{emp.break_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-red-600">{emp.holiday_days}</td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={8} className="p-0">
+                            <div className="bg-indigo-50/30 border-b border-indigo-200">
+                              <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
+                                <span className="text-xs font-semibold text-indigo-800">{emp.name} 일별 상세</span>
+                              </div>
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="bg-gray-50/80 text-left">
+                                    <th className="py-1.5 px-3">날짜</th>
+                                    <th className="py-1.5 px-3">출근</th>
+                                    <th className="py-1.5 px-3">퇴근</th>
+                                    <th className="py-1.5 px-3">기준</th>
+                                    <th className="py-1.5 px-3 text-right">기본</th>
+                                    <th className="py-1.5 px-3 text-right">연장</th>
+                                    <th className="py-1.5 px-3 text-right">야간</th>
+                                    <th className="py-1.5 px-3 text-right">휴게</th>
+                                    <th className="py-1.5 px-3">관리</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {emp.records.map((r: any) => (
+                                    <tr key={r.id} className="hover:bg-white/60">
+                                      <td className="py-1.5 px-3">{r.date}</td>
+                                      <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
+                                        const ci = e.target.value; const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);
+                                        setEditForm({...editForm, confirmed_clock_in: ci, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
+                                      }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_in}</td>
+                                      <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_out} onChange={e => {
+                                        const co = e.target.value; const calc = calcFromTimes(editForm.confirmed_clock_in, co, r.date);
+                                        setEditForm({...editForm, confirmed_clock_out: co, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
+                                      }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_out}</td>
+                                      <td className="py-1.5 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-blue-700 font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-amber-700 font-medium">{editForm.overtime_hours}</span> : parseFloat(r.overtime_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-purple-700 font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-gray-500">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3">
+                                        {editingId === r.id ? (
+                                          <div className="flex gap-1">
+                                            <button onClick={handleSave} className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]">저장</button>
+                                            <button onClick={() => setEditingId(null)} className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">취소</button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex gap-1">
+                                            <button onClick={() => { setEditingId(r.id); setEditForm({ confirmed_clock_in: r.confirmed_clock_in, confirmed_clock_out: r.confirmed_clock_out, regular_hours: parseFloat(r.regular_hours), overtime_hours: parseFloat(r.overtime_hours), night_hours: parseFloat(r.night_hours), break_hours: parseFloat(r.break_hours) }); }}
+                                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit3 className="w-3 h-3" /></button>
+                                            <button onClick={async () => { if (!confirm('삭제하시겠습니까?')) return; try { await deleteConfirmedRecord(r.id); load(); } catch (e: any) { alert(e.message); } }}
+                                              className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3" /></button>
+                                          </div>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-
-          {/* Expanded detail */}
-          {expandedEmp && (() => {
-            const emp = data.find(e => e.name === expandedEmp);
-            if (!emp) return null;
-            return (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 bg-indigo-50 border-b">
-                  <h3 className="text-sm font-semibold text-indigo-800">{emp.name} 일별 상세</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 text-left">
-                        <th className="py-2 px-3">날짜</th>
-                        <th className="py-2 px-3">출근</th>
-                        <th className="py-2 px-3">퇴근</th>
-                        <th className="py-2 px-3">기준</th>
-                        <th className="py-2 px-3 text-right">기본(h)</th>
-                        <th className="py-2 px-3 text-right">연장(h)</th>
-                        <th className="py-2 px-3 text-right">야간(h)</th>
-                        <th className="py-2 px-3 text-right">휴게(h)</th>
-                        <th className="py-2 px-3">관리</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {emp.records.map((r: any) => (
-                        <tr key={r.id} className="hover:bg-gray-50">
-                          <td className="py-2 px-3">{r.date}</td>
-                          <td className="py-2 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
-                            const ci = e.target.value;
-                            const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);
-                            setEditForm({...editForm, confirmed_clock_in: ci, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
-                          }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_in}</td>
-                          <td className="py-2 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_out} onChange={e => {
-                            const co = e.target.value;
-                            const calc = calcFromTimes(editForm.confirmed_clock_in, co, r.date);
-                            setEditForm({...editForm, confirmed_clock_out: co, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
-                          }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_out}</td>
-                          <td className="py-2 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
-                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-blue-700 font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1)}</td>
-                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-amber-700 font-medium">{editForm.overtime_hours}</span> : parseFloat(r.overtime_hours).toFixed(1)}</td>
-                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-purple-700 font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
-                          <td className="py-2 px-3 text-right">{editingId === r.id ? <span className="text-xs text-gray-500">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
-                          <td className="py-2 px-3">
-                            {editingId === r.id ? (
-                              <div className="flex gap-1">
-                                <button onClick={handleSave} className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]">저장</button>
-                                <button onClick={() => setEditingId(null)} className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">취소</button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-1">
-                                <button onClick={() => { setEditingId(r.id); setEditForm({ confirmed_clock_in: r.confirmed_clock_in, confirmed_clock_out: r.confirmed_clock_out, regular_hours: parseFloat(r.regular_hours), overtime_hours: parseFloat(r.overtime_hours), night_hours: parseFloat(r.night_hours), break_hours: parseFloat(r.break_hours) }); }}
-                                  className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit3 className="w-3 h-3" /></button>
-                                <button onClick={async () => { if (!confirm('삭제하시겠습니까?')) return; try { await deleteConfirmedRecord(r.id); load(); } catch (e: any) { alert(e.message); } }}
-                                  className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3" /></button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })()}
         </>
         );
       })()}

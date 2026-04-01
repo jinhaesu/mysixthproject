@@ -927,19 +927,8 @@ function RegularContent() {
           ))}
         </div>
 
-        {/* ── Contract Missing Warning ───────────────────────────── */}
-        {contractMissing && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
-            <ShieldAlert className="w-10 h-10 text-red-500 mx-auto mb-2" />
-            <h2 className="font-semibold text-red-800">근로계약서 미체결</h2>
-            <p className="text-sm text-red-600 mt-2">근로계약서가 체결되지 않아 출근할 수 없습니다.</p>
-            <p className="text-sm text-red-600 mt-1">근로계약서 작성 후 출퇴근을 시작할 수 있습니다.</p>
-            <p className="text-xs text-red-500 mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
-          </div>
-        )}
-
-        {/* Personal Info Required */}
-        {data && !personalInfoDone && (data.status as string) !== "deactivated" && !(data as any).contractMissing && (
+        {/* Personal Info Required (FIRST - before contract check) */}
+        {data && !personalInfoDone && (data.status as string) !== "deactivated" && (
           <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2 text-indigo-700 mb-2">
               <Users className="w-5 h-5" />
@@ -975,6 +964,17 @@ function RegularContent() {
               className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-gray-300">
               {piSaving ? "저장 중..." : "개인정보 저장"}
             </button>
+          </div>
+        )}
+
+        {/* ── Contract Missing Warning (shown after personal info is done) ── */}
+        {contractMissing && personalInfoDone && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
+            <ShieldAlert className="w-10 h-10 text-red-500 mx-auto mb-2" />
+            <h2 className="font-semibold text-red-800">근로계약서 미체결</h2>
+            <p className="text-sm text-red-600 mt-2">개인정보가 등록되었습니다. 감사합니다.</p>
+            <p className="text-sm text-red-600 mt-1">근로계약서 체결 후 출퇴근을 시작할 수 있습니다.</p>
+            <p className="text-xs text-red-500 mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
           </div>
         )}
 

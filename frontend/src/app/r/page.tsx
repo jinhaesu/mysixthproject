@@ -541,6 +541,7 @@ function RegularContent() {
   const [vacStartDate, setVacStartDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [vacEndDate, setVacEndDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [vacDays, setVacDays] = useState("1");
+  const [vacType, setVacType] = useState<'연차' | '오전반차' | '오후반차'>('연차');
   const [vacReason, setVacReason] = useState("");
   const [vacSubmitting, setVacSubmitting] = useState(false);
   const [vacData, setVacData] = useState<any>(null);
@@ -607,13 +608,16 @@ function RegularContent() {
   useEffect(() => { loadVacations(); }, [loadVacations]);
 
   useEffect(() => {
-    if (vacStartDate && vacEndDate) {
+    if (vacType === '오전반차' || vacType === '오후반차') {
+      setVacEndDate(vacStartDate);
+      setVacDays("0.5");
+    } else if (vacStartDate && vacEndDate) {
       const start = new Date(vacStartDate);
       const end = new Date(vacEndDate);
       const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       if (diff > 0) setVacDays(String(diff));
     }
-  }, [vacStartDate, vacEndDate]);
+  }, [vacStartDate, vacEndDate, vacType]);
 
   // ── Distance calculation ───────────────────────────────────────
   const calcDistance = useCallback(
@@ -718,7 +722,7 @@ function RegularContent() {
       const res = await fetch(`${API_URL}/api/regular-public/${token}/vacation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ start_date: vacStartDate, end_date: vacEndDate, days: parseFloat(vacDays), reason: vacReason }),
+        body: JSON.stringify({ start_date: vacStartDate, end_date: vacEndDate, days: parseFloat(vacDays), reason: vacReason, type: vacType }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Failed");
@@ -1522,22 +1526,46 @@ function RegularContent() {
                 )}
 
                 {/* Request form */}
-                <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">휴가 종류</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['연차', '오전반차', '오후반차'] as const).map(t => (
+                      <button key={t} onClick={() => setVacType(t)}
+                        className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${vacType === t ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  {vacType === '오전반차' && (
+                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                      오전 09:00 ~ 14:00 (0.5일) · 오후 정상 출근
+                    </div>
+                  )}
+                  {vacType === '오후반차' && (
+                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                      오후 14:00 ~ 18:00 (0.5일) · 오전 정상 근무 후 퇴근
+                    </div>
+                  )}
+                </div>
+                <div className={`grid gap-3 ${vacType === '연차' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationStart")}</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{vacType === '연차' ? '시작일' : '날짜'}</label>
                     <input type="date" value={vacStartDate} onChange={(e) => setVacStartDate(e.target.value)}
                       className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationEnd")}</label>
-                    <input type="date" value={vacEndDate} onChange={(e) => setVacEndDate(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
-                  </div>
+                  {vacType === '연차' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                      <input type="date" value={vacEndDate} onChange={(e) => setVacEndDate(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationDays")}</label>
-                  <input type="number" step="0.5" min="0.5" value={vacDays} onChange={(e) => setVacDays(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{vacType === '연차' ? '일수' : '사용 일수'}</label>
+                  <input type="number" step="0.5" min="0.5" value={vacDays} readOnly={vacType !== '연차'}
+                    onChange={(e) => setVacDays(e.target.value)}
+                    className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base ${vacType !== '연차' ? 'bg-gray-50' : ''}`} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationReason")}</label>
@@ -1558,7 +1586,10 @@ function RegularContent() {
                       {vacData.requests.map((r: any) => (
                         <div key={r.id} className="bg-gray-50 rounded-lg p-3 text-sm">
                           <div className="flex justify-between items-center">
-                            <span className="font-medium">{r.start_date} ~ {r.end_date} ({r.days}{t(lang, "vacationDaysUnit")})</span>
+                            <span className="font-medium">
+                              {r.type && r.type !== '연차' && <span className={`mr-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${r.type === '오전반차' ? 'bg-amber-100 text-amber-700' : 'bg-orange-100 text-orange-700'}`}>{r.type}</span>}
+                              {r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''} ({r.days}{t(lang, "vacationDaysUnit")})
+                            </span>
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                               r.status === 'approved' ? 'bg-green-100 text-green-700' :
                               r.status === 'rejected' ? 'bg-red-100 text-red-700' :

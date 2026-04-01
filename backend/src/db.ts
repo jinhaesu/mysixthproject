@@ -526,6 +526,8 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  try { await pool.query("ALTER TABLE regular_vacation_requests ADD COLUMN IF NOT EXISTS type TEXT DEFAULT '연차'"); } catch {}
+
   // Short-term labor contracts
   try {
     await pool.query(`

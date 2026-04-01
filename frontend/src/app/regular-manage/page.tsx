@@ -1397,6 +1397,7 @@ function VacationTab() {
                       <th className="py-2 px-4 font-medium text-gray-600">이름</th>
                       <th className="py-2 px-4 font-medium text-gray-600">부서</th>
                       <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
+                      <th className="py-2 px-4 font-medium text-gray-600">종류</th>
                       <th className="py-2 px-4 font-medium text-gray-600">기간</th>
                       <th className="py-2 px-4 font-medium text-gray-600">일수</th>
                       <th className="py-2 px-4 font-medium text-gray-600">사유</th>
@@ -1410,7 +1411,18 @@ function VacationTab() {
                         <td className="py-2.5 px-4 font-medium text-gray-900">{r.employee_name}</td>
                         <td className="py-2.5 px-4 text-gray-600">{r.department} {r.team}</td>
                         <td className="py-2.5 px-4 text-gray-600">{r.phone}</td>
-                        <td className="py-2.5 px-4 text-gray-700">{r.start_date} ~ {r.end_date}</td>
+                        <td className="py-2.5 px-4">
+                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                            r.type === '오전반차' ? 'bg-amber-50 text-amber-700' :
+                            r.type === '오후반차' ? 'bg-orange-50 text-orange-700' :
+                            'bg-blue-50 text-blue-700'
+                          }`}>
+                            {r.type || '연차'}
+                            {r.type === '오전반차' && <span className="ml-1 text-[9px] opacity-70">09~14시</span>}
+                            {r.type === '오후반차' && <span className="ml-1 text-[9px] opacity-70">14~18시</span>}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 text-gray-700">{r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''}</td>
                         <td className="py-2.5 px-4 text-gray-700">{r.days}일</td>
                         <td className="py-2.5 px-4 text-gray-600 max-w-[150px] truncate">{r.reason || "-"}</td>
                         <td className="py-2.5 px-4">

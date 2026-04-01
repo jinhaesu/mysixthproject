@@ -12,7 +12,7 @@ const otpStore = new Map<string, { code: string; phone: string; expiresAt: numbe
 router.post('/:token/vacation', async (req: Request, res: Response) => {
   try {
     const token = req.params.token as string;
-    const { start_date, end_date, days, reason } = req.body;
+    const { start_date, end_date, days, reason, type } = req.body;
 
     if (!start_date || !end_date || !days) {
       res.status(400).json({ error: '휴가 시작일, 종료일, 일수는 필수입니다.' });
@@ -43,8 +43,8 @@ router.post('/:token/vacation', async (req: Request, res: Response) => {
     }
 
     await dbRun(
-      'INSERT INTO regular_vacation_requests (employee_id, start_date, end_date, days, reason) VALUES (?, ?, ?, ?, ?)',
-      employee.id, start_date, end_date, days, reason || ''
+      'INSERT INTO regular_vacation_requests (employee_id, start_date, end_date, days, reason, type) VALUES (?, ?, ?, ?, ?, ?)',
+      employee.id, start_date, end_date, days, reason || '', type || '연차'
     );
 
     res.json({ success: true, message: '휴가 신청이 완료되었습니다. 관리자 승인을 기다려주세요.' });

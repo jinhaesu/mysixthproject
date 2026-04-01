@@ -1630,7 +1630,7 @@ function ShiftsTab() {
   const openAssign = async (shift: any) => {
     setSelectedShift(shift); setAssignSearch("");
     try {
-      const [assigned, emps] = await Promise.all([getShiftAssignments(shift.id), getRegularEmployees()]);
+      const [assigned, emps] = await Promise.all([getShiftAssignments(shift.id), getRegularEmployees({ limit: '500' })]);
       setAssignments(assigned || []); setAllEmployees((emps as any).employees || emps || []); setAssignIds(new Set());
     } catch (e: any) { alert(e.message); }
   };
@@ -1786,7 +1786,7 @@ function ShiftsTab() {
                 <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
               </div>
               <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
-                {allEmployees.filter((e: any) => !assignments.find((a: any) => a.employee_id === e.id)).filter((e: any) => assignDeptFilter === 'all' || e.department === assignDeptFilter).filter((e: any) => !assignSearch || e.name?.includes(assignSearch) || e.phone?.includes(assignSearch)).map((e: any) => (
+                {allEmployees.filter((e: any) => !assignments.find((a: any) => a.employee_id === e.id)).filter((e: any) => assignDeptFilter === 'all' || (e.department || '').includes(assignDeptFilter)).filter((e: any) => !assignSearch || (e.name || '').includes(assignSearch) || (e.phone || '').includes(assignSearch)).map((e: any) => (
                   <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
                     <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-gray-300" />
                     <span className="text-sm">{e.name}</span><span className="text-xs text-gray-500">{e.department} {e.team}</span>

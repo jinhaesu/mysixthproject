@@ -21,6 +21,7 @@ import {
   Loader2,
   FileText,
   FileCheck,
+  Trash2,
 } from "lucide-react";
 
 const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간"];
@@ -500,6 +501,16 @@ export default function RegularWorkersPage() {
                             <FileText size={12} />
                           )}
                           계약서
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`${emp.name}을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+                            try { await deleteRegularEmployee(emp.id); loadEmployees(); } catch (e: any) { alert(e.message); }
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                          title="삭제"
+                        >
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>

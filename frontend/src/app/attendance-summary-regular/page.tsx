@@ -196,7 +196,12 @@ export default function AttendanceSummaryRegularPage() {
     return { regular: Math.min(total, 8), overtime: Math.max(total - 8, 0) };
   };
 
-  const getBreakHours = (empId: number, date: string, clockIn: string, clockOut: string) => {
+  const getBreakHours = (empId: number, date: string, clockIn: string, clockOut: string, empName?: string) => {
+    // 반차일 경우 휴게시간 0 (4시간 근무이므로)
+    if (empName) {
+      const vacInfo = vacationMap[`${empName}|${date}`];
+      if (vacInfo?.type?.includes('반차')) return 0;
+    }
     const key = `${empId}|${date}`;
     if (!isMealBreakApplicable(clockIn, clockOut)) return 1;
     const hasMeal = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
@@ -205,14 +210,33 @@ export default function AttendanceSummaryRegularPage() {
 
   const getEmpSummary = (emp: any, mode: 'actual' | 'planned') => {
     let regular = 0, overtime = 0, weekend = 0, days = 0;
+    // Count vacation hours for this employee in this month
+    const ym = `${year}-${String(month).padStart(2,'0')}`;
+    let vacRegular = 0;
+    Object.entries(vacationMap).forEach(([k, vInfo]) => {
+      if (!k.startsWith(`${emp.name}|${ym}`)) return;
+      const vDate = k.split('|')[1];
+      if (isHolidayOrWeekend(vDate)) return;
+      const hasActual = emp.actuals?.some((a: any) => a.date === vDate && !a.isVacOnly && (a.clock_in_time || a.clock_out_time));
+      if (vInfo.type === '연차' && !hasActual) {
+        vacRegular += 8;
+        days++;
+      } else if (vInfo.type?.includes('반차') && hasActual) {
+        vacRegular += 4; // 반차 4h + 실근무 4h = 기본 8h
+      } else if (vInfo.type?.includes('반차') && !hasActual) {
+        vacRegular += 4;
+        days++;
+      }
+    });
     for (const actual of emp.actuals) {
+      if (actual.isVacOnly) continue; // skip vacation-only rows
       const date = actual.date;
       const planned = getPlannedForDay(emp.shifts, date);
       const clockIn = mode === 'planned' && planned ? planned.in : formatTime(actual.clock_in_time);
       const clockOut = mode === 'planned' && planned ? planned.out : formatTime(actual.clock_out_time);
       if (clockIn === '-' && clockOut === '-') continue;
       days++;
-      const breakH = getBreakHours(emp.id, date, clockIn, clockOut);
+      const breakH = getBreakHours(emp.id, date, clockIn, clockOut, emp.name);
       const h = calcHoursFromTimes(clockIn, clockOut, breakH);
       const totalH = h.regular + h.overtime;
       if (isHolidayOrWeekend(date)) {
@@ -223,6 +247,7 @@ export default function AttendanceSummaryRegularPage() {
         overtime += h.overtime;
       }
     }
+    regular += vacRegular;
     return { regular: Math.round(regular*10)/10, overtime: Math.round(overtime*10)/10, weekend: Math.round(weekend*10)/10, days };
   };
 
@@ -247,7 +272,7 @@ export default function AttendanceSummaryRegularPage() {
         const planned = getPlannedForDay(emp.shifts, date);
         const clockIn = source === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
         const clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
-        const breakH = getBreakHours(parseInt(empId), date, clockIn, clockOut);
+        const breakH = getBreakHours(parseInt(empId), date, clockIn, clockOut, emp.name);
         const h = calcHoursFromTimes(clockIn, clockOut, breakH);
         records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
       }
@@ -274,7 +299,7 @@ export default function AttendanceSummaryRegularPage() {
           const clockIn = batchSource === 'actual' ? formatTime(actual.clock_in_time) : (planned?.in || formatTime(actual.clock_in_time));
           const clockOut = batchSource === 'actual' ? formatTime(actual.clock_out_time) : (planned?.out || formatTime(actual.clock_out_time));
           if (clockIn === '-' && clockOut === '-') continue;
-          const breakH = getBreakHours(emp.id, actual.date, clockIn, clockOut);
+          const breakH = getBreakHours(emp.id, actual.date, clockIn, clockOut, emp.name);
           const h = calcHoursFromTimes(clockIn, clockOut, breakH);
           records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
         }
@@ -554,7 +579,7 @@ export default function AttendanceSummaryRegularPage() {
                           const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);
                           const mealChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
                           return (
-                            <tr key={date} className={vacInfo ? 'bg-violet-50' : isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
+                            <tr key={date} className={vacInfo?.type?.includes('반차') ? 'bg-amber-50/50' : vacInfo ? 'bg-violet-50' : isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <CheckCircle2 className="w-4 h-4 text-green-500" />

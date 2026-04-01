@@ -10,7 +10,7 @@ export default function PolicyPage() {
           <BookOpen className="w-6 h-6 text-gray-600" />
           반영기준
         </h1>
-        <p className="text-sm text-gray-500 mt-1">근태관리 시스템에 적용된 계산 기준 및 법령 근거입니다. (최종 업데이트: 2026.04.01)</p>
+        <p className="text-sm text-gray-500 mt-1">근태관리 시스템에 적용된 계산 기준 및 법령 근거입니다. (최종 업데이트: 2026.04.01 v2)</p>
       </div>
 
       <div className="space-y-6">
@@ -129,7 +129,8 @@ export default function PolicyPage() {
               <tr><td className="py-2 pr-4 font-medium text-gray-700">1년 이상 ~ 3년 미만</td><td className="py-2 text-gray-600">연 15일</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">3년 이상</td><td className="py-2 text-gray-600">15일 + 2년마다 1일 추가 (최대 25일)</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">자동 계산</td><td className="py-2 text-gray-600">입사일 기준 매일 서버에서 자동 갱신</td></tr>
-              <tr><td className="py-2 pr-4 font-medium text-gray-700">급여 반영</td><td className="py-2 text-gray-600">승인된 유급휴가 = 기본근무 8시간 인정</td></tr>
+              <tr><td className="py-2 pr-4 font-medium text-gray-700">급여 반영 (연차)</td><td className="py-2 text-gray-600">승인된 유급휴가 = 기본근무 8시간 인정</td></tr>
+              <tr><td className="py-2 pr-4 font-medium text-gray-700">급여 반영 (반차)</td><td className="py-2 text-gray-600">오전반차(09~14시) 또는 오후반차(14~18시) + 실근무 4h = 기본 8h. 반차일 근무는 휴게시간 없이 계산</td></tr>
             </tbody>
           </table>
         </div>

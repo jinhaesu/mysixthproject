@@ -1174,7 +1174,8 @@ router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
       const totalMin = endMin > startMin ? endMin - startMin : 0;
       const totalH = totalMin / 60;
 
-      const breakH = parseFloat(r.break_hours) || (totalH >= 8 ? 1 : totalH >= 4 ? 0.5 : 0);
+      const parsedBreak = parseFloat(r.break_hours);
+      const breakH = !isNaN(parsedBreak) ? parsedBreak : (totalH >= 8 ? 1 : totalH >= 4 ? 0.5 : 0);
       const workH = Math.max(totalH - breakH, 0);
 
       // Night hours (22:00~06:00)
@@ -1185,9 +1186,9 @@ router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
       }
       const nightH = Math.round(nightMin / 60 * 10) / 10;
 
-      const isHoliday = isHolidayOrWeekend(r.date);
-      const regularH = isHoliday ? 0 : Math.round(Math.min(workH, 8) * 10) / 10;
-      const overtimeH = isHoliday ? Math.round(workH * 10) / 10 : Math.round(Math.max(workH - 8, 0) * 10) / 10;
+      // 기본/연장 구분은 항상 8시간 기준 (휴일 처리는 정산/급여 단계에서 별도)
+      const regularH = Math.round(Math.min(workH, 8) * 10) / 10;
+      const overtimeH = Math.round(Math.max(workH - 8, 0) * 10) / 10;
 
       await dbRun(
         'UPDATE confirmed_attendance SET regular_hours = ?, overtime_hours = ?, night_hours = ? WHERE id = ?',

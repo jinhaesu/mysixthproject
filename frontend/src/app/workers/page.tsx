@@ -133,6 +133,25 @@ export default function WorkersPage() {
     setShowModal(true);
   }
 
+  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+  const [historyMonth, setHistoryMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const loadAttendanceHistory = async (phone: string, ym: string) => {
+    setHistoryLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const [y, m] = ym.split('-');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/survey/attendance-summary?year=${y}&month=${parseInt(m)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      const emp = (data.employees || []).find((e: any) => e.phone === phone);
+      setAttendanceHistory(emp?.actuals || []);
+    } catch { setAttendanceHistory([]); }
+    finally { setHistoryLoading(false); }
+  };
+
   function openEditModal(worker: Worker) {
     setEditingWorker(worker);
     setForm({
@@ -149,6 +168,7 @@ export default function WorkersPage() {
       memo: worker.memo,
     });
     setShowModal(true);
+    loadAttendanceHistory(worker.phone, historyMonth);
   }
 
   async function handleSave() {
@@ -616,6 +636,45 @@ export default function WorkersPage() {
                 />
               </div>
             </div>
+            {/* Attendance History */}
+            {editingWorker && (
+              <div className="px-6 py-4 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-800">출퇴근 이력</h4>
+                  <input type="month" value={historyMonth} onChange={e => {
+                    setHistoryMonth(e.target.value);
+                    if (editingWorker) loadAttendanceHistory(editingWorker.phone, e.target.value);
+                  }} className="px-2 py-1 border border-gray-300 rounded-lg text-xs" />
+                </div>
+                {historyLoading ? (
+                  <div className="py-4 text-center text-xs text-gray-400">로딩중...</div>
+                ) : attendanceHistory.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-gray-400">해당 월 출퇴근 이력이 없습니다.</div>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">날짜</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">출근</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">퇴근</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {attendanceHistory.map((r: any, i: number) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="py-1.5 px-2 text-gray-700">{r.date?.slice(5)}</td>
+                            <td className="py-1.5 px-2 text-gray-700">{r.clock_in_time ? new Date(r.clock_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                            <td className="py-1.5 px-2 text-gray-700">{r.clock_out_time ? new Date(r.clock_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}

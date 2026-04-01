@@ -652,6 +652,11 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // confirmed_attendance migrations
+  try { await pool.query("ALTER TABLE confirmed_attendance ADD COLUMN IF NOT EXISTS department TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("CREATE INDEX IF NOT EXISTS idx_confirmed_year_month ON confirmed_attendance(year_month, employee_type)"); } catch {}
+  try { await pool.query("CREATE INDEX IF NOT EXISTS idx_confirmed_employee_name ON confirmed_attendance(employee_name)"); } catch {}
+
   // Regular employee salary settings
   try {
     await pool.query(`
@@ -682,6 +687,8 @@ export function getKSTDate(): string {
   return kst.toISOString().slice(0, 10);
 }
 
+// Returns UTC ISO timestamp. Stored as-is in DB; frontend converts to KST for display.
+// Note: Do NOT add +9h here - timestamps are stored in UTC and converted at display time.
 export function getKSTTimestamp(): string {
   return new Date().toISOString();
 }

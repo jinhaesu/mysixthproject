@@ -203,7 +203,7 @@ function DashboardContent() {
           row.regular_hours += emp.regular_hours || 0;
           row.overtime_hours += emp.overtime_hours || 0;
           row.night_hours += emp.night_hours || 0;
-          row.total_hours += (emp.regular_hours || 0) + (emp.overtime_hours || 0);
+          row.total_hours += (emp.regular_hours || 0) + floor30g(emp.overtime_hours || 0);
         }
         return Array.from(groupMap.values());
       };

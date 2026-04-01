@@ -1365,13 +1365,14 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
       if (!phoneMap.has(w.phone)) {
         // Determine type: survey_responses.worker_type > workers.category
         let type = (w as any).worker_type || '';
-        if (type === 'dispatch' || type.includes('파견')) type = '파견';
-        else if (type === 'alba' || type.includes('알바') || type.includes('사업소득')) type = '알바';
+        // Normalize English and Korean variants
+        if (type === 'dispatch' || type === '파견' || type.includes('파견')) type = '파견';
+        else if (type === 'alba' || type === '알바' || type.includes('알바') || type.includes('사업소득')) type = '알바';
         else {
           // Fallback to workers DB category
           const dbCat = catMap.get(w.phone) || catMap.get(w.name) || '';
-          if (dbCat.includes('파견')) type = '파견';
-          else if (dbCat.includes('알바') || dbCat.includes('사업소득')) type = '알바';
+          if (dbCat === 'dispatch' || dbCat.includes('파견')) type = '파견';
+          else if (dbCat === 'alba' || dbCat.includes('알바') || dbCat.includes('사업소득')) type = '알바';
           else type = '';
         }
         phoneMap.set(w.phone, { phone: w.phone, name: w.name || w.phone, department: w.department || '', type, actuals: [], shifts: [] });
@@ -1516,11 +1517,12 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       let holidayPayHours = 0; // 휴일수당 시간
       for (const [, w] of emp.weekly_data) {
         if (w.hours >= 15 && w.days >= 5) weeklyHolidayWeeks++;
-        // 공휴일은 무조건 휴일수당
-        holidayPayHours += w.publicHolidayHours || 0;
-        // 주 5일 초과 + 휴일 포함 시 → 주말 근무 전체가 휴일수당 (공휴일 제외, 이미 포함)
+        // 주 5일 초과 + 휴일 포함 시 → 주말/공휴일 근무 전체가 휴일수당
         if (w.days > 5 && w.hasHoliday) {
-          holidayPayHours += Math.max((w.holidayHours || 0) - (w.publicHolidayHours || 0), 0);
+          holidayPayHours += w.holidayHours || 0;
+        } else {
+          // 주 5일 이하: 공휴일만 휴일수당
+          holidayPayHours += w.publicHolidayHours || 0;
         }
       }
       const weeklyHolidayHours = weeklyHolidayWeeks * 8;

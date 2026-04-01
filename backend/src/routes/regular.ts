@@ -661,15 +661,29 @@ router.post('/vacation-balances/auto-calc', async (req: AuthRequest, res: Respon
       let totalDays: number;
 
       if (yearsWorked < 0) {
-        // Hired after year start - calculate monthly leave for first year
-        const hireMonth = hireDate.getMonth();
-        const monthsInYear = 12 - hireMonth;
-        totalDays = Math.min(monthsInYear, 11); // 1 day per month, max 11
+        // Hired after year start - 1 day per completed full month worked
+        // Count full months from hire date to Dec 31
+        let months = 0;
+        const cur = new Date(hireDate);
+        while (true) {
+          const next = new Date(cur.getFullYear(), cur.getMonth() + 1, cur.getDate());
+          if (next > yearEnd) break;
+          months++;
+          cur.setMonth(cur.getMonth() + 1);
+        }
+        totalDays = Math.min(months, 11); // 1 day per completed month, max 11
       } else if (yearsWorked < 1) {
         // In first year of employment at year start
-        // Monthly leave: 1 day per completed month in this year
-        const monthsWorkedThisYear = Math.min(12, Math.floor((yearEnd.getTime() - hireDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
-        totalDays = Math.min(monthsWorkedThisYear, 11);
+        // 1 day per completed full month in this year
+        let months = 0;
+        const cur = new Date(hireDate);
+        while (true) {
+          const next = new Date(cur.getFullYear(), cur.getMonth() + 1, cur.getDate());
+          if (next > yearEnd) break;
+          months++;
+          cur.setMonth(cur.getMonth() + 1);
+        }
+        totalDays = Math.min(months, 11);
       } else {
         // 1+ years: Korean labor law Article 60
         // Base: 15 days
@@ -1053,14 +1067,14 @@ router.post('/attendance-confirm', async (req: AuthRequest, res: Response) => {
         );
         if (existing) {
           await dbRun(
-            `UPDATE confirmed_attendance SET employee_type = ?, confirmed_clock_in = ?, confirmed_clock_out = ?, source = ?, regular_hours = ?, overtime_hours = ?, night_hours = ?, break_hours = ?, holiday_work = ?, memo = ?, confirmed_at = NOW() WHERE id = ?`,
-            r.employee_type || '정규직', r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours || 1, r.holiday_work || 0, r.memo || '', (existing as any).id
+            `UPDATE confirmed_attendance SET employee_type = ?, confirmed_clock_in = ?, confirmed_clock_out = ?, source = ?, regular_hours = ?, overtime_hours = ?, night_hours = ?, break_hours = ?, holiday_work = ?, memo = ?, department = ?, confirmed_at = NOW() WHERE id = ?`,
+            r.employee_type || '정규직', r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours !== undefined && r.break_hours !== null ? r.break_hours : 1, r.holiday_work || 0, r.memo || '', r.department || '', (existing as any).id
           );
         } else {
           await dbRun(
-            `INSERT INTO confirmed_attendance (employee_type, employee_name, employee_phone, date, confirmed_clock_in, confirmed_clock_out, source, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo, year_month)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            r.employee_type || '정규직', r.employee_name, r.employee_phone || '', r.date, r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours || 1, r.holiday_work || 0, r.memo || '', r.year_month || r.date.slice(0, 7)
+            `INSERT INTO confirmed_attendance (employee_type, employee_name, employee_phone, date, confirmed_clock_in, confirmed_clock_out, source, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo, year_month, department)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            r.employee_type || '정규직', r.employee_name, r.employee_phone || '', r.date, r.confirmed_clock_in, r.confirmed_clock_out, r.source || 'planned', r.regular_hours || 0, r.overtime_hours || 0, r.night_hours || 0, r.break_hours !== undefined && r.break_hours !== null ? r.break_hours : 1, r.holiday_work || 0, r.memo || '', r.year_month || r.date.slice(0, 7), r.department || ''
           );
         }
         confirmed++;
@@ -1088,7 +1102,7 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
     try {
       const workers = await dbAll("SELECT name_ko, department FROM workers WHERE name_ko IS NOT NULL AND name_ko != ''");
       for (const w of workers as any[]) { if (w.name_ko) deptMap.set(w.name_ko, w.department || ''); }
-      const regs = await dbAll("SELECT name, department FROM regular_employees WHERE resigned = 0");
+      const regs = await dbAll("SELECT name, department FROM regular_employees WHERE is_active = 1");
       for (const r of regs as any[]) { if (r.name) deptMap.set(r.name, r.department || ''); }
     } catch {}
 
@@ -1125,7 +1139,7 @@ router.put('/confirmed-list/:id', async (req: AuthRequest, res: Response) => {
     const { confirmed_clock_in, confirmed_clock_out, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo } = req.body;
     await dbRun(
       `UPDATE confirmed_attendance SET confirmed_clock_in = ?, confirmed_clock_out = ?, regular_hours = ?, overtime_hours = ?, night_hours = ?, break_hours = ?, holiday_work = ?, memo = ?, confirmed_at = NOW() WHERE id = ?`,
-      confirmed_clock_in, confirmed_clock_out, regular_hours || 0, overtime_hours || 0, night_hours || 0, break_hours || 1, holiday_work || 0, memo || '', req.params.id
+      confirmed_clock_in, confirmed_clock_out, regular_hours || 0, overtime_hours || 0, night_hours || 0, break_hours !== undefined && break_hours !== null ? break_hours : 1, holiday_work || 0, memo || '', req.params.id
     );
     res.json({ success: true });
   } catch (error: any) {

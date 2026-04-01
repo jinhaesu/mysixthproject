@@ -128,9 +128,13 @@ export default function AttendanceSummaryRegularPage() {
   const getPlannedForDay = (shifts: any[], date: string) => {
     const dow = new Date(date + 'T00:00:00+09:00').getDay();
     for (const s of shifts) {
-      const days = (s.days_of_week || String(s.day_of_week)).split(',').map(Number);
+      const daysStr = s.days_of_week && s.days_of_week !== '' ? s.days_of_week : (s.day_of_week != null ? String(s.day_of_week) : '');
+      if (!daysStr) continue;
+      const days = daysStr.split(',').map(Number).filter((n: number) => !isNaN(n));
       if (days.includes(dow)) return { in: s.planned_clock_in, out: s.planned_clock_out };
     }
+    // Fallback: if no day-of-week match but shifts exist, return first shift
+    if (shifts && shifts.length > 0) return { in: shifts[0].planned_clock_in, out: shifts[0].planned_clock_out };
     return null;
   };
 
@@ -212,7 +216,7 @@ export default function AttendanceSummaryRegularPage() {
         const clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
         const breakH = getBreakHours(parseInt(empId), date, clockIn, clockOut);
         const h = calcHoursFromTimes(clockIn, clockOut, breakH);
-        records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
+        records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
       }
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
@@ -239,7 +243,7 @@ export default function AttendanceSummaryRegularPage() {
           if (clockIn === '-' && clockOut === '-') continue;
           const breakH = getBreakHours(emp.id, actual.date, clockIn, clockOut);
           const h = calcHoursFromTimes(clockIn, clockOut, breakH);
-          records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
+          records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
         }
       }
       if (records.length === 0) return alert("해당 기간에 출근 데이터가 없습니다.");

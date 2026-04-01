@@ -25,7 +25,7 @@ export default function PolicyPage() {
               <tr><td className="py-2 pr-4 font-medium text-gray-700">연장/휴일/야간 내림</td><td className="py-2 text-gray-600">연장/휴일/야간 시간은 30분 단위로 내림 처리 (0.1~0.4h → 0h, 0.5h = 30분)</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">기본 근로시간</td><td className="py-2 text-gray-600">1일 8시간 기준, 초과분은 연장근로</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">휴게시간 (점심)</td><td className="py-2 text-gray-600">4시간 이상 근무 시 30분, 8시간 이상 근무 시 1시간 (근로기준법 제54조)</td></tr>
-              <tr><td className="py-2 pr-4 font-medium text-gray-700">휴게시간 (저녁)</td><td className="py-2 text-gray-600">출근 7~9시 & 퇴근 19~20시 해당 시 저녁 식사 30분 추가 휴게 (기본 적용, 관리자 해제 가능)</td></tr>
+              <tr><td className="py-2 pr-4 font-medium text-gray-700">휴게시간 (식사)</td><td className="py-2 text-gray-600">연장근로 2시간 이상 시 식사 30분 추가 휴게 (기본 적용, 관리자 해제 가능). 연장 2시간 미만은 미해당.</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">야간조</td><td className="py-2 text-gray-600">21시 출근 ~ 다음날 06시 퇴근, 자정 넘김 시에도 퇴근 정상 처리</td></tr>
             </tbody>
           </table>

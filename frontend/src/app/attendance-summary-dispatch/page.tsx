@@ -142,12 +142,17 @@ export default function AttendanceSummaryDispatchPage() {
     return Math.abs((h1 * 60 + (m1||0)) - (h2 * 60 + (m2||0))) / 60;
   };
 
-  const isDinnerApplicable = (clockIn: string, clockOut: string) => {
+  // 연장 2시간 이상일 때만 식사 휴게 30분 해당
+  const isMealBreakApplicable = (clockIn: string, clockOut: string) => {
     if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return false;
-    const [h1] = clockIn.split(':').map(Number);
-    const [h2] = clockOut.split(':').map(Number);
+    const [h1,m1] = clockIn.split(':').map(Number);
+    const [h2,m2] = clockOut.split(':').map(Number);
     if (isNaN(h1) || isNaN(h2)) return false;
-    return h1 >= 7 && h1 <= 9 && h2 >= 19 && h2 <= 20;
+    const startMin = Math.ceil((h1 * 60 + (m1 || 0)) / 30) * 30;
+    const endMin = Math.floor((h2 * 60 + (m2 || 0)) / 30) * 30;
+    const totalH = Math.max((endMin - startMin) / 60 - 1, 0); // 점심 1h 제외
+    const overtime = Math.max(totalH - 8, 0);
+    return overtime >= 2;
   };
 
   // 출근: 30분 올림 (8:03→8:30), 퇴근: 30분 내림 (17:25→17:00)
@@ -167,10 +172,9 @@ export default function AttendanceSummaryDispatchPage() {
 
   const getBreakHours = (empId: number, date: string, clockIn: string, clockOut: string) => {
     const key = `${empId}|${date}`;
-    if (!isDinnerApplicable(clockIn, clockOut)) return 1;
-    // default is true (dinner break checked), unless explicitly unchecked
-    const hasDinner = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
-    return hasDinner ? 1.5 : 1;
+    if (!isMealBreakApplicable(clockIn, clockOut)) return 1;
+    const hasMeal = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
+    return hasMeal ? 1.5 : 1;
   };
 
   const getEmpSummary = (emp: any, mode: 'actual' | 'planned') => {
@@ -443,7 +447,7 @@ export default function AttendanceSummaryDispatchPage() {
                           <th className="py-2 px-3 text-blue-600">계획퇴근</th>
                           <th className="py-2 px-3 text-green-600">실제출근</th>
                           <th className="py-2 px-3 text-green-600">실제퇴근</th>
-                          <th className="py-2 px-3">저녁식사</th>
+                          <th className="py-2 px-3">식사</th>
                           <th className="py-2 px-3">기준</th>
                         </tr>
                       </thead>
@@ -465,8 +469,8 @@ export default function AttendanceSummaryDispatchPage() {
                           const isDayConfirmed = confirmedSet.has(`${emp.name}|${date}`);
                           const useClockIn = source === 'actual' ? actualIn : (plannedIn !== '-' ? plannedIn : actualIn);
                           const useClockOut = source === 'actual' ? actualOut : (plannedOut !== '-' ? plannedOut : actualOut);
-                          const dinnerApplicable = isDinnerApplicable(useClockIn, useClockOut);
-                          const dinnerChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
+                          const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);
+                          const mealChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
                           return (
                             <tr key={date} className={isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
                               <td className="py-1.5 px-3">
@@ -485,13 +489,13 @@ export default function AttendanceSummaryDispatchPage() {
                               <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualIn}</td>
                               <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualOut}</td>
                               <td className="py-1.5 px-3">
-                                {dinnerApplicable ? (
+                                {mealApplicable ? (
                                   <label className="inline-flex items-center gap-1 cursor-pointer">
-                                    <input type="checkbox" checked={dinnerChecked}
+                                    <input type="checkbox" checked={mealChecked}
                                       onChange={e => setDinnerBreak({...dinnerBreak, [key]: e.target.checked})}
                                       className="rounded border-gray-300" disabled={isDayConfirmed} />
-                                    <span className={`text-[10px] ${dinnerChecked ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
-                                      {dinnerChecked ? '30분 휴게' : '식사 안함'}
+                                    <span className={`text-[10px] ${mealChecked ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
+                                      {mealChecked ? '30분 휴게' : '미식사'}
                                     </span>
                                   </label>
                                 ) : (

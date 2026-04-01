@@ -183,6 +183,68 @@ async function checkAndSendScheduledMessages() {
   }
 }
 
+// ===== Regular Employee Report Schedule =====
+async function checkAndSendRegularReports() {
+  try {
+    const now = new Date();
+    const kstHours = (now.getUTCHours() + 9) % 24;
+    const kstMinutes = now.getUTCMinutes();
+    const currentTime = `${String(kstHours).padStart(2, '0')}:${String(kstMinutes).padStart(2, '0')}`;
+
+    const schedules = await dbAll('SELECT * FROM regular_report_schedules WHERE is_active = 1');
+
+    for (const schedule of schedules as any[]) {
+      const [schedH, schedM] = schedule.time.split(':').map(Number);
+      const diffMinutes = Math.abs((kstHours * 60 + kstMinutes) - (schedH * 60 + schedM));
+
+      if (diffMinutes > 10) continue;
+
+      // Check day of week
+      const jsDay = new Date(now.getTime() + 9 * 60 * 60 * 1000).getDay();
+      const kstDayOfWeek = jsDay === 0 ? 7 : jsDay; // 1=Mon ... 7=Sun
+
+      if (schedule.repeat_days && schedule.repeat_days !== 'daily') {
+        const allowedDays = schedule.repeat_days.split(',').map(Number);
+        if (!allowedDays.includes(kstDayOfWeek)) continue;
+      }
+
+      // Prevent duplicate sends within 30 min
+      if (schedule.last_sent_at) {
+        const lastSent = new Date(schedule.last_sent_at);
+        if (now.getTime() - lastSent.getTime() < 30 * 60 * 1000) continue;
+      }
+
+      const today = getKSTDate();
+      const stats = await dbGet(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN ra.clock_in_time IS NOT NULL AND ra.clock_out_time IS NULL THEN 1 ELSE 0 END) as clocked_in,
+          SUM(CASE WHEN ra.clock_out_time IS NOT NULL THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN ra.clock_in_time IS NULL THEN 1 ELSE 0 END) as not_clocked_in
+        FROM regular_employees re
+        LEFT JOIN regular_attendance ra ON re.id = ra.employee_id AND ra.date = ?
+        WHERE re.is_active = 1
+      `, today) as any;
+
+      if (!stats || stats.total === 0) continue;
+
+      const frontendUrl = process.env.FRONTEND_URL || 'https://mysixthproject.vercel.app';
+      const detailLink = `${frontendUrl}/report-regular?date=${today}`;
+      const message = `[조인앤조인 정규직 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats.total}명\n출근중: ${stats.clocked_in || 0}명\n미출근: ${stats.not_clocked_in || 0}명\n퇴근완료: ${stats.completed || 0}명\n\n상세 현황: ${detailLink}`;
+
+      const phones = JSON.parse(schedule.phones);
+      for (const phone of phones) {
+        await sendGeneralSms(phone, message);
+      }
+
+      await dbRun('UPDATE regular_report_schedules SET last_sent_at = CURRENT_TIMESTAMP WHERE id = ?', schedule.id);
+      console.log(`[RegularReport] Sent at ${currentTime} to ${phones.length} recipients`);
+    }
+  } catch (err) {
+    console.error('[RegularReport] Error:', err);
+  }
+}
+
 // ===== Auto Vacation Balance Update (Korean Labor Law) =====
 let lastVacationCheckDate = '';
 
@@ -274,6 +336,9 @@ export function startReminderService() {
   // Check scheduled items every 5 minutes
   setInterval(checkAndSendScheduledSurveys, 5 * 60 * 1000);
   setInterval(checkAndSendScheduledMessages, 5 * 60 * 1000);
+  // Regular employee report schedules - check every 10 minutes
+  setInterval(checkAndSendRegularReports, 10 * 60 * 1000);
+  setTimeout(checkAndSendRegularReports, 90 * 1000); // 1.5 min after startup
   // Vacation balance auto-update: check every hour, runs once per day
   setInterval(checkAndUpdateVacationBalances, 60 * 60 * 1000);
   setTimeout(checkAndUpdateVacationBalances, 2 * 60 * 1000); // 2 min after startup

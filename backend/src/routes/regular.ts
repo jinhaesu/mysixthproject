@@ -1015,36 +1015,45 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
     const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
     const endDate = `${year}-${month.padStart(2,'0')}-${lastDay}`;
 
-    // Get all active employees with their attendance
+    // Batch queries instead of N+1 per employee
     const employees = await dbAll('SELECT id, name, phone, department, team FROM regular_employees WHERE is_active = 1 ORDER BY department, team, name') as any[];
 
-    const result = [];
-    for (const emp of employees) {
-      // Actual attendance
-      const actuals = await dbAll(
-        'SELECT date, clock_in_time, clock_out_time FROM regular_attendance WHERE employee_id = ? AND date >= ? AND date <= ? ORDER BY date',
-        emp.id, startDate, endDate
-      );
+    // All attendance for the month in one query
+    const allActuals = await dbAll(
+      'SELECT employee_id, date, clock_in_time, clock_out_time FROM regular_attendance WHERE date >= ? AND date <= ? ORDER BY date',
+      startDate, endDate
+    ) as any[];
 
-      // Planned shifts (filter by month if set, or include month=0 which means all months)
-      const shifts = await dbAll(`
-        SELECT rs.planned_clock_in, rs.planned_clock_out, rs.days_of_week, rs.day_of_week, rs.month
-        FROM regular_shift_assignments rsa
-        JOIN regular_shifts rs ON rsa.shift_id = rs.id
-        WHERE rsa.employee_id = ? AND rs.is_active = 1 AND (rs.month = 0 OR rs.month = ?)
-      `, emp.id, parseInt(month));
+    // All shift assignments for the month in one query
+    const allShifts = await dbAll(`
+      SELECT rsa.employee_id, rs.planned_clock_in, rs.planned_clock_out, rs.days_of_week, rs.day_of_week, rs.month
+      FROM regular_shift_assignments rsa
+      JOIN regular_shifts rs ON rsa.shift_id = rs.id
+      WHERE rs.is_active = 1 AND (rs.month = 0 OR rs.month = ?)
+    `, parseInt(month)) as any[];
 
-      result.push({
-        id: emp.id,
-        name: emp.name,
-        phone: emp.phone,
-        department: emp.department,
-        team: emp.team,
-        actuals: actuals,
-        shifts: shifts,
-        actual_days: actuals.length,
-      });
+    // Index by employee_id
+    const actualsMap = new Map<number, any[]>();
+    for (const a of allActuals) {
+      if (!actualsMap.has(a.employee_id)) actualsMap.set(a.employee_id, []);
+      actualsMap.get(a.employee_id)!.push(a);
     }
+    const shiftsMap = new Map<number, any[]>();
+    for (const s of allShifts) {
+      if (!shiftsMap.has(s.employee_id)) shiftsMap.set(s.employee_id, []);
+      shiftsMap.get(s.employee_id)!.push(s);
+    }
+
+    const result = employees.map((emp: any) => ({
+      id: emp.id,
+      name: emp.name,
+      phone: emp.phone,
+      department: emp.department,
+      team: emp.team,
+      actuals: actualsMap.get(emp.id) || [],
+      shifts: shiftsMap.get(emp.id) || [],
+      actual_days: (actualsMap.get(emp.id) || []).length,
+    }));
 
     res.json({ employees: result, startDate, endDate });
   } catch (error: any) {

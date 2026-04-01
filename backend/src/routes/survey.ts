@@ -1386,20 +1386,26 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Get actual attendance per worker (with per-day planned times)
+    // Get all actual attendance in one query instead of per-worker
+    const allActuals = await dbAll(`
+      SELECT sr.phone, sr.date, resp.clock_in_time, resp.clock_out_time,
+             sr.planned_clock_in, sr.planned_clock_out
+      FROM survey_requests sr
+      JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.date >= ? AND sr.date <= ? AND resp.clock_in_time IS NOT NULL
+        AND resp.worker_name_ko IS NOT NULL AND resp.worker_name_ko != ''
+      ORDER BY sr.date
+    `, startDate, endDate) as any[];
+
+    for (const a of allActuals) {
+      const emp = phoneMap.get(a.phone);
+      if (emp) {
+        emp.actuals.push(a);
+      }
+    }
     for (const [phone, emp] of phoneMap) {
-      const actuals = await dbAll(`
-        SELECT sr.date, resp.clock_in_time, resp.clock_out_time,
-               sr.planned_clock_in, sr.planned_clock_out
-        FROM survey_requests sr
-        JOIN survey_responses resp ON sr.id = resp.request_id
-        WHERE sr.phone = ? AND sr.date >= ? AND sr.date <= ? AND resp.clock_in_time IS NOT NULL
-          AND resp.worker_name_ko IS NOT NULL AND resp.worker_name_ko != ''
-        ORDER BY sr.date
-      `, phone, startDate, endDate);
-      emp.actuals = actuals;
-      emp.actual_days = actuals.length;
-      emp.id = phone; // use phone as ID for dispatch workers
+      emp.actual_days = emp.actuals.length;
+      emp.id = phone;
     }
 
     res.json({ employees: Array.from(phoneMap.values()), startDate, endDate });

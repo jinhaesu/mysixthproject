@@ -1781,7 +1781,7 @@ function ShiftsTab() {
               <div className="flex gap-2 mb-2">
                 <select value={assignDeptFilter} onChange={e => setAssignDeptFilter(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
                   <option value="all">전체 부서</option>
-                  {Array.from(new Set(allEmployees.map((e: any) => e.department).filter(Boolean))).map(d => <option key={d} value={d}>{d}</option>)}
+                  {Array.from(new Set([...DEPARTMENTS, ...allEmployees.map((e: any) => e.department).filter(Boolean)])).map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
                 <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
               </div>

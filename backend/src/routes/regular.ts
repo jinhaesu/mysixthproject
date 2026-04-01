@@ -1012,13 +1012,13 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
         emp.id, startDate, endDate
       );
 
-      // Planned shifts
+      // Planned shifts (filter by month if set, or include month=0 which means all months)
       const shifts = await dbAll(`
-        SELECT rs.planned_clock_in, rs.planned_clock_out, rs.days_of_week, rs.day_of_week
+        SELECT rs.planned_clock_in, rs.planned_clock_out, rs.days_of_week, rs.day_of_week, rs.month
         FROM regular_shift_assignments rsa
         JOIN regular_shifts rs ON rsa.shift_id = rs.id
-        WHERE rsa.employee_id = ? AND rs.is_active = 1
-      `, emp.id);
+        WHERE rsa.employee_id = ? AND rs.is_active = 1 AND (rs.month = 0 OR rs.month = ?)
+      `, emp.id, parseInt(month));
 
       result.push({
         id: emp.id,

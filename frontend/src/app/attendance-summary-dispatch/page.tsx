@@ -118,7 +118,15 @@ export default function AttendanceSummaryDispatchPage() {
     } catch { return t; }
   };
 
-  const getPlannedForDay = (shifts: any[], _date: string) => {
+  const getPlannedForDay = (shifts: any[], date: string, actuals?: any[]) => {
+    // First check if actual record has per-day planned times
+    if (actuals) {
+      const actual = actuals.find((a: any) => a.date === date);
+      if (actual?.planned_clock_in) {
+        return { in: actual.planned_clock_in, out: actual.planned_clock_out || '' };
+      }
+    }
+    // Fallback to shifts array
     if (shifts && shifts.length > 0) {
       return { in: shifts[0].planned_clock_in, out: shifts[0].planned_clock_out };
     }
@@ -162,7 +170,7 @@ export default function AttendanceSummaryDispatchPage() {
     let regular = 0, overtime = 0, weekend = 0, days = 0;
     for (const actual of emp.actuals) {
       const date = actual.date;
-      const planned = getPlannedForDay(emp.shifts, date);
+      const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
       const clockIn = mode === 'planned' && planned ? planned.in : formatTime(actual.clock_in_time);
       const clockOut = mode === 'planned' && planned ? planned.out : formatTime(actual.clock_out_time);
       if (clockIn === '-' && clockOut === '-') continue;
@@ -199,7 +207,7 @@ export default function AttendanceSummaryDispatchPage() {
         if (!emp) continue;
         const source = selectedSource[key] || 'planned';
         const actual = emp.actuals.find((a: any) => a.date === date);
-        const planned = getPlannedForDay(emp.shifts, date);
+        const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
         const clockIn = source === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
         const clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
         const breakH = getBreakHours(parseInt(empId), date, clockIn, clockOut);
@@ -225,7 +233,7 @@ export default function AttendanceSummaryDispatchPage() {
         if (!emp) continue;
         for (const actual of emp.actuals) {
           if (actual.date < startDate || actual.date > endDate) continue;
-          const planned = getPlannedForDay(emp.shifts, actual.date);
+          const planned = getPlannedForDay(emp.shifts, actual.date, emp.actuals);
           const clockIn = batchSource === 'actual' ? formatTime(actual.clock_in_time) : (planned?.in || formatTime(actual.clock_in_time));
           const clockOut = batchSource === 'actual' ? formatTime(actual.clock_out_time) : (planned?.out || formatTime(actual.clock_out_time));
           if (clockIn === '-' && clockOut === '-') continue;
@@ -245,7 +253,7 @@ export default function AttendanceSummaryDispatchPage() {
   const getAnomalyCount = (emp: any) => {
     let count = 0;
     for (const actual of (emp.actuals || [])) {
-      const planned = getPlannedForDay(emp.shifts, actual.date);
+      const planned = getPlannedForDay(emp.shifts, actual.date, emp.actuals);
       if (!planned || planned.in === '-') continue;
       const actualIn = formatTime(actual.clock_in_time);
       const actualOut = formatTime(actual.clock_out_time);
@@ -435,7 +443,7 @@ export default function AttendanceSummaryDispatchPage() {
                       <tbody className="divide-y divide-gray-100">
                         {emp.actuals.map((actual: any) => {
                           const date = actual.date;
-                          const planned = getPlannedForDay(emp.shifts, date);
+                          const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
                           const key = `${emp.id}|${date}`;
                           const actualIn = formatTime(actual.clock_in_time);
                           const actualOut = formatTime(actual.clock_out_time);

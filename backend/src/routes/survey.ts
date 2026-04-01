@@ -1385,10 +1385,11 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Get actual attendance per worker
+    // Get actual attendance per worker (with per-day planned times)
     for (const [phone, emp] of phoneMap) {
       const actuals = await dbAll(`
-        SELECT sr.date, resp.clock_in_time, resp.clock_out_time
+        SELECT sr.date, resp.clock_in_time, resp.clock_out_time,
+               sr.planned_clock_in, sr.planned_clock_out
         FROM survey_requests sr
         JOIN survey_responses resp ON sr.id = resp.request_id
         WHERE sr.phone = ? AND sr.date >= ? AND sr.date <= ? AND resp.clock_in_time IS NOT NULL

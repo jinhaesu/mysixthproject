@@ -210,10 +210,11 @@ export default function ConfirmedListRegularPage() {
                                   {emp.records.map((r: any) => {
                                     const vType = vacationMap[`${emp.name}|${r.date}`];
                                     return (
-                                    <tr key={r.id} className={vType?.includes('반차') ? 'bg-amber-50/50 hover:bg-amber-50' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-white/60'}>
+                                    <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-50/50' : vType?.includes('반차') ? 'bg-amber-50/50 hover:bg-amber-50' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-white/60'}>
                                       <td className="py-1.5 px-3">
                                         {r.date}
-                                        {vType && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vType.includes('반차') ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{vType}</span>}
+                                        {r.source === 'vacation' && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-100 text-violet-700">{r.memo || '연차'}</span>}
+                                        {r.source !== 'vacation' && vType && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vType.includes('반차') ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{vType}</span>}
                                       </td>
                                       <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
                                         const ci = e.target.value; const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);

@@ -575,6 +575,27 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
       await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', request.days, balance.id);
     }
 
+    // Auto-create confirmed_attendance for full-day vacation (연차)
+    if (!request.type || request.type === '연차') {
+      const emp = await dbGet('SELECT name, phone, department FROM regular_employees WHERE id = ?', request.employee_id) as any;
+      if (emp) {
+        const start = new Date(request.start_date + 'T00:00:00+09:00');
+        const end = new Date(request.end_date + 'T00:00:00+09:00');
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          if (isHolidayOrWeekend(dateStr)) continue;
+          const ym = dateStr.slice(0, 7);
+          try {
+            await dbRun(`
+              INSERT INTO confirmed_attendance (employee_type, employee_name, employee_phone, date, confirmed_clock_in, confirmed_clock_out, source, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo, year_month, department)
+              VALUES ('정규직', ?, ?, ?, '휴가', '휴가', 'vacation', 8, 0, 0, 0, 0, '연차', ?, ?)
+              ON CONFLICT (employee_type, employee_name, date) DO UPDATE SET confirmed_clock_in='휴가', confirmed_clock_out='휴가', source='vacation', regular_hours=8, overtime_hours=0, night_hours=0, break_hours=0, memo='연차'
+            `, emp.name, emp.phone || '', dateStr, ym, emp.department || '');
+          } catch {}
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -1207,6 +1228,26 @@ router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
       updated++;
     }
     res.json({ success: true, updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/vacation-dates - Get approved vacation dates for a month
+router.get('/vacation-dates', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year_month } = req.query as Record<string, string>;
+    if (!year_month) { res.status(400).json({ error: 'year_month 필요' }); return; }
+
+    const vacations = await dbAll(`
+      SELECT vr.*, re.name as employee_name, re.department, re.team
+      FROM regular_vacation_requests vr
+      JOIN regular_employees re ON vr.employee_id = re.id
+      WHERE vr.status = 'approved'
+        AND vr.start_date <= ? AND vr.end_date >= ?
+    `, year_month + '-31', year_month + '-01');
+
+    res.json(vacations || []);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -1752,6 +1752,8 @@ function ShiftsTab() {
   const [unassignedDept, setUnassignedDept] = useState("");
   const [unassignedOpen, setUnassignedOpen] = useState(false);
   const [allEmpsLoaded, setAllEmpsLoaded] = useState(false);
+  // Vacation data for shifts
+  const [shiftVacations, setShiftVacations] = useState<any[]>([]);
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -1777,7 +1779,7 @@ function ShiftsTab() {
 
   useEffect(() => { loadShifts(); }, [loadShifts]);
 
-  // Load all employees once for unassigned check
+  // Load all employees + vacations once
   useEffect(() => {
     if (!allEmpsLoaded) {
       getRegularEmployees({ limit: '500' }).then((data: any) => {
@@ -1785,6 +1787,7 @@ function ShiftsTab() {
         setAllEmpsLoaded(true);
       }).catch(() => {});
     }
+    getRegularVacations({ status: 'approved' }).then((data: any) => setShiftVacations(data || [])).catch(() => {});
   }, [allEmpsLoaded]);
 
   // Load assignments when shifts are loaded (needed for both calendar and unassigned panel)
@@ -1862,6 +1865,31 @@ function ShiftsTab() {
   };
 
   const parseDays = (s: string) => s ? s.split(',').map(Number).filter(n => !isNaN(n)) : [];
+
+  // Check if employee is on vacation for a date
+  const getVacOnDate = (empName: string, dateStr: string) => {
+    for (const v of shiftVacations) {
+      if (v.employee_name !== empName) continue;
+      if (dateStr >= v.start_date && dateStr <= v.end_date) return v;
+    }
+    return null;
+  };
+  const getVacEmployeesOnDate = (dateStr: string) => {
+    const result: any[] = [];
+    for (const v of shiftVacations) {
+      if (dateStr >= v.start_date && dateStr <= v.end_date) {
+        result.push(v);
+      }
+    }
+    return result;
+  };
+  const vacEmployeeIdsOnDate = (dateStr: string) => {
+    const ids = new Set<number>();
+    for (const v of shiftVacations) {
+      if (dateStr >= v.start_date && dateStr <= v.end_date) ids.add(v.employee_id);
+    }
+    return ids;
+  };
 
   const openCalShiftPopup = async (shift: any) => {
     setCalPopupShift(shift);
@@ -1950,8 +1978,12 @@ function ShiftsTab() {
           assgn.forEach((a: any) => assignedIds.add(a.employee_id));
         }
 
+        // Vacation employees on this date
+        const vacIds = vacEmployeeIdsOnDate(unassignedDate);
+        const vacOnDate = getVacEmployeesOnDate(unassignedDate);
+
         const unassigned = allEmployees
-          .filter((e: any) => e.is_active !== 0 && !assignedIds.has(e.id))
+          .filter((e: any) => e.is_active !== 0 && !assignedIds.has(e.id) && !vacIds.has(e.id))
           .filter((e: any) => !unassignedDept || (e.department || '').includes(unassignedDept));
 
         const dayNames = ['일','월','화','수','목','금','토'];
@@ -2022,6 +2054,28 @@ function ShiftsTab() {
                 ) : (
                   <div className="text-center py-4 text-sm text-green-600 font-medium">
                     해당 날짜에 모든 인원이 배치되었습니다.
+                  </div>
+                )}
+
+                {/* Vacation list for the date */}
+                {vacOnDate.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <h5 className="text-xs font-semibold text-violet-700 mb-2">휴가자 ({vacOnDate.length}명)</h5>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
+                      {vacOnDate.map((v: any) => (
+                        <div key={v.id} className="flex items-center gap-2 bg-violet-50 rounded-lg px-2.5 py-2 border border-violet-100">
+                          <div className="w-6 h-6 rounded-full bg-violet-200 flex items-center justify-center text-[10px] font-bold text-violet-800">
+                            {(v.employee_name || '?')[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-900 truncate">{v.employee_name}</p>
+                            <p className="text-[10px] text-violet-600 truncate">
+                              {v.type === '오전반차' ? '오전반차 09~14시' : v.type === '오후반차' ? '오후반차 14~18시' : '연차'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

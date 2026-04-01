@@ -51,11 +51,13 @@ export default function AttendanceSummaryRegularPage() {
       const vacations = await getRegularVacations({ status: 'approved' });
       const map: Record<string, { type: string; status: string }> = {};
       for (const v of (vacations || [])) {
-        // For each day in the vacation range
         const start = new Date(v.start_date + 'T00:00:00+09:00');
         const end = new Date(v.end_date + 'T00:00:00+09:00');
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const dateStr = d.toISOString().slice(0, 10);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const dateStr = `${y}-${m}-${day}`;
           map[`${v.employee_name}|${dateStr}`] = { type: v.type || '연차', status: 'approved' };
         }
       }
@@ -412,7 +414,11 @@ export default function AttendanceSummaryRegularPage() {
                       {isFullyConfirmed && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-3 h-3" />확정</span>}
                       <span className="text-xs text-gray-500">{emp.department} {emp.team}</span>
                       {(() => { const ac = getAnomalyCount(emp); return ac > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">차이 발생 {ac}건</span> : null; })()}
-                      {(() => { const vc = emp.actuals?.filter((a: any) => vacationMap[`${emp.name}|${a.date}`]).length || 0; return vc > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">휴가 {vc}일</span> : null; })()}
+                      {(() => {
+                        const ym = `${year}-${String(month).padStart(2,'0')}`;
+                        const vc = Object.keys(vacationMap).filter(k => k.startsWith(`${emp.name}|${ym}`)).length;
+                        return vc > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">휴가 {vc}일</span> : null;
+                      })()}
                     </div>
                     <div className="flex items-center gap-4 text-xs">
                       <span className="text-gray-600">{summary.days}일</span>
@@ -480,10 +486,47 @@ export default function AttendanceSummaryRegularPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {emp.actuals.map((actual: any) => {
+                        {/* Merge actuals + vacation-only days */}
+                        {(() => {
+                          const ym = `${year}-${String(month).padStart(2,'0')}`;
+                          const actualDates = new Set(emp.actuals.map((a: any) => a.date));
+                          // Find vacation days with no actual record
+                          const vacOnlyDays = Object.keys(vacationMap)
+                            .filter(k => k.startsWith(`${emp.name}|${ym}`))
+                            .map(k => k.split('|')[1])
+                            .filter(d => !actualDates.has(d))
+                            .sort();
+                          // Combine: actuals + vacation-only
+                          const allRows = [
+                            ...emp.actuals.map((a: any) => ({ ...a, isVacOnly: false })),
+                            ...vacOnlyDays.map(d => ({ date: d, clock_in_time: null, clock_out_time: null, isVacOnly: true })),
+                          ].sort((a: any, b: any) => a.date.localeCompare(b.date));
+                          return allRows;
+                        })().map((actual: any) => {
                           const date = actual.date;
                           const planned = getPlannedForDay(emp.shifts, date);
                           const key = `${emp.id}|${date}`;
+                          const dowNum = new Date(date + 'T00:00:00+09:00').getDay();
+                          const dow = ['일','월','화','수','목','금','토'][dowNum];
+                          const vacInfo = vacationMap[`${emp.name}|${date}`];
+
+                          // Vacation-only row (no attendance record)
+                          if (actual.isVacOnly && vacInfo) {
+                            return (
+                              <tr key={date} className="bg-violet-50">
+                                <td className="py-1.5 px-3"><span className="w-4 h-4 inline-block text-center text-violet-500 text-xs">🏖</span></td>
+                                <td className="py-1.5 px-3 text-gray-700">
+                                  {date.slice(5)}
+                                  <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vacInfo.type?.includes('반차') ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{vacInfo.type}</span>
+                                </td>
+                                <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-red-500 font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-gray-500'}`}>{dow}</td>
+                                <td className="py-1.5 px-3 text-gray-400" colSpan={6}>
+                                  <span className="text-violet-600 font-medium text-[10px]">유급휴가 (기본 8h 인정)</span>
+                                </td>
+                              </tr>
+                            );
+                          }
+
                           const actualIn = formatTime(actual.clock_in_time);
                           const actualOut = formatTime(actual.clock_out_time);
                           const plannedIn = planned?.in || '-';
@@ -491,11 +534,8 @@ export default function AttendanceSummaryRegularPage() {
                           const diffIn = timeDiffHours(plannedIn, actualIn);
                           const diffOut = timeDiffHours(plannedOut, actualOut);
                           const isAnomaly = (diffIn >= 3 || diffOut >= 3) && plannedIn !== '-';
-                          const dowNum = new Date(date + 'T00:00:00+09:00').getDay();
-                          const dow = ['일','월','화','수','목','금','토'][dowNum];
                           const source = selectedSource[key] || 'planned';
                           const isDayConfirmed = confirmedSet.has(`${emp.name}|${date}`);
-                          const vacInfo = vacationMap[`${emp.name}|${date}`];
                           const useClockIn = source === 'actual' ? actualIn : (plannedIn !== '-' ? plannedIn : actualIn);
                           const useClockOut = source === 'actual' ? actualOut : (plannedOut !== '-' ? plannedOut : actualOut);
                           const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);

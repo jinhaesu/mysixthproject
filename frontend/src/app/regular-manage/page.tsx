@@ -1775,11 +1775,12 @@ function ShiftsTab() {
     }
   }, [allEmpsLoaded]);
 
+  // Load assignments when shifts are loaded (needed for both calendar and unassigned panel)
   useEffect(() => {
-    if (shiftSubTab === 'calendar' && shifts.length > 0) {
+    if (shifts.length > 0) {
       loadShiftCalAssignments(shifts);
     }
-  }, [shiftSubTab, shifts, loadShiftCalAssignments]);
+  }, [shifts, loadShiftCalAssignments]);
 
   const toggleDay = (day: number, target: 'form' | 'edit') => {
     if (target === 'form') {

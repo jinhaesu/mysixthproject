@@ -1157,6 +1157,50 @@ router.delete('/confirmed-list/:id', async (req: AuthRequest, res: Response) => 
   }
 });
 
+// POST /api/regular/recalc-confirmed - Recalculate all confirmed records with clock-in ceil30 + clock-out floor30
+router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
+  try {
+    const records = await dbAll('SELECT * FROM confirmed_attendance') as any[];
+    let updated = 0;
+    for (const r of records) {
+      if (!r.confirmed_clock_in || !r.confirmed_clock_out) continue;
+      const [h1, m1] = r.confirmed_clock_in.split(':').map(Number);
+      const [h2, m2] = r.confirmed_clock_out.split(':').map(Number);
+      if (isNaN(h1) || isNaN(h2)) continue;
+
+      // 출근: 30분 올림, 퇴근: 30분 내림
+      const startMin = Math.ceil((h1 * 60 + (m1 || 0)) / 30) * 30;
+      const endMin = Math.floor((h2 * 60 + (m2 || 0)) / 30) * 30;
+      const totalMin = endMin > startMin ? endMin - startMin : 0;
+      const totalH = totalMin / 60;
+
+      const breakH = parseFloat(r.break_hours) || (totalH >= 8 ? 1 : totalH >= 4 ? 0.5 : 0);
+      const workH = Math.max(totalH - breakH, 0);
+
+      // Night hours (22:00~06:00)
+      let nightMin = 0;
+      for (let min = startMin; min < endMin; min++) {
+        const h = Math.floor(min / 60) % 24;
+        if (h >= 22 || h < 6) nightMin++;
+      }
+      const nightH = Math.round(nightMin / 60 * 10) / 10;
+
+      const isHoliday = isHolidayOrWeekend(r.date);
+      const regularH = isHoliday ? 0 : Math.round(Math.min(workH, 8) * 10) / 10;
+      const overtimeH = isHoliday ? Math.round(workH * 10) / 10 : Math.round(Math.max(workH - 8, 0) * 10) / 10;
+
+      await dbRun(
+        'UPDATE confirmed_attendance SET regular_hours = ?, overtime_hours = ?, night_hours = ? WHERE id = ?',
+        regularH, overtimeH, nightH, r.id
+      );
+      updated++;
+    }
+    res.json({ success: true, updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== Salary Settings =====
 
 // GET /api/regular/salary-settings - List all salary settings with employee info

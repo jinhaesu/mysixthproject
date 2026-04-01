@@ -1260,7 +1260,7 @@ function AttendanceTab() {
 }
 
 function VacationTab() {
-  const [subTab, setSubTab] = useState<'requests' | 'balances'>('requests');
+  const [subTab, setSubTab] = useState<'requests' | 'balances' | 'calendar'>('requests');
   const [requests, setRequests] = useState<any[]>([]);
   const [balances, setBalances] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1273,6 +1273,12 @@ function VacationTab() {
   const [selectedEmpIds, setSelectedEmpIds] = useState<Set<number>>(new Set());
   const [batchDays, setBatchDays] = useState("15");
   const [balanceSearch, setBalanceSearch] = useState("");
+  // Calendar sub-tab state
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+  const [calDept, setCalDept] = useState("");
+  const [calVacations, setCalVacations] = useState<any[]>([]);
+  const [calLoading, setCalLoading] = useState(false);
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -1292,10 +1298,19 @@ function VacationTab() {
     } catch {} finally { setLoading(false); }
   }, [year]);
 
+  const loadCalVacations = useCallback(async () => {
+    setCalLoading(true);
+    try {
+      const data = await getRegularVacations({ status: 'approved' });
+      setCalVacations(data || []);
+    } catch {} finally { setCalLoading(false); }
+  }, []);
+
   useEffect(() => {
     if (subTab === 'requests') loadRequests();
-    else loadBalances();
-  }, [subTab, loadRequests, loadBalances]);
+    else if (subTab === 'balances') loadBalances();
+    else loadCalVacations();
+  }, [subTab, loadRequests, loadBalances, loadCalVacations]);
 
   const handleApprove = async (id: number) => {
     const memo = prompt("승인 메모 (선택):");
@@ -1341,6 +1356,10 @@ function VacationTab() {
         <button onClick={() => setSubTab('balances')}
           className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'balances' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
           보유 휴가 설정
+        </button>
+        <button onClick={() => setSubTab('calendar')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${subTab === 'calendar' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          <Calendar size={14} /> 휴가 캘린더
         </button>
       </div>
 
@@ -1417,6 +1436,133 @@ function VacationTab() {
           </div>
         </>
       )}
+
+      {subTab === 'calendar' && (() => {
+        const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+        const firstDow = new Date(calYear, calMonth - 1, 1).getDay(); // 0=Sun
+        // Monday-first: shift so Mon=0 ... Sun=6
+        const startOffset = (firstDow + 6) % 7;
+        const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+        const cells: (number | null)[] = Array.from({ length: totalCells }, (_, i) => {
+          const d = i - startOffset + 1;
+          return d >= 1 && d <= daysInMonth ? d : null;
+        });
+
+        const monthStr = `${calYear}-${String(calMonth).padStart(2, '0')}`;
+
+        const filteredVacations = calDept
+          ? calVacations.filter((v: any) => (v.employee_department || '').includes(calDept))
+          : calVacations;
+
+        // For each date in month, collect vacations covering that date
+        const vacsByDate = new Map<number, any[]>();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+          const covering = filteredVacations.filter((v: any) => {
+            return v.start_date <= dateStr && dateStr <= v.end_date;
+          });
+          if (covering.length > 0) vacsByDate.set(d, covering);
+        }
+
+        const DOW_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
+        return (
+          <div className="space-y-3">
+            {/* Controls */}
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
+                <input type="number" value={calYear} onChange={e => setCalYear(parseInt(e.target.value))}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-24" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">월</label>
+                <select value={calMonth} onChange={e => setCalMonth(parseInt(e.target.value))}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>{m}월</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">부서</label>
+                <select value={calDept} onChange={e => setCalDept(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  <option value="">전체</option>
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <button onClick={loadCalVacations}
+                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">새로고침</button>
+              <div className="ml-auto flex items-center gap-3 text-xs text-gray-500">
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-blue-500"></span> 연차</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-green-500"></span> 반차</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-purple-500"></span> 기타</span>
+              </div>
+            </div>
+
+            {/* Calendar grid */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-800">{calYear}년 {calMonth}월 휴가 현황</h3>
+              </div>
+              {calLoading ? (
+                <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+              ) : (
+                <div className="p-3">
+                  {/* Header row */}
+                  <div className="grid grid-cols-7 gap-px mb-px">
+                    {DOW_LABELS.map((label, i) => (
+                      <div key={label} className={`text-center text-xs font-semibold py-1.5 rounded ${i === 5 ? 'text-blue-600' : i === 6 ? 'text-red-500' : 'text-gray-600'}`}>
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Date cells */}
+                  <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+                    {cells.map((day, idx) => {
+                      const colIdx = idx % 7; // 0=Mon, 5=Sat, 6=Sun
+                      const isSat = colIdx === 5;
+                      const isSun = colIdx === 6;
+                      const vacsOnDay = day ? (vacsByDate.get(day) || []) : [];
+                      return (
+                        <div key={idx} className={`bg-white min-h-[72px] p-1.5 ${!day ? 'bg-gray-50' : ''}`}>
+                          {day && (
+                            <>
+                              <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
+                                ${isSun ? 'text-red-500' : isSat ? 'text-blue-600' : 'text-gray-700'}`}>
+                                {day}
+                              </div>
+                              <div className="space-y-0.5">
+                                {vacsOnDay.slice(0, 4).map((v: any, vi: number) => {
+                                  const typeColor = (v.type || '').includes('반차')
+                                    ? 'bg-green-100 text-green-800'
+                                    : (v.type || '') === '연차' || (v.type || '').includes('연차')
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-purple-100 text-purple-800';
+                                  return (
+                                    <div key={vi} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium ${typeColor}`}
+                                      title={`${v.employee_name} (${v.type || '휴가'})`}>
+                                      {v.employee_name}
+                                    </div>
+                                  );
+                                })}
+                                {vacsOnDay.length > 4 && (
+                                  <div className="text-[10px] text-gray-400 px-1">+{vacsOnDay.length - 4}명</div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {subTab === 'balances' && (
         <>
@@ -1560,6 +1706,7 @@ function VacationTab() {
 }
 
 function ShiftsTab() {
+  const [shiftSubTab, setShiftSubTab] = useState<'list' | 'calendar'>('list');
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: "", month: new Date().getMonth() + 1, week_number: 1, days_of_week: [] as number[], planned_clock_in: "08:00", planned_clock_out: "17:00" });
@@ -1571,6 +1718,12 @@ function ShiftsTab() {
   const [assignDeptFilter, setAssignDeptFilter] = useState("all");
   const [editingShift, setEditingShift] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", month: 1, week_number: 1, days_of_week: [] as number[], planned_clock_in: "08:00", planned_clock_out: "17:00" });
+  // Calendar sub-tab state
+  const [shiftCalYear, setShiftCalYear] = useState(new Date().getFullYear());
+  const [shiftCalMonth, setShiftCalMonth] = useState(new Date().getMonth() + 1);
+  const [shiftCalDept, setShiftCalDept] = useState("");
+  const [shiftCalAssignments, setShiftCalAssignments] = useState<Map<number, any[]>>(new Map());
+  const [shiftCalLoading, setShiftCalLoading] = useState(false);
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -1580,7 +1733,27 @@ function ShiftsTab() {
     try { const data = await getRegularShifts(); setShifts(data || []); } catch {} finally { setLoading(false); }
   }, []);
 
+  const loadShiftCalAssignments = useCallback(async (shiftsData: any[]) => {
+    setShiftCalLoading(true);
+    try {
+      const map = new Map<number, any[]>();
+      await Promise.all(shiftsData.map(async (s: any) => {
+        try {
+          const assigned = await getShiftAssignments(s.id);
+          map.set(s.id, assigned || []);
+        } catch { map.set(s.id, []); }
+      }));
+      setShiftCalAssignments(new Map(map));
+    } catch {} finally { setShiftCalLoading(false); }
+  }, []);
+
   useEffect(() => { loadShifts(); }, [loadShifts]);
+
+  useEffect(() => {
+    if (shiftSubTab === 'calendar' && shifts.length > 0) {
+      loadShiftCalAssignments(shifts);
+    }
+  }, [shiftSubTab, shifts, loadShiftCalAssignments]);
 
   const toggleDay = (day: number, target: 'form' | 'edit') => {
     if (target === 'form') {
@@ -1653,7 +1826,144 @@ function ShiftsTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">월/주차별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">월/주차별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
+        <div className="flex gap-2">
+          <button onClick={() => setShiftSubTab('list')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${shiftSubTab === 'list' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            배치 목록
+          </button>
+          <button onClick={() => setShiftSubTab('calendar')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${shiftSubTab === 'calendar' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <Calendar size={14} /> 배치 캘린더
+          </button>
+        </div>
+      </div>
+
+      {shiftSubTab === 'calendar' && (() => {
+        const daysInMonth = new Date(shiftCalYear, shiftCalMonth, 0).getDate();
+        const firstDow = new Date(shiftCalYear, shiftCalMonth - 1, 1).getDay();
+        const startOffset = (firstDow + 6) % 7; // Mon=0
+        const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+        const cells: (number | null)[] = Array.from({ length: totalCells }, (_, i) => {
+          const d = i - startOffset + 1;
+          return d >= 1 && d <= daysInMonth ? d : null;
+        });
+
+        // Filter shifts for selected month
+        const monthShifts = shifts.filter((s: any) => s.month === shiftCalMonth);
+        const filteredShifts = shiftCalDept
+          ? monthShifts.filter((s: any) => {
+              const assgn = shiftCalAssignments.get(s.id) || [];
+              return assgn.some((a: any) => (a.department || '').includes(shiftCalDept));
+            })
+          : monthShifts;
+
+        // For each date, find which shifts apply
+        const shiftsByDate = new Map<number, any[]>();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const date = new Date(shiftCalYear, shiftCalMonth - 1, d);
+          const dow = date.getDay(); // 0=Sun, 1=Mon, ...
+          // Determine week-of-month (1-indexed, starting from first Monday)
+          const weekNum = Math.ceil((d + startOffset) / 7);
+          const applicableShifts = filteredShifts.filter((s: any) => {
+            if (s.week_number !== weekNum) return false;
+            const daysArr = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
+            return daysArr.includes(dow);
+          });
+          if (applicableShifts.length > 0) shiftsByDate.set(d, applicableShifts);
+        }
+
+        const DOW_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+        const SHIFT_COLORS = ['bg-blue-100 text-blue-800', 'bg-emerald-100 text-emerald-800', 'bg-amber-100 text-amber-800', 'bg-purple-100 text-purple-800', 'bg-rose-100 text-rose-800'];
+
+        return (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
+                <input type="number" value={shiftCalYear} onChange={e => setShiftCalYear(parseInt(e.target.value))}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-24" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">월</label>
+                <select value={shiftCalMonth} onChange={e => setShiftCalMonth(parseInt(e.target.value))}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m}>{m}월</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">부서 필터</label>
+                <select value={shiftCalDept} onChange={e => setShiftCalDept(e.target.value)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  <option value="">전체</option>
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <button onClick={() => loadShiftCalAssignments(shifts)}
+                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">새로고침</button>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-800">{shiftCalYear}년 {shiftCalMonth}월 배치 캘린더</h3>
+              </div>
+              {shiftCalLoading ? (
+                <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+              ) : (
+                <div className="p-3">
+                  <div className="grid grid-cols-7 gap-px mb-px">
+                    {DOW_LABELS.map((label, i) => (
+                      <div key={label} className={`text-center text-xs font-semibold py-1.5 rounded ${i === 5 ? 'text-blue-600' : i === 6 ? 'text-red-500' : 'text-gray-600'}`}>
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+                    {cells.map((day, idx) => {
+                      const colIdx = idx % 7;
+                      const isSat = colIdx === 5;
+                      const isSun = colIdx === 6;
+                      const shiftsOnDay = day ? (shiftsByDate.get(day) || []) : [];
+                      return (
+                        <div key={idx} className={`bg-white min-h-[80px] p-1.5 ${!day ? 'bg-gray-50' : ''}`}>
+                          {day && (
+                            <>
+                              <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
+                                ${isSun ? 'text-red-500' : isSat ? 'text-blue-600' : 'text-gray-700'}`}>
+                                {day}
+                              </div>
+                              <div className="space-y-0.5">
+                                {shiftsOnDay.slice(0, 3).map((s: any, si: number) => {
+                                  const assgn = shiftCalAssignments.get(s.id) || [];
+                                  const colorClass = SHIFT_COLORS[si % SHIFT_COLORS.length];
+                                  return (
+                                    <div key={s.id} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium ${colorClass}`}
+                                      title={`${s.name} (${assgn.length}명)`}>
+                                      {s.name} <span className="opacity-70">{assgn.length}명</span>
+                                    </div>
+                                  );
+                                })}
+                                {shiftsOnDay.length > 3 && (
+                                  <div className="text-[10px] text-gray-400 px-1">+{shiftsOnDay.length - 3}개</div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {shiftSubTab === 'list' && (<>
 
       {/* Create Form */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -1799,6 +2109,7 @@ function ShiftsTab() {
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 }

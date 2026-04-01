@@ -1243,6 +1243,45 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     }
     const confirmed = Array.from(empMap.values());
 
+    // Load approved vacation requests for the payroll month and add 8h per vacation day as regular hours
+    const [yearStr, monthStr] = yearMonth.split('-');
+    const monthStart = `${yearMonth}-01`;
+    const lastDay = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
+    const monthEnd = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+
+    const approvedVacations = await dbAll(`
+      SELECT rvr.employee_id, re.name as employee_name, re.phone as employee_phone,
+             rvr.start_date, rvr.end_date, rvr.type
+      FROM regular_vacation_requests rvr
+      JOIN regular_employees re ON rvr.employee_id = re.id
+      WHERE rvr.status = 'approved'
+        AND rvr.start_date <= ? AND rvr.end_date >= ?
+    `, monthEnd, monthStart) as any[];
+
+    for (const vac of approvedVacations) {
+      // Iterate each calendar day in the vacation that falls within the payroll month
+      const vacStart = new Date(Math.max(new Date(vac.start_date).getTime(), new Date(monthStart).getTime()));
+      const vacEnd = new Date(Math.min(new Date(vac.end_date).getTime(), new Date(monthEnd).getTime()));
+      for (let d = new Date(vacStart); d <= vacEnd; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().slice(0, 10);
+        // Skip weekends and holidays — vacation on those days doesn't need to count as worked
+        if (isHolidayOrWeekend(dateStr)) continue;
+        // Skip dates that already have a confirmed attendance record
+        const alreadyCounted = allRecords.some((r: any) => r.employee_name === vac.employee_name && r.date === dateStr);
+        if (alreadyCounted) continue;
+        // Add 8 hours of regular work for this vacation day
+        if (!empMap.has(vac.employee_name)) {
+          empMap.set(vac.employee_name, { employee_name: vac.employee_name, employee_phone: vac.employee_phone, total_regular: 0, total_overtime: 0, total_night: 0, work_days: 0, holiday_days: 0, holiday_hours: 0 });
+        }
+        const empEntry = empMap.get(vac.employee_name)!;
+        empEntry.total_regular += 8;
+        empEntry.work_days++;
+      }
+    }
+
+    // Re-derive confirmed after vacation additions
+    const confirmedWithVacation = Array.from(empMap.values());
+
     // Get salary settings
     const salaries = await dbAll(`
       SELECT re.name, re.phone, re.department, re.team, re.hire_date,
@@ -1262,7 +1301,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
 
     const results = [];
     for (const sal of salaries) {
-      const att = confirmed.find(c => c.employee_name === sal.name);
+      const att = confirmedWithVacation.find(c => c.employee_name === sal.name);
       const overtimeHours = att?.total_overtime || 0;
       const holidayHours = att?.holiday_hours || 0;
       const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;

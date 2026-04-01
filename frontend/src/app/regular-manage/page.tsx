@@ -1729,6 +1729,7 @@ function ShiftsTab() {
   const [calPopupAssignments, setCalPopupAssignments] = useState<any[]>([]);
   const [calAddDate, setCalAddDate] = useState<{ day: number; dow: number; weekNum: number } | null>(null);
   const [calAddForm, setCalAddForm] = useState({ name: "", planned_clock_in: "08:00", planned_clock_out: "17:00" });
+  const [calExpandedDay, setCalExpandedDay] = useState<number | null>(null);
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -1986,7 +1987,7 @@ function ShiftsTab() {
                       const cellDow = cellDate ? cellDate.getDay() : 0;
                       const cellWeekNum = day ? Math.ceil((day + startOffset) / 7) : 0;
                       return (
-                        <div key={idx} className={`bg-white min-h-[80px] p-1.5 relative group ${!day ? 'bg-gray-50' : ''}`}>
+                        <div key={idx} className={`bg-white min-h-[120px] p-1.5 relative group ${!day ? 'bg-gray-50' : ''}`}>
                           {day && (
                             <>
                               <div className="flex items-center justify-between mb-1">
@@ -2000,7 +2001,7 @@ function ShiftsTab() {
                                   title="배치 추가">+</button>
                               </div>
                               <div className="space-y-0.5">
-                                {shiftsOnDay.slice(0, 3).map((s: any, si: number) => {
+                                {(calExpandedDay === day ? shiftsOnDay : shiftsOnDay.slice(0, 5)).map((s: any, si: number) => {
                                   const assgn = shiftCalAssignments.get(s.id) || [];
                                   const colorClass = SHIFT_COLORS[si % SHIFT_COLORS.length];
                                   return (
@@ -2011,8 +2012,17 @@ function ShiftsTab() {
                                     </button>
                                   );
                                 })}
-                                {shiftsOnDay.length > 3 && (
-                                  <div className="text-[10px] text-gray-400 px-1">+{shiftsOnDay.length - 3}개</div>
+                                {calExpandedDay !== day && shiftsOnDay.length > 5 && (
+                                  <button onClick={() => setCalExpandedDay(day)}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-medium px-1 hover:underline">
+                                    +{shiftsOnDay.length - 5}개 더보기
+                                  </button>
+                                )}
+                                {calExpandedDay === day && shiftsOnDay.length > 5 && (
+                                  <button onClick={() => setCalExpandedDay(null)}
+                                    className="text-[10px] text-gray-500 hover:text-gray-700 font-medium px-1 hover:underline">
+                                    접기
+                                  </button>
                                 )}
                               </div>
                             </>

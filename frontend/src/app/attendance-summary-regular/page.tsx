@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2, CheckCircle2, XCircle } from "lucide-react";
-import { getAttendanceSummaryRegular, confirmAttendance, getConfirmedList, deleteConfirmedRecord } from "@/lib/api";
+import { getAttendanceSummaryRegular, confirmAttendance, getConfirmedList, deleteConfirmedRecord, getRegularVacations } from "@/lib/api";
 
 // Korean public holidays
 const HOLIDAYS: Record<number, string[]> = {
@@ -43,6 +43,25 @@ export default function AttendanceSummaryRegularPage() {
   const [nameSearch, setNameSearch] = usePersistedState("asr_nameSearch", "");
   const [deptFilter, setDeptFilter] = usePersistedState("asr_deptFilter", "");
   const [dinnerBreak, setDinnerBreak] = useState<Record<string, boolean>>({});
+  const [vacationMap, setVacationMap] = useState<Record<string, { type: string; status: string }>>({});
+
+  // Load approved vacations for the month
+  const loadVacations = useCallback(async () => {
+    try {
+      const vacations = await getRegularVacations({ status: 'approved' });
+      const map: Record<string, { type: string; status: string }> = {};
+      for (const v of (vacations || [])) {
+        // For each day in the vacation range
+        const start = new Date(v.start_date + 'T00:00:00+09:00');
+        const end = new Date(v.end_date + 'T00:00:00+09:00');
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dateStr = d.toISOString().slice(0, 10);
+          map[`${v.employee_name}|${dateStr}`] = { type: v.type || '연차', status: 'approved' };
+        }
+      }
+      setVacationMap(map);
+    } catch {}
+  }, []);
 
   const load = useCallback(async () => {
     const key = `reg-${year}-${month}`;
@@ -116,7 +135,7 @@ export default function AttendanceSummaryRegularPage() {
     finally { setLoading(false); }
   }, [year, month]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadVacations(); }, [load, loadVacations]);
 
   const formatTime = (t: string | null) => {
     if (!t) return '-';
@@ -393,6 +412,7 @@ export default function AttendanceSummaryRegularPage() {
                       {isFullyConfirmed && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-3 h-3" />확정</span>}
                       <span className="text-xs text-gray-500">{emp.department} {emp.team}</span>
                       {(() => { const ac = getAnomalyCount(emp); return ac > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">차이 발생 {ac}건</span> : null; })()}
+                      {(() => { const vc = emp.actuals?.filter((a: any) => vacationMap[`${emp.name}|${a.date}`]).length || 0; return vc > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">휴가 {vc}일</span> : null; })()}
                     </div>
                     <div className="flex items-center gap-4 text-xs">
                       <span className="text-gray-600">{summary.days}일</span>
@@ -425,8 +445,20 @@ export default function AttendanceSummaryRegularPage() {
                       <XCircle className="w-3.5 h-3.5 inline mr-0.5" />취소
                     </button>
                   )}
-                  <button onClick={(e) => { e.stopPropagation(); setHiddenEmps(new Set([...hiddenEmps, emp.id])); }}
-                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거">
+                  <button onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!confirm(`${emp.name}을(를) 리스트에서 제거하시겠습니까? 확정된 데이터도 함께 삭제됩니다.`)) return;
+                    try {
+                      const ym = `${year}-${String(month).padStart(2,'0')}`;
+                      const confirmed = await getConfirmedList(ym, '정규직');
+                      const empData = (confirmed || []).find((c: any) => c.name === emp.name);
+                      if (empData?.records) {
+                        for (const rec of empData.records) { await deleteConfirmedRecord(rec.id); }
+                      }
+                    } catch {}
+                    setHiddenEmps(new Set([...hiddenEmps, emp.id]));
+                  }}
+                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거 + 확정 삭제">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -463,12 +495,13 @@ export default function AttendanceSummaryRegularPage() {
                           const dow = ['일','월','화','수','목','금','토'][dowNum];
                           const source = selectedSource[key] || 'planned';
                           const isDayConfirmed = confirmedSet.has(`${emp.name}|${date}`);
+                          const vacInfo = vacationMap[`${emp.name}|${date}`];
                           const useClockIn = source === 'actual' ? actualIn : (plannedIn !== '-' ? plannedIn : actualIn);
                           const useClockOut = source === 'actual' ? actualOut : (plannedOut !== '-' ? plannedOut : actualOut);
                           const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);
                           const mealChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
                           return (
-                            <tr key={date} className={isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
+                            <tr key={date} className={vacInfo ? 'bg-violet-50' : isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -478,7 +511,11 @@ export default function AttendanceSummaryRegularPage() {
                                     className="rounded border-gray-300" />
                                 )}
                               </td>
-                              <td className="py-1.5 px-3 text-gray-700">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-green-600">확정</span>}</td>
+                              <td className="py-1.5 px-3 text-gray-700">
+                                {date.slice(5)}
+                                {isDayConfirmed && <span className="ml-1 text-[9px] text-green-600">확정</span>}
+                                {vacInfo && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vacInfo.type === '반차' || vacInfo.type?.includes('반차') ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{vacInfo.type}</span>}
+                              </td>
                               <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-red-500 font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-gray-500'}`}>{dow}</td>
                               <td className="py-1.5 px-3 text-blue-700">{plannedIn}</td>
                               <td className="py-1.5 px-3 text-blue-700">{plannedOut}</td>

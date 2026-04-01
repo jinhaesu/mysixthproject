@@ -429,8 +429,21 @@ export default function AttendanceSummaryDispatchPage() {
                       <XCircle className="w-3.5 h-3.5 inline mr-0.5" />취소
                     </button>
                   )}
-                  <button onClick={(e) => { e.stopPropagation(); setHiddenEmps(new Set([...hiddenEmps, emp.id])); }}
-                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거">
+                  <button onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!confirm(`${emp.name}을(를) 리스트에서 제거하시겠습니까? 확정된 데이터도 함께 삭제됩니다.`)) return;
+                    // Delete confirmed records for this employee
+                    try {
+                      const ym = `${year}-${String(month).padStart(2,'0')}`;
+                      const confirmed = await getConfirmedList(ym, '');
+                      const empData = (confirmed || []).find((c: any) => c.name === emp.name && c.type !== '정규직');
+                      if (empData?.records) {
+                        for (const rec of empData.records) { await deleteConfirmedRecord(rec.id); }
+                      }
+                    } catch {}
+                    setHiddenEmps(new Set([...hiddenEmps, emp.id]));
+                  }}
+                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거 + 확정 삭제">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

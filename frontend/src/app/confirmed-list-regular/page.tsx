@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Table2, Loader2, Edit3, Trash2 } from "lucide-react";
-import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord } from "@/lib/api";
+import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord, getRegularVacations } from "@/lib/api";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -67,10 +67,28 @@ export default function ConfirmedListRegularPage() {
   const [editForm, setEditForm] = useState<any>({});
   const [nameSearch, setNameSearch] = usePersistedState("clr_nameSearch", "");
   const [deptFilter, setDeptFilter] = usePersistedState("clr_deptFilter", "");
+  const [vacationMap, setVacationMap] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const d = await getConfirmedList(yearMonth, '정규직'); setData(d || []); } catch (e: any) { alert(e.message); }
+    try {
+      const d = await getConfirmedList(yearMonth, '정규직');
+      setData(d || []);
+      // Load approved vacations
+      try {
+        const vacations = await getRegularVacations({ status: 'approved' });
+        const map: Record<string, string> = {};
+        for (const v of (vacations || [])) {
+          const start = new Date(v.start_date + 'T00:00:00+09:00');
+          const end = new Date(v.end_date + 'T00:00:00+09:00');
+          for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
+            const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+            map[`${v.employee_name}|${dateStr}`] = v.type || '연차';
+          }
+        }
+        setVacationMap(map);
+      } catch {}
+    } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [yearMonth]);
 
@@ -150,7 +168,18 @@ export default function ConfirmedListRegularPage() {
                         <td className="py-2.5 px-4 font-medium text-gray-900">{emp.name}{emp.department && <span className="ml-1 text-[10px] text-gray-500">{emp.department}</span>}</td>
                         <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
                         <td className="py-2.5 px-4 text-right">{emp.days}</td>
-                        <td className="py-2.5 px-4 text-right text-blue-700">{emp.regular_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-blue-700">
+                          {emp.regular_hours.toFixed(1)}
+                          {(() => {
+                            const ym = yearMonth;
+                            const vacDays = Object.entries(vacationMap).filter(([k]) => k.startsWith(`${emp.name}|${ym}`));
+                            const fullVac = vacDays.filter(([,t]) => t === '연차').length;
+                            const halfVac = vacDays.filter(([,t]) => t?.includes('반차')).length;
+                            const vacH = fullVac * 8 + halfVac * 4;
+                            if (vacH > 0) return <span className="ml-1 text-[9px] text-red-600 font-medium">+{fullVac > 0 ? `휴가${fullVac * 8}h` : ''}{fullVac > 0 && halfVac > 0 ? '+' : ''}{halfVac > 0 ? `반차${halfVac * 4}h` : ''}</span>;
+                            return null;
+                          })()}
+                        </td>
                         <td className="py-2.5 px-4 text-right text-amber-700">{emp.overtime_hours.toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-purple-700">{emp.night_hours.toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-gray-500">{emp.break_hours.toFixed(1)}</td>

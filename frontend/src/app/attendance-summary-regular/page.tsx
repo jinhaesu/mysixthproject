@@ -416,8 +416,14 @@ export default function AttendanceSummaryRegularPage() {
                       {(() => { const ac = getAnomalyCount(emp); return ac > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">차이 발생 {ac}건</span> : null; })()}
                       {(() => {
                         const ym = `${year}-${String(month).padStart(2,'0')}`;
-                        const vc = Object.keys(vacationMap).filter(k => k.startsWith(`${emp.name}|${ym}`)).length;
-                        return vc > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">휴가 {vc}일</span> : null;
+                        const vacDays = Object.entries(vacationMap).filter(([k]) => k.startsWith(`${emp.name}|${ym}`));
+                        const fullDays = vacDays.filter(([,v]) => v.type === '연차').length;
+                        const halfDays = vacDays.filter(([,v]) => v.type?.includes('반차')).length;
+                        if (fullDays + halfDays === 0) return null;
+                        return (<>
+                          {fullDays > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">연차 {fullDays}일</span>}
+                          {halfDays > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">반차 {halfDays}건</span>}
+                        </>);
                       })()}
                     </div>
                     <div className="flex items-center gap-4 text-xs">
@@ -512,16 +518,23 @@ export default function AttendanceSummaryRegularPage() {
 
                           // Vacation-only row (no attendance record)
                           if (actual.isVacOnly && vacInfo) {
+                            const isHalf = vacInfo.type?.includes('반차');
                             return (
-                              <tr key={date} className="bg-violet-50">
-                                <td className="py-1.5 px-3"><span className="w-4 h-4 inline-block text-center text-violet-500 text-xs">🏖</span></td>
+                              <tr key={date} className={isHalf ? 'bg-amber-50' : 'bg-violet-50'}>
+                                <td className="py-1.5 px-3"></td>
                                 <td className="py-1.5 px-3 text-gray-700">
                                   {date.slice(5)}
-                                  <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vacInfo.type?.includes('반차') ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{vacInfo.type}</span>
+                                  <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${isHalf ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
+                                    {vacInfo.type}
+                                    {vacInfo.type === '오전반차' && ' 09~14시'}
+                                    {vacInfo.type === '오후반차' && ' 14~18시'}
+                                  </span>
                                 </td>
                                 <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-red-500 font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-gray-500'}`}>{dow}</td>
                                 <td className="py-1.5 px-3 text-gray-400" colSpan={6}>
-                                  <span className="text-violet-600 font-medium text-[10px]">유급휴가 (기본 8h 인정)</span>
+                                  <span className={`font-medium text-[10px] ${isHalf ? 'text-amber-600' : 'text-violet-600'}`}>
+                                    유급{isHalf ? '반차' : '휴가'} ({isHalf ? '4h' : '8h'} 인정)
+                                  </span>
                                 </td>
                               </tr>
                             );

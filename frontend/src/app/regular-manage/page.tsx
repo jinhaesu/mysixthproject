@@ -1724,6 +1724,11 @@ function ShiftsTab() {
   const [shiftCalDept, setShiftCalDept] = useState("");
   const [shiftCalAssignments, setShiftCalAssignments] = useState<Map<number, any[]>>(new Map());
   const [shiftCalLoading, setShiftCalLoading] = useState(false);
+  // Calendar popup state
+  const [calPopupShift, setCalPopupShift] = useState<any>(null);
+  const [calPopupAssignments, setCalPopupAssignments] = useState<any[]>([]);
+  const [calAddDate, setCalAddDate] = useState<{ day: number; dow: number; weekNum: number } | null>(null);
+  const [calAddForm, setCalAddForm] = useState({ name: "", planned_clock_in: "08:00", planned_clock_out: "17:00" });
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -1823,6 +1828,56 @@ function ShiftsTab() {
   };
 
   const parseDays = (s: string) => s ? s.split(',').map(Number).filter(n => !isNaN(n)) : [];
+
+  const openCalShiftPopup = async (shift: any) => {
+    setCalPopupShift(shift);
+    try {
+      const [assigned, emps] = await Promise.all([getShiftAssignments(shift.id), getRegularEmployees({ limit: '500' })]);
+      setCalPopupAssignments(assigned || []);
+      setAllEmployees((emps as any).employees || emps || []);
+      setAssignIds(new Set());
+      setAssignSearch("");
+      setAssignDeptFilter("all");
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleCalPopupAssign = async () => {
+    if (assignIds.size === 0 || !calPopupShift) return;
+    try {
+      await assignEmployeesToShift(calPopupShift.id, Array.from(assignIds));
+      setAssignIds(new Set());
+      const updated = await getShiftAssignments(calPopupShift.id);
+      setCalPopupAssignments(updated || []);
+      loadShiftCalAssignments(shifts);
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleCalPopupRemove = async (empId: number) => {
+    if (!calPopupShift) return;
+    try {
+      await removeShiftAssignment(calPopupShift.id, empId);
+      setCalPopupAssignments(calPopupAssignments.filter(a => a.employee_id !== empId));
+      loadShiftCalAssignments(shifts);
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleCalAddShift = async () => {
+    if (!calAddDate || !calAddForm.name.trim()) { alert("배치명을 입력해주세요."); return; }
+    try {
+      await createRegularShift({
+        name: calAddForm.name,
+        month: shiftCalMonth,
+        week_number: calAddDate.weekNum,
+        day_of_week: calAddDate.dow,
+        days_of_week: String(calAddDate.dow),
+        planned_clock_in: calAddForm.planned_clock_in,
+        planned_clock_out: calAddForm.planned_clock_out,
+      } as any);
+      setCalAddDate(null);
+      setCalAddForm({ name: "", planned_clock_in: "08:00", planned_clock_out: "17:00" });
+      loadShifts();
+    } catch (e: any) { alert(e.message); }
+  };
 
   return (
     <div className="space-y-4">
@@ -1927,23 +1982,33 @@ function ShiftsTab() {
                       const isSat = colIdx === 5;
                       const isSun = colIdx === 6;
                       const shiftsOnDay = day ? (shiftsByDate.get(day) || []) : [];
+                      const cellDate = day ? new Date(shiftCalYear, shiftCalMonth - 1, day) : null;
+                      const cellDow = cellDate ? cellDate.getDay() : 0;
+                      const cellWeekNum = day ? Math.ceil((day + startOffset) / 7) : 0;
                       return (
-                        <div key={idx} className={`bg-white min-h-[80px] p-1.5 ${!day ? 'bg-gray-50' : ''}`}>
+                        <div key={idx} className={`bg-white min-h-[80px] p-1.5 relative group ${!day ? 'bg-gray-50' : ''}`}>
                           {day && (
                             <>
-                              <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
-                                ${isSun ? 'text-red-500' : isSat ? 'text-blue-600' : 'text-gray-700'}`}>
-                                {day}
+                              <div className="flex items-center justify-between mb-1">
+                                <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full
+                                  ${isSun ? 'text-red-500' : isSat ? 'text-blue-600' : 'text-gray-700'}`}>
+                                  {day}
+                                </div>
+                                <button
+                                  onClick={() => { setCalAddDate({ day, dow: cellDow, weekNum: cellWeekNum }); setCalAddForm({ name: "", planned_clock_in: "08:00", planned_clock_out: "17:00" }); }}
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-blue-50 text-blue-600 hover:bg-blue-100 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
+                                  title="배치 추가">+</button>
                               </div>
                               <div className="space-y-0.5">
                                 {shiftsOnDay.slice(0, 3).map((s: any, si: number) => {
                                   const assgn = shiftCalAssignments.get(s.id) || [];
                                   const colorClass = SHIFT_COLORS[si % SHIFT_COLORS.length];
                                   return (
-                                    <div key={s.id} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium ${colorClass}`}
-                                      title={`${s.name} (${assgn.length}명)`}>
+                                    <button key={s.id} onClick={() => openCalShiftPopup(s)}
+                                      className={`text-[10px] px-1 py-0.5 rounded truncate font-medium w-full text-left hover:ring-1 hover:ring-blue-400 ${colorClass}`}
+                                      title={`${s.name} (${assgn.length}명) — 클릭하여 상세보기`}>
                                       {s.name} <span className="opacity-70">{assgn.length}명</span>
-                                    </div>
+                                    </button>
                                   );
                                 })}
                                 {shiftsOnDay.length > 3 && (
@@ -1962,6 +2027,101 @@ function ShiftsTab() {
           </div>
         );
       })()}
+
+      {/* Calendar Shift Detail Popup */}
+      {calPopupShift && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-semibold text-gray-900">{calPopupShift.name}</h3>
+              <button onClick={() => setCalPopupShift(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              {calPopupShift.planned_clock_in}~{calPopupShift.planned_clock_out} · {shiftCalMonth}월 {calPopupShift.week_number}주차 · {parseDays(calPopupShift.days_of_week || String(calPopupShift.day_of_week)).map((d: number) => DAY_NAMES[d]).join('/')}요일
+            </p>
+
+            {/* Assigned employees */}
+            {calPopupAssignments.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-gray-600 mb-2">배정된 직원 ({calPopupAssignments.length}명)</h4>
+                <div className="space-y-1">
+                  {calPopupAssignments.map((a: any) => (
+                    <div key={a.employee_id} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
+                      <span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-green-600">{a.department} {a.team}</span></span>
+                      <button onClick={() => handleCalPopupRemove(a.employee_id)} className="text-xs text-red-600 hover:text-red-800">해제</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Add employees */}
+            <div>
+              <h4 className="text-xs font-semibold text-gray-600 mb-2">직원 추가</h4>
+              <div className="flex gap-2 mb-2">
+                <select value={assignDeptFilter} onChange={e => setAssignDeptFilter(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  <option value="all">전체 부서</option>
+                  {Array.from(new Set([...DEPARTMENTS, ...allEmployees.map((e: any) => e.department).filter(Boolean)])).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                {allEmployees
+                  .filter((e: any) => !calPopupAssignments.find((a: any) => a.employee_id === e.id))
+                  .filter((e: any) => assignDeptFilter === 'all' || (e.department || '').includes(assignDeptFilter))
+                  .filter((e: any) => !assignSearch || (e.name || '').includes(assignSearch) || (e.phone || '').includes(assignSearch))
+                  .map((e: any) => (
+                    <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
+                      <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-gray-300" />
+                      <span className="text-sm">{e.name}</span><span className="text-xs text-gray-500">{e.department} {e.team}</span>
+                    </label>
+                  ))}
+              </div>
+              {assignIds.size > 0 && <button onClick={handleCalPopupAssign} className="mt-2 w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">{assignIds.size}명 배정하기</button>}
+            </div>
+
+            <button onClick={() => setCalPopupShift(null)} className="mt-4 w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">닫기</button>
+          </div>
+        </div>
+      )}
+
+      {/* Calendar Add Shift Popup */}
+      {calAddDate && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">배치 추가</h3>
+              <button onClick={() => setCalAddDate(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              {shiftCalYear}년 {shiftCalMonth}월 {calAddDate.day}일 ({DAY_NAMES[calAddDate.dow]}요일) · {calAddDate.weekNum}주차
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">배치명 <span className="text-red-500">*</span></label>
+                <input type="text" value={calAddForm.name} onChange={e => setCalAddForm({ ...calAddForm, name: e.target.value })}
+                  placeholder="예: A조 오전" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">출근</label>
+                  <input type="time" value={calAddForm.planned_clock_in} onChange={e => setCalAddForm({ ...calAddForm, planned_clock_in: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">퇴근</label>
+                  <input type="time" value={calAddForm.planned_clock_out} onChange={e => setCalAddForm({ ...calAddForm, planned_clock_out: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+              </div>
+              <button onClick={handleCalAddShift}
+                className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                배치 추가
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {shiftSubTab === 'list' && (<>
 

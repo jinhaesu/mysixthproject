@@ -32,8 +32,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       SELECT w.*,
         (SELECT lc.id FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_id,
         (SELECT lc.contract_start FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_start,
-        (SELECT lc.contract_end FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_end
-      FROM workers w ${where} ORDER BY w.name_ko ASC LIMIT ? OFFSET ?
+        (SELECT lc.contract_end FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_end,
+        (SELECT MAX(sr.date) FROM survey_requests sr JOIN survey_responses resp ON sr.id = resp.request_id WHERE sr.phone = w.phone AND resp.clock_in_time IS NOT NULL) as last_clock_in_date
+      FROM workers w ${where} ORDER BY last_clock_in_date DESC NULLS LAST, w.name_ko ASC LIMIT ? OFFSET ?
     `, ...params, limitNum, offset);
 
     res.json({

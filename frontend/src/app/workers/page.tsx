@@ -329,6 +329,9 @@ export default function WorkersPage() {
                     주민번호
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">
+                    마지막 출근
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">
                     비상연락처
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">
@@ -383,6 +386,9 @@ export default function WorkersPage() {
                           </button>
                         )
                       ) : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {(worker as any).last_clock_in_date || "-"}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
                       {worker.emergency_contact || "-"}

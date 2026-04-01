@@ -602,6 +602,18 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
   }
 });
 
+// PUT /api/regular/vacations/:id/update-type - Update vacation type
+router.put('/vacations/:id/update-type', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { type, days } = req.body;
+    await dbRun('UPDATE regular_vacation_requests SET type = ?, days = ?, updated_at = NOW() WHERE id = ?', type || '연차', days || 1, id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // PUT /api/regular/vacations/:id/reject - Reject vacation
 router.put('/vacations/:id/reject', async (req: AuthRequest, res: Response) => {
   try {

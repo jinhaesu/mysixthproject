@@ -1412,15 +1412,21 @@ function VacationTab() {
                         <td className="py-2.5 px-4 text-gray-600">{r.department} {r.team}</td>
                         <td className="py-2.5 px-4 text-gray-600">{r.phone}</td>
                         <td className="py-2.5 px-4">
-                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                            r.type === '오전반차' ? 'bg-amber-50 text-amber-700' :
-                            r.type === '오후반차' ? 'bg-orange-50 text-orange-700' :
-                            'bg-blue-50 text-blue-700'
-                          }`}>
-                            {r.type || '연차'}
-                            {r.type === '오전반차' && <span className="ml-1 text-[9px] opacity-70">09~14시</span>}
-                            {r.type === '오후반차' && <span className="ml-1 text-[9px] opacity-70">14~18시</span>}
-                          </span>
+                          <select value={r.type || '연차'} onChange={async (e) => {
+                            const newType = e.target.value;
+                            try {
+                              const token = localStorage.getItem('token');
+                              await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/vacations/${r.id}/update-type`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ type: newType, days: newType.includes('반차') ? 0.5 : r.days }),
+                              });
+                              loadRequests();
+                            } catch (err: any) { alert(err.message); }
+                          }} className="px-1.5 py-1 border border-gray-200 rounded text-xs bg-white">
+                            <option value="연차">연차</option>
+                            <option value="오전반차">오전반차 (09~14시)</option>
+                            <option value="오후반차">오후반차 (14~18시)</option>
+                          </select>
                         </td>
                         <td className="py-2.5 px-4 text-gray-700">{r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''}</td>
                         <td className="py-2.5 px-4 text-gray-700">{r.days}일</td>

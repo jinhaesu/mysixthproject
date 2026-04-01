@@ -169,15 +169,15 @@ export default function ConfirmedListRegularPage() {
                         <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
                         <td className="py-2.5 px-4 text-right">{emp.days}</td>
                         <td className="py-2.5 px-4 text-right text-blue-700">
-                          {emp.regular_hours.toFixed(1)}
                           {(() => {
                             const ym = yearMonth;
                             const vacDays = Object.entries(vacationMap).filter(([k]) => k.startsWith(`${emp.name}|${ym}`));
                             const fullVac = vacDays.filter(([,t]) => t === '연차').length;
                             const halfVac = vacDays.filter(([,t]) => t?.includes('반차')).length;
                             const vacH = fullVac * 8 + halfVac * 4;
-                            if (vacH > 0) return <span className="ml-1 text-[9px] text-red-600 font-medium">+{fullVac > 0 ? `휴가${fullVac * 8}h` : ''}{fullVac > 0 && halfVac > 0 ? '+' : ''}{halfVac > 0 ? `반차${halfVac * 4}h` : ''}</span>;
-                            return null;
+                            const total = emp.regular_hours + vacH;
+                            if (vacH > 0) return <>{total.toFixed(1)} <span className="text-[9px] text-red-600 font-medium">(휴가{vacH}h 포함)</span></>;
+                            return <>{emp.regular_hours.toFixed(1)}</>;
                           })()}
                         </td>
                         <td className="py-2.5 px-4 text-right text-amber-700">{emp.overtime_hours.toFixed(1)}</td>
@@ -207,7 +207,40 @@ export default function ConfirmedListRegularPage() {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                  {emp.records.map((r: any) => {
+                                  {/* Merge records + vacation-only days */}
+                                  {(() => {
+                                    const recordDates = new Set(emp.records.map((r: any) => r.date));
+                                    const ym = yearMonth;
+                                    const vacOnlyRows = Object.entries(vacationMap)
+                                      .filter(([k]) => k.startsWith(`${emp.name}|${ym}`))
+                                      .map(([k, t]) => ({ date: k.split('|')[1], type: t }))
+                                      .filter(v => !recordDates.has(v.date));
+                                    const allRows = [
+                                      ...emp.records.map((r: any) => ({ ...r, isVacOnly: false })),
+                                      ...vacOnlyRows.map(v => ({ id: `vac-${v.date}`, date: v.date, isVacOnly: true, vacType: v.type })),
+                                    ].sort((a: any, b: any) => a.date.localeCompare(b.date));
+                                    return allRows;
+                                  })().map((r: any) => {
+                                    if (r.isVacOnly) {
+                                      return (
+                                        <tr key={r.id} className="bg-violet-50/50">
+                                          <td className="py-1.5 px-3">
+                                            {r.date}
+                                            <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-100 text-violet-700">
+                                              {r.vacType}{r.vacType === '오전반차' ? ' 09~14시' : r.vacType === '오후반차' ? ' 14~18시' : ''}
+                                            </span>
+                                          </td>
+                                          <td className="py-1.5 px-3 text-violet-600">휴가</td>
+                                          <td className="py-1.5 px-3 text-violet-600">휴가</td>
+                                          <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700">휴가</span></td>
+                                          <td className="py-1.5 px-3 text-right text-violet-700">{r.vacType?.includes('반차') ? '4.0' : '8.0'}</td>
+                                          <td className="py-1.5 px-3 text-right">0.0</td>
+                                          <td className="py-1.5 px-3 text-right">0.0</td>
+                                          <td className="py-1.5 px-3 text-right">0.0</td>
+                                          <td className="py-1.5 px-3"></td>
+                                        </tr>
+                                      );
+                                    }
                                     const vType = vacationMap[`${emp.name}|${r.date}`];
                                     return (
                                     <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-50/50' : vType?.includes('반차') ? 'bg-amber-50/50 hover:bg-amber-50' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-white/60'}>

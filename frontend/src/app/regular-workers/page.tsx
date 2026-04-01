@@ -41,6 +41,8 @@ interface Employee {
   bank_account?: string | null;
   id_number?: string | null;
   name_en?: string | null;
+  hire_date?: string | null;
+  is_active?: number;
 }
 
 interface Pagination {
@@ -134,6 +136,7 @@ export default function RegularWorkersPage() {
       const params: Record<string, string> = {
         page: String(page),
         limit: "50",
+        include_resigned: "1",
       };
       if (search) params.search = search;
       if (filterDept) params.department = filterDept;
@@ -369,6 +372,7 @@ export default function RegularWorkersPage() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-3 text-left font-medium text-gray-600">이름</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">입사일</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">전화번호</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">부서</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">조</th>
@@ -385,10 +389,14 @@ export default function RegularWorkersPage() {
                 {employees.map((emp) => (
                   <tr
                     key={emp.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                    className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${emp.is_active === 0 ? 'opacity-50 bg-gray-50' : ''}`}
                     onClick={() => openEditModal(emp)}
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {emp.name}
+                      {emp.is_active === 0 && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">퇴사자</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{emp.hire_date || "-"}</td>
                     <td className="px-4 py-3 text-gray-700">{emp.phone}</td>
                     <td className="px-4 py-3 text-gray-700">{emp.department || "-"}</td>
                     <td className="px-4 py-3 text-gray-700">{emp.team || "-"}</td>
@@ -426,7 +434,7 @@ export default function RegularWorkersPage() {
                             : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {emp.status === "active" ? "활성" : "비활성"}
+                        {emp.is_active === 0 ? "퇴사" : emp.status === "active" ? "활성" : "비활성"}
                       </span>
                     </td>
                     <td className="px-4 py-3">

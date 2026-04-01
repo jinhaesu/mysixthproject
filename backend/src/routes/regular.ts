@@ -11,9 +11,9 @@ const router = Router();
 // GET /api/regular/employees - List with filters
 router.get('/employees', async (req: AuthRequest, res: Response) => {
   try {
-    const { search, department, team, role, page = '1', limit = '50' } = req.query as Record<string, string>;
+    const { search, department, team, role, page = '1', limit = '50', include_resigned } = req.query as Record<string, string>;
 
-    let where = 'WHERE re.is_active = 1';
+    let where = include_resigned === '1' ? 'WHERE 1=1' : 'WHERE re.is_active = 1';
     const params: any[] = [];
 
     if (search) {
@@ -44,7 +44,7 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
       ${where}
-      ORDER BY re.department, re.team, re.name
+      ORDER BY re.is_active DESC, re.hire_date DESC NULLS LAST, re.name
       LIMIT ? OFFSET ?
     `, ...params, limitNum, offset);
 

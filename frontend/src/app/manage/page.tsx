@@ -48,10 +48,36 @@ export default function ManagePage() {
     }
   }
 
+  const [recalcing, setRecalcing] = useState(false);
+  const handleRecalc = async () => {
+    if (!confirm("모든 확정 데이터의 근무시간을 재계산합니다 (출근 올림/퇴근 내림 적용). 계속하시겠습니까?")) return;
+    setRecalcing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/recalc-confirmed`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json();
+      alert(`${body.updated}건 재계산 완료`);
+    } catch (e: any) { alert(e.message); }
+    finally { setRecalcing(false); }
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-2">데이터 관리</h2>
-      <p className="text-gray-500 mb-8">업로드된 파일과 기록을 관리합니다.</p>
+      <p className="text-gray-500 mb-4">업로드된 파일과 기록을 관리합니다.</p>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-amber-900">확정 데이터 근무시간 재계산</h3>
+          <p className="text-xs text-amber-700 mt-1">출근 30분 올림 / 퇴근 30분 내림 기준을 모든 기존 확정 데이터에 일괄 적용합니다.</p>
+        </div>
+        <button onClick={handleRecalc} disabled={recalcing}
+          className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-gray-300 whitespace-nowrap">
+          {recalcing ? "처리중..." : "재계산 실행"}
+        </button>
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-32">

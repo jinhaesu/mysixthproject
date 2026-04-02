@@ -1158,17 +1158,21 @@ function AttendanceTab() {
     return { label: "미출근", cls: "bg-red-50 text-red-700 border border-red-200" };
   };
 
-  const chartData = useMemo(() => {
-    return records.filter((r: any) => r.clock_in_time).map((r: any) => {
-      const h = new Date(r.clock_in_time).getHours();
-      return { hour: h, count: 1, department: r.department || '기타' };
-    });
+  const clockInChartData = useMemo(() => {
+    return records.filter((r: any) => r.clock_in_time).map((r: any) => ({
+      hour: new Date(r.clock_in_time).getHours(), count: 1, department: r.department || '기타',
+    }));
+  }, [records]);
+  const clockOutChartData = useMemo(() => {
+    return records.filter((r: any) => r.clock_out_time).map((r: any) => ({
+      hour: new Date(r.clock_out_time).getHours(), count: 1, department: r.department || '기타',
+    }));
   }, [records]);
 
   return (
     <div className="space-y-4">
-      <HourlyChart data={chartData} title={`${date} 실제 시간대별 출근 인원`}
-        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} compact />
+      <HourlyChart clockInData={clockInChartData} clockOutData={clockOutChartData} title={`${date} 시간대별 출퇴근 인원`}
+        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex flex-wrap gap-3 items-end">
@@ -2020,16 +2024,17 @@ function ShiftsTab() {
   const [chartStartDate, setChartStartDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; });
   const [chartEndDate, setChartEndDate] = useState(() => { const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth()+1, 0); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`; });
 
-  const chartData = useMemo(() => {
-    const result: { hour: number; count: number; department: string }[] = [];
+  const { clockInChart, clockOutChart } = useMemo(() => {
+    const inR: { hour: number; count: number; department: string }[] = [];
+    const outR: { hour: number; count: number; department: string }[] = [];
     const startD = new Date(chartStartDate + 'T00:00:00+09:00');
     const endD = new Date(chartEndDate + 'T00:00:00+09:00');
     for (const s of shifts) {
       const assgn = shiftCalAssignments.get(s.id) || [];
       if (assgn.length === 0) continue;
-      const hour = parseInt(s.planned_clock_in?.split(':')[0] || '0');
+      const inH = parseInt(s.planned_clock_in?.split(':')[0] || '0');
+      const outH = parseInt(s.planned_clock_out?.split(':')[0] || '0');
       const daysArr = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
-      // Count how many matching days in the date range
       for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
         if (d.getMonth() + 1 !== s.month) continue;
         const firstDow = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
@@ -2038,18 +2043,18 @@ function ShiftsTab() {
         if (wn !== s.week_number) continue;
         if (!daysArr.includes(d.getDay())) continue;
         for (const a of assgn) {
-          result.push({ hour, count: 1, department: a.department || '기타' });
+          inR.push({ hour: inH, count: 1, department: a.department || '기타' });
+          outR.push({ hour: outH, count: 1, department: a.department || '기타' });
         }
       }
     }
-    return result;
+    return { clockInChart: inR, clockOutChart: outR };
   }, [shifts, chartStartDate, chartEndDate, shiftCalAssignments]);
 
   return (
     <div className="space-y-4">
-      <HourlyChart data={chartData} title="계획 시간대별 출근 인원"
+      <HourlyChart clockInData={clockInChart} clockOutData={clockOutChart} title="계획 시간대별 출퇴근 인원"
         departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept}
-        compact
         extraControls={
           <div className="flex items-center gap-1">
             <input type="date" value={chartStartDate} onChange={e => setChartStartDate(e.target.value)}

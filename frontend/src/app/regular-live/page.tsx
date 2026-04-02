@@ -220,21 +220,17 @@ export default function RegularLivePage() {
           {/* Hourly Chart */}
           {(() => {
             const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간"];
-            const chartData = data.departments.flatMap((dept) =>
-              dept.teams.flatMap((team) =>
-                team.employees
-                  .filter((e) => e.clock_in_time)
-                  .map((e) => ({
-                    hour: new Date(e.clock_in_time!).getHours(),
-                    count: 1,
-                    department: e.department || '기타',
-                  }))
-              )
-            );
+            const allEmps = data.departments.flatMap((dept) => dept.teams.flatMap((team) => team.employees));
+            const inData = allEmps.filter((e) => e.clock_in_time).map((e) => ({
+              hour: new Date(e.clock_in_time!).getHours(), count: 1, department: e.department || '기타',
+            }));
+            const outData = allEmps.filter((e) => e.clock_out_time).map((e) => ({
+              hour: new Date(e.clock_out_time!).getHours(), count: 1, department: e.department || '기타',
+            }));
             return (
               <div className="mb-6">
-                <HourlyChart data={chartData} title={`${date} 실시간 시간대별 출근 인원`}
-                  departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} compact />
+                <HourlyChart clockInData={inData} clockOutData={outData} title={`${date} 실시간 시간대별 출퇴근 인원`}
+                  departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
               </div>
             );
           })()}

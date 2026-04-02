@@ -528,6 +528,22 @@ export async function initializeDB(): Promise<void> {
 
   try { await pool.query("ALTER TABLE regular_vacation_requests ADD COLUMN IF NOT EXISTS type TEXT DEFAULT '연차'"); } catch {}
 
+  // Vacation update logs
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS vacation_update_logs (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL,
+        employee_name TEXT NOT NULL,
+        action TEXT NOT NULL,
+        prev_days NUMERIC(4,1) DEFAULT 0,
+        new_days NUMERIC(4,1) DEFAULT 0,
+        reason TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch {}
+
   // Short-term labor contracts
   try {
     await pool.query(`

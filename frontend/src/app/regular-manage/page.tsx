@@ -1277,6 +1277,8 @@ function VacationTab() {
   const [editUsedDays, setEditUsedDays] = useState("");
   const [selectedEmpIds, setSelectedEmpIds] = useState<Set<number>>(new Set());
   const [batchDays, setBatchDays] = useState("15");
+  const [vacLogs, setVacLogs] = useState<any[]>([]);
+  const [logsOpen, setLogsOpen] = useState(false);
   const [balanceSearch, setBalanceSearch] = useState("");
   // Calendar sub-tab state
   const [calYear, setCalYear] = useState(new Date().getFullYear());
@@ -1303,6 +1305,17 @@ function VacationTab() {
     } catch {} finally { setLoading(false); }
   }, [year]);
 
+  const loadVacLogs = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/vacation-logs`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setVacLogs(data || []);
+    } catch {}
+  }, []);
+
   const loadCalVacations = useCallback(async () => {
     setCalLoading(true);
     try {
@@ -1312,7 +1325,7 @@ function VacationTab() {
   }, []);
 
   useEffect(() => {
-    if (subTab === 'requests') loadRequests();
+    if (subTab === 'requests') { loadRequests(); loadVacLogs(); }
     else if (subTab === 'balances') loadBalances();
     else loadCalVacations();
   }, [subTab, loadRequests, loadBalances, loadCalVacations]);
@@ -1454,6 +1467,51 @@ function VacationTab() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          {/* Vacation Update Logs */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <button onClick={() => setLogsOpen(!logsOpen)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left">
+              <span className="text-sm font-semibold text-gray-800">휴가 변동 이력</span>
+              <span className="text-xs text-gray-400">{logsOpen ? '접기' : '펼치기'} ({vacLogs.length}건)</span>
+            </button>
+            {logsOpen && (
+              <div className="border-t border-gray-100 max-h-64 overflow-y-auto">
+                {vacLogs.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-gray-400">변동 이력이 없습니다.</div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">일시</th>
+                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">이름</th>
+                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">구분</th>
+                        <th className="py-1.5 px-3 text-right font-medium text-gray-600">이전</th>
+                        <th className="py-1.5 px-3 text-right font-medium text-gray-600">변경</th>
+                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">사유</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {vacLogs.map((log: any) => (
+                        <tr key={log.id} className="hover:bg-gray-50">
+                          <td className="py-1.5 px-3 text-gray-500">{log.created_at ? new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                          <td className="py-1.5 px-3 font-medium text-gray-900">{log.employee_name}</td>
+                          <td className="py-1.5 px-3">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${log.action === '자동갱신' ? 'bg-blue-50 text-blue-700' : log.action === '신규생성' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-gray-600">{parseFloat(log.prev_days || 0).toFixed(1)}일</td>
+                          <td className="py-1.5 px-3 text-right font-medium text-blue-700">{parseFloat(log.new_days || 0).toFixed(1)}일</td>
+                          <td className="py-1.5 px-3 text-gray-500">{log.reason || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
           </div>

@@ -693,30 +693,23 @@ router.post('/vacation-balances/auto-calc', async (req: AuthRequest, res: Respon
 
       let totalDays: number;
 
-      if (yearsWorked < 0) {
-        // Hired after year start - 1 day per completed full month worked
-        // Count full months from hire date to Dec 31
-        let months = 0;
-        const cur = new Date(hireDate);
+      // 입사일~오늘 기준 완전한 달 수 계산
+      const todayDate = new Date(today + 'T00:00:00+09:00');
+      function countMonths(from: Date, to: Date) {
+        let m = 0;
+        const c = new Date(from);
         while (true) {
-          const next = new Date(cur.getFullYear(), cur.getMonth() + 1, cur.getDate());
-          if (next > yearEnd) break;
-          months++;
-          cur.setMonth(cur.getMonth() + 1);
+          const next = new Date(c.getFullYear(), c.getMonth() + 1, c.getDate());
+          if (next > to) break;
+          m++;
+          c.setMonth(c.getMonth() + 1);
         }
-        totalDays = Math.min(months, 11); // 1 day per completed month, max 11
-      } else if (yearsWorked < 1) {
-        // In first year of employment at year start
-        // 1 day per completed full month in this year
-        let months = 0;
-        const cur = new Date(hireDate);
-        while (true) {
-          const next = new Date(cur.getFullYear(), cur.getMonth() + 1, cur.getDate());
-          if (next > yearEnd) break;
-          months++;
-          cur.setMonth(cur.getMonth() + 1);
-        }
-        totalDays = Math.min(months, 11);
+        return m;
+      }
+
+      if (yearsWorked < 1) {
+        // 1년 미만: 입사일~오늘 기준 완전 개월 수 (월 1개, 최대 11)
+        totalDays = Math.min(countMonths(hireDate, todayDate), 11);
       } else {
         // 1+ years: Korean labor law Article 60
         // Base: 15 days
@@ -732,12 +725,22 @@ router.post('/vacation-balances/auto-calc', async (req: AuthRequest, res: Respon
         }
       }
 
-      // Upsert balance
-      const existing = await dbGet('SELECT id, used_days FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', emp.id, targetYear) as any;
+      // Upsert balance + log
+      const existing = await dbGet('SELECT id, total_days, used_days FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', emp.id, targetYear) as any;
+      const prevDays = existing ? parseFloat(existing.total_days) : 0;
       if (existing) {
         await dbRun('UPDATE regular_vacation_balances SET total_days = ?, updated_at = NOW() WHERE id = ?', totalDays, existing.id);
       } else {
         await dbRun('INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)', emp.id, targetYear, totalDays);
+      }
+      if (prevDays !== totalDays) {
+        const yearsInfo = yearsWorked < 1 ? `1년미만 ${countMonths(hireDate, todayDate)}개월` : `근속 ${Math.floor(yearsWorked)}년`;
+        try {
+          await dbRun(
+            'INSERT INTO vacation_update_logs (employee_id, employee_name, action, prev_days, new_days, reason) VALUES (?, ?, ?, ?, ?, ?)',
+            emp.id, emp.name, '수동재계산', prevDays, totalDays, yearsInfo
+          );
+        } catch {}
       }
       updated++;
     }
@@ -749,6 +752,16 @@ router.post('/vacation-balances/auto-calc', async (req: AuthRequest, res: Respon
 });
 
 // POST /api/regular/vacation-balances/init - Initialize balances for all active employees
+// GET /api/regular/vacation-logs - Get vacation update logs
+router.get('/vacation-logs', async (_req: AuthRequest, res: Response) => {
+  try {
+    const logs = await dbAll('SELECT * FROM vacation_update_logs ORDER BY created_at DESC LIMIT 200');
+    res.json(logs || []);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/vacation-balances/init', async (req: AuthRequest, res: Response) => {
   try {
     const { year, total_days } = req.body;

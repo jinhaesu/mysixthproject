@@ -248,6 +248,19 @@ async function checkAndSendRegularReports() {
 // ===== Auto Vacation Balance Update (Korean Labor Law) =====
 let lastVacationCheckDate = '';
 
+// Count completed full months from hireDate to today
+function countCompletedMonths(hireDate: Date, today: Date): number {
+  let months = 0;
+  const cur = new Date(hireDate);
+  while (true) {
+    const next = new Date(cur.getFullYear(), cur.getMonth() + 1, cur.getDate());
+    if (next > today) break;
+    months++;
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return months;
+}
+
 async function checkAndUpdateVacationBalances() {
   try {
     const today = getKSTDate();
@@ -266,19 +279,17 @@ async function checkAndUpdateVacationBalances() {
 
       const hireDate = new Date(emp.hire_date + 'T00:00:00+09:00');
       const msWorked = todayDate.getTime() - hireDate.getTime();
-      if (msWorked < 0) continue; // Not yet hired
+      if (msWorked < 0) continue;
 
       const daysWorked = msWorked / (24 * 60 * 60 * 1000);
       const yearsWorked = daysWorked / 365.25;
-      const monthsWorked = daysWorked / 30.44;
 
       let totalDays: number;
 
       if (yearsWorked < 1) {
-        // First year: 1 day per completed month (max 11)
-        totalDays = Math.min(Math.floor(monthsWorked), 11);
+        // 1년 미만: 입사일~오늘 기준 완전한 달 수 (월 1개, 최대 11)
+        totalDays = Math.min(countCompletedMonths(hireDate, todayDate), 11);
       } else {
-        // 1+ years: Korean labor law Article 60
         const fullYears = Math.floor(yearsWorked);
         if (fullYears < 3) {
           totalDays = 15;
@@ -288,30 +299,43 @@ async function checkAndUpdateVacationBalances() {
         }
       }
 
-      // Get current balance
       const balance = await dbGet(
         'SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?',
         emp.id, currentYear
       ) as any;
 
       if (balance) {
-        // Only update if total_days changed (don't overwrite manual edits if same)
-        if (parseFloat(balance.total_days) !== totalDays) {
+        const prevDays = parseFloat(balance.total_days);
+        if (prevDays !== totalDays) {
           await dbRun(
             'UPDATE regular_vacation_balances SET total_days = ?, updated_at = NOW() WHERE id = ?',
             totalDays, balance.id
           );
+          // Log the change
+          const reason = yearsWorked < 1
+            ? `1년 미만 월차 발생 (${countCompletedMonths(hireDate, todayDate)}개월 경과)`
+            : `근속 ${Math.floor(yearsWorked)}년 연차`;
+          await dbRun(
+            'INSERT INTO vacation_update_logs (employee_id, employee_name, action, prev_days, new_days, reason) VALUES (?, ?, ?, ?, ?, ?)',
+            emp.id, emp.name, '자동갱신', prevDays, totalDays, reason
+          );
           updated++;
-          console.log(`[Vacation] Updated ${emp.name}: ${balance.total_days} → ${totalDays} days`);
+          console.log(`[Vacation] ${emp.name}: ${prevDays} → ${totalDays}일 (${reason})`);
         }
       } else {
-        // Create new balance record
         await dbRun(
           'INSERT INTO regular_vacation_balances (employee_id, year, total_days) VALUES (?, ?, ?)',
           emp.id, currentYear, totalDays
         );
+        const reason = yearsWorked < 1
+          ? `신규 등록 - 1년 미만 ${countCompletedMonths(hireDate, todayDate)}개월 경과`
+          : `신규 등록 - 근속 ${Math.floor(yearsWorked)}년`;
+        await dbRun(
+          'INSERT INTO vacation_update_logs (employee_id, employee_name, action, prev_days, new_days, reason) VALUES (?, ?, ?, ?, ?, ?)',
+          emp.id, emp.name, '신규생성', 0, totalDays, reason
+        );
         updated++;
-        console.log(`[Vacation] Created ${emp.name}: ${totalDays} days for ${currentYear}`);
+        console.log(`[Vacation] ${emp.name}: 신규 ${totalDays}일 (${reason})`);
       }
     }
 

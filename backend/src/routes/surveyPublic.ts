@@ -250,11 +250,14 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
   // Auto-upsert worker profile
   try {
     const existingWorker = await dbGet('SELECT id FROM workers WHERE phone = ?', request.phone);
+    // Normalize worker_type to category
+    const category = worker_type === 'dispatch' ? '파견' : worker_type === 'alba' ? '알바' : worker_type || '';
+
     if (!existingWorker) {
       await dbRun(`
-        INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, gender, birth_year, agency)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '');
+        INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, gender, birth_year, agency, category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', category);
     } else {
       await dbRun(`
         UPDATE workers SET
@@ -267,9 +270,10 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
           gender = COALESCE(NULLIF(?, ''), gender),
           birth_year = COALESCE(?, birth_year),
           agency = COALESCE(NULLIF(?, ''), agency),
+          category = COALESCE(NULLIF(?, ''), category),
           updated_at = CURRENT_TIMESTAMP
         WHERE phone = ?
-      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', request.phone);
+      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', category, request.phone);
     }
   } catch (err) {
     console.error('[Worker] Auto-upsert failed:', err);

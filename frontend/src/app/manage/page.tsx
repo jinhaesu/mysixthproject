@@ -104,12 +104,11 @@ export default function ManagePage() {
             const token = localStorage.getItem('token');
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/workers/backfill-category`, {
               method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ default_category: '파견' }),
+              body: JSON.stringify({}),
             });
             const body = await res.json();
             let msg = `빈 구분 ${body.total_empty}명 중 ${body.updated}명 채움 완료`;
-            if (body.defaulted > 0) msg += ` (${body.defaulted}명은 기록 기반 '파견' 기본 적용)`;
-            if (body.not_found?.length > 0) msg += `\n채울 수 없음: ${body.not_found.join(', ')}`;
+            if (body.not_found?.length > 0) msg += `\n유형 데이터 없어 빈칸 유지: ${body.not_found.join(', ')}`;
             alert(msg);
           } catch (e: any) { alert(e.message); }
         }}

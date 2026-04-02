@@ -175,14 +175,7 @@ router.post('/backfill-category', async (req: AuthRequest, res: Response) => {
         category = resp.worker_type === 'dispatch' ? '파견' : resp.worker_type === 'alba' ? '알바' : resp.worker_type.includes('파견') ? '파견' : resp.worker_type.includes('알바') ? '알바' : resp.worker_type;
       }
 
-      // If still empty, check if they have any survey_requests at all (meaning they worked)
-      if (!category) {
-        const hasWork = await dbGet('SELECT id FROM survey_requests WHERE phone = ? LIMIT 1', w.phone) as any;
-        if (hasWork && default_category) {
-          category = default_category; // Use provided default (e.g., '파견')
-          defaulted++;
-        }
-      }
+      // worker_type 데이터가 없으면 빈칸 유지 (추정값 넣지 않음)
 
       if (category) {
         await dbRun('UPDATE workers SET category = ? WHERE id = ?', category, w.id);

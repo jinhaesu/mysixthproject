@@ -60,6 +60,9 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
   return { regular: Math.round(regular * 10) / 10, overtime: Math.round(overtime * 10) / 10, night: nightH, breakH };
 }
 
+const _cache: Record<string, { data: any; vac: any; time: number }> = {};
+const CACHE_TTL = 10 * 60 * 1000; // 10분
+
 export default function ConfirmedListRegularPage() {
   const [yearMonth, setYearMonth] = usePersistedState("clr_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any[]>([]);
@@ -72,6 +75,11 @@ export default function ConfirmedListRegularPage() {
   const [vacationMap, setVacationMap] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
+    const cacheKey = `clr-${yearMonth}`;
+    const cached = _cache[cacheKey];
+    if (cached && Date.now() - cached.time < CACHE_TTL) {
+      setData(cached.data); setVacationMap(cached.vac); return;
+    }
     setLoading(true);
     try {
       const d = await getConfirmedList(yearMonth, '정규직');
@@ -89,6 +97,7 @@ export default function ConfirmedListRegularPage() {
           }
         }
         setVacationMap(map);
+        _cache[cacheKey] = { data: d || [], vac: map, time: Date.now() };
       } catch {}
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
@@ -132,7 +141,7 @@ export default function ConfirmedListRegularPage() {
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
         </div>
-        <button onClick={load} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
+        <button onClick={() => { delete _cache[`clr-${yearMonth}`]; load(); }} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
 
       {loading ? (

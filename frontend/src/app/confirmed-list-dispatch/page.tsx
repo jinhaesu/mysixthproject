@@ -47,6 +47,9 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
   return { regular: Math.round(Math.min(dayWork, 8) * 10) / 10, overtime: Math.round(Math.max(dayWork - 8, 0) * 10) / 10, night: nightH, breakH };
 }
 
+const _cache: Record<string, { data: any; time: number }> = {};
+const CACHE_TTL = 10 * 60 * 1000;
+
 export default function ConfirmedListDispatchPage() {
   const [yearMonth, setYearMonth] = usePersistedState("cld_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any[]>([]);
@@ -58,11 +61,15 @@ export default function ConfirmedListDispatchPage() {
   const [deptFilter, setDeptFilter] = usePersistedState("cld_deptFilter", "");
 
   const load = useCallback(async () => {
+    const cacheKey = `cld-${yearMonth}`;
+    const cached = _cache[cacheKey];
+    if (cached && Date.now() - cached.time < CACHE_TTL) { setData(cached.data); return; }
     setLoading(true);
     try {
       const d = await getConfirmedList(yearMonth, '');
-      // Filter out 정규직
-      setData((d || []).filter((e: any) => e.type !== '정규직'));
+      const filtered = (d || []).filter((e: any) => e.type !== '정규직');
+      setData(filtered);
+      _cache[cacheKey] = { data: filtered, time: Date.now() };
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [yearMonth]);
@@ -103,7 +110,7 @@ export default function ConfirmedListDispatchPage() {
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
         </div>
-        <button onClick={load} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
+        <button onClick={() => { delete _cache[`cld-${yearMonth}`]; load(); }} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
 
       {loading ? (

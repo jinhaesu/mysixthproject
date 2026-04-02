@@ -138,6 +138,9 @@ function getPrevYearMonth(y: number, m: number): [number, number] {
   return m === 1 ? [y - 1, 12] : [y, m - 1];
 }
 
+const _dashCache: Record<string, { summaryData: any; dailyData: any; twoMonthsAgoData: any; twoMonthsAgoWHH: any; time: number }> = {};
+const DASH_CACHE_TTL = 10 * 60 * 1000;
+
 // --- Component ---
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -161,7 +164,19 @@ function DashboardContent() {
   const [revenue, setRevenue] = useState(0);
   const [targetRatio, setTargetRatio] = useState(30);
 
+  const [forceRefresh, setForceRefresh] = useState(0);
   const fetchData = useCallback(async () => {
+    const cacheKey = `dash-${dashboardType}-${year}-${month}`;
+    if (forceRefresh === 0) {
+      const cached = _dashCache[cacheKey];
+      if (cached && Date.now() - cached.time < DASH_CACHE_TTL) {
+        setSummaryData(cached.summaryData);
+        setDailyData(cached.dailyData);
+        setTwoMonthsAgoData(cached.twoMonthsAgoData);
+        setTwoMonthsAgoWHH(cached.twoMonthsAgoWHH);
+        return;
+      }
+    }
     setLoading(true);
     setError("");
     try {
@@ -299,17 +314,26 @@ function DashboardContent() {
       if (isRegular) {
         try { const sd = await getSalarySettings(); setSalaryData(sd || []); } catch {}
       }
+      // Save to cache
+      _dashCache[cacheKey] = {
+        summaryData: { current: mergedCurrent, previous: mergedPrevious, year, month, prevYear: prevY, prevMonth: prevM, weeklyHolidayHours: { current: finalCurrentWHH, previous: finalPrevWHH } },
+        dailyData: { data: dailyRows, groups: [], categories: [], year, month },
+        twoMonthsAgoData: [],
+        twoMonthsAgoWHH: {},
+        time: Date.now(),
+      };
     } catch (err: any) {
       setError(err.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
     }
-  }, [year, month, isRegular]);
+  }, [year, month, isRegular, forceRefresh]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const prevMonth = () => { if (month === 1) { setYear(y => y - 1); setMonth(12); } else setMonth(m => m - 1); };
   const nextMonth = () => { if (month === 12) { setYear(y => y + 1); setMonth(1); } else setMonth(m => m + 1); };
+  const refreshData = () => { delete _dashCache[`dash-${dashboardType}-${year}-${month}`]; setForceRefresh(f => f + 1); };
 
   // Processed data
   const groups = useMemo(() => summaryData ? processSummaryGroups(summaryData.current) : [], [summaryData]);
@@ -544,6 +568,7 @@ function DashboardContent() {
           <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft size={20} /></button>
           <span className="text-lg font-semibold text-gray-900 min-w-[120px] text-center">{year}년 {month}월</span>
           <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded"><ChevronRight size={20} /></button>
+          <button onClick={refreshData} disabled={loading} className="ml-2 px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-300" title="새로고침">조회</button>
         </div>
       </div>
 

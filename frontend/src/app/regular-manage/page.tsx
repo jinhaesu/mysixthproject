@@ -1168,7 +1168,7 @@ function AttendanceTab() {
   return (
     <div className="space-y-4">
       <HourlyChart data={chartData} title={`${date} 실제 시간대별 출근 인원`}
-        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
+        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} compact />
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex flex-wrap gap-3 items-end">
@@ -2017,23 +2017,49 @@ function ShiftsTab() {
     } catch (e: any) { alert(e.message); }
   };
 
+  const [chartStartDate, setChartStartDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; });
+  const [chartEndDate, setChartEndDate] = useState(() => { const d = new Date(); const last = new Date(d.getFullYear(), d.getMonth()+1, 0); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`; });
+
   const chartData = useMemo(() => {
     const result: { hour: number; count: number; department: string }[] = [];
-    const monthShifts = shifts.filter((s: any) => s.month === shiftCalMonth);
-    for (const s of monthShifts) {
+    const startD = new Date(chartStartDate + 'T00:00:00+09:00');
+    const endD = new Date(chartEndDate + 'T00:00:00+09:00');
+    for (const s of shifts) {
       const assgn = shiftCalAssignments.get(s.id) || [];
+      if (assgn.length === 0) continue;
       const hour = parseInt(s.planned_clock_in?.split(':')[0] || '0');
-      for (const a of assgn) {
-        result.push({ hour, count: 1, department: a.department || '기타' });
+      const daysArr = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
+      // Count how many matching days in the date range
+      for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+        if (d.getMonth() + 1 !== s.month) continue;
+        const firstDow = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+        const so = (firstDow + 6) % 7;
+        const wn = Math.ceil((d.getDate() + so) / 7);
+        if (wn !== s.week_number) continue;
+        if (!daysArr.includes(d.getDay())) continue;
+        for (const a of assgn) {
+          result.push({ hour, count: 1, department: a.department || '기타' });
+        }
       }
     }
     return result;
-  }, [shifts, shiftCalMonth, shiftCalAssignments]);
+  }, [shifts, chartStartDate, chartEndDate, shiftCalAssignments]);
 
   return (
     <div className="space-y-4">
-      <HourlyChart data={chartData} title={`${shiftCalMonth}월 계획 시간대별 출근 인원`}
-        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
+      <HourlyChart data={chartData} title="계획 시간대별 출근 인원"
+        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept}
+        compact
+        extraControls={
+          <div className="flex items-center gap-1">
+            <input type="date" value={chartStartDate} onChange={e => setChartStartDate(e.target.value)}
+              className="px-1.5 py-1 border border-gray-300 rounded text-xs" />
+            <span className="text-gray-400 text-xs">~</span>
+            <input type="date" value={chartEndDate} onChange={e => setChartEndDate(e.target.value)}
+              className="px-1.5 py-1 border border-gray-300 rounded text-xs" />
+          </div>
+        }
+      />
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">월/주차별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
         <div className="flex gap-2">

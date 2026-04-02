@@ -234,7 +234,7 @@ export default function RegularLivePage() {
             return (
               <div className="mb-6">
                 <HourlyChart data={chartData} title={`${date} 실시간 시간대별 출근 인원`}
-                  departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
+                  departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} compact />
               </div>
             );
           })()}

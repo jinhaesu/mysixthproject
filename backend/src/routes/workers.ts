@@ -152,14 +152,16 @@ router.post('/import', async (_req: AuthRequest, res: Response) => {
 });
 
 // POST /api/workers/backfill-category - Fill empty category from survey_responses
-router.post('/backfill-category', async (_req: AuthRequest, res: Response) => {
+router.post('/backfill-category', async (req: AuthRequest, res: Response) => {
   try {
-    // Find workers with empty category
-    const emptyWorkers = await dbAll("SELECT id, phone FROM workers WHERE category IS NULL OR category = ''") as any[];
+    const { default_category } = req.body || {};
+    const emptyWorkers = await dbAll("SELECT id, phone, name_ko FROM workers WHERE category IS NULL OR category = ''") as any[];
     let updated = 0;
+    let defaulted = 0;
+    const notFound: string[] = [];
 
     for (const w of emptyWorkers) {
-      // Find the most recent worker_type from survey_responses
+      // Try survey_responses.worker_type first
       const resp = await dbGet(`
         SELECT resp.worker_type
         FROM survey_responses resp
@@ -168,16 +170,29 @@ router.post('/backfill-category', async (_req: AuthRequest, res: Response) => {
         ORDER BY resp.created_at DESC LIMIT 1
       `, w.phone) as any;
 
+      let category = '';
       if (resp?.worker_type) {
-        const category = resp.worker_type === 'dispatch' ? '파견' : resp.worker_type === 'alba' ? '알바' : resp.worker_type.includes('파견') ? '파견' : resp.worker_type.includes('알바') ? '알바' : resp.worker_type;
-        if (category) {
-          await dbRun('UPDATE workers SET category = ? WHERE id = ?', category, w.id);
-          updated++;
+        category = resp.worker_type === 'dispatch' ? '파견' : resp.worker_type === 'alba' ? '알바' : resp.worker_type.includes('파견') ? '파견' : resp.worker_type.includes('알바') ? '알바' : resp.worker_type;
+      }
+
+      // If still empty, check if they have any survey_requests at all (meaning they worked)
+      if (!category) {
+        const hasWork = await dbGet('SELECT id FROM survey_requests WHERE phone = ? LIMIT 1', w.phone) as any;
+        if (hasWork && default_category) {
+          category = default_category; // Use provided default (e.g., '파견')
+          defaulted++;
         }
+      }
+
+      if (category) {
+        await dbRun('UPDATE workers SET category = ? WHERE id = ?', category, w.id);
+        updated++;
+      } else {
+        notFound.push(w.name_ko || w.phone);
       }
     }
 
-    res.json({ success: true, total_empty: emptyWorkers.length, updated });
+    res.json({ success: true, total_empty: emptyWorkers.length, updated, defaulted, not_found: notFound.slice(0, 20) });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

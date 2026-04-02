@@ -104,9 +104,13 @@ export default function ManagePage() {
             const token = localStorage.getItem('token');
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/workers/backfill-category`, {
               method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ default_category: '파견' }),
             });
             const body = await res.json();
-            alert(`빈 구분 ${body.total_empty}명 중 ${body.updated}명 채움 완료`);
+            let msg = `빈 구분 ${body.total_empty}명 중 ${body.updated}명 채움 완료`;
+            if (body.defaulted > 0) msg += ` (${body.defaulted}명은 기록 기반 '파견' 기본 적용)`;
+            if (body.not_found?.length > 0) msg += `\n채울 수 없음: ${body.not_found.join(', ')}`;
+            alert(msg);
           } catch (e: any) { alert(e.message); }
         }}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">

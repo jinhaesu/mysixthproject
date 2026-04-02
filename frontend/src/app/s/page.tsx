@@ -108,6 +108,14 @@ function SurveyContent() {
         if (lr.bank_name && !result.worker?.bank_name) setBankName(lr.bank_name);
         if (lr.bank_account && !result.worker?.bank_account) setBankAccount(lr.bank_account);
         if (lr.emergency_contact && !result.worker?.emergency_contact) setEmergencyContact(lr.emergency_contact);
+        // Pre-fill worker type from last response or worker profile
+        if (lr.worker_type === 'dispatch' || lr.worker_type === '파견') setWorkerType('dispatch');
+        else if (lr.worker_type === 'alba' || lr.worker_type === '알바') setWorkerType('alba');
+      }
+      // Also check worker.category if lastResponse didn't have worker_type
+      if (result.worker?.category && !workerType) {
+        if (result.worker.category === '파견' || result.worker.category === 'dispatch') setWorkerType('dispatch');
+        else if (result.worker.category === '알바' || result.worker.category === 'alba' || result.worker.category === '아르바이트') setWorkerType('alba');
       }
     } catch (err: any) {
       setError(err.message);
@@ -641,6 +649,19 @@ function SurveyContent() {
               className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 hover:bg-orange-700 transition-colors">
               {contractSubmitting ? "처리 중..." : "근로계약서 서명 및 제출"}
             </button>
+          </div>
+        )}
+
+        {/* Worker type badge (auto-filled from previous) */}
+        {data.status === "sent" && agreementAccepted && workerType && (
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">근무 유형:</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-bold ${workerType === 'dispatch' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
+                {workerType === 'dispatch' ? '파견' : '알바'}
+              </span>
+            </div>
+            <button onClick={() => setWorkerType("")} className="text-xs text-gray-500 hover:text-gray-700 underline">변경</button>
           </div>
         )}
 

@@ -140,6 +140,7 @@ router.get('/:token', async (req: Request, res: Response) => {
       bank_name: worker.bank_name,
       bank_account: worker.bank_account,
       emergency_contact: worker.emergency_contact,
+      category: worker.category || '',
     } : null,
     lastResponse: lastResponse ? {
       id_number: lastResponse.id_number,
@@ -152,6 +153,7 @@ router.get('/:token', async (req: Request, res: Response) => {
       emergency_contact: lastResponse.emergency_contact,
       worker_name_ko: lastResponse.worker_name_ko,
       worker_name_en: lastResponse.worker_name_en,
+      worker_type: lastResponse.worker_type || '',
     } : null,
   });
 });

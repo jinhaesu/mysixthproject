@@ -42,6 +42,7 @@ export default function AttendanceSummaryDispatchPage() {
   const [nameSearch, setNameSearch] = usePersistedState("asd_nameSearch", "");
   const [deptFilter, setDeptFilter] = usePersistedState("asd_deptFilter", "");
   const [dinnerBreak, setDinnerBreak] = useState<Record<string, boolean>>({});
+  const [confirmFilter, setConfirmFilter] = usePersistedState<'all'|'unconfirmed'|'confirmed'>("asd_confirmFilter", 'all');
 
   const [forceRefresh, setForceRefresh] = useState(0);
 
@@ -290,7 +291,8 @@ export default function AttendanceSummaryDispatchPage() {
     !hiddenEmps.has(e.id) &&
     (typeFilter === 'all' || (e.type || '').includes(typeFilter)) &&
     (!nameSearch || (e.name || '').includes(nameSearch)) &&
-    (!deptFilter || (e.department || '').includes(deptFilter))
+    (!deptFilter || (e.department || '').includes(deptFilter)) &&
+    (confirmFilter === 'all' || (confirmFilter === 'confirmed' && confirmedEmpSet.has(e.name)) || (confirmFilter === 'unconfirmed' && !confirmedEmpSet.has(e.name)))
   );
   const lastDay = new Date(year, month, 0).getDate();
 
@@ -343,6 +345,14 @@ export default function AttendanceSummaryDispatchPage() {
           <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">확정 상태</label>
+          <select value={confirmFilter} onChange={e => setConfirmFilter(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value="all">전체</option>
+            <option value="unconfirmed">미확정만</option>
+            <option value="confirmed">확정만</option>
+          </select>
         </div>
         <button onClick={() => { delete _cache[`disp-${year}-${month}`]; setForceRefresh(f => f+1); }} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>

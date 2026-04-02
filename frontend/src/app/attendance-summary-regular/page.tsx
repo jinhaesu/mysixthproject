@@ -65,10 +65,12 @@ export default function AttendanceSummaryRegularPage() {
     } catch {}
   }, []);
 
+  const [forceRefresh, setForceRefresh] = useState(0);
+
   const load = useCallback(async () => {
     const key = `reg-${year}-${month}`;
     const cached = _cache[key];
-    if (cached && Date.now() - cached.time < CACHE_TTL) {
+    if (forceRefresh === 0 && cached && Date.now() - cached.time < CACHE_TTL) {
       setData(cached.data);
       // Still load confirmed data even from cache
       const ym = `${year}-${String(month).padStart(2,'0')}`;
@@ -135,7 +137,7 @@ export default function AttendanceSummaryRegularPage() {
       } catch {}
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
-  }, [year, month]);
+  }, [year, month, forceRefresh]);
 
   useEffect(() => { load(); loadVacations(); }, [load, loadVacations]);
 
@@ -385,7 +387,7 @@ export default function AttendanceSummaryRegularPage() {
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
         </div>
-        <button onClick={load} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
+        <button onClick={() => { delete _cache[`reg-${year}-${month}`]; setForceRefresh(f => f+1); }} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
 
       {visibleEmployees.length > 0 && (

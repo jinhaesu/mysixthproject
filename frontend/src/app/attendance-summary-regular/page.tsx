@@ -190,17 +190,23 @@ export default function AttendanceSummaryRegularPage() {
 
   // isHalfDay: 반차일 경우 기본 4h cap, 초과분 연장
   const calcHoursFromTimes = (clockIn: string, clockOut: string, breakH = 1, isHalfDay = false) => {
-    if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return { regular: 0, overtime: 0 };
+    if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return { regular: 0, overtime: 0, night: 0 };
     const [h1,m1] = clockIn.split(':').map(Number);
     const [h2,m2] = clockOut.split(':').map(Number);
-    if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0 };
+    if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0, night: 0 };
     const startMin = ceil30Min(h1 * 60 + (m1 || 0));
     let endMin = floor30Min(h2 * 60 + (m2 || 0));
-    // 야간조: 자정 넘김 (예: 21:00~06:00)
     if (endMin <= startMin) endMin += 1440;
     const total = Math.max((endMin - startMin) / 60 - breakH, 0);
-    const cap = isHalfDay ? 4 : 8; // 반차일: 4h 기본, 초과 연장
-    return { regular: Math.min(total, cap), overtime: Math.max(total - cap, 0) };
+    const cap = isHalfDay ? 4 : 8;
+    // 야간시간 계산 (22:00~06:00)
+    let nightMin = 0;
+    for (let min = startMin; min < endMin; min++) {
+      const h = Math.floor((min % 1440) / 60);
+      if (h >= 22 || h < 6) nightMin++;
+    }
+    const night = Math.round(nightMin / 60 * 10) / 10;
+    return { regular: Math.min(total, cap), overtime: Math.max(total - cap, 0), night };
   };
 
   const getBreakHours = (empId: number, date: string, clockIn: string, clockOut: string, empName?: string) => {
@@ -283,7 +289,7 @@ export default function AttendanceSummaryRegularPage() {
         const isHalfVac = !!vacationMap[`${emp.name}|${date}`]?.type?.includes('반차');
         const breakH = getBreakHours(parseInt(empId), date, clockIn, clockOut, emp.name);
         const h = calcHoursFromTimes(clockIn, clockOut, breakH, isHalfVac);
-        records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
+        records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, night_hours: h.night, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
       }
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
@@ -311,7 +317,7 @@ export default function AttendanceSummaryRegularPage() {
           const isHalfVac = !!vacationMap[`${emp.name}|${actual.date}`]?.type?.includes('반차');
           const breakH = getBreakHours(emp.id, actual.date, clockIn, clockOut, emp.name);
           const h = calcHoursFromTimes(clockIn, clockOut, breakH, isHalfVac);
-          records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
+          records.push({ employee_type: '정규직', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date: actual.date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source: batchSource, regular_hours: h.regular, overtime_hours: h.overtime, night_hours: h.night, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
         }
       }
       if (records.length === 0) return alert("해당 기간에 출근 데이터가 없습니다.");

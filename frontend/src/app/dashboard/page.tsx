@@ -193,9 +193,13 @@ function DashboardContent() {
           if (!isRegular && emp.type === '정규직') continue;
           confirmedNames.add(emp.name);
           const category = emp.type || '파견';
-          const key = `${category}`;
+          // Determine shift: if employee has night_hours > regular_hours → 야간
+          const isNightWorker = (emp.night_hours || 0) > (emp.regular_hours || 0);
+          const shift = isNightWorker ? '야간' : '주간';
+          const dept = emp.department || '';
+          const key = `${category}-${shift}-${dept}`;
           if (!groupMap.has(key)) {
-            groupMap.set(key, { department: '', workplace: '', category, shift: '주간', attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, annual_leave_days: 0 });
+            groupMap.set(key, { department: dept, workplace: '', category, shift, attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, annual_leave_days: 0 });
           }
           const row = groupMap.get(key)!;
           row.attendance_count += emp.days || 0;
@@ -203,7 +207,7 @@ function DashboardContent() {
           row.regular_hours += emp.regular_hours || 0;
           row.overtime_hours += emp.overtime_hours || 0;
           row.night_hours += emp.night_hours || 0;
-          row.total_hours += (emp.regular_hours || 0) + floor30g(emp.overtime_hours || 0);
+          row.total_hours += (emp.regular_hours || 0) + floor30g(emp.overtime_hours || 0) + (emp.night_hours || 0);
         }
         return Array.from(groupMap.values());
       };
@@ -230,7 +234,7 @@ function DashboardContent() {
             if (!dayMap.has(key)) dayMap.set(key, { date: key, department: '', workplace: '', category: emp.type || '파견', count: 0, total_hours: 0 });
             const d = dayMap.get(key)!;
             d.count += 1;
-            d.total_hours += (parseFloat(rec.regular_hours) || 0) + (parseFloat(rec.overtime_hours) || 0);
+            d.total_hours += (parseFloat(rec.regular_hours) || 0) + (parseFloat(rec.overtime_hours) || 0) + (parseFloat(rec.night_hours) || 0);
           }
         }
         dailyRows = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));

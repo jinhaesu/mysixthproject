@@ -42,8 +42,9 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
     if (h >= 22 || h < 6) nightMin++;
   }
   const nightH = Math.round(nightMin / 60 * 10) / 10;
-  if (isHolidayOrWeekend(date)) return { regular: 0, overtime: Math.round(workH * 10) / 10, night: nightH, breakH };
-  return { regular: Math.round(Math.min(workH, 8) * 10) / 10, overtime: Math.round(Math.max(workH - 8, 0) * 10) / 10, night: nightH, breakH };
+  const dayWork = Math.max(workH - nightH, 0); // 야간 분리
+  if (isHolidayOrWeekend(date)) return { regular: 0, overtime: Math.round(dayWork * 10) / 10, night: nightH, breakH };
+  return { regular: Math.round(Math.min(dayWork, 8) * 10) / 10, overtime: Math.round(Math.max(dayWork - 8, 0) * 10) / 10, night: nightH, breakH };
 }
 
 export default function ConfirmedListDispatchPage() {

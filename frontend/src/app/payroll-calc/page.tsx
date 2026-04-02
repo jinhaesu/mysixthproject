@@ -40,9 +40,11 @@ export default function PayrollCalcPage() {
   const results = (data?.results || []).map((r: any) => {
     const otHours = floor30(r.overtime_hours || 0);
     const holHours = floor30(r.holiday_hours || 0);
+    const nightHours = floor30(r.night_hours || 0);
     const otPay = Math.round(otHours * overtimeRate * 1.5);
     const holPay = Math.round(holHours * overtimeRate * 1.5);
-    const gross = (r.base_pay || 0) + (r.meal_allowance || 0) + (r.bonus || 0) + (r.position_allowance || 0) + (r.other_allowance || 0) + otPay + holPay;
+    const nightPay = Math.round(nightHours * overtimeRate * 1.5); // 야간시간은 기본에서 분리됨, 1.5배
+    const gross = (r.base_pay || 0) + (r.meal_allowance || 0) + (r.bonus || 0) + (r.position_allowance || 0) + (r.other_allowance || 0) + otPay + holPay + nightPay;
     const taxBase = (r.base_pay || 0) + (r.meal_allowance || 0);
     const np = Math.round(taxBase * 0.045);
     const hi = Math.round(taxBase * 0.03545);
@@ -52,7 +54,7 @@ export default function PayrollCalcPage() {
     const lt = Math.round(it * 0.1);
     const ded = np + hi + ltc + ei + it + lt;
     const net = gross - ded;
-    return { ...r, overtime_pay: otPay, holiday_pay: holPay, gross_pay: gross, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: it, local_tax: lt, total_deductions: ded, net_pay: net };
+    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: gross, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: it, local_tax: lt, total_deductions: ded, net_pay: net };
   });
 
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);

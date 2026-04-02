@@ -199,14 +199,17 @@ export default function AttendanceSummaryRegularPage() {
     if (endMin <= startMin) endMin += 1440;
     const total = Math.max((endMin - startMin) / 60 - breakH, 0);
     const cap = isHalfDay ? 4 : 8;
-    // 야간시간 계산 (22:00~06:00)
+    // 야간시간 계산 (22:00~06:00) - 야간시간은 기본/연장에서 분리
     let nightMin = 0;
     for (let min = startMin; min < endMin; min++) {
       const h = Math.floor((min % 1440) / 60);
       if (h >= 22 || h < 6) nightMin++;
     }
     const night = Math.round(nightMin / 60 * 10) / 10;
-    return { regular: Math.min(total, cap), overtime: Math.max(total - cap, 0), night };
+    const dayWork = Math.max(total - night, 0); // 주간 근무시간
+    const regular = Math.min(dayWork, cap);
+    const overtime = Math.max(dayWork - cap, 0);
+    return { regular, overtime, night };
   };
 
   const getBreakHours = (empId: number, date: string, clockIn: string, clockOut: string, empName?: string) => {

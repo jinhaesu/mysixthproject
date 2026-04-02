@@ -49,13 +49,14 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
     if (h >= 22 || h < 6) nightMin++;
   }
   const nightH = Math.round(nightMin / 60 * 10) / 10;
+  const dayWork = Math.max(workH - nightH, 0); // 야간 분리
 
   if (isHolidayOrWeekend(date)) {
-    return { regular: 0, overtime: Math.round(workH * 10) / 10, night: nightH, breakH };
+    return { regular: 0, overtime: Math.round(dayWork * 10) / 10, night: nightH, breakH };
   }
 
-  const regular = Math.min(workH, 8);
-  const overtime = Math.max(workH - 8, 0);
+  const regular = Math.min(dayWork, 8);
+  const overtime = Math.max(dayWork - 8, 0);
   return { regular: Math.round(regular * 10) / 10, overtime: Math.round(overtime * 10) / 10, night: nightH, breakH };
 }
 

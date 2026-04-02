@@ -1241,11 +1241,11 @@ router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
         if (h >= 22 || h < 6) nightMin++;
       }
       const nightH = Math.round(nightMin / 60 * 10) / 10;
+      const dayWork = Math.max(workH - nightH, 0); // 야간 분리
 
-      // 휴일이면 전체 시간을 연장으로, 평일이면 8시간 기준 분리
       const isHoliday = isHolidayOrWeekend(r.date);
-      const regularH = isHoliday ? 0 : Math.round(Math.min(workH, 8) * 10) / 10;
-      const overtimeH = isHoliday ? Math.round(workH * 10) / 10 : Math.round(Math.max(workH - 8, 0) * 10) / 10;
+      const regularH = isHoliday ? 0 : Math.round(Math.min(dayWork, 8) * 10) / 10;
+      const overtimeH = isHoliday ? Math.round(dayWork * 10) / 10 : Math.round(Math.max(dayWork - 8, 0) * 10) / 10;
 
       await dbRun(
         'UPDATE confirmed_attendance SET regular_hours = ?, overtime_hours = ?, night_hours = ? WHERE id = ?',

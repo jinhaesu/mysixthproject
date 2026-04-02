@@ -177,7 +177,8 @@ export default function AttendanceSummaryDispatchPage() {
       if (h >= 22 || h < 6) nightMin++;
     }
     const night = Math.round(nightMin / 60 * 10) / 10;
-    return { regular: Math.min(total, 8), overtime: Math.max(total - 8, 0), night };
+    const dayWork = Math.max(total - night, 0);
+    return { regular: Math.min(dayWork, 8), overtime: Math.max(dayWork - 8, 0), night };
   };
 
   const getBreakHours = (empId: number, date: string, clockIn: string, clockOut: string) => {

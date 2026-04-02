@@ -56,7 +56,7 @@ export default function SettlementDispatchPage() {
     const basePay = Math.round(r.regular_hours * hourlyRate);
     const overtimePay = Math.round(otHours * hourlyRate * 1.5);
     const holidayPay = Math.round(holHours * hourlyRate * 1.5);
-    const nightPay = Math.round(nightHours * hourlyRate * 1.5);
+    const nightPay = Math.round(nightHours * hourlyRate * 1.5); // 야간시간은 기본에서 분리됨, 1.5배
     const whPay = Math.round(r.weekly_holiday_hours * hourlyRate);
     const grossPay = basePay + overtimePay + holidayPay + nightPay + whPay;
     const meal = mealDeductions[idx] || 0;

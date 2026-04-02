@@ -39,7 +39,7 @@ export default function PolicyPage() {
           <table className="w-full text-sm border-collapse">
             <tbody className="divide-y divide-gray-100">
               <tr><td className="py-2 pr-4 font-medium text-gray-700 w-40">연장수당</td><td className="py-2 text-gray-600">1일 8시간 초과 근무 시, 초과시간 × 시급 × 1.5배 (근로기준법 제56조)</td></tr>
-              <tr><td className="py-2 pr-4 font-medium text-gray-700">야간수당</td><td className="py-2 text-gray-600">22:00~06:00 근무 시, 해당 시간 × 시급 × 0.5배 가산 (근로기준법 제56조)</td></tr>
+              <tr><td className="py-2 pr-4 font-medium text-gray-700">야간수당</td><td className="py-2 text-gray-600">22:00~06:00 근무 시, 야간시간은 기본에서 분리 → 야간시간 × 시급 × 1.5배 (근로기준법 제56조)</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">휴일수당</td><td className="py-2 text-gray-600">토/일/법정공휴일 근무 시, 전체 근무시간 × 시급 × 1.5배 (근로기준법 제56조)</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">급여 구성</td><td className="py-2 text-gray-600">기본급 + 식대 + 상여 + 직책수당 + 기타수당 (월정액) + 연장/야간/휴일수당</td></tr>
               <tr><td className="py-2 pr-4 font-medium text-gray-700">결근 공제</td><td className="py-2 text-gray-600">월정액 ÷ 해당월 평일수 × 결근일수 차감</td></tr>

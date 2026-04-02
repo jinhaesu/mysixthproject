@@ -161,14 +161,15 @@ router.post('/backfill-category', async (req: AuthRequest, res: Response) => {
     const notFound: string[] = [];
 
     for (const w of emptyWorkers) {
-      // Try survey_responses.worker_type first
+      // Try survey_responses.worker_type first (normalize phone: strip dashes)
+      const phoneNorm = (w.phone || '').replace(/-/g, '');
       const resp = await dbGet(`
         SELECT resp.worker_type
         FROM survey_responses resp
         JOIN survey_requests sr ON resp.request_id = sr.id
-        WHERE sr.phone = ? AND resp.worker_type IS NOT NULL AND resp.worker_type != ''
+        WHERE REPLACE(sr.phone, '-', '') = ? AND resp.worker_type IS NOT NULL AND resp.worker_type != ''
         ORDER BY resp.created_at DESC LIMIT 1
-      `, w.phone) as any;
+      `, phoneNorm) as any;
 
       let category = '';
       if (resp?.worker_type) {

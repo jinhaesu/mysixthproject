@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend, normalizePhone } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms } from '../services/smsService';
 
@@ -65,7 +65,8 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
 // POST /api/regular/employees - Create employee (v6 - bulletproof)
 router.post('/employees', async (req: AuthRequest, res: Response) => {
   try {
-    const { phone, name, department, team, role, workplace_id, hire_date } = req.body;
+    const { phone: rawPhone, name, department, team, role, workplace_id, hire_date } = req.body;
+    const phone = normalizePhone(rawPhone);
 
     if (!phone || !name) {
       res.status(400).json({ error: '전화번호와 이름은 필수입니다.' });
@@ -104,7 +105,8 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
 router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { phone, name, department, team, role, workplace_id, hire_date } = req.body;
+    const { phone: rawPhone, name, department, team, role, workplace_id, hire_date } = req.body;
+    const phone = normalizePhone(rawPhone);
 
     await dbRun(`
       UPDATE regular_employees SET phone = ?, name = ?, department = ?, team = ?, role = ?, workplace_id = ?, hire_date = ?

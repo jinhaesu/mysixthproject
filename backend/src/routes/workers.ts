@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTDate } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, normalizePhone } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -63,7 +63,8 @@ router.get('/by-phone/:phone', async (req: AuthRequest, res: Response) => {
 // POST /api/workers
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+    const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+    const phone = normalizePhone(rawPhone);
     if (!phone) {
       res.status(400).json({ error: '전화번호는 필수입니다.' });
       return;
@@ -91,7 +92,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+    const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+    const phone = normalizePhone(rawPhone);
 
     await dbRun(`
       UPDATE workers SET phone = ?, name_ko = ?, name_en = ?, bank_name = ?, bank_account = ?,

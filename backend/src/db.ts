@@ -698,6 +698,12 @@ export async function initializeDB(): Promise<void> {
 
 export { pool };
 
+// ===== Phone Number Normalization =====
+// 010-1234-5678 → 01012345678 (대시, 공백 제거)
+export function normalizePhone(phone: string): string {
+  return (phone || '').replace(/[-\s]/g, '').trim();
+}
+
 // ===== KST (Korean Standard Time) Helpers =====
 export function getKSTDate(): string {
   const now = new Date();

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, normalizePhone } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 
@@ -264,7 +264,8 @@ router.get('/:token', async (req: Request, res: Response) => {
 router.post('/:token/send-otp', async (req: Request, res: Response) => {
   try {
     const token = req.params.token as string;
-    const { phone } = req.body;
+    const { phone: rawPhone } = req.body;
+    const phone = normalizePhone(rawPhone);
 
     if (!phone) {
       res.status(400).json({ error: '전화번호를 입력해주세요.' });

@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
-import { dbGet, dbAll, dbRun, getKSTDate, isHolidayOrWeekend, isKoreanHoliday } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, isHolidayOrWeekend, isKoreanHoliday, normalizePhone } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendSurveyMessage, sendGeneralSms } from '../services/smsService';
 
@@ -319,7 +319,8 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
 
 // POST /api/survey/send - Send survey to a single phone
 router.post('/send', async (req: AuthRequest, res: Response) => {
-  const { phone, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range } = req.body;
+  const { phone: rawPhone, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range } = req.body;
+  const phone = normalizePhone(rawPhone);
 
   if (!phone || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호, 날짜, 근무지는 필수입니다.' });
@@ -424,7 +425,7 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
       const schedTime = new Date(`${dateStr}T${daily_time}`).toISOString();
 
       for (const phone of phones) {
-        const trimmedPhone = phone.trim();
+        const trimmedPhone = normalizePhone(phone);
         if (!trimmedPhone) continue;
 
         const t = uuidv4();
@@ -448,7 +449,7 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
   const results = [];
 
   for (const phone of phones) {
-    const trimmedPhone = phone.trim();
+    const trimmedPhone = normalizePhone(phone);
     if (!trimmedPhone) continue;
 
     const token = uuidv4();

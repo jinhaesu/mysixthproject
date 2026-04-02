@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTTimestamp, getKSTDate } from '../db';
+import { dbGet, dbAll, dbRun, getKSTTimestamp, getKSTDate, normalizePhone } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 
@@ -249,7 +249,8 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
 
   // Auto-upsert worker profile
   try {
-    const existingWorker = await dbGet('SELECT id FROM workers WHERE phone = ?', request.phone);
+    const workerPhone = normalizePhone(request.phone);
+    const existingWorker = await dbGet('SELECT id FROM workers WHERE phone = ?', workerPhone);
     // Normalize worker_type to category
     const category = worker_type === 'dispatch' ? '파견' : worker_type === 'alba' ? '알바' : worker_type || '';
 
@@ -257,7 +258,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       await dbRun(`
         INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, gender, birth_year, agency, category)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, request.phone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', category);
+      `, workerPhone, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', category);
     } else {
       await dbRun(`
         UPDATE workers SET
@@ -273,7 +274,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
           category = COALESCE(NULLIF(?, ''), category),
           updated_at = CURRENT_TIMESTAMP
         WHERE phone = ?
-      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', category, request.phone);
+      `, worker_name_ko, worker_name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', gender || '', birth_year || null, agency || '', category, workerPhone);
     }
   } catch (err) {
     console.error('[Worker] Auto-upsert failed:', err);

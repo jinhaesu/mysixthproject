@@ -8,21 +8,10 @@ interface HourlyChartProps {
   departments?: string[];
   selectedDept?: string;
   onDeptChange?: (dept: string) => void;
-  /** Optional: extra controls rendered next to the dept filter */
   extraControls?: React.ReactNode;
-  /** Show only working hours 5~23 instead of 0~24 */
   compact?: boolean;
 }
 
-const DEPT_COLORS: Record<string, { bg: string; text: string }> = {
-  "물류1층": { bg: "#dbeafe", text: "#1d4ed8" },
-  "물류":   { bg: "#dbeafe", text: "#1d4ed8" },
-  "생산2층": { bg: "#d1fae5", text: "#047857" },
-  "생산3층": { bg: "#fef3c7", text: "#b45309" },
-  "생산 야간": { bg: "#ede9fe", text: "#6d28d9" },
-  "물류 야간": { bg: "#e0e7ff", text: "#4338ca" },
-  "기타":   { bg: "#f1f5f9", text: "#475569" },
-};
 const BAR_COLORS: Record<string, string> = {
   "물류1층": "#3b82f6", "물류": "#3b82f6",
   "생산2층": "#10b981", "생산3층": "#f59e0b",
@@ -30,12 +19,15 @@ const BAR_COLORS: Record<string, string> = {
   "기타": "#94a3b8",
 };
 
+const CHART_H = 200; // 바 영역 높이(px)
+
 export default function HourlyChart({ data, title, departments, selectedDept, onDeptChange, extraControls, compact }: HourlyChartProps) {
   const startH = compact ? 5 : 0;
   const endH = compact ? 23 : 24;
   const hours = Array.from({ length: endH - startH }, (_, i) => i + startH);
 
-  const { hourMap, allDepts, maxCount, totalPeople } = useMemo(() => {
+  const { hourTotals, allDepts, maxCount, totalPeople } = useMemo(() => {
+    // Aggregate
     const hm = new Map<number, Map<string, number>>();
     for (let h = 0; h < 24; h++) hm.set(h, new Map());
     for (const d of data) {
@@ -43,18 +35,30 @@ export default function HourlyChart({ data, title, departments, selectedDept, on
       const m = hm.get(d.hour)!;
       m.set(dept, (m.get(dept) || 0) + d.count);
     }
-    const ad = departments || Array.from(new Set(data.map(d => d.department || '기타'))).sort();
-    let mc = 0;
-    let tp = 0;
-    for (const [, m] of hm) {
-      let sum = 0;
-      if (selectedDept) { sum = m.get(selectedDept) || 0; }
-      else { m.forEach(v => sum += v); }
-      if (sum > mc) mc = sum;
-      tp += sum;
+
+    const ht: { hour: number; total: number; segments: { dept: string; count: number }[] }[] = [];
+    let mc = 0, tp = 0;
+    for (let h = 0; h < 24; h++) {
+      const m = hm.get(h)!;
+      let total = 0;
+      const segs: { dept: string; count: number }[] = [];
+      if (selectedDept) {
+        const c = m.get(selectedDept) || 0;
+        if (c > 0) segs.push({ dept: selectedDept, count: c });
+        total = c;
+      } else {
+        m.forEach((count, dept) => { if (count > 0) segs.push({ dept, count }); total += count; });
+      }
+      ht.push({ hour: h, total, segments: segs });
+      if (total > mc) mc = total;
+      tp += total;
     }
-    return { hourMap: hm, allDepts: ad, maxCount: Math.max(1, mc), totalPeople: tp };
+
+    const ad = departments || Array.from(new Set(data.map(d => d.department || '기타'))).sort();
+    return { hourTotals: ht, allDepts: ad, maxCount: Math.max(1, mc), totalPeople: tp };
   }, [data, departments, selectedDept]);
+
+  const yTicks = [maxCount, Math.round(maxCount * 0.75), Math.round(maxCount * 0.5), Math.round(maxCount * 0.25), 0];
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -62,13 +66,13 @@ export default function HourlyChart({ data, title, departments, selectedDept, on
       <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-          <span className="text-xs text-gray-500">총 {totalPeople}명</span>
+          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">{totalPeople}명</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {extraControls}
           {onDeptChange && (
             <select value={selectedDept || ''} onChange={e => onDeptChange(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white min-w-[80px]">
+              className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
               <option value="">전체 부서</option>
               {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
@@ -76,111 +80,106 @@ export default function HourlyChart({ data, title, departments, selectedDept, on
         </div>
       </div>
 
-      <div className="px-4 py-3">
+      <div className="p-4">
         {/* Legend */}
         {!selectedDept && allDepts.length > 1 && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3">
-            {allDepts.map(d => {
-              const c = DEPT_COLORS[d] || DEPT_COLORS['기타'];
-              return (
-                <button key={d} onClick={() => onDeptChange?.(d)}
-                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium hover:opacity-80 transition-opacity"
-                  style={{ backgroundColor: c.bg, color: c.text }}>
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: BAR_COLORS[d] || '#94a3b8' }} />
-                  {d}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {allDepts.map(d => (
+              <button key={d} onClick={() => onDeptChange?.(d)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border border-gray-200 hover:border-gray-400 transition-colors bg-white">
+                <span className="w-3 h-3 rounded" style={{ backgroundColor: BAR_COLORS[d] || '#94a3b8' }} />
+                {d}
+              </button>
+            ))}
+          </div>
+        )}
+        {selectedDept && (
+          <div className="flex items-center gap-2 mb-4">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700">
+              <span className="w-3 h-3 rounded" style={{ backgroundColor: BAR_COLORS[selectedDept] || '#94a3b8' }} />
+              {selectedDept}
+            </span>
+            <button onClick={() => onDeptChange?.('')} className="text-xs text-gray-500 hover:text-gray-700">전체 보기</button>
           </div>
         )}
 
-        {/* Chart area */}
-        <div className="relative">
-          {/* Y-axis guides */}
-          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none" style={{ height: '160px' }}>
-            {[maxCount, Math.round(maxCount * 0.5), 0].map((v, i) => (
-              <div key={i} className="flex items-center">
-                <span className="text-[10px] text-gray-400 w-6 text-right mr-2">{v}</span>
-                <div className="flex-1 border-t border-gray-100" />
-              </div>
+        {/* Chart */}
+        <div className="flex">
+          {/* Y-axis */}
+          <div className="flex flex-col justify-between pr-2 py-0" style={{ height: `${CHART_H}px` }}>
+            {yTicks.map((v, i) => (
+              <span key={i} className="text-[10px] text-gray-400 leading-none text-right w-5">{v}</span>
             ))}
           </div>
 
-          {/* Bars */}
-          <div className="flex items-end gap-[3px] ml-8" style={{ height: '160px' }}>
-            {hours.map(h => {
-              const hMap = hourMap.get(h)!;
-              let total = 0;
-              const segments: { dept: string; count: number }[] = [];
-              if (selectedDept) {
-                const c = hMap.get(selectedDept) || 0;
-                if (c > 0) segments.push({ dept: selectedDept, count: c });
-                total = c;
-              } else {
-                hMap.forEach((count, dept) => {
-                  if (count > 0) segments.push({ dept, count });
-                  total += count;
-                });
-              }
-              const heightPct = total > 0 ? (total / maxCount) * 100 : 0;
-              const isActive = total > 0;
+          {/* Chart body */}
+          <div className="flex-1 relative" style={{ height: `${CHART_H}px` }}>
+            {/* Grid lines */}
+            {yTicks.map((_, i) => (
+              <div key={i} className="absolute w-full border-t border-gray-100"
+                style={{ top: `${(i / (yTicks.length - 1)) * 100}%` }} />
+            ))}
 
-              return (
-                <div key={h} className="flex-1 flex flex-col items-center group relative min-w-0">
-                  {/* Tooltip */}
-                  {isActive && (
-                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg whitespace-nowrap pointer-events-none"
-                      style={{ left: '50%', transform: 'translateX(-50%)' }}>
-                      <div className="font-semibold mb-1">{h}:00 ~ {h + 1}:00</div>
-                      {segments.map(s => (
-                        <div key={s.dept} className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: BAR_COLORS[s.dept] || '#94a3b8' }} />
-                          <span>{s.dept}</span>
-                          <span className="font-semibold ml-auto pl-3">{s.count}명</span>
-                        </div>
-                      ))}
-                      {segments.length > 1 && <div className="border-t border-gray-700 mt-1 pt-1 text-right font-semibold">합계 {total}명</div>}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900" />
-                    </div>
-                  )}
+            {/* Bars */}
+            <div className="absolute inset-0 flex items-end gap-[2px] px-1">
+              {hours.map(h => {
+                const ht = hourTotals[h];
+                const barH = ht.total > 0 ? Math.max((ht.total / maxCount) * CHART_H, 4) : 0;
 
-                  {/* Count label on top */}
-                  {isActive && (
-                    <div className="text-[10px] font-semibold text-gray-600 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {total}
-                    </div>
-                  )}
+                return (
+                  <div key={h} className="flex-1 relative group" style={{ height: '100%' }}>
+                    {/* Tooltip */}
+                    {ht.total > 0 && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                        <div className="font-bold mb-1">{h}:00 ~ {h + 1}:00</div>
+                        {ht.segments.map(s => (
+                          <div key={s.dept} className="flex items-center gap-2 py-0.5">
+                            <span className="w-2.5 h-2.5 rounded" style={{ backgroundColor: BAR_COLORS[s.dept] || '#94a3b8' }} />
+                            <span className="flex-1">{s.dept}</span>
+                            <span className="font-bold ml-4">{s.count}명</span>
+                          </div>
+                        ))}
+                        {ht.segments.length > 1 && <div className="border-t border-gray-600 mt-1 pt-1 text-right font-bold">합계 {ht.total}명</div>}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                      </div>
+                    )}
 
-                  {/* Bar */}
-                  <div className="w-full flex flex-col justify-end" style={{ height: '100%' }}>
-                    <div className={`w-full rounded-t overflow-hidden flex flex-col-reverse transition-all duration-200 ${isActive ? 'group-hover:ring-2 group-hover:ring-blue-400/50' : ''}`}
-                      style={{ height: `${heightPct}%`, minHeight: isActive ? '3px' : '0' }}>
-                      {segments.map((s, i) => {
-                        const segPct = total > 0 ? (s.count / total) * 100 : 0;
+                    {/* Count on top */}
+                    {ht.total > 0 && (
+                      <div className="absolute w-full text-center text-[10px] font-bold text-gray-700"
+                        style={{ bottom: `${barH + 2}px` }}>
+                        {ht.total}
+                      </div>
+                    )}
+
+                    {/* Bar stack */}
+                    <div className="absolute bottom-0 left-[10%] right-[10%] rounded-t-sm overflow-hidden group-hover:ring-2 group-hover:ring-blue-400 transition-shadow"
+                      style={{ height: `${barH}px` }}>
+                      {ht.segments.map((s, i) => {
+                        const segH = ht.total > 0 ? (s.count / ht.total) * barH : 0;
                         return (
-                          <div key={i} className="transition-all duration-200"
-                            style={{ height: `${segPct}%`, backgroundColor: BAR_COLORS[s.dept] || '#94a3b8', minHeight: '2px' }} />
+                          <div key={i} style={{ height: `${segH}px`, backgroundColor: BAR_COLORS[s.dept] || '#94a3b8' }} />
                         );
                       })}
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-
-          {/* X-axis labels */}
-          <div className="flex ml-8 mt-1.5">
-            {hours.map(h => (
-              <div key={h} className="flex-1 text-center">
-                <span className={`text-[10px] ${h % 2 === 0 ? 'text-gray-600 font-medium' : 'text-gray-300'}`}>
-                  {h % 2 === 0 ? `${h}` : ''}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="ml-8 text-center text-[10px] text-gray-400 mt-0.5">(시)</div>
         </div>
+
+        {/* X-axis */}
+        <div className="flex ml-7 pl-1 mt-1">
+          {hours.map(h => (
+            <div key={h} className="flex-1 text-center">
+              <span className={`text-[10px] ${h % 2 === 0 ? 'text-gray-600 font-medium' : 'text-transparent'}`}>
+                {h}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="ml-7 text-center text-[10px] text-gray-400">(시)</div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import HourlyChart from "@/components/HourlyChart";
 import {
   getRegularDashboard,
   getRegularReportSchedules,
@@ -107,6 +108,7 @@ export default function RegularLivePage() {
   const [reportTime, setReportTime] = useState("09:00");
   const [repeatDays, setRepeatDays] = useState("daily");
   const [reportPhones, setReportPhones] = useState("");
+  const [chartDept, setChartDept] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -215,6 +217,27 @@ export default function RegularLivePage() {
         </div>
       ) : data ? (
         <>
+          {/* Hourly Chart */}
+          {(() => {
+            const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간"];
+            const chartData = data.departments.flatMap((dept) =>
+              dept.teams.flatMap((team) =>
+                team.employees
+                  .filter((e) => e.clock_in_time)
+                  .map((e) => ({
+                    hour: new Date(e.clock_in_time!).getHours(),
+                    count: 1,
+                    department: e.department || '기타',
+                  }))
+              )
+            );
+            return (
+              <div className="mb-6">
+                <HourlyChart data={chartData} title={`${date} 실시간 시간대별 출근 인원`}
+                  departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
+              </div>
+            );
+          })()}
           {/* Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-xl border border-gray-200 p-5 text-center">

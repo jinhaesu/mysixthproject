@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import HourlyChart from "@/components/HourlyChart";
 import { usePersistedState } from "@/lib/usePersistedState";
 import {
   getSurveyWorkplaces,
@@ -1118,6 +1119,7 @@ function AttendanceTab() {
   const [date, setDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [searchName, setSearchName] = useState("");
   const [shiftPlans, setShiftPlans] = useState<Record<number, any>>({});
+  const [chartDept, setChartDept] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1156,8 +1158,17 @@ function AttendanceTab() {
     return { label: "미출근", cls: "bg-red-50 text-red-700 border border-red-200" };
   };
 
+  const chartData = useMemo(() => {
+    return records.filter((r: any) => r.clock_in_time).map((r: any) => {
+      const h = new Date(r.clock_in_time).getHours();
+      return { hour: h, count: 1, department: r.department || '기타' };
+    });
+  }, [records]);
+
   return (
     <div className="space-y-4">
+      <HourlyChart data={chartData} title={`${date} 실제 시간대별 출근 인원`}
+        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex flex-wrap gap-3 items-end">
@@ -1818,6 +1829,7 @@ function ShiftsTab() {
   const [allEmpsLoaded, setAllEmpsLoaded] = useState(false);
   // Vacation data for shifts
   const [shiftVacations, setShiftVacations] = useState<any[]>([]);
+  const [chartDept, setChartDept] = useState("");
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -2005,8 +2017,23 @@ function ShiftsTab() {
     } catch (e: any) { alert(e.message); }
   };
 
+  const chartData = useMemo(() => {
+    const result: { hour: number; count: number; department: string }[] = [];
+    const monthShifts = shifts.filter((s: any) => s.month === shiftCalMonth);
+    for (const s of monthShifts) {
+      const assgn = shiftCalAssignments.get(s.id) || [];
+      const hour = parseInt(s.planned_clock_in?.split(':')[0] || '0');
+      for (const a of assgn) {
+        result.push({ hour, count: 1, department: a.department || '기타' });
+      }
+    }
+    return result;
+  }, [shifts, shiftCalMonth, shiftCalAssignments]);
+
   return (
     <div className="space-y-4">
+      <HourlyChart data={chartData} title={`${shiftCalMonth}월 계획 시간대별 출근 인원`}
+        departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">월/주차별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
         <div className="flex gap-2">

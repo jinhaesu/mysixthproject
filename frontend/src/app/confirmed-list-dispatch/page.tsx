@@ -115,8 +115,34 @@ export default function ConfirmedListDispatchPage() {
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
           (!deptFilter || (e.department || '').includes(deptFilter))
         );
+        const totals = filtered.reduce((acc: any, e: any) => {
+          acc.regular += e.regular_hours || 0;
+          acc.overtime += e.overtime_hours || 0;
+          acc.night += e.night_hours || 0;
+          return acc;
+        }, { regular: 0, overtime: 0, night: 0 });
         return (
         <>
+          {/* Stats Board */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+              <p className="text-2xl font-bold text-gray-900">{filtered.length}</p>
+              <p className="text-xs text-gray-500 mt-1">총 근무자</p>
+            </div>
+            <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
+              <p className="text-2xl font-bold text-blue-700">{totals.regular.toFixed(1)}</p>
+              <p className="text-xs text-gray-500 mt-1">기본시간(h)</p>
+            </div>
+            <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
+              <p className="text-2xl font-bold text-amber-700">{totals.overtime.toFixed(1)}</p>
+              <p className="text-xs text-gray-500 mt-1">연장시간(h)</p>
+            </div>
+            <div className="bg-white rounded-xl border border-purple-200 p-4 text-center">
+              <p className="text-2xl font-bold text-purple-700">{totals.night.toFixed(1)}</p>
+              <p className="text-xs text-gray-500 mt-1">야간시간(h)</p>
+            </div>
+          </div>
+
           {/* Summary Table */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
             <table className="w-full text-sm">

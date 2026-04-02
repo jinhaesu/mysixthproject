@@ -149,8 +149,9 @@ export default function AttendanceSummaryDispatchPage() {
     const [h2,m2] = clockOut.split(':').map(Number);
     if (isNaN(h1) || isNaN(h2)) return false;
     const startMin = Math.ceil((h1 * 60 + (m1 || 0)) / 30) * 30;
-    const endMin = Math.floor((h2 * 60 + (m2 || 0)) / 30) * 30;
-    const totalH = Math.max((endMin - startMin) / 60 - 1, 0); // 점심 1h 제외
+    let endMin = Math.floor((h2 * 60 + (m2 || 0)) / 30) * 30;
+    if (endMin <= startMin) endMin += 1440;
+    const totalH = Math.max((endMin - startMin) / 60 - 1, 0);
     const overtime = Math.max(totalH - 8, 0);
     return overtime >= 2;
   };
@@ -165,7 +166,8 @@ export default function AttendanceSummaryDispatchPage() {
     const [h2,m2] = clockOut.split(':').map(Number);
     if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0 };
     const startMin = ceil30Min(h1 * 60 + (m1 || 0));
-    const endMin = floor30Min(h2 * 60 + (m2 || 0));
+    let endMin = floor30Min(h2 * 60 + (m2 || 0));
+    if (endMin <= startMin) endMin += 1440; // 야간조 자정 넘김
     const total = Math.max((endMin - startMin) / 60 - breakH, 0);
     return { regular: Math.min(total, 8), overtime: Math.max(total - 8, 0) };
   };

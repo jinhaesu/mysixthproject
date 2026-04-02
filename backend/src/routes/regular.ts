@@ -1212,8 +1212,9 @@ router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
 
       // 출근: 30분 올림, 퇴근: 30분 내림
       const startMin = Math.ceil((h1 * 60 + (m1 || 0)) / 30) * 30;
-      const endMin = Math.floor((h2 * 60 + (m2 || 0)) / 30) * 30;
-      const totalMin = endMin > startMin ? endMin - startMin : 0;
+      let endMin = Math.floor((h2 * 60 + (m2 || 0)) / 30) * 30;
+      if (endMin <= startMin) endMin += 1440; // 야간조 자정 넘김
+      const totalMin = endMin - startMin;
       const totalH = totalMin / 60;
 
       const parsedBreak = parseFloat(r.break_hours);

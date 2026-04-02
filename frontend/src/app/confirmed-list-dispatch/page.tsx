@@ -28,8 +28,9 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
   const [h2, m2] = clockOut.split(':').map(Number);
   if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0, night: 0, breakH: 0 };
   const startMin = ceil30Min(h1 * 60 + (m1 || 0));
-  const endMin = floor30Min(h2 * 60 + (m2 || 0));
-  const totalMin = endMin > startMin ? endMin - startMin : 0;
+  let endMin = floor30Min(h2 * 60 + (m2 || 0));
+  if (endMin <= startMin) endMin += 1440; // 야간조 자정 넘김
+  const totalMin = endMin - startMin;
   const totalH = totalMin / 60;
   let breakH = 0;
   if (totalH >= 8) breakH = 1;

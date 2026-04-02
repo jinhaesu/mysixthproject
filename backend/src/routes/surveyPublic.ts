@@ -350,8 +350,9 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
       const inMin = clockIn.getHours() * 60 + clockIn.getMinutes();
       const outMin = clockOut.getHours() * 60 + clockOut.getMinutes();
       const roundedInMin = Math.ceil(inMin / 30) * 30;
-      const roundedOutMin = Math.floor(outMin / 30) * 30;
-      const totalHours = Math.round(Math.max((roundedOutMin - roundedInMin) / 60, 0) * 100) / 100;
+      let roundedOutMin = Math.floor(outMin / 30) * 30;
+      if (roundedOutMin <= roundedInMin) roundedOutMin += 1440; // 야간조 자정 넘김
+      const totalHours = Math.round((roundedOutMin - roundedInMin) / 60 * 100) / 100;
       const breakTime = totalHours >= 8 ? 1 : totalHours >= 4 ? 0.5 : 0;
       const regularHours = Math.min(Math.max(totalHours - breakTime, 0), 8);
       const overtimeHours = Math.max(totalHours - breakTime - 8, 0);

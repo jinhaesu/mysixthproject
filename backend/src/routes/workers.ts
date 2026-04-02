@@ -151,4 +151,36 @@ router.post('/import', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/workers/backfill-category - Fill empty category from survey_responses
+router.post('/backfill-category', async (_req: AuthRequest, res: Response) => {
+  try {
+    // Find workers with empty category
+    const emptyWorkers = await dbAll("SELECT id, phone FROM workers WHERE category IS NULL OR category = ''") as any[];
+    let updated = 0;
+
+    for (const w of emptyWorkers) {
+      // Find the most recent worker_type from survey_responses
+      const resp = await dbGet(`
+        SELECT resp.worker_type
+        FROM survey_responses resp
+        JOIN survey_requests sr ON resp.request_id = sr.id
+        WHERE sr.phone = ? AND resp.worker_type IS NOT NULL AND resp.worker_type != ''
+        ORDER BY resp.created_at DESC LIMIT 1
+      `, w.phone) as any;
+
+      if (resp?.worker_type) {
+        const category = resp.worker_type === 'dispatch' ? '파견' : resp.worker_type === 'alba' ? '알바' : resp.worker_type.includes('파견') ? '파견' : resp.worker_type.includes('알바') ? '알바' : resp.worker_type;
+        if (category) {
+          await dbRun('UPDATE workers SET category = ? WHERE id = ?', category, w.id);
+          updated++;
+        }
+      }
+    }
+
+    res.json({ success: true, total_empty: emptyWorkers.length, updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

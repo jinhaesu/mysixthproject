@@ -94,6 +94,26 @@ export default function ManagePage() {
         </button>
       </div>
 
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-blue-900">근무자 DB 구분(파견/알바) 일괄 채우기</h3>
+          <p className="text-xs text-blue-700 mt-1">구분이 비어있는 근무자에 대해 출퇴근 기록에서 파견/알바 유형을 찾아 자동 채웁니다.</p>
+        </div>
+        <button onClick={async () => {
+          try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/workers/backfill-category`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            });
+            const body = await res.json();
+            alert(`빈 구분 ${body.total_empty}명 중 ${body.updated}명 채움 완료`);
+          } catch (e: any) { alert(e.message); }
+        }}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">
+          구분 채우기
+        </button>
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />

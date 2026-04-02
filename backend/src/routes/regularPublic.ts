@@ -395,6 +395,19 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
     const today = getKSTDate();
     const clockInTime = getKSTTimestamp();
 
+    // Check contract requirement (server-side enforcement)
+    const hireDate = employee.hire_date || '';
+    if (hireDate && hireDate >= '2026-03-27') {
+      const signedContract = await dbGet(
+        "SELECT id FROM regular_labor_contracts WHERE employee_id = ? AND status = 'signed' AND contract_end >= ?",
+        employee.id, today
+      );
+      if (!signedContract) {
+        res.status(403).json({ error: '근로계약서가 체결되지 않아 출근할 수 없습니다.' });
+        return;
+      }
+    }
+
     // Check if already clocked in today (UNIQUE constraint on employee_id + date)
     const existing = await dbGet('SELECT id FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
     if (existing) {

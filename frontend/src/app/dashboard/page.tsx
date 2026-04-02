@@ -694,7 +694,7 @@ function DashboardContent() {
                       <thead>
                         <tr className="bg-blue-900 text-white">
                           {["부서","근무층","고용형태","시간대"].map(h => <th key={h} className="text-left px-3 py-3 font-medium">{h}</th>)}
-                          {["출근횟수","총근로시간","정규시간","연장시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
+                          {["출근횟수","총근로시간","기본시간","연장시간","야간시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
                         </tr>
                       </thead>
                       <tbody>
@@ -711,6 +711,7 @@ function DashboardContent() {
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours + floor30g(r.overtime_hours) + (r.night_hours || 0))}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30g(r.overtime_hours))}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.night_hours || 0)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt((r.regular_hours + floor30g(r.overtime_hours) + (r.night_hours || 0)) / r.unique_workers) : "-"}</td>
                                 <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(floor30g(r.overtime_hours) / r.unique_workers) : "-"}</td>
@@ -724,6 +725,7 @@ function DashboardContent() {
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours + floor30g(g.subtotal.overtime_hours) + g.subtotal.night_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30g(g.subtotal.overtime_hours))}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.night_hours)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt((g.subtotal.regular_hours + floor30g(g.subtotal.overtime_hours) + g.subtotal.night_hours) / g.subtotal.unique_workers) : "-"}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(floor30g(g.subtotal.overtime_hours) / g.subtotal.unique_workers) : "-"}</td>
@@ -767,6 +769,10 @@ function DashboardContent() {
                               <td className="text-right px-3 py-2 tabular-nums">
                                 {fmt(floor30g(gt.overtime_hours))}
                                 {momBadge(floor30g(gt.overtime_hours), floor30g(pt.overtime_hours))}
+                              </td>
+                              <td className="text-right px-3 py-2 tabular-nums">
+                                {fmt(gt.night_hours)}
+                                {momBadge(gt.night_hours, pt.night_hours)}
                               </td>
                               <td className="text-right px-3 py-2 tabular-nums">{gt.annual_leave_days}</td>
                               <td className="text-right px-3 py-2 tabular-nums">

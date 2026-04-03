@@ -1834,6 +1834,8 @@ function ShiftsTab() {
   // Vacation data for shifts
   const [shiftVacations, setShiftVacations] = useState<any[]>([]);
   const [chartDept, setChartDept] = useState("");
+  const [listMonthFilter, setListMonthFilter] = useState(new Date().getMonth() + 1);
+  const [listWeekFilter, setListWeekFilter] = useState(0);
 
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   const MONTHS = Array.from({length: 12}, (_, i) => i + 1);
@@ -2445,6 +2447,24 @@ function ShiftsTab() {
 
       {shiftSubTab === 'list' && (<>
 
+      {/* List Filters */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">월</label>
+          <select value={listMonthFilter} onChange={e => setListMonthFilter(parseInt(e.target.value))} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value={0}>전체</option>
+            {MONTHS.map(m => <option key={m} value={m}>{m}월</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">주차</label>
+          <select value={listWeekFilter} onChange={e => setListWeekFilter(parseInt(e.target.value))} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value={0}>전체</option>
+            {[1,2,3,4,5].map(w => <option key={w} value={w}>{w}주차</option>)}
+          </select>
+        </div>
+      </div>
+
       {/* Create Form */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h3 className="text-sm font-semibold text-gray-800 mb-3">배치 추가</h3>
@@ -2506,7 +2526,10 @@ function ShiftsTab() {
               <th className="py-2 px-4 font-medium text-gray-600">관리</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {shifts.map((s: any) => {
+              {[...shifts]
+                .filter((s: any) => (listMonthFilter === 0 || s.month === listMonthFilter) && (listWeekFilter === 0 || s.week_number === listWeekFilter))
+                .sort((a: any, b: any) => b.month === a.month ? b.week_number - a.week_number : b.month - a.month)
+                .map((s: any) => {
                 const days = parseDays(s.days_of_week || String(s.day_of_week));
                 return (
                   <tr key={s.id} className="hover:bg-gray-50">

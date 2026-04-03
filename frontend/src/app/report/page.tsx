@@ -110,7 +110,7 @@ function ReportContent() {
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold">출퇴근 현황 리포트</h1>
+              <h1 className="text-xl font-bold">알바(사업소득)/파견 출퇴근 현황 리포트</h1>
               <p className="text-blue-200 text-xs mt-1">{lastUpdated} 업데이트 · 30초 자동 갱신</p>
             </div>
             <input

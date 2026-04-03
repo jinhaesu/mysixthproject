@@ -96,6 +96,60 @@ function createMcpServer() {
     return { content: [{ type: 'text' as const, text: `${m}월 배치 (${shifts.length}건):\n${lines.join('\n')}` }] };
   });
 
+  server.tool('analyze_schedule', 'Analyze shift schedule for a date range (배치 분석 리포트). Shows daily assigned/vacation/unassigned counts.',
+    { start_date: z.string().describe('시작일 YYYY-MM-DD'), end_date: z.string().describe('종료일 YYYY-MM-DD') },
+    async ({ start_date, end_date }) => {
+      const shifts = await q('SELECT * FROM regular_shifts WHERE is_active = 1') as any[];
+      const allEmps = (await q('SELECT id, name, department, team FROM regular_employees WHERE is_active = 1') as any[]);
+      const vacs = await q("SELECT * FROM regular_vacation_requests vr JOIN regular_employees re ON vr.employee_id = re.id WHERE vr.status = 'approved'") as any[];
+      const dn = ['일', '월', '화', '수', '목', '금', '토'];
+      const report: string[] = [`📊 배치 분석 (${start_date}~${end_date}) 총 ${allEmps.length}명\n`];
+      const sd = new Date(start_date + 'T00:00:00+09:00'), ed = new Date(end_date + 'T00:00:00+09:00');
+      for (let dt = new Date(sd); dt <= ed; dt.setDate(dt.getDate() + 1)) {
+        const ds = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        const dow = dt.getDay();
+        if (dow === 0 || dow === 6) { report.push(`${ds}(${dn[dow]}) 주말`); continue; }
+        const m = dt.getMonth() + 1, fd = new Date(dt.getFullYear(), dt.getMonth(), 1).getDay(), so = (fd + 6) % 7, wn = Math.ceil((dt.getDate() + so) / 7);
+        const aids = new Set<number>();
+        for (const s of shifts) {
+          if (s.month !== m || s.week_number !== wn) continue;
+          const da = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
+          if (!da.includes(dow)) continue;
+          const assigned = await q('SELECT employee_id FROM regular_shift_assignments WHERE shift_id = ?', s.id) as any[];
+          assigned.forEach((x: any) => aids.add(x.employee_id));
+        }
+        const vids = new Set<number>();
+        vacs.forEach((v: any) => { if (ds >= v.start_date && ds <= v.end_date) vids.add(v.employee_id); });
+        const un = allEmps.filter(e => !aids.has(e.id) && !vids.has(e.id)).length;
+        report.push(`${ds}(${dn[dow]}) 배치${aids.size}명 휴가${vids.size}명${un > 0 ? ` ⚠️미배치${un}명` : ' ✅'}`);
+      }
+      return { content: [{ type: 'text' as const, text: report.join('\n') }] };
+    }
+  );
+
+  server.tool('get_unassigned_employees', 'Get unassigned employees for a specific date (미배치 인력 확인)',
+    { date: z.string().describe('날짜 YYYY-MM-DD') },
+    async ({ date }) => {
+      const d = new Date(date + 'T00:00:00+09:00');
+      const dow = d.getDay(), m = d.getMonth() + 1;
+      const fd = new Date(d.getFullYear(), d.getMonth(), 1).getDay(), so = (fd + 6) % 7, wn = Math.ceil((d.getDate() + so) / 7);
+      const shifts = await q('SELECT * FROM regular_shifts WHERE is_active = 1 AND month = ?', m) as any[];
+      const allEmps = await q('SELECT id, name, department, team FROM regular_employees WHERE is_active = 1') as any[];
+      const aids = new Set<number>();
+      for (const s of shifts) {
+        if (s.week_number !== wn) continue;
+        const da = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
+        if (!da.includes(dow)) continue;
+        (await q('SELECT employee_id FROM regular_shift_assignments WHERE shift_id = ?', s.id) as any[]).forEach((x: any) => aids.add(x.employee_id));
+      }
+      const vids = new Set<number>();
+      (await q("SELECT employee_id, start_date, end_date FROM regular_vacation_requests WHERE status = 'approved'") as any[]).forEach((v: any) => { if (date >= v.start_date && date <= v.end_date) vids.add(v.employee_id); });
+      const unassigned = allEmps.filter(e => !aids.has(e.id) && !vids.has(e.id));
+      const dn = ['일', '월', '화', '수', '목', '금', '토'];
+      return { content: [{ type: 'text' as const, text: `${date}(${dn[dow]}) 총${allEmps.length}명 배치${aids.size}명 휴가${vids.size}명 미배치${unassigned.length}명${unassigned.length > 0 ? '\n\n미배치:\n' + unassigned.map(e => `  ${e.name}(${e.department} ${e.team})`).join('\n') : '\n전원 배치 완료!'}` }] };
+    }
+  );
+
   server.tool('approve_vacation', '휴가 승인', { request_id: z.number(), memo: z.string().optional() }, async ({ request_id, memo }) => {
     await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'approved', memo || '', request_id);
     return { content: [{ type: 'text' as const, text: `휴가 #${request_id} 승인 완료` }] };
@@ -106,7 +160,8 @@ function createMcpServer() {
     return { content: [{ type: 'text' as const, text: `휴가 #${request_id} 반려` }] };
   });
 
-  server.tool('create_shift', '배치 생성', { name: z.string(), month: z.number(), week_number: z.number(), days_of_week: z.string(), planned_clock_in: z.string(), planned_clock_out: z.string() },
+  server.tool('create_shift', 'Create a new shift schedule (배치 생성). Specify name, month (1-12), week_number (1-5), days_of_week (comma-separated: 0=Sun,1=Mon,...6=Sat), planned clock-in/out times.',
+    { name: z.string().describe('배치명 (예: A조 오전 4월2주차)'), month: z.number().describe('월 1-12'), week_number: z.number().describe('주차 1-5'), days_of_week: z.string().describe('요일 쉼표구분 (0=일,1=월,2=화,3=수,4=목,5=금,6=토)'), planned_clock_in: z.string().describe('출근시간 (HH:MM)'), planned_clock_out: z.string().describe('퇴근시간 (HH:MM)') },
     async ({ name, month, week_number, days_of_week, planned_clock_in, planned_clock_out }) => {
       const r = await dbRun('INSERT INTO regular_shifts (name, month, week_number, day_of_week, days_of_week, planned_clock_in, planned_clock_out) VALUES (?,?,?,?,?,?,?)',
         name, month, week_number, parseInt(days_of_week.split(',')[0]), days_of_week, planned_clock_in, planned_clock_out);
@@ -114,7 +169,8 @@ function createMcpServer() {
     }
   );
 
-  server.tool('assign_employees', '배치에 직원 배정', { shift_id: z.number(), employee_names: z.string() }, async ({ shift_id, employee_names }) => {
+  server.tool('assign_employees', 'Assign employees to a shift by names (배치에 직원 배정). Provide shift_id and comma-separated employee names.',
+    { shift_id: z.number().describe('배치 ID'), employee_names: z.string().describe('직원 이름들 쉼표구분 (예: 김단니,박서현)') }, async ({ shift_id, employee_names }) => {
     const names = employee_names.split(',').map(n => n.trim());
     const emps = await q('SELECT id, name FROM regular_employees WHERE is_active = 1') as any[];
     let assigned = 0;

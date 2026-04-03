@@ -120,6 +120,43 @@ s.tool("assign_employees","직원 배정",{shift_id:z.number(),employee_names:z.
   return t(`#${shift_id}에 ${ids.length}명 배정${nf.length?' 못찾음:'+nf.join(','):''}`);
 });
 
+// ===== 비밀번호 필요 도구 =====
+async function verifyPw(pw) {
+  try { const r = await a("/api/regular/verify-password","POST",{password:pw}); return r.verified; } catch { return false; }
+}
+
+s.tool("get_settlement","파견/알바 정산 (비밀번호 필요)",{year_month:z.string(),type:z.string().optional().describe("dispatch/alba"),password:z.string().describe("접근 비밀번호")},async({year_month,type,password})=>{
+  if(!await verifyPw(password))return t("❌ 비밀번호 불일치");
+  const d=await a(`/api/regular/confirmed-list?year_month=${year_month}`);
+  const f=(d||[]).filter(e=>e.type!=='정규직').filter(e=>!type||(type==='alba'?e.type==='알바':e.type==='파견'));
+  if(!f.length)return t(`${year_month} 없음`);
+  return t(`${f.length}명:\n${f.map(e=>`${e.name}[${e.type}] ${e.days}일 기${e.regular_hours.toFixed(1)}h 연${e.overtime_hours.toFixed(1)}h 야${e.night_hours.toFixed(1)}h`).join('\n')}`);
+});
+
+s.tool("get_salary_settings","기본급 설정 조회 (비밀번호 필요)",{password:z.string().describe("접근 비밀번호")},async({password})=>{
+  if(!await verifyPw(password))return t("❌ 비밀번호 불일치");
+  const d=await a("/api/regular/salary-settings");
+  if(!d?.length)return t("없음");
+  return t(`${d.length}명:\n${d.map(x=>`${x.name}(${x.department||'-'}) 기본${x.base_pay||0} 식대${x.meal_allowance||0}`).join('\n')}`);
+});
+
+s.tool("get_payroll_calc","급여 계산 조회 (비밀번호 필요)",{year_month:z.string(),password:z.string().describe("접근 비밀번호")},async({year_month,password})=>{
+  if(!await verifyPw(password))return t("❌ 비밀번호 불일치");
+  const d=await a(`/api/regular/payroll-calc?year_month=${year_month}`);
+  if(!d?.results?.length)return t(`${year_month} 없음`);
+  return t(`${year_month} ${d.results.length}명:\n${d.results.map(r=>`${r.name} ${r.work_days}일 기본급${r.base_pay||0} 연장${r.overtime_hours?.toFixed(1)||0}h`).join('\n')}`);
+});
+
+s.tool("update_salary","기본급 수정 (비밀번호 필요)",{employee_name:z.string(),base_pay:z.number().optional(),meal_allowance:z.number().optional(),password:z.string().describe("접근 비밀번호")},async({employee_name,base_pay,meal_allowance,password})=>{
+  if(!await verifyPw(password))return t("❌ 비밀번호 불일치");
+  const emps=(await a("/api/regular/employees?limit=500")).employees||[];
+  const emp=emps.find(e=>e.name===employee_name);
+  if(!emp)return t(`${employee_name} 없음`);
+  const body={};if(base_pay!==undefined)body.base_pay=base_pay;if(meal_allowance!==undefined)body.meal_allowance=meal_allowance;
+  await a(`/api/regular/salary-settings/${emp.id}`,"PUT",body);
+  return t(`${employee_name} 급여 수정 완료`);
+});
+
 s.tool("approve_vacation","휴가 승인",{request_id:z.number(),memo:z.string().optional()},async({request_id,memo})=>{
   await a(`/api/regular/vacations/${request_id}/approve`,"PUT",{admin_memo:memo||""});return t(`#${request_id} 승인`);
 });

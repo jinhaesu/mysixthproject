@@ -12,6 +12,12 @@ function verifyToken(token: string): boolean {
   try { return (jwt.verify(token, JWT_SECRET) as any).type === 'auth'; } catch { return false; }
 }
 
+async function verifyPassword(pw: string): Promise<boolean> {
+  const setting = await dbGet("SELECT value FROM admin_settings WHERE key = 'contract_password'") as any;
+  if (!setting?.value) return true; // 비밀번호 미설정 시 허용
+  return setting.value === pw;
+}
+
 function createMcpServer() {
   const server = new McpServer({ name: 'attendance-system', version: '1.0.0' });
   const q = dbAll, q1 = dbGet;
@@ -125,6 +131,58 @@ function createMcpServer() {
     for (const n of names) { const e = emps.find((x: any) => x.name === n); if (e) { try { await dbRun('INSERT INTO regular_shift_assignments(shift_id,employee_id) VALUES(?,?)', shift_id, e.id); ok++; } catch {} } else nf.push(n); }
     return { content: [{ type: 'text' as const, text: `#${shift_id}에 ${ok}명 배정${nf.length ? ` 못찾음:${nf.join(',')}` : ''}` }] };
   });
+
+  // ===== 비밀번호 필요 도구 (정산/급여/기본급) =====
+  server.tool('get_settlement', '파견/알바 정산 조회 (비밀번호 필요)', { year_month: z.string(), type: z.string().optional().describe('dispatch/alba'), password: z.string().describe('접근 비밀번호') }, async ({ year_month, type, password }) => {
+    if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
+    const confirmed = await q(`SELECT employee_name,employee_type,SUM(regular_hours) as r,SUM(overtime_hours) as o,SUM(night_hours) as n,COUNT(*) as days FROM confirmed_attendance WHERE year_month=? AND employee_type!=? GROUP BY employee_name,employee_type`, year_month, '정규직') as any[];
+    const f = type ? confirmed.filter((e: any) => type === 'alba' ? e.employee_type === '알바' : e.employee_type === '파견') : confirmed;
+    if (!f.length) return { content: [{ type: 'text' as const, text: `${year_month} 정산 데이터 없음` }] };
+    return { content: [{ type: 'text' as const, text: `${year_month} 정산 ${f.length}명:\n${f.map((e: any) => `${e.employee_name}[${e.employee_type}] ${e.days}일 기본${(+e.r).toFixed(1)}h 연장${(+e.o).toFixed(1)}h 야간${(+e.n).toFixed(1)}h`).join('\n')}` }] };
+  });
+
+  server.tool('get_salary_settings', '정규직 기본급 설정 조회 (비밀번호 필요)', { password: z.string().describe('접근 비밀번호') }, async ({ password }) => {
+    if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
+    const data = await q(`SELECT ss.*,re.name,re.department FROM regular_salary_settings ss JOIN regular_employees re ON ss.employee_id=re.id ORDER BY re.name`) as any[];
+    if (!data.length) return { content: [{ type: 'text' as const, text: '기본급 설정 없음' }] };
+    return { content: [{ type: 'text' as const, text: `기본급 ${data.length}명:\n${data.map((s: any) => `${s.name}(${s.department||'-'}) 기본${s.base_pay||0} 식대${s.meal_allowance||0} 상여${s.bonus||0} 직책${s.position_allowance||0} 기타${s.other_allowance||0}`).join('\n')}` }] };
+  });
+
+  server.tool('get_payroll_calc', '정규직 급여 계산 조회 (비밀번호 필요)', { year_month: z.string(), password: z.string().describe('접근 비밀번호') }, async ({ year_month, password }) => {
+    if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
+    // 확정 데이터 + 급여 설정 조합
+    const confirmed = await q(`SELECT employee_name,SUM(regular_hours) as r,SUM(overtime_hours) as o,SUM(night_hours) as n,SUM(break_hours) as b,COUNT(*) as days FROM confirmed_attendance WHERE year_month=? AND employee_type='정규직' GROUP BY employee_name`, year_month) as any[];
+    const salaries = await q(`SELECT ss.*,re.name FROM regular_salary_settings ss JOIN regular_employees re ON ss.employee_id=re.id`) as any[];
+    const salMap: Record<string, any> = {}; salaries.forEach((s: any) => { salMap[s.name] = s; });
+    if (!confirmed.length) return { content: [{ type: 'text' as const, text: `${year_month} 급여 데이터 없음` }] };
+    const lines = confirmed.map((c: any) => {
+      const s = salMap[c.employee_name] || {};
+      const base = +(s.base_pay || 0), meal = +(s.meal_allowance || 0), bonus = +(s.bonus || 0);
+      const gross = base + meal + bonus + +(s.position_allowance || 0) + +(s.other_allowance || 0);
+      return `${c.employee_name} ${c.days}일 | 기본급${base} 식대${meal} | 기본${(+c.r).toFixed(1)}h 연장${(+c.o).toFixed(1)}h 야간${(+c.n).toFixed(1)}h | 총액${gross}`;
+    });
+    return { content: [{ type: 'text' as const, text: `${year_month} 급여 ${confirmed.length}명:\n${lines.join('\n')}` }] };
+  });
+
+  server.tool('update_salary', '정규직 기본급 수정 (비밀번호 필요)', { employee_name: z.string(), base_pay: z.number().optional(), meal_allowance: z.number().optional(), bonus: z.number().optional(), position_allowance: z.number().optional(), other_allowance: z.number().optional(), password: z.string().describe('접근 비밀번호') },
+    async ({ employee_name, base_pay, meal_allowance, bonus, position_allowance, other_allowance, password }) => {
+      if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
+      const emp = await q1('SELECT id FROM regular_employees WHERE name=? AND is_active=1', employee_name) as any;
+      if (!emp) return { content: [{ type: 'text' as const, text: `${employee_name} 찾을 수 없음` }] };
+      const existing = await q1('SELECT id FROM regular_salary_settings WHERE employee_id=?', emp.id) as any;
+      if (existing) {
+        const sets: string[] = []; const params: any[] = [];
+        if (base_pay !== undefined) { sets.push('base_pay=?'); params.push(base_pay); }
+        if (meal_allowance !== undefined) { sets.push('meal_allowance=?'); params.push(meal_allowance); }
+        if (bonus !== undefined) { sets.push('bonus=?'); params.push(bonus); }
+        if (position_allowance !== undefined) { sets.push('position_allowance=?'); params.push(position_allowance); }
+        if (other_allowance !== undefined) { sets.push('other_allowance=?'); params.push(other_allowance); }
+        if (sets.length) { sets.push('updated_at=NOW()'); await dbRun(`UPDATE regular_salary_settings SET ${sets.join(',')} WHERE employee_id=?`, ...params, emp.id); }
+      } else {
+        await dbRun('INSERT INTO regular_salary_settings (employee_id,base_pay,meal_allowance,bonus,position_allowance,other_allowance) VALUES(?,?,?,?,?,?)', emp.id, base_pay || 0, meal_allowance || 0, bonus || 0, position_allowance || 0, other_allowance || 0);
+      }
+      return { content: [{ type: 'text' as const, text: `${employee_name} 급여 설정 완료` }] };
+    });
 
   server.tool('approve_vacation', '휴가 승인', { request_id: z.number(), memo: z.string().optional() }, async ({ request_id, memo }) => {
     await dbRun("UPDATE regular_vacation_requests SET status='approved',admin_memo=?,updated_at=NOW() WHERE id=?", memo || '', request_id);

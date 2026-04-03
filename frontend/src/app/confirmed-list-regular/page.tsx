@@ -159,10 +159,9 @@ export default function ConfirmedListRegularPage() {
           acc.night += e.night_hours || 0;
           return acc;
         }, { regular: 0, overtime: 0, night: 0 });
-        const vacCount = Object.keys(vacationMap).filter(k => {
-          const name = k.split('|')[0];
-          return k.includes(yearMonth) && filtered.some((e: any) => e.name === name);
-        }).length;
+        const vacCount = Object.entries(vacationMap)
+          .filter(([k]) => k.includes(yearMonth) && filtered.some((e: any) => e.name === k.split('|')[0]))
+          .reduce((sum, [, vType]) => sum + (typeof vType === 'string' && vType.includes('반차') ? 0.5 : 1), 0);
         return (
         <>
           {/* Stats Board */}
@@ -184,7 +183,7 @@ export default function ConfirmedListRegularPage() {
               <p className="text-xs text-gray-500 mt-1">야간시간(h)</p>
             </div>
             <div className="bg-white rounded-xl border border-violet-200 p-4 text-center">
-              <p className="text-2xl font-bold text-violet-700">{vacCount}</p>
+              <p className="text-2xl font-bold text-violet-700">{vacCount % 1 === 0 ? vacCount : vacCount.toFixed(1)}</p>
               <p className="text-xs text-gray-500 mt-1">휴가 사용(일)</p>
             </div>
           </div>

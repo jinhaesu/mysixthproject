@@ -151,14 +151,30 @@ export default function AttendanceSummaryRegularPage() {
   };
 
   const getPlannedForDay = (shifts: any[], date: string) => {
-    const dow = new Date(date + 'T00:00:00+09:00').getDay();
+    const d = new Date(date + 'T00:00:00+09:00');
+    const dow = d.getDay();
+    const dayOfMonth = d.getDate();
+    const firstDow = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+    const startOffset = (firstDow + 6) % 7;
+    const weekNum = Math.ceil((dayOfMonth + startOffset) / 7);
+
+    // 1차: month + week_number + 요일 정확 매칭
     for (const s of shifts) {
+      if (s.week_number && s.week_number !== weekNum) continue;
       const daysStr = s.days_of_week && s.days_of_week !== '' ? s.days_of_week : (s.day_of_week != null ? String(s.day_of_week) : '');
       if (!daysStr) continue;
       const days = daysStr.split(',').map(Number).filter((n: number) => !isNaN(n));
       if (days.includes(dow)) return { in: s.planned_clock_in, out: s.planned_clock_out };
     }
-    // Fallback: if no day-of-week match but shifts exist, return first shift
+    // 2차: 요일만 매칭 (week_number 없는 시프트)
+    for (const s of shifts) {
+      if (s.week_number) continue; // week_number 있는 건 1차에서 처리
+      const daysStr = s.days_of_week && s.days_of_week !== '' ? s.days_of_week : (s.day_of_week != null ? String(s.day_of_week) : '');
+      if (!daysStr) continue;
+      const days = daysStr.split(',').map(Number).filter((n: number) => !isNaN(n));
+      if (days.includes(dow)) return { in: s.planned_clock_in, out: s.planned_clock_out };
+    }
+    // 3차: fallback
     if (shifts && shifts.length > 0) return { in: shifts[0].planned_clock_in, out: shifts[0].planned_clock_out };
     return null;
   };

@@ -1074,7 +1074,7 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
 
     // All shift assignments for the month in one query
     const allShifts = await dbAll(`
-      SELECT rsa.employee_id, rs.planned_clock_in, rs.planned_clock_out, rs.days_of_week, rs.day_of_week, rs.month
+      SELECT rsa.employee_id, rs.planned_clock_in, rs.planned_clock_out, rs.days_of_week, rs.day_of_week, rs.month, rs.week_number
       FROM regular_shift_assignments rsa
       JOIN regular_shifts rs ON rsa.shift_id = rs.id
       WHERE rs.is_active = 1 AND (rs.month = 0 OR rs.month = ?)

@@ -24,6 +24,7 @@ import {
   Shield,
   HardHat,
   Lock,
+  CalendarCheck,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -68,6 +69,7 @@ const groups: NavGroup[] = [
     icon: Briefcase,
     items: [
       { href: "/attendance-summary-dispatch", label: "근태 정보 종합 요약", icon: ClipboardList },
+      { href: "/confirm-calendar-dispatch", label: "미확정 캘린더 관리", icon: CalendarCheck },
       { href: "/confirmed-list-dispatch", label: "근태 정보 확정 리스트", icon: Table2 },
       { href: "/dashboard?type=dispatch", label: "대시보드", icon: BarChart3 },
       { href: "/upload", label: "엑셀 업로드", icon: UploadCloud },
@@ -80,6 +82,7 @@ const groups: NavGroup[] = [
     icon: Briefcase,
     items: [
       { href: "/attendance-summary-regular", label: "근태 정보 종합 요약", icon: ClipboardList },
+      { href: "/confirm-calendar-regular", label: "미확정 캘린더 관리", icon: CalendarCheck },
       { href: "/confirmed-list-regular", label: "근태 정보 확정 리스트", icon: Table2 },
       { href: "/dashboard?type=regular", label: "대시보드", icon: BarChart3 },
       { href: "/upload-regular", label: "엑셀 업로드", icon: UploadCloud },

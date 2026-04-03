@@ -255,6 +255,287 @@ ${deptLines.join('\n')}`;
   }
 );
 
+// ===== 시프트 배치 조회 =====
+server.tool(
+  "get_shift_schedules",
+  "계획 출퇴근 배치 목록과 배정 인원을 조회합니다",
+  { month: z.number().optional().describe("월 (1-12, 기본: 이번 달)") },
+  async ({ month }) => {
+    const m = month || (new Date().getMonth() + 1);
+    const shifts = await api("/api/regular/shifts");
+    const monthShifts = (shifts || []).filter(s => s.month === m);
+    if (monthShifts.length === 0) return { content: [{ type: "text", text: `${m}월 배치 없음` }] };
+
+    const lines = [];
+    for (const s of monthShifts) {
+      let assigned = [];
+      try { assigned = await api(`/api/regular/shifts/${s.id}/assignments`); } catch {}
+      const daysStr = s.days_of_week ? s.days_of_week.split(',').map(Number).map(d => ['일','월','화','수','목','금','토'][d]).join('/') : '';
+      const empNames = (assigned || []).map(a => `${a.name}(${a.department || ''})`).join(', ');
+      lines.push(`${s.name} | ${m}월 ${s.week_number}주차 ${daysStr} | ${s.planned_clock_in}~${s.planned_clock_out} | ${assigned.length}명: ${empNames || '미배정'}`);
+    }
+    return { content: [{ type: "text", text: `${m}월 배치 (${monthShifts.length}건):\n${lines.join('\n')}` }] };
+  }
+);
+
+// ===== 미배치 인력 확인 =====
+server.tool(
+  "get_unassigned_employees",
+  "특정 날짜에 배치되지 않은 인력을 확인합니다",
+  { date: z.string().describe("날짜 (예: 2026-04-07)") },
+  async ({ date }) => {
+    const d = new Date(date + 'T00:00:00+09:00');
+    const month = d.getMonth() + 1;
+    const dow = d.getDay();
+    const firstDow = new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+    const so = (firstDow + 6) % 7;
+    const weekNum = Math.ceil((d.getDate() + so) / 7);
+
+    const [shifts, empsData] = await Promise.all([
+      api("/api/regular/shifts"),
+      api("/api/regular/employees?limit=500&include_resigned=0"),
+    ]);
+    const allEmps = empsData.employees || [];
+    const monthShifts = (shifts || []).filter(s => s.month === month);
+
+    const assignedIds = new Set();
+    for (const s of monthShifts) {
+      if (s.week_number !== weekNum) continue;
+      const daysArr = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
+      if (!daysArr.includes(dow)) continue;
+      try {
+        const assigned = await api(`/api/regular/shifts/${s.id}/assignments`);
+        (assigned || []).forEach(a => assignedIds.add(a.employee_id));
+      } catch {}
+    }
+
+    // Check vacations
+    let vacIds = new Set();
+    try {
+      const vacs = await api("/api/regular/vacations?status=approved");
+      for (const v of (vacs || [])) {
+        if (date >= v.start_date && date <= v.end_date) vacIds.add(v.employee_id);
+      }
+    } catch {}
+
+    const unassigned = allEmps.filter(e => e.is_active !== 0 && !assignedIds.has(e.id) && !vacIds.has(e.id));
+    const onVac = allEmps.filter(e => vacIds.has(e.id));
+
+    const dayName = ['일','월','화','수','목','금','토'][dow];
+    let text = `${date} (${dayName}) 인력 현황:\n총 ${allEmps.filter(e=>e.is_active!==0).length}명 | 배치 ${assignedIds.size}명 | 휴가 ${onVac.length}명 | 미배치 ${unassigned.length}명`;
+
+    if (onVac.length > 0) text += `\n\n휴가자:\n${onVac.map(e => `  ${e.name} (${e.department})`).join('\n')}`;
+    if (unassigned.length > 0) text += `\n\n미배치:\n${unassigned.map(e => `  ${e.name} (${e.department} ${e.team})`).join('\n')}`;
+    else text += `\n\n전원 배치 완료!`;
+
+    return { content: [{ type: "text", text }] };
+  }
+);
+
+// ===== 배치 분석 및 제안 =====
+server.tool(
+  "analyze_schedule",
+  "향후 1~2주 배치 계획을 분석하고 휴가/미배치를 종합하여 리포트를 생성합니다",
+  {
+    start_date: z.string().describe("분석 시작일 (예: 2026-04-07)"),
+    end_date: z.string().describe("분석 종료일 (예: 2026-04-18)"),
+  },
+  async ({ start_date, end_date }) => {
+    const [shifts, empsData, vacs, balances] = await Promise.all([
+      api("/api/regular/shifts"),
+      api("/api/regular/employees?limit=500&include_resigned=0"),
+      api("/api/regular/vacations?status=approved").catch(() => []),
+      api(`/api/regular/vacation-balances?year=${start_date.slice(0, 4)}`).catch(() => []),
+    ]);
+    const allEmps = (empsData.employees || []).filter(e => e.is_active !== 0);
+
+    const dayNames = ['일','월','화','수','목','금','토'];
+    const report = [];
+    const dailyStats = [];
+    const empWorkDays = {};
+
+    // Iterate each day
+    const sd = new Date(start_date + 'T00:00:00+09:00');
+    const ed = new Date(end_date + 'T00:00:00+09:00');
+    for (let dt = new Date(sd); dt <= ed; dt.setDate(dt.getDate() + 1)) {
+      const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+      const dow = dt.getDay();
+      const month = dt.getMonth() + 1;
+      const firstDow = new Date(dt.getFullYear(), dt.getMonth(), 1).getDay();
+      const so = (firstDow + 6) % 7;
+      const weekNum = Math.ceil((dt.getDate() + so) / 7);
+
+      if (dow === 0 || dow === 6) {
+        dailyStats.push({ date: dateStr, dow, assigned: 0, vacation: 0, unassigned: 0, weekend: true });
+        continue;
+      }
+
+      const assignedIds = new Set();
+      const shiftDetails = [];
+      for (const s of (shifts || [])) {
+        if (s.month !== month || s.week_number !== weekNum) continue;
+        const daysArr = s.days_of_week ? s.days_of_week.split(',').map(Number) : [s.day_of_week];
+        if (!daysArr.includes(dow)) continue;
+        let assigned = [];
+        try { assigned = await api(`/api/regular/shifts/${s.id}/assignments`); } catch {}
+        assigned.forEach(a => { assignedIds.add(a.employee_id); empWorkDays[a.name] = (empWorkDays[a.name] || 0) + 1; });
+        shiftDetails.push({ name: s.name, time: `${s.planned_clock_in}~${s.planned_clock_out}`, count: assigned.length });
+      }
+
+      const vacIds = new Set();
+      for (const v of (vacs || [])) {
+        if (dateStr >= v.start_date && dateStr <= v.end_date) vacIds.add(v.employee_id);
+      }
+
+      const unassigned = allEmps.filter(e => !assignedIds.has(e.id) && !vacIds.has(e.id)).length;
+      dailyStats.push({ date: dateStr, dow, assigned: assignedIds.size, vacation: vacIds.size, unassigned, weekend: false, shifts: shiftDetails });
+    }
+
+    // Build report
+    report.push(`📊 배치 분석 리포트 (${start_date} ~ ${end_date})`);
+    report.push(`총 직원: ${allEmps.length}명\n`);
+
+    report.push("=== 일별 현황 ===");
+    for (const ds of dailyStats) {
+      if (ds.weekend) { report.push(`${ds.date} (${dayNames[ds.dow]}) 주말`); continue; }
+      const shiftInfo = ds.shifts?.map(s => `${s.name}(${s.count}명)`).join(', ') || '배치없음';
+      const warn = ds.unassigned > 0 ? ` ⚠️ 미배치 ${ds.unassigned}명` : ' ✅';
+      report.push(`${ds.date} (${dayNames[ds.dow]}) | 배치 ${ds.assigned}명 | 휴가 ${ds.vacation}명${warn} | ${shiftInfo}`);
+    }
+
+    // Workload analysis
+    report.push("\n=== 근무 일수 분포 ===");
+    const workDayEntries = Object.entries(empWorkDays).sort((a, b) => b[1] - a[1]);
+    const avgDays = workDayEntries.length > 0 ? workDayEntries.reduce((s, [,d]) => s + d, 0) / workDayEntries.length : 0;
+    report.push(`평균 ${avgDays.toFixed(1)}일`);
+    const overworked = workDayEntries.filter(([,d]) => d > avgDays + 2);
+    const underworked = workDayEntries.filter(([,d]) => d < avgDays - 2);
+    if (overworked.length > 0) report.push(`과다 근무: ${overworked.map(([n,d]) => `${n}(${d}일)`).join(', ')}`);
+    if (underworked.length > 0) report.push(`적은 근무: ${underworked.map(([n,d]) => `${n}(${d}일)`).join(', ')}`);
+
+    // Vacation warnings
+    report.push("\n=== 휴가 정보 ===");
+    const upcomingVacs = (vacs || []).filter(v => v.end_date >= start_date && v.start_date <= end_date);
+    if (upcomingVacs.length > 0) {
+      for (const v of upcomingVacs) {
+        report.push(`${v.employee_name}: ${v.type || '연차'} ${v.start_date}~${v.end_date} (${v.days}일)`);
+      }
+    } else {
+      report.push("해당 기간 승인된 휴가 없음");
+    }
+
+    // Remaining vacation balance warnings
+    report.push("\n=== 잔여 휴가 알림 ===");
+    const lowBalance = (balances || []).filter(b => parseFloat(b.total_days) - parseFloat(b.used_days) <= 2 && parseFloat(b.total_days) > 0);
+    if (lowBalance.length > 0) {
+      for (const b of lowBalance) {
+        report.push(`⚠️ ${b.employee_name}: 잔여 ${(parseFloat(b.total_days) - parseFloat(b.used_days)).toFixed(1)}일`);
+      }
+    } else {
+      report.push("잔여 2일 이하 직원 없음");
+    }
+
+    return { content: [{ type: "text", text: report.join('\n') }] };
+  }
+);
+
+// ===== 배치 생성 =====
+server.tool(
+  "create_shift",
+  "새 배치(시프트)를 생성합니다",
+  {
+    name: z.string().describe("배치명 (예: A조 오전 4월2주차)"),
+    month: z.number().describe("월 (1-12)"),
+    week_number: z.number().describe("주차 (1-5)"),
+    days_of_week: z.string().describe("요일 (쉼표구분, 0=일 1=월 2=화 3=수 4=목 5=금 6=토, 예: 1,2,3,4,5)"),
+    planned_clock_in: z.string().describe("계획 출근 시간 (예: 08:00)"),
+    planned_clock_out: z.string().describe("계획 퇴근 시간 (예: 17:00)"),
+  },
+  async ({ name, month, week_number, days_of_week, planned_clock_in, planned_clock_out }) => {
+    const result = await api("/api/regular/shifts", "POST", {
+      name, month, week_number, days_of_week,
+      day_of_week: parseInt(days_of_week.split(',')[0]),
+      planned_clock_in, planned_clock_out,
+    });
+    return { content: [{ type: "text", text: `배치 생성 완료: ${name} (ID: ${result.id})` }] };
+  }
+);
+
+// ===== 배치에 직원 배정 =====
+server.tool(
+  "assign_employees_to_shift",
+  "배치(시프트)에 직원을 배정합니다",
+  {
+    shift_id: z.number().describe("배치 ID"),
+    employee_names: z.string().describe("배정할 직원 이름들 (쉼표 구분, 예: 김단니,박서현,이하윤)"),
+  },
+  async ({ shift_id, employee_names }) => {
+    const names = employee_names.split(',').map(n => n.trim());
+    const empsData = await api("/api/regular/employees?limit=500");
+    const allEmps = empsData.employees || [];
+    const ids = [];
+    const notFound = [];
+    for (const name of names) {
+      const emp = allEmps.find(e => e.name === name);
+      if (emp) ids.push(emp.id);
+      else notFound.push(name);
+    }
+    if (ids.length === 0) return { content: [{ type: "text", text: `배정할 직원을 찾지 못했습니다: ${notFound.join(', ')}` }] };
+    await api(`/api/regular/shifts/${shift_id}/assignments`, "POST", { employee_ids: ids });
+    let text = `배치 #${shift_id}에 ${ids.length}명 배정 완료`;
+    if (notFound.length > 0) text += `\n찾지 못한 직원: ${notFound.join(', ')}`;
+    return { content: [{ type: "text", text }] };
+  }
+);
+
+// ===== 근태 확정 =====
+server.tool(
+  "confirm_attendance",
+  "근태 데이터를 확정합니다",
+  {
+    records: z.string().describe("확정할 레코드 JSON 배열 (예: [{employee_type:'정규직', employee_name:'김단니', date:'2026-04-03', confirmed_clock_in:'09:00', confirmed_clock_out:'18:00', source:'planned', regular_hours:8, overtime_hours:0, night_hours:0, break_hours:1, year_month:'2026-04'}])"),
+  },
+  async ({ records }) => {
+    const parsed = JSON.parse(records);
+    const result = await api("/api/regular/attendance-confirm", "POST", { records: parsed });
+    return { content: [{ type: "text", text: `${result.confirmed}건 확정 완료` }] };
+  }
+);
+
+// ===== 휴가 반려 =====
+server.tool(
+  "reject_vacation",
+  "휴가 신청을 반려합니다",
+  {
+    request_id: z.number().describe("휴가 신청 ID"),
+    reason: z.string().describe("반려 사유"),
+  },
+  async ({ request_id, reason }) => {
+    const result = await api(`/api/regular/vacations/${request_id}/reject`, "PUT", { admin_memo: reason });
+    return { content: [{ type: "text", text: result.success ? `휴가 #${request_id} 반려 완료` : "반려 실패" }] };
+  }
+);
+
+// ===== 직원 정보 수정 =====
+server.tool(
+  "update_employee",
+  "정규직 직원 정보를 수정합니다",
+  {
+    employee_id: z.number().describe("직원 ID"),
+    department: z.string().optional().describe("부서"),
+    team: z.string().optional().describe("조"),
+    role: z.string().optional().describe("직책"),
+  },
+  async ({ employee_id, department, team, role }) => {
+    const body = {};
+    if (department) body.department = department;
+    if (team) body.team = team;
+    if (role) body.role = role;
+    await api(`/api/regular/employees/${employee_id}`, "PUT", body);
+    return { content: [{ type: "text", text: `직원 #${employee_id} 정보 수정 완료` }] };
+  }
+);
+
 // Start server
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -1,12 +1,7 @@
 {
   "mcpServers": {
     "attendance": {
-      "command": "node",
-      "args": ["mcp-server/index.mjs"],
-      "env": {
-        "ATTENDANCE_API_URL": "https://mysixthproject-production.up.railway.app",
-        "ATTENDANCE_API_TOKEN": ""
-      }
+      "url": "https://mysixthproject-production.up.railway.app/mcp/sse?key=joinandjoin-mcp-2026"
     }
   }
 }

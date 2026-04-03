@@ -53,6 +53,10 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
 });
 
+// MCP SSE endpoint (remote MCP server for Claude Desktop/Mobile)
+import { setupMcpRoutes } from './routes/mcp';
+setupMcpRoutes(app);
+
 // Error handling
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);

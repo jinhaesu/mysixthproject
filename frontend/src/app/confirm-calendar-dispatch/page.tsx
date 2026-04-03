@@ -23,12 +23,16 @@ interface ActualRecord {
   date: string;
   clock_in_time: string | null;
   clock_out_time: string | null;
+  planned_clock_in?: string;
+  planned_clock_out?: string;
 }
 
 interface ShiftRecord {
   date: string;
   clock_in_time: string | null;
   clock_out_time: string | null;
+  planned_clock_in?: string;
+  planned_clock_out?: string;
 }
 
 interface Employee {
@@ -47,6 +51,10 @@ interface DayEntry {
   date: string;
   clockIn: string;
   clockOut: string;
+  actualClockIn?: string;
+  actualClockOut?: string;
+  plannedClockIn?: string;
+  plannedClockOut?: string;
   source: "planned" | "actual";
   confirmedId?: number;
   isConfirmed: boolean;
@@ -81,10 +89,11 @@ function calcHours(clockIn: string, clockOut: string) {
   };
 }
 
-function padTime(t: string | null | undefined): string {
+function formatTime(t: string | null | undefined): string {
   if (!t) return "";
   if (t.length === 5) return t;
   if (t.length === 8) return t.slice(0, 5);
+  try { const d = new Date(t); if (!isNaN(d.getTime())) return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch {}
   return t;
 }
 
@@ -188,67 +197,43 @@ export default function ConfirmCalendarDispatchPage() {
    */
   const { confirmedMap, allEntries } = useMemo(() => {
     // Build confirmed map: key = "name__date" -> { id, clockIn, clockOut }
-    const cMap: Record<
-      string,
-      { id: number; clockIn: string; clockOut: string }
-    > = {};
+    const cMap: Record<string, { id: number; clockIn: string; clockOut: string; source: string; confirmed_clock_in: string; confirmed_clock_out: string }> = {};
 
-    // confirmed records come grouped by employee from getConfirmedList
-    // The structure can vary — handle both grouped and flat
     for (const item of confirmedData) {
-      // Flat record format (individual rows)
       if (item.date && item.employee_name) {
         const k = buildDayKey(item.employee_name, item.date);
-        cMap[k] = {
-          id: item.id,
-          clockIn: padTime(item.confirmed_clock_in),
-          clockOut: padTime(item.confirmed_clock_out),
-        };
+        cMap[k] = { id: item.id, clockIn: formatTime(item.confirmed_clock_in), clockOut: formatTime(item.confirmed_clock_out), source: item.source || 'actual', confirmed_clock_in: item.confirmed_clock_in || '', confirmed_clock_out: item.confirmed_clock_out || '' };
       }
-      // Grouped format (employee with records array)
       if (item.records && item.name) {
         for (const r of item.records) {
           const k = buildDayKey(item.name, r.date);
-          cMap[k] = {
-            id: r.id,
-            clockIn: padTime(r.confirmed_clock_in),
-            clockOut: padTime(r.confirmed_clock_out),
-          };
+          cMap[k] = { id: r.id, clockIn: formatTime(r.confirmed_clock_in), clockOut: formatTime(r.confirmed_clock_out), source: r.source || 'actual', confirmed_clock_in: r.confirmed_clock_in || '', confirmed_clock_out: r.confirmed_clock_out || '' };
         }
       }
     }
 
-    // Build all entries
     const entries: DayEntry[] = [];
     for (const emp of summaryData) {
-      // Actual records
+      // Get planned times for this employee
+      const getPlanned = (date: string) => {
+        const shifts = emp.shifts || [];
+        if (shifts.length > 0) return { in: shifts[0].planned_clock_in || '', out: shifts[0].planned_clock_out || '' };
+        return null;
+      };
       for (const a of emp.actuals || []) {
         if (!a.clock_in_time && !a.clock_out_time) continue;
         const k = buildDayKey(emp.name, a.date);
         const confirmed = cMap[k];
+        const planned = getPlanned(a.date);
+        const actIn = formatTime(a.clock_in_time);
+        const actOut = formatTime(a.clock_out_time);
         entries.push({
-          emp,
-          date: a.date,
-          clockIn: padTime(a.clock_in_time),
-          clockOut: padTime(a.clock_out_time),
-          source: "actual",
-          confirmedId: confirmed?.id,
-          isConfirmed: !!confirmed,
-        });
-      }
-      // Shifts (only those without an actual record)
-      const actualDates = new Set((emp.actuals || []).map((a) => a.date));
-      for (const s of emp.shifts || []) {
-        if (actualDates.has(s.date)) continue;
-        if (!s.clock_in_time && !s.clock_out_time) continue;
-        const k = buildDayKey(emp.name, s.date);
-        const confirmed = cMap[k];
-        entries.push({
-          emp,
-          date: s.date,
-          clockIn: padTime(s.clock_in_time),
-          clockOut: padTime(s.clock_out_time),
-          source: "planned",
+          emp, date: a.date,
+          clockIn: confirmed ? (confirmed.confirmed_clock_in || actIn) : actIn,
+          clockOut: confirmed ? (confirmed.confirmed_clock_out || actOut) : actOut,
+          actualClockIn: actIn, actualClockOut: actOut,
+          plannedClockIn: a.planned_clock_in || planned?.in || '', plannedClockOut: a.planned_clock_out || planned?.out || '',
+          source: confirmed ? (confirmed.source as any || "actual") : "actual",
           confirmedId: confirmed?.id,
           isConfirmed: !!confirmed,
         });
@@ -317,20 +302,22 @@ export default function ConfirmCalendarDispatchPage() {
   // ── Actions ──────────────────────────────────────────────────────────────────
 
   const handleConfirm = useCallback(
-    async (entry: DayEntry) => {
+    async (entry: DayEntry, useSource: "actual" | "planned" = "actual") => {
       const key = buildDayKey(entry.emp.name, entry.date);
       setActionLoading(key);
       try {
-        const { regular, overtime } = calcHours(entry.clockIn, entry.clockOut);
+        const clockIn = useSource === "planned" && entry.plannedClockIn ? entry.plannedClockIn : (entry.actualClockIn || entry.clockIn);
+        const clockOut = useSource === "planned" && entry.plannedClockOut ? entry.plannedClockOut : (entry.actualClockOut || entry.clockOut);
+        const { regular, overtime } = calcHours(clockIn, clockOut);
         const record = {
           employee_type: entry.emp.type || "파견",
           employee_name: entry.emp.name,
           employee_phone: entry.emp.phone,
           department: entry.emp.department,
           date: entry.date,
-          confirmed_clock_in: entry.clockIn,
-          confirmed_clock_out: entry.clockOut,
-          source: entry.source,
+          confirmed_clock_in: clockIn,
+          confirmed_clock_out: clockOut,
+          source: useSource,
           regular_hours: Math.round(regular * 10) / 10,
           overtime_hours: Math.round(overtime * 10) / 10,
           night_hours: 0,
@@ -425,8 +412,8 @@ export default function ConfirmCalendarDispatchPage() {
       const c = confirmedMap[k];
       result.push({
         date: a.date,
-        clockIn: padTime(a.clock_in_time),
-        clockOut: padTime(a.clock_out_time),
+        clockIn: formatTime(a.clock_in_time),
+        clockOut: formatTime(a.clock_out_time),
         source: "actual",
         isConfirmed: !!c,
         confirmedId: c?.id,
@@ -439,8 +426,8 @@ export default function ConfirmCalendarDispatchPage() {
       const c = confirmedMap[k];
       result.push({
         date: s.date,
-        clockIn: padTime(s.clock_in_time),
-        clockOut: padTime(s.clock_out_time),
+        clockIn: formatTime(s.clock_in_time),
+        clockOut: formatTime(s.clock_out_time),
         source: "planned",
         isConfirmed: !!c,
         confirmedId: c?.id,
@@ -685,57 +672,37 @@ export default function ConfirmCalendarDispatchPage() {
                           {entry.emp.type || "파견"}
                         </span>
                         {/* Times */}
-                        <span className="text-sm text-gray-700">
-                          {entry.clockIn || "--:--"} ~{" "}
-                          {entry.clockOut || "--:--"}
-                        </span>
-                        {/* Source */}
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            entry.source === "actual"
-                              ? "bg-green-50 text-green-700"
-                              : "bg-blue-50 text-blue-700"
-                          }`}
-                        >
-                          {entry.source === "actual" ? "실제" : "계획"}
-                        </span>
-                        {/* Status + action */}
+                        <div className="flex flex-col text-xs">
+                          <span className="text-gray-700">실제: <b>{entry.actualClockIn || "--:--"} ~ {entry.actualClockOut || "--:--"}</b></span>
+                          {entry.plannedClockIn && <span className="text-blue-600">계획: {entry.plannedClockIn} ~ {entry.plannedClockOut}</span>}
+                        </div>
+                        {entry.isConfirmed && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${entry.source === "actual" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}>
+                            {entry.source === "actual" ? "실제확정" : "계획확정"}
+                          </span>
+                        )}
                         <div className="ml-auto flex items-center gap-2">
                           {entry.isConfirmed ? (
                             <>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                확정
-                              </span>
-                              <button
-                                onClick={() => handleCancelConfirm(entry)}
-                                disabled={isActioning}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
-                              >
-                                {isActioning ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <XCircle className="w-3 h-3" />
-                                )}
-                                확정취소
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">확정 ({entry.clockIn}~{entry.clockOut})</span>
+                              <button onClick={() => handleCancelConfirm(entry)} disabled={isActioning}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">
+                                {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />} 취소
                               </button>
                             </>
                           ) : (
                             <>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                                미확정
-                              </span>
-                              <button
-                                onClick={() => handleConfirm(entry)}
-                                disabled={isActioning}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-                              >
-                                {isActioning ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Check className="w-3 h-3" />
-                                )}
-                                확정
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">미확정</span>
+                              <button onClick={() => handleConfirm(entry, "actual")} disabled={isActioning}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                                {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} 실제확정
                               </button>
+                              {entry.plannedClockIn && (
+                                <button onClick={() => handleConfirm(entry, "planned")} disabled={isActioning}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                                  {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} 계획확정
+                                </button>
+                              )}
                             </>
                           )}
                         </div>

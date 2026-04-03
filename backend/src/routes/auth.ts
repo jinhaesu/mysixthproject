@@ -161,4 +161,29 @@ router.get('/me', (req: Request, res: Response) => {
   }
 });
 
+// POST /api/auth/mcp-token - Generate long-lived token for MCP integration
+router.post('/mcp-token', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: '인증이 필요합니다.' });
+    return;
+  }
+  try {
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET) as any;
+    if (decoded.type !== 'auth') {
+      res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+      return;
+    }
+    // Generate 1-year token for MCP
+    const mcpToken = jwt.sign(
+      { email: decoded.email, type: 'auth', mcp: true },
+      JWT_SECRET,
+      { expiresIn: '365d' }
+    );
+    res.json({ token: mcpToken, expires: '365 days' });
+  } catch {
+    res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+  }
+});
+
 export default router;

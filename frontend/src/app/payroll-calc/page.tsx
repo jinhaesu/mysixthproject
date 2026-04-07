@@ -60,8 +60,8 @@ export default function PayrollCalcPage() {
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','은행','계좌번호','주민번호','기본급','식대','상여','직책수당','근무일','연장h','연장수당','휴일일','휴일수당','지급액','국민연금','건강보험','장기요양','고용보험','소득세','주민세','공제계','실지급액'];
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.bank_name, r.bank_account, r.id_number, r.base_pay, r.meal_allowance, r.bonus, r.position_allowance, r.work_days, r.overtime_hours, r.overtime_pay, r.holiday_days, r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
+    const header = ['성명','부서','은행','계좌번호','주민번호','기본급','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일일','휴일수당','지급액','국민연금','건강보험','장기요양','고용보험','소득세','주민세','공제계','실지급액'];
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.bank_name, r.bank_account, r.id_number, r.base_pay, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, r.holiday_days, r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
     const csv = [header, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -126,6 +126,8 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right">기본급</th>
                   <th className="py-2 px-2 text-right">식대</th>
                   <th className="py-2 px-2 text-right">상여</th>
+                  <th className="py-2 px-2 text-right">직책수당</th>
+                  <th className="py-2 px-2 text-right">기타수당</th>
                   <th className="py-2 px-2 text-right">일</th>
                   <th className="py-2 px-2 text-right">연장h</th>
                   <th className="py-2 px-2 text-right">연장수당</th>
@@ -153,6 +155,8 @@ export default function PayrollCalcPage() {
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.base_pay)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.meal_allowance)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.bonus)}</td>
+                    <td className="py-1.5 px-2 text-right">{fmt.format(r.position_allowance || 0)}</td>
+                    <td className="py-1.5 px-2 text-right">{fmt.format(r.other_allowance || 0)}</td>
                     <td className="py-1.5 px-2 text-right">{r.work_days}</td>
                     <td className="py-1.5 px-2 text-right text-amber-700">{(r.overtime_hours || 0).toFixed(1)}</td>
                     <td className="py-1.5 px-2 text-right text-amber-700">{fmt.format(r.overtime_pay)}</td>
@@ -172,7 +176,7 @@ export default function PayrollCalcPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-bold text-[10px]">
-                  <td className="py-2 px-2 text-indigo-900" colSpan={8}>합계 ({results.length}명)</td>
+                  <td className="py-2 px-2 text-indigo-900" colSpan={10}>합계 ({results.length}명)</td>
                   <td className="py-2 px-2 text-right">{sum('work_days')}</td>
                   <td className="py-2 px-2 text-right">{sum('overtime_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('overtime_pay'))}</td>

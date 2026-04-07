@@ -59,6 +59,7 @@ export default function ConfirmedListDispatchPage() {
   const [editForm, setEditForm] = useState<any>({});
   const [nameSearch, setNameSearch] = usePersistedState("cld_nameSearch", "");
   const [deptFilter, setDeptFilter] = usePersistedState("cld_deptFilter", "");
+  const [typeFilter, setTypeFilter] = usePersistedState("cld_typeFilter", "");
 
   const load = useCallback(async () => {
     const cacheKey = `cld-${yearMonth}`;
@@ -106,6 +107,14 @@ export default function ConfirmedListDispatchPage() {
           </select>
         </div>
         <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">분류</label>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            <option value="">전체</option>
+            <option value="파견">파견</option>
+            <option value="알바">사업소득(알바)</option>
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
@@ -120,14 +129,17 @@ export default function ConfirmedListDispatchPage() {
       ) : (() => {
         const filtered = data.filter((e: any) =>
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
-          (!deptFilter || (e.department || '').includes(deptFilter))
+          (!deptFilter || (e.department || '').includes(deptFilter)) &&
+          (!typeFilter || e.type === typeFilter)
         );
         const totals = filtered.reduce((acc: any, e: any) => {
           acc.regular += e.regular_hours || 0;
           acc.overtime += e.overtime_hours || 0;
           acc.night += e.night_hours || 0;
+          const k = e.type === '파견' ? 'dispatch' : e.type === '알바' ? 'alba' : 'other';
+          acc.byType[k] = (acc.byType[k] || 0) + (e.regular_hours || 0);
           return acc;
-        }, { regular: 0, overtime: 0, night: 0 });
+        }, { regular: 0, overtime: 0, night: 0, byType: {} as Record<string, number> });
         return (
         <>
           {/* Stats Board */}
@@ -139,6 +151,7 @@ export default function ConfirmedListDispatchPage() {
             <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
               <p className="text-2xl font-bold text-blue-700">{totals.regular.toFixed(1)}</p>
               <p className="text-xs text-gray-500 mt-1">기본시간(h)</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.byType.dispatch || 0).toFixed(1)} / 알바 {(totals.byType.alba || 0).toFixed(1)}</p>
             </div>
             <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
               <p className="text-2xl font-bold text-amber-700">{totals.overtime.toFixed(1)}</p>

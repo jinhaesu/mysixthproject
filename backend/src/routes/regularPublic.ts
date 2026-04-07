@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, normalizePhone } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, getBusinessDate, normalizePhone } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 
@@ -162,13 +162,14 @@ router.get('/:token', async (req: Request, res: Response) => {
       return;
     }
 
-    const today = getKSTDate();
-    // Check today first, then yesterday (for night shifts crossing midnight)
-    let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
-    let attendanceDate = today;
+    const today = getKSTDate(); // calendar date for notices/contracts
+    const businessToday = getBusinessDate(); // business day for attendance (07:00 boundary)
+    // Check current business day first, then previous business day (for shifts ending after 07:00)
+    let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, businessToday) as any;
+    let attendanceDate = businessToday;
     if (!attendance || (!attendance.clock_out_time && !attendance.clock_in_time)) {
-      // Check yesterday for an uncompleted night shift (clocked in but not out)
-      const yd = new Date(new Date(today + 'T00:00:00+09:00').getTime() - 86400000);
+      // Fallback: find any open session from previous business day (clocked in but not out)
+      const yd = new Date(new Date(businessToday + 'T00:00:00+09:00').getTime() - 86400000);
       const yesterday = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
       const yesterdayAtt = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL', employee.id, yesterday) as any;
       if (yesterdayAtt) {
@@ -393,7 +394,8 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       ? Math.round(calculateDistance(latitude, longitude, employee.wp_lat, employee.wp_lng))
       : null;
 
-    const today = getKSTDate();
+    const today = getKSTDate(); // calendar date for contract check
+    const businessToday = getBusinessDate(); // business day (07:00 boundary) for attendance record
     const clockInTime = getKSTTimestamp();
 
     // Check contract requirement (server-side enforcement)
@@ -409,8 +411,8 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       }
     }
 
-    // Check if already clocked in today (UNIQUE constraint on employee_id + date)
-    const existing = await dbGet('SELECT id FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, today) as any;
+    // Check if already clocked in for this business day (UNIQUE constraint on employee_id + date)
+    const existing = await dbGet('SELECT id FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, businessToday) as any;
     if (existing) {
       res.status(400).json({ error: '이미 출근이 기록되었습니다.' });
       return;
@@ -419,7 +421,7 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
     await dbRun(`
       INSERT INTO regular_attendance (employee_id, date, clock_in_time, clock_in_lat, clock_in_lng, gps_valid, agreement_accepted, agreement_accepted_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, employee.id, today, clockInTime, latitude || null, longitude || null, gpsValid, agreement_accepted ? 1 : 0, agreement_accepted_at || null);
+    `, employee.id, businessToday, clockInTime, latitude || null, longitude || null, gpsValid, agreement_accepted ? 1 : 0, agreement_accepted_at || null);
 
     res.json({
       success: true,
@@ -469,13 +471,14 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
       ? Math.round(calculateDistance(latitude, longitude, employee.wp_lat, employee.wp_lng))
       : null;
 
-    const today = getKSTDate();
+    const businessToday = getBusinessDate();
     const clockOutTime = getKSTTimestamp();
 
-    // Must have clocked in first - check today, then yesterday (night shift crossing midnight)
-    let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL', employee.id, today) as any;
+    // Must have clocked in first - check current business day, then previous business day
+    // (handles shift ending after 07:00 when business day has already rolled over)
+    let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL', employee.id, businessToday) as any;
     if (!attendance) {
-      const yd = new Date(new Date(today + 'T00:00:00+09:00').getTime() - 86400000);
+      const yd = new Date(new Date(businessToday + 'T00:00:00+09:00').getTime() - 86400000);
       const yesterday = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
       attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL', employee.id, yesterday) as any;
     }

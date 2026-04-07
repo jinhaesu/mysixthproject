@@ -717,6 +717,22 @@ export function getKSTTimestamp(): string {
   return new Date().toISOString();
 }
 
+// Business day boundary for attendance records.
+// Workers clocking in before this hour (KST) are attributed to the previous calendar day,
+// so that night shifts (e.g., 21:00 → 06:00) stay as a single business day record.
+export const BUSINESS_DAY_START_HOUR = 7;
+
+// Returns the business date string (YYYY-MM-DD) that the given instant belongs to.
+// If current KST hour is before BUSINESS_DAY_START_HOUR, returns previous calendar day.
+export function getBusinessDate(now?: Date): string {
+  const d = now || new Date();
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  if (kst.getUTCHours() < BUSINESS_DAY_START_HOUR) {
+    kst.setUTCDate(kst.getUTCDate() - 1);
+  }
+  return kst.toISOString().slice(0, 10);
+}
+
 // ===== Korean Public Holidays =====
 const KOREAN_HOLIDAYS: Record<number, string[]> = {
   2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],

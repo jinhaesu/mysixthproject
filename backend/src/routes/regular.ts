@@ -105,13 +105,13 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
 router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { phone: rawPhone, name, department, team, role, workplace_id, hire_date } = req.body;
+    const { phone: rawPhone, name, department, team, role, workplace_id, hire_date, bank_name, bank_account } = req.body;
     const phone = normalizePhone(rawPhone);
 
     await dbRun(`
-      UPDATE regular_employees SET phone = ?, name = ?, department = ?, team = ?, role = ?, workplace_id = ?, hire_date = ?
+      UPDATE regular_employees SET phone = ?, name = ?, department = ?, team = ?, role = ?, workplace_id = ?, hire_date = ?, bank_name = ?, bank_account = ?
       WHERE id = ?
-    `, phone, name, department || '', team || '', role || '', workplace_id || null, hire_date || '', id);
+    `, phone, name, department || '', team || '', role || '', workplace_id || null, hire_date || '', bank_name || '', bank_account || '', id);
 
     const updated = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
     res.json(updated);

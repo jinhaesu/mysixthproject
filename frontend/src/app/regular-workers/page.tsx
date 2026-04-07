@@ -60,6 +60,8 @@ const emptyForm = {
   team: TEAMS[0],
   role: ROLES[0],
   workplace_id: null as number | null,
+  bank_name: "",
+  bank_account: "",
 };
 
 export default function RegularWorkersPage() {
@@ -203,6 +205,8 @@ export default function RegularWorkersPage() {
       team: emp.team,
       role: emp.role,
       workplace_id: emp.workplace_id,
+      bank_name: emp.bank_name || "",
+      bank_account: emp.bank_account || "",
     });
     setShowModal(true);
     loadAttendanceHistory(emp.name, historyMonth);
@@ -728,6 +732,28 @@ export default function RegularWorkersPage() {
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">은행</label>
+                  <input
+                    type="text"
+                    value={form.bank_name}
+                    onChange={(e) => updateForm("bank_name", e.target.value)}
+                    placeholder="국민은행"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">계좌번호</label>
+                  <input
+                    type="text"
+                    value={form.bank_account}
+                    onChange={(e) => updateForm("bank_account", e.target.value)}
+                    placeholder="000-00-000000"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
 

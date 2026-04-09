@@ -181,12 +181,12 @@ export default function ConfirmedListDispatchPage() {
                       catMap.get(r.employee_name) || '';
           return normType(cat) || '?';
         };
-        // Identity: phone 우선, 없으면 raw name. 이름 괄호 normalization 제거.
+        // Identity: 이름 기준 (다른 이름이면 다른 사람으로 취급 — 수빈 vs 수빈(HO THI BICH) 분리)
         const canonicalId = (r: any): string => {
+          const name = r.employee_name || '';
+          if (name) return `n:${name}`;
           const np = normalizePhone(r.employee_phone || '');
-          const wid = wIdByPhone.get(np);
-          if (wid) return `w${wid}`;
-          return np || r.employee_name || '';
+          return np ? `p:${np}` : '';
         };
         const isTypeMatch = (t: string) => !typeFilter || t === typeFilter;
 

@@ -3,10 +3,35 @@
 import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Loader2, Download } from "lucide-react";
-import { getSettlement } from "@/lib/api";
+import { getConfirmedList, getWorkers } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
 
 const fmt = new Intl.NumberFormat('ko-KR');
+
+const HOLIDAYS: Record<number, string[]> = {
+  2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
+  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-05','2026-05-24','2026-06-06','2026-08-15','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25'],
+  2027: ['2027-01-01','2027-02-05','2027-02-06','2027-02-07','2027-03-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-10-03','2027-10-09','2027-10-14','2027-10-15','2027-10-16','2027-12-25'],
+};
+const isHolidayOrWeekend = (dateStr: string): boolean => {
+  const d = new Date(dateStr + 'T00:00:00+09:00');
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true;
+  return (HOLIDAYS[d.getFullYear()] || []).includes(dateStr);
+};
+const isKoreanHoliday = (dateStr: string): boolean => {
+  const year = parseInt(dateStr.slice(0, 4));
+  return (HOLIDAYS[year] || []).includes(dateStr);
+};
+const normalizePhone = (p: string | null | undefined) => (p || '').replace(/[-\s]/g, '').trim();
+const normType = (t: string | null | undefined): string => {
+  const s = (t || '').toString().trim();
+  if (!s) return '';
+  if (s.includes('파견')) return '파견';
+  if (s.includes('알바') || s.includes('사업소득')) return '알바';
+  if (s.includes('정규')) return '정규직';
+  return '';
+};
 
 export default function SettlementDispatchPage() {
   const [authorized, setAuthorized] = useState(false);
@@ -21,15 +46,103 @@ export default function SettlementDispatchPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const d = await getSettlement(yearMonth, 'dispatch');
-      setData(d);
-      // Auto-select all and init meal deductions
-      if (d?.results) {
-        setCheckedEmps(new Set(d.results.map((_: any, i: number) => i)));
-        const meals: Record<number, number> = {};
-        d.results.forEach((_: any, i: number) => { meals[i] = 0; });
-        setMealDeductions(meals);
+      // confirmed-list + workers 직접 조회 → 로컬 정산 계산 (정규직 오분류 버그 우회)
+      const [workersResp, confList] = await Promise.all([
+        getWorkers({ limit: '10000' }).catch(() => ({ workers: [] })),
+        getConfirmedList(yearMonth, ''),
+      ]);
+      const workersList = (workersResp as any).workers || (workersResp as any) || [];
+      const catMap = new Map<string, string>();
+      const workerByIdentity = new Map<string, any>();
+      for (const w of workersList) {
+        const np = normalizePhone(w.phone || '');
+        if (w.category) {
+          if (np) catMap.set(np, w.category);
+          if (w.phone) catMap.set(w.phone, w.category);
+          if (w.name_ko) catMap.set(w.name_ko, w.category);
+        }
+        if (np) workerByIdentity.set(np, w);
+        if (w.name_ko) workerByIdentity.set(w.name_ko, w);
       }
+
+      const empMap = new Map<string, any>();
+      for (const e of (confList || [])) {
+        for (const r of (e.records || [])) {
+          const raw = (r.employee_type || '').toString().trim();
+          let t = raw;
+          if (!t) {
+            const np = normalizePhone(r.employee_phone || '');
+            t = catMap.get(np) || catMap.get(r.employee_phone) || catMap.get(r.employee_name) || '';
+          }
+          const effType = normType(t);
+          if (effType !== '파견') continue;
+          const identity = `n:${r.employee_name || ''}`;
+          if (!empMap.has(identity)) {
+            const worker = workerByIdentity.get(normalizePhone(r.employee_phone || '')) || workerByIdentity.get(r.employee_name) || {};
+            empMap.set(identity, {
+              name: r.employee_name,
+              phone: r.employee_phone || '',
+              bank_name: worker.bank_name || '',
+              bank_account: worker.bank_account || '',
+              id_number: worker.id_number || '',
+              work_days: 0,
+              regular_hours: 0,
+              overtime_hours: 0,
+              night_hours: 0,
+              holiday_pay_hours: 0,
+              weekly_holiday_hours: 0,
+              weekly_data: new Map<string, any>(),
+            });
+          }
+          const emp = empMap.get(identity);
+          emp.work_days++;
+          const regH = parseFloat(r.regular_hours) || 0;
+          const otH = parseFloat(r.overtime_hours) || 0;
+          const nightH = parseFloat(r.night_hours) || 0;
+          const totalH = regH + otH;
+          emp.regular_hours += regH;
+          emp.overtime_hours += otH;
+          emp.night_hours += nightH;
+          const isHoliday = isHolidayOrWeekend(r.date);
+          const isPublicHoliday = isKoreanHoliday(r.date);
+          const d = new Date(r.date + 'T00:00:00+09:00');
+          const weekStart = new Date(d);
+          weekStart.setDate(d.getDate() - d.getDay());
+          const weekKey = weekStart.toISOString().slice(0, 10);
+          if (!emp.weekly_data.has(weekKey)) emp.weekly_data.set(weekKey, { days: 0, hours: 0, hasHoliday: false, holidayHours: 0, publicHolidayHours: 0 });
+          const w = emp.weekly_data.get(weekKey);
+          w.days++;
+          w.hours += totalH;
+          if (isHoliday) { w.hasHoliday = true; w.holidayHours += totalH; }
+          if (isPublicHoliday) w.publicHolidayHours += totalH;
+        }
+      }
+
+      const results: any[] = [];
+      for (const [, emp] of empMap) {
+        let weeklyHolidayWeeks = 0;
+        let holidayPayHours = 0;
+        for (const [, w] of emp.weekly_data) {
+          if (w.hours >= 15 && w.days >= 5) weeklyHolidayWeeks++;
+          if (w.days > 5 && w.hasHoliday) holidayPayHours += w.holidayHours || 0;
+          else holidayPayHours += w.publicHolidayHours || 0;
+        }
+        results.push({
+          ...emp,
+          regular_hours: Math.round(emp.regular_hours * 100) / 100,
+          overtime_hours: Math.round(emp.overtime_hours * 100) / 100,
+          night_hours: Math.round(emp.night_hours * 100) / 100,
+          weekly_holiday_weeks: weeklyHolidayWeeks,
+          weekly_holiday_hours: weeklyHolidayWeeks * 8,
+          holiday_pay_hours: Math.round(holidayPayHours * 100) / 100,
+        });
+      }
+      results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setData({ results });
+      setCheckedEmps(new Set(results.map((_: any, i: number) => i)));
+      const meals: Record<number, number> = {};
+      results.forEach((_, i) => { meals[i] = 0; });
+      setMealDeductions(meals);
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [yearMonth]);

@@ -49,7 +49,7 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
 
 // 캐시 제거 — 매번 신규 조회로 stale 데이터 이슈 원천 차단
 const normalizePhone = (p: string | null | undefined) => (p || '').replace(/[-\s]/g, '').trim();
-const normalizeName = (n: string | null | undefined) => (n || '').replace(/\(.*?\)/g, '').trim();
+// NOTE: 이름 괄호 suffix('수빈(HO THI BICH)')는 별개 사람일 수 있어 절대 병합하지 않음.
 
 export default function ConfirmedListDispatchPage() {
   const [yearMonth, setYearMonth] = usePersistedState("cld_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
@@ -75,24 +75,21 @@ export default function ConfirmedListDispatchPage() {
         getWorkers({ limit: '10000' }).catch(() => ({ workers: [] })),
         getConfirmedList(yearMonth, ''),
       ]);
-      // Build lookup maps
+      // Build lookup maps (phone 우선, name은 정확 일치만 — 괄호 suffix 정규화 금지)
       const cm = new Map<string, string>();
       const pm = new Map<string, number>();
       const nm = new Map<string, number>();
       const workersList = (workersResp as any).workers || (workersResp as any) || [];
       for (const w of workersList) {
         const np = normalizePhone(w.phone || '');
-        const nn = normalizeName(w.name_ko);
         if (w.category) {
           if (np) cm.set(np, w.category);
           if (w.phone) cm.set(w.phone, w.category);
           if (w.name_ko) cm.set(w.name_ko, w.category);
-          if (nn) cm.set(nn, w.category);
         }
         if (w.id) {
           if (np) pm.set(np, w.id);
           if (w.name_ko) nm.set(w.name_ko, w.id);
-          if (nn) nm.set(nn, w.id);
         }
       }
       setCatMap(cm);
@@ -172,27 +169,24 @@ export default function ConfirmedListDispatchPage() {
           return '';
         };
         const computeEffType = (r: any): string => {
-          // 1차: 레코드의 raw employee_type
-          const raw = (r.employee_type || '').toString();
-          if (raw === '파견' || raw === '알바' || raw === '사업소득') {
-            return raw === '사업소득' ? '알바' : raw;
+          // 명시값 우선: employee_type이 비어있지 않으면 그 값을 사용 (정규직 등 포함)
+          // workers.category가 '알바'여도 레코드의 '정규직'을 덮지 않음
+          const raw = (r.employee_type || '').toString().trim();
+          if (raw) {
+            return normType(raw) || '?';
           }
-          // 2차: workers.category fallback (phone 정규화/원본, name 원본/정규화)
+          // 빈 값일 때만 workers.category fallback
           const np = normalizePhone(r.employee_phone || '');
-          const nn = normalizeName(r.employee_name);
           const cat = catMap.get(np) || catMap.get(r.employee_phone) ||
-                      catMap.get(r.employee_name) || catMap.get(nn) || '';
-          const normalized = normType(cat);
-          if (normalized) return normalized;
-          // 3차: raw값 normalize (예: '정규직' → '정규직')
-          return normType(raw) || '?';
+                      catMap.get(r.employee_name) || '';
+          return normType(cat) || '?';
         };
+        // Identity: phone 우선, 없으면 raw name. 이름 괄호 normalization 제거.
         const canonicalId = (r: any): string => {
           const np = normalizePhone(r.employee_phone || '');
-          const nn = normalizeName(r.employee_name);
-          const wid = wIdByPhone.get(np) || wIdByName.get(r.employee_name) || wIdByName.get(nn);
+          const wid = wIdByPhone.get(np);
           if (wid) return `w${wid}`;
-          return np || nn || r.employee_name;
+          return np || r.employee_name || '';
         };
         const isTypeMatch = (t: string) => !typeFilter || t === typeFilter;
 

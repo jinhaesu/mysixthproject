@@ -1154,58 +1154,47 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
 
     const records = await dbAll(`SELECT * FROM confirmed_attendance ${where} ORDER BY employee_name, date`, ...params);
 
-    // Look up departments + worker categories + canonical worker IDs
-    // NOTE: No name_ko NOT NULL filter — we need ALL worker rows so category fallback
-    // works even for records whose worker row has no name_ko.
+    // Look up departments + worker categories + worker IDs (phone 기준만)
+    // NOTE: 이름 괄호 suffix('수빈(HO THI BICH)')는 별개 사람일 수 있어 병합 금지.
     const deptMap = new Map<string, string>();
     const catMap = new Map<string, string>();
     const wIdByPhone = new Map<string, number>();
-    const wIdByName = new Map<string, number>();
-    // Name normalization: strip parenthetical suffixes like "(HO THI BICH)"
-    const normalizeName = (name: string | null | undefined) =>
-      (name || '').replace(/\(.*?\)/g, '').trim();
     try {
       const workers = await dbAll("SELECT id, name_ko, phone, department, category FROM workers");
       for (const w of workers as any[]) {
         const np = normalizePhone(w.phone || '');
-        const nn = normalizeName(w.name_ko);
         if (w.name_ko) deptMap.set(w.name_ko, w.department || '');
-        if (nn) deptMap.set(nn, w.department || '');
         if (w.category) {
           if (np) catMap.set(np, w.category);
           if (w.phone) catMap.set(w.phone, w.category);
           if (w.name_ko) catMap.set(w.name_ko, w.category);
-          if (nn) catMap.set(nn, w.category);
         }
         if (np) wIdByPhone.set(np, w.id);
-        if (w.name_ko) wIdByName.set(w.name_ko, w.id);
-        if (nn) wIdByName.set(nn, w.id);
       }
       const regs = await dbAll("SELECT name, department FROM regular_employees WHERE is_active = 1");
       for (const r of regs as any[]) { if (r.name) deptMap.set(r.name, r.department || ''); }
     } catch {}
 
-    // Effective type with workers.category fallback (matches /api/survey/settlement logic)
+    // Effective type: 명시값 있으면 그대로 사용, 빈 값만 workers.category로 fallback
+    // '정규직' 등 명시값은 자동 재분류 안 함
     const getEffectiveType = (r: any): string => {
-      let t = r.employee_type || '';
-      if (!t || (t !== '파견' && t !== '알바' && t !== '사업소득')) {
+      let t = (r.employee_type || '').toString().trim();
+      if (!t) {
         const np = normalizePhone(r.employee_phone || '');
-        const nn = normalizeName(r.employee_name);
-        t = catMap.get(np) || catMap.get(r.employee_phone) ||
-            catMap.get(r.employee_name) || catMap.get(nn) || t;
+        t = catMap.get(np) || catMap.get(r.employee_phone) || catMap.get(r.employee_name) || '';
       }
       if (t.includes('파견')) return '파견';
       if (t.includes('알바') || t.includes('사업소득')) return '알바';
+      if (t.includes('정규')) return '정규직';
       return t || '?';
     };
 
-    // Canonical identity: worker.id (by phone or normalized name) > phone > normalized name
+    // Canonical identity: phone 우선, 없으면 raw name. 이름 normalization 금지.
     const canonicalIdentity = (r: any): string => {
       const normPhone = normalizePhone(r.employee_phone || '');
-      const nn = normalizeName(r.employee_name);
-      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name) || wIdByName.get(nn);
+      const wid = wIdByPhone.get(normPhone);
       if (wid) return `w${wid}`;
-      return normPhone || nn || r.employee_name;
+      return normPhone || r.employee_name || '';
     };
 
     // Summarize by (normalized phone || name) + effective_type so that

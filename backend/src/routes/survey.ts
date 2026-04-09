@@ -1430,45 +1430,38 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       year_month
     ) as any[];
 
-    // Get workers for category fallback AND canonical identity
+    // Get workers for category fallback
+    // NOTE: 이름 괄호 suffix('수빈(HO THI BICH)')는 다른 사람일 수 있어 절대 병합하지 않음.
+    // phone 기준으로만 worker lookup. 이름 기준 lookup은 하지 않음.
     const wCats = await dbAll('SELECT id, phone, category, name_ko FROM workers') as any[];
     const wCatMap = new Map<string, string>();
-    const wIdByPhone = new Map<string, number>();
-    const wIdByName = new Map<string, number>();
-    const normalizeName = (name: string | null | undefined) =>
-      (name || '').replace(/\(.*?\)/g, '').trim();
     for (const wc of wCats) {
       const wp = normalizePhone(wc.phone || '');
-      const nn = normalizeName(wc.name_ko);
       if (wc.category) {
         if (wp) wCatMap.set(wp, wc.category);
         if (wc.phone) wCatMap.set(wc.phone, wc.category);
         if (wc.name_ko) wCatMap.set(wc.name_ko, wc.category);
-        if (nn) wCatMap.set(nn, wc.category);
       }
-      if (wp) wIdByPhone.set(wp, wc.id);
-      if (wc.name_ko) wIdByName.set(wc.name_ko, wc.id);
-      if (nn) wIdByName.set(nn, wc.id);
     }
+    // Identity = phone if exists else name (raw, no normalization — 이름 다르면 다른 사람으로 취급)
     const canonicalIdentity = (r: any): string => {
       const normPhone = normalizePhone(r.employee_phone || '');
-      const nn = normalizeName(r.employee_name);
-      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name) || wIdByName.get(nn);
-      if (wid) return `w${wid}`;
-      return normPhone || nn || r.employee_name;
+      return normPhone || r.employee_name || '';
     };
 
-    // Filter: use employee_type first, fallback to workers.category (by normalized phone or name)
+    // Filter: 명시적으로 employee_type 값이 있으면 그대로 사용 (정규직 등 어떤 값이든).
+    // 오직 빈 값일 때만 workers.category로 fallback.
+    // '정규직'으로 저장된 레코드를 알바/파견으로 자동 재분류하지 않도록.
     const getEffectiveType = (r: any): string => {
-      let t = r.employee_type || '';
-      if (!t || (t !== '파견' && t !== '알바' && t !== '사업소득')) {
+      let t = (r.employee_type || '').toString().trim();
+      if (!t) {
         const np = normalizePhone(r.employee_phone || '');
-        const nn = normalizeName(r.employee_name);
         t = wCatMap.get(np) || wCatMap.get(r.employee_phone) ||
-            wCatMap.get(r.employee_name) || wCatMap.get(nn) || '';
+            wCatMap.get(r.employee_name) || '';
       }
       if (t.includes('파견')) return '파견';
       if (t.includes('알바') || t.includes('사업소득')) return '알바';
+      if (t.includes('정규')) return '정규직';
       return t;
     };
 

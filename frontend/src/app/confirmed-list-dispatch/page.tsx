@@ -289,6 +289,7 @@ export default function ConfirmedListDispatchPage() {
                                 <tbody className="divide-y divide-gray-100">
                                   {emp.records.map((r: any) => {
                                     const rawType = r.employee_type || '';
+                                    const effType = r.effective_type || '(없음)';
                                     const typeColor = rawType === '파견' ? 'bg-blue-50 text-blue-700 border-blue-200'
                                       : (rawType === '알바' || rawType === '사업소득') ? 'bg-orange-50 text-orange-700 border-orange-200'
                                       : rawType === '정규직' ? 'bg-purple-50 text-purple-700 border-purple-200'
@@ -308,7 +309,7 @@ export default function ConfirmedListDispatchPage() {
                                             } catch (err: any) { alert(err.message || '타입 변경 실패'); }
                                           }}
                                           className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${typeColor} cursor-pointer`}
-                                          title="저장된 employee_type 값 (변경 시 즉시 반영)"
+                                          title={`raw: ${rawType || '(빈값)'} | effective: ${effType}`}
                                         >
                                           <option value="">(빈값)</option>
                                           <option value="파견">파견</option>
@@ -316,6 +317,7 @@ export default function ConfirmedListDispatchPage() {
                                           <option value="사업소득">사업소득</option>
                                           <option value="정규직">정규직</option>
                                         </select>
+                                        <span className="ml-1 text-[9px] text-gray-500">→{effType}</span>
                                       </td>
                                       <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
                                         const ci = e.target.value; const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);

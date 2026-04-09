@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Table2, Loader2, Edit3, Trash2 } from "lucide-react";
-import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord, updateConfirmedRecordType } from "@/lib/api";
+import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord, updateConfirmedRecordType, getWorkers } from "@/lib/api";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -47,8 +47,9 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
   return { regular: Math.round(Math.min(dayWork, 8) * 10) / 10, overtime: Math.round(Math.max(dayWork - 8, 0) * 10) / 10, night: nightH, breakH };
 }
 
-const _cache: Record<string, { data: any; time: number }> = {};
-const CACHE_TTL = 30 * 1000; // 30s — short TTL so 정산관리와 총합 불일치 시 빠르게 재조회
+// 캐시 제거 — 매번 신규 조회로 stale 데이터 이슈 원천 차단
+const normalizePhone = (p: string | null | undefined) => (p || '').replace(/[-\s]/g, '').trim();
+const normalizeName = (n: string | null | undefined) => (n || '').replace(/\(.*?\)/g, '').trim();
 
 export default function ConfirmedListDispatchPage() {
   const [yearMonth, setYearMonth] = usePersistedState("cld_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
@@ -60,17 +61,45 @@ export default function ConfirmedListDispatchPage() {
   const [nameSearch, setNameSearch] = usePersistedState("cld_nameSearch", "");
   const [deptFilter, setDeptFilter] = usePersistedState("cld_deptFilter", "");
   const [typeFilter, setTypeFilter] = usePersistedState("cld_typeFilter", "");
+  // workers.category lookup maps (phone/name → category), built client-side.
+  // Makes classification independent of backend deploy state.
+  const [catMap, setCatMap] = useState<Map<string, string>>(new Map());
+  const [wIdByPhone, setWIdByPhone] = useState<Map<string, number>>(new Map());
+  const [wIdByName, setWIdByName] = useState<Map<string, number>>(new Map());
 
   const load = useCallback(async () => {
-    const cacheKey = `cld-${yearMonth}`;
-    const cached = _cache[cacheKey];
-    if (cached && Date.now() - cached.time < CACHE_TTL) { setData(cached.data); return; }
     setLoading(true);
     try {
-      const d = await getConfirmedList(yearMonth, '');
+      // Fetch workers AND confirmed records in parallel
+      const [workersResp, d] = await Promise.all([
+        getWorkers({ limit: '10000' }).catch(() => ({ workers: [] })),
+        getConfirmedList(yearMonth, ''),
+      ]);
+      // Build lookup maps
+      const cm = new Map<string, string>();
+      const pm = new Map<string, number>();
+      const nm = new Map<string, number>();
+      const workersList = (workersResp as any).workers || (workersResp as any) || [];
+      for (const w of workersList) {
+        const np = normalizePhone(w.phone || '');
+        const nn = normalizeName(w.name_ko);
+        if (w.category) {
+          if (np) cm.set(np, w.category);
+          if (w.phone) cm.set(w.phone, w.category);
+          if (w.name_ko) cm.set(w.name_ko, w.category);
+          if (nn) cm.set(nn, w.category);
+        }
+        if (w.id) {
+          if (np) pm.set(np, w.id);
+          if (w.name_ko) nm.set(w.name_ko, w.id);
+          if (nn) nm.set(nn, w.id);
+        }
+      }
+      setCatMap(cm);
+      setWIdByPhone(pm);
+      setWIdByName(nm);
       const filtered = (d || []).filter((e: any) => e.type !== '정규직');
       setData(filtered);
-      _cache[cacheKey] = { data: filtered, time: Date.now() };
     } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [yearMonth]);
@@ -119,7 +148,7 @@ export default function ConfirmedListDispatchPage() {
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
         </div>
-        <button onClick={() => { delete _cache[`cld-${yearMonth}`]; load(); }} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
+        <button onClick={() => load()} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
 
       {loading ? (
@@ -127,8 +156,10 @@ export default function ConfirmedListDispatchPage() {
       ) : data.length === 0 ? (
         <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">확정된 데이터가 없습니다.</div>
       ) : (() => {
-        // 레코드 단위 분류: record.employee_type을 직접 normalize해서 사용.
-        // 상세 뷰에서 대표님이 확인한 타입 뱃지와 1:1 일치시키는 소스 of truth.
+        // 레코드 단위 분류: 이 페이지가 source of truth.
+        // 로직 = settlement endpoint의 getEffectiveType과 동일:
+        //   1. employee_type이 '파견'/'알바'/'사업소득'이면 그대로 사용
+        //   2. 비어있거나 기타값이면 workers.category fallback (phone/name lookup)
         const passesFilters = (e: any) =>
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
           (!deptFilter || (e.department || '').includes(deptFilter));
@@ -138,18 +169,30 @@ export default function ConfirmedListDispatchPage() {
           if (s.includes('파견')) return '파견';
           if (s.includes('알바') || s.includes('사업소득')) return '알바';
           if (s.includes('정규')) return '정규직';
-          return '?';
+          return '';
         };
-        // 우선순위: backend effective_type (workers.category fallback 포함) → raw employee_type → emp.type
-        const recType = (r: any, empType: string) => {
-          if (r.effective_type) {
-            const n = normType(r.effective_type);
-            if (n) return n;
-            return r.effective_type;
+        const computeEffType = (r: any): string => {
+          // 1차: 레코드의 raw employee_type
+          const raw = (r.employee_type || '').toString();
+          if (raw === '파견' || raw === '알바' || raw === '사업소득') {
+            return raw === '사업소득' ? '알바' : raw;
           }
-          const fromRecord = normType(r.employee_type);
-          if (fromRecord) return fromRecord;
-          return normType(empType) || empType || '?';
+          // 2차: workers.category fallback (phone 정규화/원본, name 원본/정규화)
+          const np = normalizePhone(r.employee_phone || '');
+          const nn = normalizeName(r.employee_name);
+          const cat = catMap.get(np) || catMap.get(r.employee_phone) ||
+                      catMap.get(r.employee_name) || catMap.get(nn) || '';
+          const normalized = normType(cat);
+          if (normalized) return normalized;
+          // 3차: raw값 normalize (예: '정규직' → '정규직')
+          return normType(raw) || '?';
+        };
+        const canonicalId = (r: any): string => {
+          const np = normalizePhone(r.employee_phone || '');
+          const nn = normalizeName(r.employee_name);
+          const wid = wIdByPhone.get(np) || wIdByName.get(r.employee_name) || wIdByName.get(nn);
+          if (wid) return `w${wid}`;
+          return np || nn || r.employee_name;
         };
         const isTypeMatch = (t: string) => !typeFilter || t === typeFilter;
 
@@ -163,31 +206,38 @@ export default function ConfirmedListDispatchPage() {
           otByType: {} as Record<string, number>,
           ntByType: {} as Record<string, number> };
 
+        // 중복 방지용 id set
+        const seenRecordIds = new Set<any>();
         for (const e of data) {
           if (!passesFilters(e)) continue;
           for (const r of (e.records || [])) {
-            const t = recType(r, e.type);
-            if (t === '정규직') continue; // 정규직은 이 페이지에서 제외
+            if (r.id != null && seenRecordIds.has(r.id)) continue;
+            if (r.id != null) seenRecordIds.add(r.id);
+            // 클라이언트 단독 분류 (backend effective_type 무시)
+            const t = computeEffType(r);
+            // 진단용: 레코드에 effective_type 복사해서 상세 뷰가 읽을 수 있게
+            (r as any).__computed_type = t;
+            if (t === '정규직') continue;
             const reg = parseFloat(r.regular_hours) || 0;
             const ot = parseFloat(r.overtime_hours) || 0;
             const nt = parseFloat(r.night_hours) || 0;
             const br = parseFloat(r.break_hours) || 0;
-            // 분류별 breakdown은 필터와 무관하게 항상 전체 표시
             const k = t === '파견' ? 'dispatch' : t === '알바' ? 'alba' : 'other';
             totals.regByType[k] = (totals.regByType[k] || 0) + reg;
             totals.otByType[k] = (totals.otByType[k] || 0) + ot;
             totals.ntByType[k] = (totals.ntByType[k] || 0) + nt;
-            // 메인 합계와 bucket은 filter 적용
             if (!isTypeMatch(t)) continue;
             totals.regular += reg;
             totals.overtime += ot;
             totals.night += nt;
-            const phoneNorm = (e.phone || '').replace(/[-\s]/g, '');
-            const idKey = phoneNorm || e.name;
-            const key = `${idKey}|${t}`;
+            // canonical identity 기준으로 사람 단위 병합
+            const key = `${canonicalId({ employee_phone: r.employee_phone ?? e.phone, employee_name: r.employee_name ?? e.name })}|${t}`;
             if (!bucketMap.has(key)) {
               bucketMap.set(key, {
-                name: e.name, phone: e.phone, type: t, department: e.department || '',
+                name: r.employee_name || e.name,
+                phone: r.employee_phone || e.phone,
+                type: t,
+                department: e.department || '',
                 days: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0,
                 break_hours: 0, holiday_days: 0, records: [],
               });
@@ -289,7 +339,7 @@ export default function ConfirmedListDispatchPage() {
                                 <tbody className="divide-y divide-gray-100">
                                   {emp.records.map((r: any) => {
                                     const rawType = r.employee_type || '';
-                                    const effType = r.effective_type || '(없음)';
+                                    const effType = (r as any).__computed_type || r.effective_type || '(미분류)';
                                     const typeColor = rawType === '파견' ? 'bg-blue-50 text-blue-700 border-blue-200'
                                       : (rawType === '알바' || rawType === '사업소득') ? 'bg-orange-50 text-orange-700 border-orange-200'
                                       : rawType === '정규직' ? 'bg-purple-50 text-purple-700 border-purple-200'
@@ -304,7 +354,6 @@ export default function ConfirmedListDispatchPage() {
                                             const newType = e.target.value;
                                             try {
                                               await updateConfirmedRecordType(r.id, newType);
-                                              delete _cache[`cld-${yearMonth}`];
                                               load();
                                             } catch (err: any) { alert(err.message || '타입 변경 실패'); }
                                           }}

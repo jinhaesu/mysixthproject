@@ -153,21 +153,29 @@ export default function ConfirmedListRegularPage() {
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
           (!deptFilter || (e.department || '').includes(deptFilter))
         );
-        // 휴일 근무 시간 = 각 레코드에서 토/일/공휴일 날짜의 (기본+연장) 합
-        // 정규직은 확정 시 주말/공휴일이면 regular=0, overtime=전량으로 저장되므로
-        // 레코드 단위로 날짜 체크해서 holiday_hours를 별도 집계
+        // 레코드별로 날짜 확인 → 휴일 레코드는 기본/연장에서 완전히 제외하고 휴일에만 집계
+        // (레거시 데이터로 휴일 레코드에 regular > 0이 저장된 경우도 자동 보정)
         const totals = filtered.reduce((acc: any, e: any) => {
-          let empHoliday = 0;
+          let empReg = 0, empOt = 0, empNight = 0, empHoliday = 0;
           for (const r of (e.records || [])) {
+            const reg = parseFloat(r.regular_hours) || 0;
+            const ot = parseFloat(r.overtime_hours) || 0;
+            const nt = parseFloat(r.night_hours) || 0;
             if (isHolidayOrWeekend(r.date)) {
-              empHoliday += (parseFloat(r.regular_hours) || 0) + (parseFloat(r.overtime_hours) || 0);
+              // 휴일/주말: 기본/연장 전량을 휴일로 몰아넣음
+              empHoliday += reg + ot;
+            } else {
+              empReg += reg;
+              empOt += ot;
             }
+            empNight += nt;
           }
-          e._holiday_hours = Math.round(empHoliday * 10) / 10; // 각 emp에 attach (상세에서 재사용)
-          acc.regular += e.regular_hours || 0;
-          // overtime 합계에서 휴일분 제외 (평일 연장만)
-          acc.overtime += Math.max((e.overtime_hours || 0) - empHoliday, 0);
-          acc.night += e.night_hours || 0;
+          e._weekday_regular = Math.round(empReg * 10) / 10;
+          e._weekday_overtime = Math.round(empOt * 10) / 10;
+          e._holiday_hours = Math.round(empHoliday * 10) / 10;
+          acc.regular += empReg;
+          acc.overtime += empOt;
+          acc.night += empNight;
           acc.holiday += empHoliday;
           return acc;
         }, { regular: 0, overtime: 0, night: 0, holiday: 0 });
@@ -235,12 +243,14 @@ export default function ConfirmedListRegularPage() {
                             const fullVac = vacDays.filter(([,t]) => t === '연차').length;
                             const halfVac = vacDays.filter(([,t]) => t?.includes('반차')).length;
                             const vacH = fullVac * 8 + halfVac * 4;
-                            const total = emp.regular_hours + vacH;
+                            // 기본시간 = 평일 기본만 (휴일 레코드는 제외)
+                            const weekdayReg = emp._weekday_regular || 0;
+                            const total = weekdayReg + vacH;
                             if (vacH > 0) return <>{total.toFixed(1)} <span className="text-[9px] text-red-600 font-medium">(휴가{vacH}h 포함)</span></>;
-                            return <>{emp.regular_hours.toFixed(1)}</>;
+                            return <>{weekdayReg.toFixed(1)}</>;
                           })()}
                         </td>
-                        <td className="py-2.5 px-4 text-right text-amber-700">{Math.max(emp.overtime_hours - (emp._holiday_hours || 0), 0).toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-amber-700">{(emp._weekday_overtime || 0).toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-purple-700">{emp.night_hours.toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-gray-500">{emp.break_hours.toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-red-600 font-medium">{(emp._holiday_hours || 0).toFixed(1)}</td>
@@ -332,7 +342,7 @@ export default function ConfirmedListRegularPage() {
                                       }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_out}</td>
                                       <td className="py-1.5 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
                                       <td className="py-1.5 px-3 text-right">
-                                        {editingId === r.id ? <span className="text-xs text-blue-700 font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1)}
+                                        {isHoliday ? '0.0' : (editingId === r.id ? <span className="text-xs text-blue-700 font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1))}
                                         {vType?.includes('반차') && <span className="ml-0.5 text-[9px] text-red-600 font-medium">+반차4h</span>}
                                         {vType === '연차' && <span className="ml-0.5 text-[9px] text-red-600 font-medium">+휴가8h</span>}
                                       </td>

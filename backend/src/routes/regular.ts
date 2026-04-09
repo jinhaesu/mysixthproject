@@ -1154,17 +1154,23 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
 
     const records = await dbAll(`SELECT * FROM confirmed_attendance ${where} ORDER BY employee_name, date`, ...params);
 
-    // Look up departments + worker categories for type fallback
+    // Look up departments + worker categories + canonical worker IDs
     const deptMap = new Map<string, string>();
     const catMap = new Map<string, string>();
+    const wIdByPhone = new Map<string, number>();
+    const wIdByName = new Map<string, number>();
     try {
-      const workers = await dbAll("SELECT name_ko, phone, department, category FROM workers WHERE name_ko IS NOT NULL AND name_ko != ''");
+      const workers = await dbAll("SELECT id, name_ko, phone, department, category FROM workers WHERE name_ko IS NOT NULL AND name_ko != ''");
       for (const w of workers as any[]) {
+        const np = normalizePhone(w.phone || '');
         if (w.name_ko) deptMap.set(w.name_ko, w.department || '');
         if (w.category) {
+          if (np) catMap.set(np, w.category);
           if (w.phone) catMap.set(w.phone, w.category);
           if (w.name_ko) catMap.set(w.name_ko, w.category);
         }
+        if (np) wIdByPhone.set(np, w.id);
+        if (w.name_ko) wIdByName.set(w.name_ko, w.id);
       }
       const regs = await dbAll("SELECT name, department FROM regular_employees WHERE is_active = 1");
       for (const r of regs as any[]) { if (r.name) deptMap.set(r.name, r.department || ''); }
@@ -1174,11 +1180,20 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
     const getEffectiveType = (r: any): string => {
       let t = r.employee_type || '';
       if (!t || (t !== '파견' && t !== '알바' && t !== '사업소득')) {
-        t = catMap.get(r.employee_phone) || catMap.get(r.employee_name) || t;
+        const np = normalizePhone(r.employee_phone || '');
+        t = catMap.get(np) || catMap.get(r.employee_phone) || catMap.get(r.employee_name) || t;
       }
       if (t.includes('파견')) return '파견';
       if (t.includes('알바') || t.includes('사업소득')) return '알바';
       return t || '?';
+    };
+
+    // Canonical identity: worker.id > phone > name (so '수빈' + '수빈(HO THI BICH)' merge)
+    const canonicalIdentity = (r: any): string => {
+      const normPhone = normalizePhone(r.employee_phone || '');
+      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name);
+      if (wid) return `w${wid}`;
+      return normPhone || r.employee_name;
     };
 
     // Summarize by (normalized phone || name) + effective_type so that
@@ -1190,8 +1205,7 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
     for (const r of records as any[]) {
       const effType = getEffectiveType(r);
       (r as any).effective_type = effType;
-      const normPhone = r.employee_phone ? normalizePhone(r.employee_phone) : '';
-      const identity = normPhone || r.employee_name;
+      const identity = canonicalIdentity(r);
       const key = `${identity}|${effType}`;
       if (!empMap.has(key)) {
         empMap.set(key, {

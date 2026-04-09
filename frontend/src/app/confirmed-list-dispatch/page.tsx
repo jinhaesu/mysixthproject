@@ -140,11 +140,15 @@ export default function ConfirmedListDispatchPage() {
           if (s.includes('정규')) return '정규직';
           return '?';
         };
-        // 우선순위: 레코드 raw employee_type → backend effective_type → emp.type
+        // 우선순위: backend effective_type (workers.category fallback 포함) → raw employee_type → emp.type
         const recType = (r: any, empType: string) => {
+          if (r.effective_type) {
+            const n = normType(r.effective_type);
+            if (n) return n;
+            return r.effective_type;
+          }
           const fromRecord = normType(r.employee_type);
           if (fromRecord) return fromRecord;
-          if (r.effective_type) return normType(r.effective_type) || r.effective_type;
           return normType(empType) || empType || '?';
         };
         const isTypeMatch = (t: string) => !typeFilter || t === typeFilter;

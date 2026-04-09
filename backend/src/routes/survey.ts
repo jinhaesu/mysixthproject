@@ -1430,18 +1430,35 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       year_month
     ) as any[];
 
-    // Get workers category for fallback
-    const wCats = await dbAll('SELECT phone, category, name_ko FROM workers') as any[];
+    // Get workers for category fallback AND canonical identity (so multiple
+    // name spellings / phone variations collapse to one worker.id).
+    const wCats = await dbAll('SELECT id, phone, category, name_ko FROM workers') as any[];
     const wCatMap = new Map<string, string>();
+    const wIdByPhone = new Map<string, number>();
+    const wIdByName = new Map<string, number>();
     for (const wc of wCats) {
-      if (wc.category) { wCatMap.set(wc.phone, wc.category); if (wc.name_ko) wCatMap.set(wc.name_ko, wc.category); }
+      const wp = normalizePhone(wc.phone || '');
+      if (wc.category) {
+        if (wp) wCatMap.set(wp, wc.category);
+        if (wc.phone) wCatMap.set(wc.phone, wc.category);
+        if (wc.name_ko) wCatMap.set(wc.name_ko, wc.category);
+      }
+      if (wp) wIdByPhone.set(wp, wc.id);
+      if (wc.name_ko) wIdByName.set(wc.name_ko, wc.id);
     }
+    const canonicalIdentity = (r: any): string => {
+      const normPhone = normalizePhone(r.employee_phone || '');
+      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name);
+      if (wid) return `w${wid}`;
+      return normPhone || r.employee_name;
+    };
 
-    // Filter: use employee_type first, fallback to workers.category
+    // Filter: use employee_type first, fallback to workers.category (by normalized phone or name)
     const getEffectiveType = (r: any): string => {
       let t = r.employee_type || '';
       if (!t || (t !== '파견' && t !== '알바' && t !== '사업소득')) {
-        t = wCatMap.get(r.employee_phone) || wCatMap.get(r.employee_name) || '';
+        const np = normalizePhone(r.employee_phone || '');
+        t = wCatMap.get(np) || wCatMap.get(r.employee_phone) || wCatMap.get(r.employee_name) || '';
       }
       if (t.includes('파견')) return '파견';
       if (t.includes('알바') || t.includes('사업소득')) return '알바';
@@ -1462,12 +1479,11 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       // Simple approach: check if employee_name has division info stored
     }
 
-    // Group by (normalized phone || name) so that same person entered under different
-    // name spellings (e.g. "수빈" vs "수빈(HO THI BICH)") merges into one row.
+    // Group by canonical worker identity (worker.id if matched, else phone, else name)
+    // so that "수빈" + "수빈(HO THI BICH)" (same worker different name spellings) merge.
     const empMap = new Map<string, any>();
     for (const r of records) {
-      const normPhone = r.employee_phone ? normalizePhone(r.employee_phone) : '';
-      const identity = normPhone || r.employee_name;
+      const identity = canonicalIdentity(r);
       if (!empMap.has(identity)) {
         empMap.set(identity, {
           name: r.employee_name,

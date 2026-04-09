@@ -1462,11 +1462,14 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       // Simple approach: check if employee_name has division info stored
     }
 
-    // Group by employee
+    // Group by (normalized phone || name) so that same person entered under different
+    // name spellings (e.g. "수빈" vs "수빈(HO THI BICH)") merges into one row.
     const empMap = new Map<string, any>();
     for (const r of records) {
-      if (!empMap.has(r.employee_name)) {
-        empMap.set(r.employee_name, {
+      const normPhone = r.employee_phone ? normalizePhone(r.employee_phone) : '';
+      const identity = normPhone || r.employee_name;
+      if (!empMap.has(identity)) {
+        empMap.set(identity, {
           name: r.employee_name,
           phone: r.employee_phone || '',
           type: getEffectiveType(r),
@@ -1479,7 +1482,7 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
           weekly_data: new Map<string, { days: number; hours: number }>(),
         });
       }
-      const emp = empMap.get(r.employee_name)!;
+      const emp = empMap.get(identity)!;
       emp.work_days++;
       const regH = parseFloat(r.regular_hours) || 0;
       const otH = parseFloat(r.overtime_hours) || 0;

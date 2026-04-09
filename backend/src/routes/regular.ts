@@ -1181,13 +1181,16 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
       return t || '?';
     };
 
-    // Summarize by (employee_name + effective_type) so records with different
-    // classifications under the same name are split — this matches the per-record
-    // classification used by /api/survey/settlement, guaranteeing identical totals.
+    // Summarize by (normalized phone || name) + effective_type so that
+    // (1) same person entered under different name spellings merges into one row,
+    // (2) mixed-type records under one name split into per-type rows,
+    // matching /api/survey/settlement's per-record classification.
     const empMap = new Map<string, any>();
     for (const r of records as any[]) {
       const effType = getEffectiveType(r);
-      const key = `${r.employee_name}|${effType}`;
+      const normPhone = r.employee_phone ? normalizePhone(r.employee_phone) : '';
+      const identity = normPhone || r.employee_name;
+      const key = `${identity}|${effType}`;
       if (!empMap.has(key)) {
         empMap.set(key, {
           name: r.employee_name, phone: r.employee_phone, type: effType,

@@ -137,29 +137,36 @@ export default function ConfirmedListDispatchPage() {
           acc.overtime += e.overtime_hours || 0;
           acc.night += e.night_hours || 0;
           const k = e.type === '파견' ? 'dispatch' : e.type === '알바' ? 'alba' : 'other';
-          acc.byType[k] = (acc.byType[k] || 0) + (e.regular_hours || 0);
+          acc.regByType[k] = (acc.regByType[k] || 0) + (e.regular_hours || 0);
+          acc.otByType[k] = (acc.otByType[k] || 0) + (e.overtime_hours || 0);
+          acc.ntByType[k] = (acc.ntByType[k] || 0) + (e.night_hours || 0);
           return acc;
-        }, { regular: 0, overtime: 0, night: 0, byType: {} as Record<string, number> });
+        }, { regular: 0, overtime: 0, night: 0,
+             regByType: {} as Record<string, number>,
+             otByType: {} as Record<string, number>,
+             ntByType: {} as Record<string, number> });
         return (
         <>
-          {/* Stats Board */}
+          {/* Stats Board - filter 적용 시 해당 분류만 표시 */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
               <p className="text-2xl font-bold text-gray-900">{filtered.length}</p>
-              <p className="text-xs text-gray-500 mt-1">총 근무자</p>
+              <p className="text-xs text-gray-500 mt-1">근무자 {typeFilter ? `(${typeFilter})` : '(전체)'}</p>
             </div>
             <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
               <p className="text-2xl font-bold text-blue-700">{totals.regular.toFixed(1)}</p>
               <p className="text-xs text-gray-500 mt-1">기본시간(h)</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.byType.dispatch || 0).toFixed(1)} / 알바 {(totals.byType.alba || 0).toFixed(1)}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.regByType.dispatch || 0).toFixed(1)} / 알바 {(totals.regByType.alba || 0).toFixed(1)}</p>
             </div>
             <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
               <p className="text-2xl font-bold text-amber-700">{totals.overtime.toFixed(1)}</p>
               <p className="text-xs text-gray-500 mt-1">연장시간(h)</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.otByType.dispatch || 0).toFixed(1)} / 알바 {(totals.otByType.alba || 0).toFixed(1)}</p>
             </div>
             <div className="bg-white rounded-xl border border-purple-200 p-4 text-center">
               <p className="text-2xl font-bold text-purple-700">{totals.night.toFixed(1)}</p>
               <p className="text-xs text-gray-500 mt-1">야간시간(h)</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.ntByType.dispatch || 0).toFixed(1)} / 알바 {(totals.ntByType.alba || 0).toFixed(1)}</p>
             </div>
           </div>
 

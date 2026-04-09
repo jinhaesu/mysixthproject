@@ -1423,8 +1423,8 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const totalH = regH + otH;
 
       if (isHolidayOrWeekend(rec.date)) {
-        // All hours on holidays/weekends count as overtime
-        emp.total_overtime += totalH;
+        // 휴일/주말 근무 시간은 holiday_hours에만 누적 (overtime과 별개로 계산)
+        // 이전 버그: overtime에도 더하고 holiday_hours에도 더해서 이중 지급됨
         emp.holiday_days++;
         emp.holiday_hours += totalH;
       } else {

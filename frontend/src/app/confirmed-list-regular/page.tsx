@@ -153,19 +153,31 @@ export default function ConfirmedListRegularPage() {
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
           (!deptFilter || (e.department || '').includes(deptFilter))
         );
+        // 휴일 근무 시간 = 각 레코드에서 토/일/공휴일 날짜의 (기본+연장) 합
+        // 정규직은 확정 시 주말/공휴일이면 regular=0, overtime=전량으로 저장되므로
+        // 레코드 단위로 날짜 체크해서 holiday_hours를 별도 집계
         const totals = filtered.reduce((acc: any, e: any) => {
+          let empHoliday = 0;
+          for (const r of (e.records || [])) {
+            if (isHolidayOrWeekend(r.date)) {
+              empHoliday += (parseFloat(r.regular_hours) || 0) + (parseFloat(r.overtime_hours) || 0);
+            }
+          }
+          e._holiday_hours = Math.round(empHoliday * 10) / 10; // 각 emp에 attach (상세에서 재사용)
           acc.regular += e.regular_hours || 0;
-          acc.overtime += e.overtime_hours || 0;
+          // overtime 합계에서 휴일분 제외 (평일 연장만)
+          acc.overtime += Math.max((e.overtime_hours || 0) - empHoliday, 0);
           acc.night += e.night_hours || 0;
+          acc.holiday += empHoliday;
           return acc;
-        }, { regular: 0, overtime: 0, night: 0 });
+        }, { regular: 0, overtime: 0, night: 0, holiday: 0 });
         const vacCount = Object.entries(vacationMap)
           .filter(([k]) => k.includes(yearMonth) && filtered.some((e: any) => e.name === k.split('|')[0]))
           .reduce((sum, [, vType]) => sum + (typeof vType === 'string' && vType.includes('반차') ? 0.5 : 1), 0);
         return (
         <>
           {/* Stats Board */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-4">
             <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
               <p className="text-2xl font-bold text-gray-900">{filtered.length}</p>
               <p className="text-xs text-gray-500 mt-1">총 근무자</p>
@@ -177,6 +189,10 @@ export default function ConfirmedListRegularPage() {
             <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
               <p className="text-2xl font-bold text-amber-700">{totals.overtime.toFixed(1)}</p>
               <p className="text-xs text-gray-500 mt-1">연장시간(h)</p>
+            </div>
+            <div className="bg-white rounded-xl border border-red-200 p-4 text-center">
+              <p className="text-2xl font-bold text-red-700">{totals.holiday.toFixed(1)}</p>
+              <p className="text-xs text-gray-500 mt-1">휴일근무(h)</p>
             </div>
             <div className="bg-white rounded-xl border border-purple-200 p-4 text-center">
               <p className="text-2xl font-bold text-purple-700">{totals.night.toFixed(1)}</p>
@@ -200,7 +216,7 @@ export default function ConfirmedListRegularPage() {
                   <th className="py-2 px-4 font-medium text-gray-600 text-right">연장(h)</th>
                   <th className="py-2 px-4 font-medium text-gray-600 text-right">야간(h)</th>
                   <th className="py-2 px-4 font-medium text-gray-600 text-right">휴게(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">휴일</th>
+                  <th className="py-2 px-4 font-medium text-gray-600 text-right">휴일(h)</th>
                 </tr>
               </thead>
               <tbody>
@@ -224,14 +240,15 @@ export default function ConfirmedListRegularPage() {
                             return <>{emp.regular_hours.toFixed(1)}</>;
                           })()}
                         </td>
-                        <td className="py-2.5 px-4 text-right text-amber-700">{emp.overtime_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-amber-700">{Math.max(emp.overtime_hours - (emp._holiday_hours || 0), 0).toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-purple-700">{emp.night_hours.toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-gray-500">{emp.break_hours.toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-red-600">{emp.holiday_days}</td>
+                        <td className="py-2.5 px-4 text-right text-red-600 font-medium">{(emp._holiday_hours || 0).toFixed(1)}</td>
                       </tr>
                       {isExpanded && (
                         <tr>
                           <td colSpan={8} className="p-0">
+                            {/* colSpan=8 matches the outer summary table's 8 columns, not the inner detail's 10 */}
                             <div className="bg-indigo-50/30 border-b border-indigo-200">
                               <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
                                 <span className="text-xs font-semibold text-indigo-800">{emp.name} 일별 상세</span>
@@ -245,6 +262,7 @@ export default function ConfirmedListRegularPage() {
                                     <th className="py-1.5 px-3">기준</th>
                                     <th className="py-1.5 px-3 text-right">기본</th>
                                     <th className="py-1.5 px-3 text-right">연장</th>
+                                    <th className="py-1.5 px-3 text-right">휴일</th>
                                     <th className="py-1.5 px-3 text-right">야간</th>
                                     <th className="py-1.5 px-3 text-right">휴게</th>
                                     <th className="py-1.5 px-3">관리</th>
@@ -281,15 +299,26 @@ export default function ConfirmedListRegularPage() {
                                           <td className="py-1.5 px-3 text-right">0.0</td>
                                           <td className="py-1.5 px-3 text-right">0.0</td>
                                           <td className="py-1.5 px-3 text-right">0.0</td>
+                                          <td className="py-1.5 px-3 text-right">0.0</td>
                                           <td className="py-1.5 px-3"></td>
                                         </tr>
                                       );
                                     }
                                     const vType = vacationMap[`${emp.name}|${r.date}`];
+                                    const isHoliday = isHolidayOrWeekend(r.date);
+                                    const holidayLabel = (() => {
+                                      if (!isHoliday) return null;
+                                      const d = new Date(r.date + 'T00:00:00+09:00');
+                                      const dow = d.getDay();
+                                      if (dow === 6) return '토요일';
+                                      if (dow === 0) return '일요일';
+                                      return '공휴일';
+                                    })();
                                     return (
-                                    <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-50/50' : vType?.includes('반차') ? 'bg-amber-50/50 hover:bg-amber-50' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-white/60'}>
+                                    <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-50/50' : isHoliday ? 'bg-red-50/40 hover:bg-red-50' : vType?.includes('반차') ? 'bg-amber-50/50 hover:bg-amber-50' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-white/60'}>
                                       <td className="py-1.5 px-3">
                                         {r.date}
+                                        {holidayLabel && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-red-100 text-red-700">{holidayLabel}</span>}
                                         {r.source === 'vacation' && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-100 text-violet-700">{r.memo || '연차'}</span>}
                                         {r.source !== 'vacation' && vType && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vType.includes('반차') ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{vType}</span>}
                                       </td>
@@ -307,7 +336,12 @@ export default function ConfirmedListRegularPage() {
                                         {vType?.includes('반차') && <span className="ml-0.5 text-[9px] text-red-600 font-medium">+반차4h</span>}
                                         {vType === '연차' && <span className="ml-0.5 text-[9px] text-red-600 font-medium">+휴가8h</span>}
                                       </td>
-                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-amber-700 font-medium">{editForm.overtime_hours}</span> : parseFloat(r.overtime_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right text-amber-700">
+                                        {isHoliday ? '0.0' : (editingId === r.id ? editForm.overtime_hours : parseFloat(r.overtime_hours).toFixed(1))}
+                                      </td>
+                                      <td className="py-1.5 px-3 text-right text-red-700 font-medium">
+                                        {isHoliday ? ((parseFloat(r.regular_hours) || 0) + (parseFloat(r.overtime_hours) || 0)).toFixed(1) : '0.0'}
+                                      </td>
                                       <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-purple-700 font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
                                       <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-gray-500">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
                                       <td className="py-1.5 px-3">

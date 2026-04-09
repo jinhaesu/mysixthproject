@@ -60,8 +60,8 @@ export default function PayrollCalcPage() {
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','은행','계좌번호','주민번호','기본급','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일일','휴일수당','지급액','국민연금','건강보험','장기요양','고용보험','소득세','주민세','공제계','실지급액'];
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.bank_name, r.bank_account, r.id_number, r.base_pay, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, r.holiday_days, r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
+    const header = ['성명','부서','은행','계좌번호','주민번호','기본급','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금','건강보험','장기요양','고용보험','소득세','주민세','공제계','실지급액'];
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.bank_name, r.bank_account, r.id_number, r.base_pay, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, (r.holiday_hours || 0).toFixed(1), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
     const csv = [header, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -79,7 +79,7 @@ export default function PayrollCalcPage() {
         </h1>
         <p className="text-sm text-gray-500 mt-1">확정 근태 + 기본급 설정 기반 급여 자동 계산</p>
         <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-xs text-indigo-800">
-          <b>연장/휴일 수당 계산 기준:</b> 시급 × 1.5배 | 연장/휴일 시간은 <b>30분 단위 내림</b> 적용 (0.1~0.4h → 0h, 0.5h = 30분) | 토/일/공휴일 근무 → 전량 연장
+          <b>수당 계산:</b> 연장/휴일/야간 각 <b>시급 × 1.5배</b> | <b>30분 단위 내림</b> (0.1~0.4h → 0, 0.5h = 30분) | 토/일/공휴일 근무 = <b>휴일(h) 별도 집계</b> (연장 제외) | 22:00~06:00 = 야간(h) 별도 | 연장 2h 초과 시 저녁식사 30분 휴게 자동 추가
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right">일</th>
                   <th className="py-2 px-2 text-right">연장h</th>
                   <th className="py-2 px-2 text-right">연장수당</th>
-                  <th className="py-2 px-2 text-right">휴일</th>
+                  <th className="py-2 px-2 text-right">휴일h</th>
                   <th className="py-2 px-2 text-right">휴일수당</th>
                   <th className="py-2 px-2 text-right font-bold">지급액</th>
                   <th className="py-2 px-2 text-right">국민연금<br/><span className="text-[8px] text-gray-400">4.5%</span></th>
@@ -160,7 +160,7 @@ export default function PayrollCalcPage() {
                     <td className="py-1.5 px-2 text-right">{r.work_days}</td>
                     <td className="py-1.5 px-2 text-right text-amber-700">{(r.overtime_hours || 0).toFixed(1)}</td>
                     <td className="py-1.5 px-2 text-right text-amber-700">{fmt.format(r.overtime_pay)}</td>
-                    <td className="py-1.5 px-2 text-right">{r.holiday_days}</td>
+                    <td className="py-1.5 px-2 text-right text-red-700">{(r.holiday_hours || 0).toFixed(1)}</td>
                     <td className="py-1.5 px-2 text-right text-red-600">{fmt.format(r.holiday_pay)}</td>
                     <td className="py-1.5 px-2 text-right font-medium">{fmt.format(r.gross_pay)}</td>
                     <td className="py-1.5 px-2 text-right text-gray-500">{fmt.format(r.national_pension)}</td>
@@ -180,7 +180,7 @@ export default function PayrollCalcPage() {
                   <td className="py-2 px-2 text-right">{sum('work_days')}</td>
                   <td className="py-2 px-2 text-right">{sum('overtime_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('overtime_pay'))}</td>
-                  <td className="py-2 px-2 text-right">{sum('holiday_days')}</td>
+                  <td className="py-2 px-2 text-right">{sum('holiday_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('holiday_pay'))}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('gross_pay'))}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('national_pension'))}</td>

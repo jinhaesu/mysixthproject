@@ -334,6 +334,10 @@ export default function AttendanceSummaryRegularPage() {
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
       setCheckedRows(new Set());
+      // 확정 후 캐시 무효화 + 크로스 페이지 signal + 재조회
+      delete _cache[`reg-${year}-${month}`];
+      bumpRegularDataVersion();
+      setForceRefresh(f => f + 1);
     } catch (e: any) { alert(e.message); }
     finally { setConfirming(false); }
   };
@@ -364,6 +368,9 @@ export default function AttendanceSummaryRegularPage() {
       const result = await confirmAttendance(records);
       alert(`${result.confirmed}건 확정 완료`);
       setCheckedEmps(new Set());
+      delete _cache[`reg-${year}-${month}`];
+      bumpRegularDataVersion();
+      setForceRefresh(f => f + 1);
     } catch (e: any) { alert(e.message); }
     finally { setConfirming(false); }
   };
@@ -541,6 +548,9 @@ export default function AttendanceSummaryRegularPage() {
                         emp.actuals.forEach((a: any) => cSet.delete(`${emp.name}|${a.date}`));
                         setConfirmedSet(cSet);
                         setConfirmedEmpSet(cEmpSet);
+                        // 캐시 무효화 + signal — 미확정 캘린더에도 바로 반영되도록
+                        delete _cache[`reg-${year}-${month}`];
+                        bumpRegularDataVersion();
                         alert('확정 취소 완료');
                       } catch (err: any) { alert(err.message); }
                     }} className="ml-1 px-1.5 py-0.5 text-[10px] font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded" title="확정 취소">

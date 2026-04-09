@@ -127,13 +127,26 @@ export default function ConfirmedListDispatchPage() {
       ) : data.length === 0 ? (
         <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">확정된 데이터가 없습니다.</div>
       ) : (() => {
-        // 레코드 단위 분류: 각 record.effective_type으로 filter/집계하면
-        // 한 사람이 여러 type을 가져도 정산관리와 동일하게 분리됨.
-        // 없으면 (구 backend) emp.type으로 fallback.
+        // 레코드 단위 분류: record.employee_type을 직접 normalize해서 사용.
+        // 상세 뷰에서 대표님이 확인한 타입 뱃지와 1:1 일치시키는 소스 of truth.
         const passesFilters = (e: any) =>
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
           (!deptFilter || (e.department || '').includes(deptFilter));
-        const recType = (r: any, empType: string) => (r.effective_type || empType || '?');
+        const normType = (t: string | null | undefined): string => {
+          const s = (t || '').toString();
+          if (!s) return '';
+          if (s.includes('파견')) return '파견';
+          if (s.includes('알바') || s.includes('사업소득')) return '알바';
+          if (s.includes('정규')) return '정규직';
+          return '?';
+        };
+        // 우선순위: 레코드 raw employee_type → backend effective_type → emp.type
+        const recType = (r: any, empType: string) => {
+          const fromRecord = normType(r.employee_type);
+          if (fromRecord) return fromRecord;
+          if (r.effective_type) return normType(r.effective_type) || r.effective_type;
+          return normType(empType) || empType || '?';
+        };
         const isTypeMatch = (t: string) => !typeFilter || t === typeFilter;
 
         // 필터 통과 레코드만 대상으로 사람 단위 재집계 (employee key = phone|type)
@@ -228,10 +241,11 @@ export default function ConfirmedListDispatchPage() {
               </thead>
               <tbody>
                 {filtered.map((emp: any) => {
-                  const isExpanded = expandedEmp === emp.name;
+                  const rowKey = `${emp.name}|${emp.type}`;
+                  const isExpanded = expandedEmp === rowKey;
                   return (
-                    <React.Fragment key={emp.name}>
-                      <tr className={`hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${isExpanded ? 'bg-indigo-50/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : emp.name)}>
+                    <React.Fragment key={rowKey}>
+                      <tr className={`hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${isExpanded ? 'bg-indigo-50/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : rowKey)}>
                         <td className="py-2.5 px-4 font-medium text-gray-900">
                           {emp.name}
                           <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-blue-50 text-blue-700' : emp.type === '알바' ? 'bg-orange-50 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{emp.type || '?'}</span>

@@ -8,6 +8,19 @@ const router = Router();
 // In-memory OTP store: key = token, value = { code, phone, expiresAt }
 const otpStore = new Map<string, { code: string; phone: string; expiresAt: number }>();
 
+// GET /api/regular-public/_health - Deploy/version verification (no auth)
+// Returns current server time, business date, calendar date to verify 07:00 boundary is active.
+router.get('/_health', async (_req: Request, res: Response) => {
+  const now = new Date();
+  res.json({
+    server_utc: now.toISOString(),
+    kst_calendar_date: getKSTDate(),
+    kst_business_date: getBusinessDate(),
+    business_day_start_hour: 7,
+    build_marker: 'bdate-v1', // bump this to verify new deploys
+  });
+});
+
 // POST /api/regular-public/:token/vacation - Request vacation (no GPS needed)
 router.post('/:token/vacation', async (req: Request, res: Response) => {
   try {
@@ -255,6 +268,8 @@ router.get('/:token', async (req: Request, res: Response) => {
       notices: notices || [],
       org_chart: orgChart,
       date: today,
+      business_date: businessToday, // 07:00 경계 기준 근무일 (야간조 자정 넘김 대응)
+      attendance_date: attendanceDate, // 실제 조회된 attendance record의 date
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

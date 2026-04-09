@@ -48,7 +48,7 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
 }
 
 const _cache: Record<string, { data: any; time: number }> = {};
-const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_TTL = 30 * 1000; // 30s — short TTL so 정산관리와 총합 불일치 시 빠르게 재조회
 
 export default function ConfirmedListDispatchPage() {
   const [yearMonth, setYearMonth] = usePersistedState("cld_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());

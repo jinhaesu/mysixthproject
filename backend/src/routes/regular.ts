@@ -1181,18 +1181,22 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
       return t || '?';
     };
 
-    // Summarize by employee
+    // Summarize by (employee_name + effective_type) so records with different
+    // classifications under the same name are split — this matches the per-record
+    // classification used by /api/survey/settlement, guaranteeing identical totals.
     const empMap = new Map<string, any>();
     for (const r of records as any[]) {
-      if (!empMap.has(r.employee_name)) {
-        empMap.set(r.employee_name, {
-          name: r.employee_name, phone: r.employee_phone, type: getEffectiveType(r),
+      const effType = getEffectiveType(r);
+      const key = `${r.employee_name}|${effType}`;
+      if (!empMap.has(key)) {
+        empMap.set(key, {
+          name: r.employee_name, phone: r.employee_phone, type: effType,
           department: deptMap.get(r.employee_name) || '',
           days: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, break_hours: 0, holiday_days: 0,
           records: []
         });
       }
-      const emp = empMap.get(r.employee_name)!;
+      const emp = empMap.get(key)!;
       emp.days++;
       emp.regular_hours += parseFloat(r.regular_hours) || 0;
       emp.overtime_hours += parseFloat(r.overtime_hours) || 0;
@@ -1202,7 +1206,15 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
       emp.records.push(r);
     }
 
-    res.json(Array.from(empMap.values()));
+    // Round sums to 2 decimals to match /api/survey/settlement output exactly
+    const result = Array.from(empMap.values()).map((e: any) => ({
+      ...e,
+      regular_hours: Math.round(e.regular_hours * 100) / 100,
+      overtime_hours: Math.round(e.overtime_hours * 100) / 100,
+      night_hours: Math.round(e.night_hours * 100) / 100,
+      break_hours: Math.round(e.break_hours * 100) / 100,
+    }));
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -239,14 +239,20 @@ export default function ConfirmedListRegularPage() {
                         <td className="py-2.5 px-4 text-right text-blue-700">
                           {(() => {
                             const ym = yearMonth;
+                            // 레코드 날짜 set — confirmed_attendance에 이미 저장된 날짜는 휴가 별도 가산 금지
+                            // (반차 확정 시 calcHours가 이미 regular 8h 저장하므로 중복 방지)
+                            const recordDates = new Set((emp.records || []).map((r: any) => r.date));
                             const vacDays = Object.entries(vacationMap).filter(([k]) => k.startsWith(`${emp.name}|${ym}`));
-                            const fullVac = vacDays.filter(([,t]) => t === '연차').length;
-                            const halfVac = vacDays.filter(([,t]) => t?.includes('반차')).length;
-                            const vacH = fullVac * 8 + halfVac * 4;
-                            // 기본시간 = 평일 기본만 (휴일 레코드는 제외)
+                            let unconfirmedVacH = 0;
+                            for (const [k, t] of vacDays) {
+                              const d = k.split('|')[1];
+                              if (recordDates.has(d)) continue;
+                              if (t === '연차') unconfirmedVacH += 8;
+                              else if (t?.includes('반차')) unconfirmedVacH += 4;
+                            }
                             const weekdayReg = emp._weekday_regular || 0;
-                            const total = weekdayReg + vacH;
-                            if (vacH > 0) return <>{total.toFixed(1)} <span className="text-[9px] text-red-600 font-medium">(휴가{vacH}h 포함)</span></>;
+                            const total = weekdayReg + unconfirmedVacH;
+                            if (unconfirmedVacH > 0) return <>{total.toFixed(1)} <span className="text-[9px] text-red-600 font-medium">(미확정 휴가{unconfirmedVacH}h 포함)</span></>;
                             return <>{weekdayReg.toFixed(1)}</>;
                           })()}
                         </td>

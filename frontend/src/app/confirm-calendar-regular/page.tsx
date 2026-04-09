@@ -15,7 +15,9 @@ import {
   getConfirmedList,
   confirmAttendance,
   deleteConfirmedRecord,
+  getRegularVacations,
 } from "@/lib/api";
+import { getRegularDataVersion } from "@/lib/dataSignal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,13 +66,39 @@ const EMPLOYEE_TYPE = "정규직";
 const CACHE_TTL = 3 * 60 * 60 * 1000;
 const _summaryCache: Record<string, { data: any; time: number }> = {};
 const _confirmedCache: Record<string, { data: any[]; time: number }> = {};
+const _cacheVersion: { v: string } = { v: '' }; // cross-page signal 추적
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const ceil30Min = (min: number) => Math.ceil(min / 30) * 30;
 const floor30Min = (min: number) => Math.floor(min / 30) * 30;
 
-function calcHours(clockIn: string, clockOut: string) {
+function calcHours(clockIn: string, clockOut: string, vacationType?: string) {
+  // 반차: 실제 근무시간과 무관하게 기본 4h(실근무) + 반차 4h = regular 8h 고정, 연장 0, 휴게 0
+  if (vacationType && vacationType.includes('반차')) {
+    // 야간 시간만 실제 clock-in/out에서 계산 (반차 시간대가 야간과 겹칠 경우)
+    let night = 0;
+    if (clockIn && clockOut) {
+      const [h1, m1] = clockIn.split(":").map(Number);
+      const [h2, m2] = clockOut.split(":").map(Number);
+      if (!isNaN(h1) && !isNaN(h2)) {
+        const startMin = ceil30Min(h1 * 60 + (m1 || 0));
+        let endMin = floor30Min(h2 * 60 + (m2 || 0));
+        if (endMin <= startMin) endMin += 1440;
+        let nightMin = 0;
+        for (let min = startMin; min < endMin; min++) {
+          const h = Math.floor((min % 1440) / 60);
+          if (h >= 22 || h < 6) nightMin++;
+        }
+        night = Math.round(nightMin / 60 * 10) / 10;
+      }
+    }
+    return { regular: 8, overtime: 0, night, breakH: 0 };
+  }
+  // 연차(전일 휴가): 출근/퇴근 입력해도 regular 8h, 연장/야간/휴게 모두 0
+  if (vacationType === '연차') {
+    return { regular: 8, overtime: 0, night: 0, breakH: 0 };
+  }
   if (!clockIn || !clockOut) return { regular: 0, overtime: 0, night: 0, breakH: 1 };
   const [h1, m1] = clockIn.split(":").map(Number);
   const [h2, m2] = clockOut.split(":").map(Number);
@@ -150,6 +178,7 @@ export default function ConfirmCalendarRegularPage() {
 
   const [summaryData, setSummaryData] = useState<Employee[]>([]);
   const [confirmedData, setConfirmedData] = useState<any[]>([]);
+  const [vacationMap, setVacationMap] = useState<Record<string, string>>({}); // `${name}|${date}` → type
   const [loading, setLoading] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -165,6 +194,16 @@ export default function ConfirmCalendarRegularPage() {
     async (forceRefresh = false) => {
       setLoading(true);
       try {
+        // 크로스 페이지 invalidation signal 체크:
+        // 다른 페이지에서 데이터를 변경했다면 signal 버전이 바뀌어 있으므로 캐시 무효화
+        const currentVer = getRegularDataVersion();
+        if ((_cacheVersion as any).v !== currentVer) {
+          Object.keys(_summaryCache).forEach(k => delete _summaryCache[k]);
+          Object.keys(_confirmedCache).forEach(k => delete _confirmedCache[k]);
+          (_cacheVersion as any).v = currentVer;
+          forceRefresh = true;
+        }
+
         // Summary
         const sKey = `reg-${year}-${month}`;
         let summary = _summaryCache[sKey];
@@ -197,6 +236,23 @@ export default function ConfirmCalendarRegularPage() {
           confirmed = _confirmedCache[cKey];
         }
         setConfirmedData(confirmed.data);
+
+        // 휴가(연차/반차) map 로드 - 확정 계산 시 반차 여부 판단용
+        try {
+          const vacations = await getRegularVacations({ status: 'approved' });
+          const vmap: Record<string, string> = {};
+          for (const v of (vacations || [])) {
+            const start = new Date(v.start_date + 'T00:00:00+09:00');
+            const end = new Date(v.end_date + 'T00:00:00+09:00');
+            for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
+              const y2 = dt.getFullYear();
+              const m2 = String(dt.getMonth() + 1).padStart(2, '0');
+              const d2 = String(dt.getDate()).padStart(2, '0');
+              vmap[`${v.employee_name}|${y2}-${m2}-${d2}`] = v.type || '연차';
+            }
+          }
+          setVacationMap(vmap);
+        } catch {}
       } catch (e: any) {
         alert(e.message);
       } finally {
@@ -208,6 +264,18 @@ export default function ConfirmCalendarRegularPage() {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // 탭 포커스 시 cross-page signal 체크 → 다른 페이지에서 변경됐으면 재조회
+  useEffect(() => {
+    const handler = () => {
+      const currentVer = getRegularDataVersion();
+      if ((_cacheVersion as any).v !== currentVer) {
+        loadData(true);
+      }
+    };
+    window.addEventListener('focus', handler);
+    return () => window.removeEventListener('focus', handler);
   }, [loadData]);
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -356,7 +424,8 @@ export default function ConfirmCalendarRegularPage() {
       try {
         const clockIn = useSource === "planned" && entry.plannedClockIn ? entry.plannedClockIn : (entry.actualClockIn || entry.clockIn);
         const clockOut = useSource === "planned" && entry.plannedClockOut ? entry.plannedClockOut : (entry.actualClockOut || entry.clockOut);
-        const { regular, overtime, night, breakH } = calcHours(clockIn, clockOut);
+        const vType = vacationMap[`${entry.emp.name}|${entry.date}`];
+        const { regular, overtime, night, breakH } = calcHours(clockIn, clockOut, vType);
         const record = {
           employee_type: EMPLOYEE_TYPE,
           employee_name: entry.emp.name,
@@ -381,7 +450,7 @@ export default function ConfirmCalendarRegularPage() {
         setActionLoading(null);
       }
     },
-    [yearMonth, loadData]
+    [yearMonth, loadData, vacationMap]
   );
 
   const handleCancelConfirm = useCallback(
@@ -417,7 +486,8 @@ export default function ConfirmCalendarRegularPage() {
         if (confirmedId) {
           await deleteConfirmedRecord(confirmedId);
         } else {
-          const { regular, overtime, night, breakH } = calcHours(clockIn, clockOut);
+          const vType = vacationMap[`${emp.name}|${date}`];
+          const { regular, overtime, night, breakH } = calcHours(clockIn, clockOut, vType);
           await confirmAttendance([
             {
               employee_type: EMPLOYEE_TYPE,
@@ -444,7 +514,7 @@ export default function ConfirmCalendarRegularPage() {
         setActionLoading(null);
       }
     },
-    [yearMonth, loadData]
+    [yearMonth, loadData, vacationMap]
   );
 
   // ── Popup data ───────────────────────────────────────────────────────────────

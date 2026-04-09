@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2, CheckCircle2, XCircle } from "lucide-react";
-import { getAttendanceSummaryRegular, confirmAttendance, getConfirmedList, deleteConfirmedRecord, getRegularVacations } from "@/lib/api";
+import { getAttendanceSummaryRegular, confirmAttendance, getConfirmedList, deleteConfirmedRecord, getRegularVacations, deleteRegularAttendanceMonth } from "@/lib/api";
+import { bumpRegularDataVersion } from "@/lib/dataSignal";
 
 // Korean public holidays
 const HOLIDAYS: Record<number, string[]> = {
@@ -205,8 +206,28 @@ export default function AttendanceSummaryRegularPage() {
   const ceil30Min = (min: number) => Math.ceil(min / 30) * 30;
   const floor30Min = (min: number) => Math.floor(min / 30) * 30;
 
-  // isHalfDay: 반차일 경우 기본 4h cap, 초과분 연장
+  // isHalfDay: 반차일 경우 기본 8h 고정(실근무 4h + 반차 4h), 연장 없음
   const calcHoursFromTimes = (clockIn: string, clockOut: string, breakH = 1, isHalfDay = false) => {
+    if (isHalfDay) {
+      // 반차: 출/퇴근 시각과 무관하게 기본 8h, 연장 0. 야간 시간만 clock 기반으로 계산.
+      let night = 0;
+      if (clockIn && clockOut && clockIn !== '-' && clockOut !== '-') {
+        const [h1,m1] = clockIn.split(':').map(Number);
+        const [h2,m2] = clockOut.split(':').map(Number);
+        if (!isNaN(h1) && !isNaN(h2)) {
+          const startMin = ceil30Min(h1 * 60 + (m1 || 0));
+          let endMin = floor30Min(h2 * 60 + (m2 || 0));
+          if (endMin <= startMin) endMin += 1440;
+          let nightMin = 0;
+          for (let min = startMin; min < endMin; min++) {
+            const h = Math.floor((min % 1440) / 60);
+            if (h >= 22 || h < 6) nightMin++;
+          }
+          night = Math.round(nightMin / 60 * 10) / 10;
+        }
+      }
+      return { regular: 8, overtime: 0, night };
+    }
     if (!clockIn || !clockOut || clockIn === '-' || clockOut === '-') return { regular: 0, overtime: 0, night: 0 };
     const [h1,m1] = clockIn.split(':').map(Number);
     const [h2,m2] = clockOut.split(':').map(Number);
@@ -215,7 +236,6 @@ export default function AttendanceSummaryRegularPage() {
     let endMin = floor30Min(h2 * 60 + (m2 || 0));
     if (endMin <= startMin) endMin += 1440;
     const total = Math.max((endMin - startMin) / 60 - breakH, 0);
-    const cap = isHalfDay ? 4 : 8;
     // 야간시간 계산 (22:00~06:00) - 야간시간은 기본/연장에서 분리
     let nightMin = 0;
     for (let min = startMin; min < endMin; min++) {
@@ -224,8 +244,8 @@ export default function AttendanceSummaryRegularPage() {
     }
     const night = Math.round(nightMin / 60 * 10) / 10;
     const dayWork = Math.max(total - night, 0); // 주간 근무시간
-    const regular = Math.min(dayWork, cap);
-    const overtime = Math.max(dayWork - cap, 0);
+    const regular = Math.min(dayWork, 8);
+    const overtime = Math.max(dayWork - 8, 0);
     return { regular, overtime, night };
   };
 
@@ -254,12 +274,12 @@ export default function AttendanceSummaryRegularPage() {
       if (vInfo.type === '연차' && !hasActual) {
         vacRegular += 8;
         days++;
-      } else if (vInfo.type?.includes('반차') && hasActual) {
-        vacRegular += 4; // 반차 4h + 실근무 4h = 기본 8h
       } else if (vInfo.type?.includes('반차') && !hasActual) {
         vacRegular += 4;
         days++;
       }
+      // 반차 + 실근무: calcHoursFromTimes가 이미 regular 8h(실 4h + 반차 4h) 반환하므로
+      // 여기서 추가로 더하지 않음 (이전 버그: 중복 집계)
     });
     for (const actual of emp.actuals) {
       if (actual.isVacOnly) continue; // skip vacation-only rows
@@ -529,18 +549,21 @@ export default function AttendanceSummaryRegularPage() {
                   )}
                   <button onClick={async (e) => {
                     e.stopPropagation();
-                    if (!confirm(`${emp.name}을(를) 리스트에서 제거하시겠습니까? 확정된 데이터도 함께 삭제됩니다.`)) return;
+                    if (!confirm(`${emp.name}을(를) 완전히 삭제하시겠습니까?\n\n해당 월의 실제 출퇴근 기록 + 확정 데이터가 모두 삭제됩니다.\n(미확정 캘린더에서도 사라집니다)`)) return;
                     try {
-                      const ym = `${year}-${String(month).padStart(2,'0')}`;
-                      const confirmed = await getConfirmedList(ym, '정규직');
-                      const empData = (confirmed || []).find((c: any) => c.name === emp.name);
-                      if (empData?.records) {
-                        for (const rec of empData.records) { await deleteConfirmedRecord(rec.id); }
-                      }
-                    } catch {}
+                      // 실제 출퇴근 기록 + 확정 기록 일괄 삭제 (백엔드)
+                      await deleteRegularAttendanceMonth(emp.id, year, month);
+                      // 자체 캐시 무효화 + 크로스 페이지 signal
+                      delete _cache[`reg-${year}-${month}`];
+                      bumpRegularDataVersion();
+                    } catch (err: any) {
+                      alert(err.message || '삭제 실패');
+                      return;
+                    }
                     setHiddenEmps(new Set([...hiddenEmps, emp.id]));
+                    setForceRefresh(f => f + 1); // 재조회
                   }}
-                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거 + 확정 삭제">
+                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="완전 삭제 (실제+확정, 미확정 캘린더와 동기화)">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

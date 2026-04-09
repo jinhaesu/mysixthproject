@@ -1109,6 +1109,47 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// DELETE /api/regular/attendance-month/:employeeId?year=X&month=Y
+// 특정 직원의 해당 월 regular_attendance + confirmed_attendance 완전 삭제
+// 근태정보 종합요약의 '리스트에서 제거' 버튼이 호출 → 미확정 캘린더와 일치 유지
+router.delete('/attendance-month/:employeeId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employeeId } = req.params;
+    const { year, month } = req.query as Record<string, string>;
+    if (!year || !month) { res.status(400).json({ error: 'year, month 필요' }); return; }
+    const mm = month.padStart(2, '0');
+    const startDate = `${year}-${mm}-01`;
+    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    const endDate = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+    const yearMonth = `${year}-${mm}`;
+
+    // 직원 이름 조회 (confirmed_attendance는 name으로 저장됨)
+    const emp = await dbGet('SELECT name FROM regular_employees WHERE id = ?', employeeId) as any;
+    const empName = emp?.name || '';
+
+    // regular_attendance 삭제 (실제 출퇴근 기록)
+    const delAtt = await dbRun(
+      'DELETE FROM regular_attendance WHERE employee_id = ? AND date >= ? AND date <= ?',
+      employeeId, startDate, endDate
+    );
+    // confirmed_attendance 삭제 (확정된 기록, 정규직만)
+    let delConf: any = { changes: 0 };
+    if (empName) {
+      delConf = await dbRun(
+        "DELETE FROM confirmed_attendance WHERE employee_name = ? AND employee_type = '정규직' AND year_month = ?",
+        empName, yearMonth
+      );
+    }
+    res.json({
+      success: true,
+      deleted_attendance: (delAtt as any)?.changes || 0,
+      deleted_confirmed: (delConf as any)?.changes || 0,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/regular/attendance-confirm - Confirm attendance records
 router.post('/attendance-confirm', async (req: AuthRequest, res: Response) => {
   try {

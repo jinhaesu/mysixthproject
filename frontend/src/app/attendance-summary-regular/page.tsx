@@ -560,18 +560,40 @@ export default function AttendanceSummaryRegularPage() {
                   <button onClick={async (e) => {
                     e.stopPropagation();
                     if (!confirm(`${emp.name}을(를) 완전히 삭제하시겠습니까?\n\n해당 월의 실제 출퇴근 기록 + 확정 데이터가 모두 삭제됩니다.\n(미확정 캘린더에서도 사라집니다)`)) return;
+                    let confirmedDeleted = 0;
+                    let attendanceDeletedFailed = false;
+                    const errors: string[] = [];
+                    // 1) confirmed_attendance 삭제 (기존에 잘 작동하는 endpoint)
                     try {
-                      // 실제 출퇴근 기록 + 확정 기록 일괄 삭제 (백엔드)
-                      await deleteRegularAttendanceMonth(emp.id, year, month);
-                      // 자체 캐시 무효화 + 크로스 페이지 signal
-                      delete _cache[`reg-${year}-${month}`];
-                      bumpRegularDataVersion();
+                      const ym = `${year}-${String(month).padStart(2,'0')}`;
+                      const confirmed = await getConfirmedList(ym, '정규직');
+                      const empData = (confirmed || []).find((c: any) => c.name === emp.name);
+                      if (empData?.records) {
+                        for (const rec of empData.records) {
+                          try { await deleteConfirmedRecord(rec.id); confirmedDeleted++; } catch {}
+                        }
+                      }
                     } catch (err: any) {
-                      alert(err.message || '삭제 실패');
-                      return;
+                      errors.push(`확정 조회 실패: ${err.message || err}`);
                     }
+                    // 2) regular_attendance 삭제 (신규 endpoint — Railway 배포 지연 가능)
+                    try {
+                      await deleteRegularAttendanceMonth(emp.id, year, month);
+                    } catch (err: any) {
+                      attendanceDeletedFailed = true;
+                      errors.push(`실제기록 삭제 실패: ${err.message || err}`);
+                    }
+                    // 3) 로컬 캐시 무효화 + signal
+                    delete _cache[`reg-${year}-${month}`];
+                    bumpRegularDataVersion();
                     setHiddenEmps(new Set([...hiddenEmps, emp.id]));
-                    setForceRefresh(f => f + 1); // 재조회
+                    setForceRefresh(f => f + 1);
+
+                    if (attendanceDeletedFailed) {
+                      alert(`확정 ${confirmedDeleted}건 삭제 완료.\n\n실제 출퇴근 기록(regular_attendance) 삭제는 실패했습니다 (백엔드 배포 대기 중일 수 있음).\n잠시 후 다시 시도하세요.\n\n에러: ${errors.join(' / ')}`);
+                    } else if (errors.length > 0) {
+                      alert(`부분 성공 (${confirmedDeleted}건 확정 삭제). 에러: ${errors.join(' / ')}`);
+                    }
                   }}
                     className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="완전 삭제 (실제+확정, 미확정 캘린더와 동기화)">
                     <Trash2 className="w-3.5 h-3.5" />

@@ -1430,27 +1430,32 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       year_month
     ) as any[];
 
-    // Get workers for category fallback AND canonical identity (so multiple
-    // name spellings / phone variations collapse to one worker.id).
+    // Get workers for category fallback AND canonical identity
     const wCats = await dbAll('SELECT id, phone, category, name_ko FROM workers') as any[];
     const wCatMap = new Map<string, string>();
     const wIdByPhone = new Map<string, number>();
     const wIdByName = new Map<string, number>();
+    const normalizeName = (name: string | null | undefined) =>
+      (name || '').replace(/\(.*?\)/g, '').trim();
     for (const wc of wCats) {
       const wp = normalizePhone(wc.phone || '');
+      const nn = normalizeName(wc.name_ko);
       if (wc.category) {
         if (wp) wCatMap.set(wp, wc.category);
         if (wc.phone) wCatMap.set(wc.phone, wc.category);
         if (wc.name_ko) wCatMap.set(wc.name_ko, wc.category);
+        if (nn) wCatMap.set(nn, wc.category);
       }
       if (wp) wIdByPhone.set(wp, wc.id);
       if (wc.name_ko) wIdByName.set(wc.name_ko, wc.id);
+      if (nn) wIdByName.set(nn, wc.id);
     }
     const canonicalIdentity = (r: any): string => {
       const normPhone = normalizePhone(r.employee_phone || '');
-      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name);
+      const nn = normalizeName(r.employee_name);
+      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name) || wIdByName.get(nn);
       if (wid) return `w${wid}`;
-      return normPhone || r.employee_name;
+      return normPhone || nn || r.employee_name;
     };
 
     // Filter: use employee_type first, fallback to workers.category (by normalized phone or name)
@@ -1458,7 +1463,9 @@ router.get('/settlement', async (req: AuthRequest, res: Response) => {
       let t = r.employee_type || '';
       if (!t || (t !== '파견' && t !== '알바' && t !== '사업소득')) {
         const np = normalizePhone(r.employee_phone || '');
-        t = wCatMap.get(np) || wCatMap.get(r.employee_phone) || wCatMap.get(r.employee_name) || '';
+        const nn = normalizeName(r.employee_name);
+        t = wCatMap.get(np) || wCatMap.get(r.employee_phone) ||
+            wCatMap.get(r.employee_name) || wCatMap.get(nn) || '';
       }
       if (t.includes('파견')) return '파견';
       if (t.includes('알바') || t.includes('사업소득')) return '알바';

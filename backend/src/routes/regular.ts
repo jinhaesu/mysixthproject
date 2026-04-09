@@ -1155,22 +1155,31 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
     const records = await dbAll(`SELECT * FROM confirmed_attendance ${where} ORDER BY employee_name, date`, ...params);
 
     // Look up departments + worker categories + canonical worker IDs
+    // NOTE: No name_ko NOT NULL filter — we need ALL worker rows so category fallback
+    // works even for records whose worker row has no name_ko.
     const deptMap = new Map<string, string>();
     const catMap = new Map<string, string>();
     const wIdByPhone = new Map<string, number>();
     const wIdByName = new Map<string, number>();
+    // Name normalization: strip parenthetical suffixes like "(HO THI BICH)"
+    const normalizeName = (name: string | null | undefined) =>
+      (name || '').replace(/\(.*?\)/g, '').trim();
     try {
-      const workers = await dbAll("SELECT id, name_ko, phone, department, category FROM workers WHERE name_ko IS NOT NULL AND name_ko != ''");
+      const workers = await dbAll("SELECT id, name_ko, phone, department, category FROM workers");
       for (const w of workers as any[]) {
         const np = normalizePhone(w.phone || '');
+        const nn = normalizeName(w.name_ko);
         if (w.name_ko) deptMap.set(w.name_ko, w.department || '');
+        if (nn) deptMap.set(nn, w.department || '');
         if (w.category) {
           if (np) catMap.set(np, w.category);
           if (w.phone) catMap.set(w.phone, w.category);
           if (w.name_ko) catMap.set(w.name_ko, w.category);
+          if (nn) catMap.set(nn, w.category);
         }
         if (np) wIdByPhone.set(np, w.id);
         if (w.name_ko) wIdByName.set(w.name_ko, w.id);
+        if (nn) wIdByName.set(nn, w.id);
       }
       const regs = await dbAll("SELECT name, department FROM regular_employees WHERE is_active = 1");
       for (const r of regs as any[]) { if (r.name) deptMap.set(r.name, r.department || ''); }
@@ -1181,19 +1190,22 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
       let t = r.employee_type || '';
       if (!t || (t !== '파견' && t !== '알바' && t !== '사업소득')) {
         const np = normalizePhone(r.employee_phone || '');
-        t = catMap.get(np) || catMap.get(r.employee_phone) || catMap.get(r.employee_name) || t;
+        const nn = normalizeName(r.employee_name);
+        t = catMap.get(np) || catMap.get(r.employee_phone) ||
+            catMap.get(r.employee_name) || catMap.get(nn) || t;
       }
       if (t.includes('파견')) return '파견';
       if (t.includes('알바') || t.includes('사업소득')) return '알바';
       return t || '?';
     };
 
-    // Canonical identity: worker.id > phone > name (so '수빈' + '수빈(HO THI BICH)' merge)
+    // Canonical identity: worker.id (by phone or normalized name) > phone > normalized name
     const canonicalIdentity = (r: any): string => {
       const normPhone = normalizePhone(r.employee_phone || '');
-      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name);
+      const nn = normalizeName(r.employee_name);
+      const wid = wIdByPhone.get(normPhone) || wIdByName.get(r.employee_name) || wIdByName.get(nn);
       if (wid) return `w${wid}`;
-      return normPhone || r.employee_name;
+      return normPhone || nn || r.employee_name;
     };
 
     // Summarize by (normalized phone || name) + effective_type so that

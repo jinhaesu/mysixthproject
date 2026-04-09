@@ -127,24 +127,65 @@ export default function ConfirmedListDispatchPage() {
       ) : data.length === 0 ? (
         <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">확정된 데이터가 없습니다.</div>
       ) : (() => {
-        const filtered = data.filter((e: any) =>
+        // 레코드 단위 분류: 각 record.effective_type으로 filter/집계하면
+        // 한 사람이 여러 type을 가져도 정산관리와 동일하게 분리됨.
+        // 없으면 (구 backend) emp.type으로 fallback.
+        const passesFilters = (e: any) =>
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
-          (!deptFilter || (e.department || '').includes(deptFilter)) &&
-          (!typeFilter || e.type === typeFilter)
-        );
-        const totals = filtered.reduce((acc: any, e: any) => {
-          acc.regular += e.regular_hours || 0;
-          acc.overtime += e.overtime_hours || 0;
-          acc.night += e.night_hours || 0;
-          const k = e.type === '파견' ? 'dispatch' : e.type === '알바' ? 'alba' : 'other';
-          acc.regByType[k] = (acc.regByType[k] || 0) + (e.regular_hours || 0);
-          acc.otByType[k] = (acc.otByType[k] || 0) + (e.overtime_hours || 0);
-          acc.ntByType[k] = (acc.ntByType[k] || 0) + (e.night_hours || 0);
-          return acc;
-        }, { regular: 0, overtime: 0, night: 0,
-             regByType: {} as Record<string, number>,
-             otByType: {} as Record<string, number>,
-             ntByType: {} as Record<string, number> });
+          (!deptFilter || (e.department || '').includes(deptFilter));
+        const recType = (r: any, empType: string) => (r.effective_type || empType || '?');
+        const isTypeMatch = (t: string) => !typeFilter || t === typeFilter;
+
+        // 필터 통과 레코드만 대상으로 사람 단위 재집계 (employee key = phone|type)
+        type Bucket = { name: string; phone: string; type: string; department: string;
+          days: number; regular_hours: number; overtime_hours: number; night_hours: number;
+          break_hours: number; holiday_days: number; records: any[]; };
+        const bucketMap = new Map<string, Bucket>();
+        const totals = { regular: 0, overtime: 0, night: 0,
+          regByType: {} as Record<string, number>,
+          otByType: {} as Record<string, number>,
+          ntByType: {} as Record<string, number> };
+
+        for (const e of data) {
+          if (!passesFilters(e)) continue;
+          for (const r of (e.records || [])) {
+            const t = recType(r, e.type);
+            if (t === '정규직') continue; // 정규직은 이 페이지에서 제외
+            const reg = parseFloat(r.regular_hours) || 0;
+            const ot = parseFloat(r.overtime_hours) || 0;
+            const nt = parseFloat(r.night_hours) || 0;
+            const br = parseFloat(r.break_hours) || 0;
+            // 분류별 breakdown은 필터와 무관하게 항상 전체 표시
+            const k = t === '파견' ? 'dispatch' : t === '알바' ? 'alba' : 'other';
+            totals.regByType[k] = (totals.regByType[k] || 0) + reg;
+            totals.otByType[k] = (totals.otByType[k] || 0) + ot;
+            totals.ntByType[k] = (totals.ntByType[k] || 0) + nt;
+            // 메인 합계와 bucket은 filter 적용
+            if (!isTypeMatch(t)) continue;
+            totals.regular += reg;
+            totals.overtime += ot;
+            totals.night += nt;
+            const phoneNorm = (e.phone || '').replace(/[-\s]/g, '');
+            const idKey = phoneNorm || e.name;
+            const key = `${idKey}|${t}`;
+            if (!bucketMap.has(key)) {
+              bucketMap.set(key, {
+                name: e.name, phone: e.phone, type: t, department: e.department || '',
+                days: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0,
+                break_hours: 0, holiday_days: 0, records: [],
+              });
+            }
+            const b = bucketMap.get(key)!;
+            b.days++;
+            b.regular_hours += reg;
+            b.overtime_hours += ot;
+            b.night_hours += nt;
+            b.break_hours += br;
+            b.holiday_days += r.holiday_work ? 1 : 0;
+            b.records.push(r);
+          }
+        }
+        const filtered = Array.from(bucketMap.values());
         return (
         <>
           {/* Stats Board - filter 적용 시 해당 분류만 표시 */}

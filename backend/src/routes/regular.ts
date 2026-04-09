@@ -1185,9 +1185,11 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
     // (1) same person entered under different name spellings merges into one row,
     // (2) mixed-type records under one name split into per-type rows,
     // matching /api/survey/settlement's per-record classification.
+    // Also attach effective_type to each record for client-side filtering/debugging.
     const empMap = new Map<string, any>();
     for (const r of records as any[]) {
       const effType = getEffectiveType(r);
+      (r as any).effective_type = effType;
       const normPhone = r.employee_phone ? normalizePhone(r.employee_phone) : '';
       const identity = normPhone || r.employee_name;
       const key = `${identity}|${effType}`;

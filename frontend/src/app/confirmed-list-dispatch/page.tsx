@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Table2, Loader2, Edit3, Trash2 } from "lucide-react";
-import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord } from "@/lib/api";
+import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord, updateConfirmedRecordType } from "@/lib/api";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -201,13 +201,15 @@ export default function ConfirmedListDispatchPage() {
                         <tr>
                           <td colSpan={8} className="p-0">
                             <div className="bg-indigo-50/30 border-b border-indigo-200">
-                              <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
+                              <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
                                 <span className="text-xs font-semibold text-indigo-800">{emp.name} 일별 상세</span>
+                                <span className="text-[10px] text-indigo-600">타입 뱃지 클릭 → 드롭다운에서 변경 가능</span>
                               </div>
                               <table className="w-full text-xs">
                                 <thead>
                                   <tr className="bg-gray-50/80 text-left">
                                     <th className="py-1.5 px-3">날짜</th>
+                                    <th className="py-1.5 px-3">타입</th>
                                     <th className="py-1.5 px-3">출근</th>
                                     <th className="py-1.5 px-3">퇴근</th>
                                     <th className="py-1.5 px-3">기준</th>
@@ -219,9 +221,36 @@ export default function ConfirmedListDispatchPage() {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                  {emp.records.map((r: any) => (
+                                  {emp.records.map((r: any) => {
+                                    const rawType = r.employee_type || '';
+                                    const typeColor = rawType === '파견' ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : (rawType === '알바' || rawType === '사업소득') ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                      : rawType === '정규직' ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-red-50 text-red-700 border-red-200';
+                                    return (
                                     <tr key={r.id} className="hover:bg-white/60">
                                       <td className="py-1.5 px-3">{r.date}</td>
+                                      <td className="py-1.5 px-3">
+                                        <select
+                                          value={rawType}
+                                          onChange={async (e) => {
+                                            const newType = e.target.value;
+                                            try {
+                                              await updateConfirmedRecordType(r.id, newType);
+                                              delete _cache[`cld-${yearMonth}`];
+                                              load();
+                                            } catch (err: any) { alert(err.message || '타입 변경 실패'); }
+                                          }}
+                                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${typeColor} cursor-pointer`}
+                                          title="저장된 employee_type 값 (변경 시 즉시 반영)"
+                                        >
+                                          <option value="">(빈값)</option>
+                                          <option value="파견">파견</option>
+                                          <option value="알바">알바</option>
+                                          <option value="사업소득">사업소득</option>
+                                          <option value="정규직">정규직</option>
+                                        </select>
+                                      </td>
                                       <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
                                         const ci = e.target.value; const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);
                                         setEditForm({...editForm, confirmed_clock_in: ci, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
@@ -251,7 +280,8 @@ export default function ConfirmedListDispatchPage() {
                                         )}
                                       </td>
                                     </tr>
-                                  ))}
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>

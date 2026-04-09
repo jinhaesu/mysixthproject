@@ -580,6 +580,9 @@ export async function updateConfirmedRecord(id: number, data: any) {
 export async function deleteConfirmedRecord(id: number) {
   return fetchAPI<any>(`/api/regular/confirmed-list/${id}`, { method: 'DELETE' });
 }
+export async function updateConfirmedRecordType(id: number, employee_type: string) {
+  return fetchAPI<any>(`/api/regular/confirmed-list/${id}/type`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_type }) });
+}
 
 // ===== Salary Settings =====
 export async function getSalarySettings() {

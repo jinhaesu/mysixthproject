@@ -1237,6 +1237,24 @@ router.put('/confirmed-list/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// PATCH /api/regular/confirmed-list/:id/type - Update employee_type for a single record
+router.patch('/confirmed-list/:id/type', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_type } = req.body;
+    if (typeof employee_type !== 'string') {
+      res.status(400).json({ error: 'employee_type 필요' });
+      return;
+    }
+    await dbRun(
+      'UPDATE confirmed_attendance SET employee_type = ?, confirmed_at = NOW() WHERE id = ?',
+      employee_type, req.params.id
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/regular/confirmed-list/:id - Delete single confirmed record
 router.delete('/confirmed-list/:id', async (req: AuthRequest, res: Response) => {
   try {

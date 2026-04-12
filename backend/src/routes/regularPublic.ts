@@ -181,13 +181,11 @@ router.get('/:token', async (req: Request, res: Response) => {
     let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ?', employee.id, businessToday) as any;
     let attendanceDate = businessToday;
     if (!attendance || (!attendance.clock_out_time && !attendance.clock_in_time)) {
-      // Fallback: find any open session from previous business day (clocked in but not out)
-      const yd = new Date(new Date(businessToday + 'T00:00:00+09:00').getTime() - 86400000);
-      const yesterday = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
-      const yesterdayAtt = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL', employee.id, yesterday) as any;
-      if (yesterdayAtt) {
-        attendance = yesterdayAtt;
-        attendanceDate = yesterday;
+      // Fallback: find most recent open session (any date), handles 2+ day gaps
+      const openAtt = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL ORDER BY date DESC LIMIT 1', employee.id) as any;
+      if (openAtt) {
+        attendance = openAtt;
+        attendanceDate = openAtt.date;
       }
     }
 
@@ -493,9 +491,11 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     // (handles shift ending after 07:00 when business day has already rolled over)
     let attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL', employee.id, businessToday) as any;
     if (!attendance) {
-      const yd = new Date(new Date(businessToday + 'T00:00:00+09:00').getTime() - 86400000);
-      const yesterday = `${yd.getFullYear()}-${String(yd.getMonth()+1).padStart(2,'0')}-${String(yd.getDate()).padStart(2,'0')}`;
-      attendance = await dbGet('SELECT * FROM regular_attendance WHERE employee_id = ? AND date = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL', employee.id, yesterday) as any;
+      // Find most recent open session (any date), handles 2+ day gaps
+      attendance = await dbGet(
+        'SELECT * FROM regular_attendance WHERE employee_id = ? AND clock_in_time IS NOT NULL AND clock_out_time IS NULL ORDER BY date DESC LIMIT 1',
+        employee.id
+      ) as any;
     }
     if (!attendance) {
       res.status(400).json({ error: '먼저 출근을 기록해주세요.' });

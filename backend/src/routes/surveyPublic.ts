@@ -364,6 +364,14 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
       const regularHours = Math.min(Math.max(totalHours - breakTime, 0), 8);
       const overtimeHours = Math.max(totalHours - breakTime - 8, 0);
 
+      // Calculate night hours (22:00~06:00)
+      let nightMin = 0;
+      for (let min = roundedInMin; min < (roundedOutMin <= roundedInMin ? roundedOutMin + 1440 : roundedOutMin); min++) {
+        const h = Math.floor((min % 1440) / 60);
+        if (h >= 22 || h < 6) nightMin++;
+      }
+      const nightHours = Math.round(nightMin / 60 * 100) / 100;
+
       const clockInStr = clockIn.toTimeString().slice(0, 5);
       const clockOutStr = clockOut.toTimeString().slice(0, 5);
 
@@ -376,9 +384,9 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
       }
 
       await dbRun(`
-        INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, total_hours, regular_hours, overtime_hours, break_time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, uploadId, request.date, response.worker_name_ko, clockInStr, clockOutStr, '파견', '', request.workplace_name || '', totalHours, regularHours, overtimeHours, breakTime);
+        INSERT INTO attendance_records (upload_id, date, name, clock_in, clock_out, category, department, workplace, total_hours, regular_hours, overtime_hours, break_time, night_hours)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, uploadId, request.date, response.worker_name_ko, clockInStr, clockOutStr, '파견', '', request.workplace_name || '', totalHours, regularHours, overtimeHours, breakTime, nightHours);
 
       // record_count 업데이트
       await dbRun('UPDATE uploads SET record_count = record_count + 1 WHERE id = ?', uploadId);

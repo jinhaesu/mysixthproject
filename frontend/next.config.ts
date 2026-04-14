@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const BASE_PATH = '/HR';
+const BASE_PATH = '/attendance';
 
 const nextConfig: NextConfig = {
   output: 'export',

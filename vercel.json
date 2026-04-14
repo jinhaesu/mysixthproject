@@ -4,9 +4,8 @@
   "outputDirectory": "frontend/out",
   "cleanUrls": true,
   "trailingSlash": false,
-  "routes": [
-    { "src": "/HR/(.*)", "dest": "https://frontend-vert-theta-99.vercel.app/HR/$1" },
-    { "src": "/HR", "dest": "https://frontend-vert-theta-99.vercel.app/HR" },
-    { "handle": "filesystem" }
+  "rewrites": [
+    { "source": "/HR", "destination": "https://frontend-vert-theta-99.vercel.app/HR" },
+    { "source": "/HR/(.*)", "destination": "https://frontend-vert-theta-99.vercel.app/HR/$1" }
   ]
 }

@@ -101,7 +101,37 @@ export default function AttendanceSummaryRegularPage() {
     try {
       const d = await getAttendanceSummaryRegular(year, month);
       if (d?.employees) {
-        d.employees = d.employees.filter((e: any) => e.actuals && e.actuals.length > 0);
+        // 계획 출퇴근만 있고 실제 출퇴근이 없는 직원도 표시되도록
+        // shifts에서 해당 월 날짜를 가상 actual로 생성 → 확정 가능하게
+        const ym = `${year}-${String(month).padStart(2,'0')}`;
+        const lastDay = new Date(year, month, 0).getDate();
+        for (const emp of d.employees) {
+          if (emp.actuals.length === 0 && emp.shifts && emp.shifts.length > 0) {
+            // 이 직원은 실제 출퇴근 기록은 없지만 계획 배치가 있음
+            // → 과거 날짜에 대해 가상 actual 생성 (계획 확정용)
+            const existingDates = new Set(emp.actuals.map((a: any) => a.date));
+            const today = new Date().toLocaleDateString('sv-SE');
+            for (let day = 1; day <= lastDay; day++) {
+              const dateStr = `${ym}-${String(day).padStart(2,'0')}`;
+              if (dateStr > today) continue; // 미래 날짜 스킵
+              if (existingDates.has(dateStr)) continue;
+              const planned = getPlannedForDay(emp.shifts, dateStr);
+              if (planned && planned.in && planned.in !== '-') {
+                emp.actuals.push({
+                  employee_id: emp.id,
+                  date: dateStr,
+                  clock_in_time: null,
+                  clock_out_time: null,
+                  isPlannedOnly: true, // 마커: 실제 출퇴근 없는 가상 행
+                });
+              }
+            }
+          }
+        }
+        // 실제 출퇴근 OR 계획 배치가 있는 직원만 표시
+        d.employees = d.employees.filter((e: any) =>
+          (e.actuals && e.actuals.length > 0) || (e.shifts && e.shifts.length > 0)
+        );
       }
       setData(d);
       _cache[key] = { data: d, time: Date.now() };

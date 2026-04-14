@@ -3,9 +3,5 @@
   "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/out",
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    { "source": "/HR", "destination": "https://frontend-vert-theta-99.vercel.app/HR" },
-    { "source": "/HR/(.*)", "destination": "https://frontend-vert-theta-99.vercel.app/HR/$1" }
-  ]
+  "trailingSlash": false
 }

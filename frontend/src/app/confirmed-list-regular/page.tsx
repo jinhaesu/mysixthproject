@@ -257,8 +257,8 @@ export default function ConfirmedListRegularPage() {
                           })()}
                         </td>
                         <td className="py-2.5 px-4 text-right text-amber-700">{(emp._weekday_overtime || 0).toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-purple-700">{emp.night_hours.toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-gray-500">{emp.break_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-purple-700">{(emp.night_hours || 0).toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-gray-500">{(emp.break_hours || 0).toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right text-red-600 font-medium">{(emp._holiday_hours || 0).toFixed(1)}</td>
                       </tr>
                       {isExpanded && (
@@ -287,14 +287,14 @@ export default function ConfirmedListRegularPage() {
                                 <tbody className="divide-y divide-gray-100">
                                   {/* Merge records + vacation-only days */}
                                   {(() => {
-                                    const recordDates = new Set(emp.records.map((r: any) => r.date));
+                                    const recordDates = new Set((emp.records || []).map((r: any) => r.date));
                                     const ym = yearMonth;
                                     const vacOnlyRows = Object.entries(vacationMap)
                                       .filter(([k]) => k.startsWith(`${emp.name}|${ym}`))
                                       .map(([k, t]) => ({ date: k.split('|')[1], type: t }))
                                       .filter(v => !recordDates.has(v.date));
                                     const allRows = [
-                                      ...emp.records.map((r: any) => ({ ...r, isVacOnly: false })),
+                                      ...(emp.records || []).map((r: any) => ({ ...r, isVacOnly: false })),
                                       ...vacOnlyRows.map(v => ({ id: `vac-${v.date}`, date: v.date, isVacOnly: true, vacType: v.type })),
                                     ].sort((a: any, b: any) => a.date.localeCompare(b.date));
                                     return allRows;

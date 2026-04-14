@@ -220,7 +220,7 @@ export default function RegularLivePage() {
           {/* Hourly Chart */}
           {(() => {
             const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간"];
-            const allEmps = data.departments.flatMap((dept) => dept.teams.flatMap((team) => team.employees));
+            const allEmps = (data.departments || []).flatMap((dept: any) => (dept.teams || []).flatMap((team: any) => team.employees || []));
             const inData = allEmps.filter((e) => e.clock_in_time).map((e) => ({
               hour: new Date(e.clock_in_time!).getHours(), count: 1, department: e.department || '기타',
             }));

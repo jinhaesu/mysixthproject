@@ -331,7 +331,7 @@ export default function ConfirmedListDispatchPage() {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                  {emp.records.map((r: any) => {
+                                  {(emp.records || []).map((r: any) => {
                                     const rawType = r.employee_type || '';
                                     const effType = (r as any).__computed_type || r.effective_type || '(미분류)';
                                     const typeColor = rawType === '파견' ? 'bg-blue-50 text-blue-700 border-blue-200'

@@ -15,19 +15,20 @@ function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-function isEmailAllowed(email: string): boolean {
-  const allowed = process.env.ALLOWED_EMAILS;
-  if (!allowed) return true;
-  const list = allowed.split(',').map(e => e.trim().toLowerCase());
-  const normalized = email.toLowerCase();
-  return list.some(entry => {
-    // Domain pattern: "@nuldam.com" allows all emails with that domain
-    if (entry.startsWith('@')) {
-      return normalized.endsWith(entry);
-    }
-    // Exact email match
-    return normalized === entry;
+function getAllowedDomains(): string[] {
+  const raw = process.env.ALLOWED_EMAILS || process.env.ALLOWED_EMAIL_DOMAIN || '';
+  if (!raw) return [];
+  return raw.split(',').map(e => {
+    const trimmed = e.trim().toLowerCase();
+    return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
   });
+}
+
+function isEmailAllowed(email: string): boolean {
+  const domains = getAllowedDomains();
+  if (domains.length === 0) return true;
+  const normalized = email.toLowerCase();
+  return domains.some(domain => normalized.endsWith(domain));
 }
 
 // POST /api/auth/send-code
@@ -43,7 +44,9 @@ router.post('/send-code', async (req: Request, res: Response) => {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!isEmailAllowed(normalizedEmail)) {
-      res.status(403).json({ error: '허용되지 않은 이메일입니다.' });
+      const domains = getAllowedDomains();
+      const domainList = domains.join(', ');
+      res.status(403).json({ error: `${domainList} 이메일만 사용할 수 있습니다.` });
       return;
     }
 

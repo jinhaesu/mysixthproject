@@ -28,7 +28,8 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      window.location.href = `${base}/login`;
     }
     throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
   }

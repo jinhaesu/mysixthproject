@@ -1,6 +1,6 @@
 {
+  "outputDirectory": "out",
   "cleanUrls": true,
-  "trailingSlash": true,
   "redirects": [
     { "source": "/attendance/:path*", "destination": "/:path*", "permanent": false }
   ]

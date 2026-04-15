@@ -72,15 +72,15 @@ function formatPlannedTime(time: string | null): string {
 }
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  scheduled: { label: "예약됨", cls: "bg-purple-50 text-purple-700 border border-purple-200" },
-  sent: { label: "발송완료", cls: "bg-blue-50 text-blue-700 border border-blue-200" },
-  clock_in: { label: "출근완료", cls: "bg-amber-50 text-amber-700 border border-amber-200" },
-  completed: { label: "퇴근완료", cls: "bg-green-50 text-green-700 border border-green-200" },
-  expired: { label: "만료", cls: "bg-gray-50 text-gray-500 border border-gray-200" },
+  scheduled: { label: "예약됨", cls: "bg-[#5E6AD2]/10 text-[#828FFF] border border-[#5E6AD2]/30" },
+  sent: { label: "발송완료", cls: "bg-[#4EA7FC]/10 text-[#828FFF] border border-[#5E6AD2]/30" },
+  clock_in: { label: "출근완료", cls: "bg-[#F0BF00]/10 text-[#F0BF00] border border-[#F0BF00]/30" },
+  completed: { label: "퇴근완료", cls: "bg-[#27A644]/10 text-[#27A644] border border-[#27A644]/30" },
+  expired: { label: "만료", cls: "bg-[#08090A] text-[#8A8F98] border border-[#23252A]" },
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_MAP[status] || { label: status, cls: "bg-gray-50 text-gray-600" };
+  const s = STATUS_MAP[status] || { label: status, cls: "bg-[#08090A] text-[#8A8F98]" };
   return (
     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${s.cls}`}>
       {s.label}
@@ -103,14 +103,14 @@ export default function SurveyManagePage() {
     <div className="min-w-0">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">설문 출퇴근 관리</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-[#F7F8F8]">설문 출퇴근 관리</h1>
+        <p className="text-sm text-[#8A8F98] mt-1">
           단기 근무자에게 설문을 발송하고, 출퇴근 기록을 관리합니다.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-[#23252A] mb-6">
         <nav className="flex gap-6">
           {tabs.map((t) => {
             const Icon = t.icon;
@@ -121,8 +121,8 @@ export default function SurveyManagePage() {
                 onClick={() => setTab(t.key)}
                 className={`flex items-center gap-2 pb-3 text-sm font-medium border-b-2 transition-colors ${
                   active
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    ? "border-blue-600 text-[#7070FF]"
+                    : "border-transparent text-[#8A8F98] hover:text-[#D0D6E0] hover:border-[#23252A]"
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -285,11 +285,11 @@ function SendTab() {
       {stats && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-600">파트별 현황:</span>
+            <span className="text-xs font-medium text-[#8A8F98]">파트별 현황:</span>
             <select
               value={statsDeptFilter}
               onChange={(e) => setStatsDeptFilter(e.target.value)}
-              className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-2 py-1 border border-[#23252A] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">전체</option>
               <option value="물류">물류</option>
@@ -298,47 +298,47 @@ function SendTab() {
             </select>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{stats.today || 0}</p>
-              <p className="text-xs text-gray-500 mt-1">오늘 발송</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 text-center">
+              <p className="text-2xl font-bold text-[#F7F8F8]">{stats.today || 0}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">오늘 발송</p>
             </div>
-            <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
-              <p className="text-2xl font-bold text-blue-600">{stats.todayByStatus?.sent || 0}</p>
-              <p className="text-xs text-gray-500 mt-1">대기중</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#5E6AD2]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#7070FF]">{stats.todayByStatus?.sent || 0}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">대기중</p>
             </div>
-            <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
-              <p className="text-2xl font-bold text-amber-600">{stats.todayByStatus?.clock_in || 0}</p>
-              <p className="text-xs text-gray-500 mt-1">출근완료</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#F0BF00]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#F0BF00]">{stats.todayByStatus?.clock_in || 0}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">출근완료</p>
             </div>
-            <div className="bg-white rounded-xl border border-green-200 p-4 text-center">
-              <p className="text-2xl font-bold text-green-600">{stats.todayByStatus?.completed || 0}</p>
-              <p className="text-xs text-gray-500 mt-1">퇴근완료</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#27A644]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#27A644]">{stats.todayByStatus?.completed || 0}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">퇴근완료</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Send Form Card */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
         {/* Common Settings */}
-        <div className="p-5 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">발송 설정</h2>
+        <div className="p-5 border-b border-[#23252A]">
+          <h2 className="text-base font-semibold text-[#F7F8F8] mb-4">발송 설정</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무일</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">근무일</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2]"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">근무지 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">근무지 <span className="text-[#EB5757]">*</span></label>
               <select
                 value={workplaceId ?? ""}
                 onChange={(e) => setWorkplaceId(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] bg-[#0F1011]"
               >
                 <option value="">근무지를 선택하세요 (필수)</option>
                 {workplaces.map((w) => (
@@ -347,11 +347,11 @@ function SendTab() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">배정 파트 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">배정 파트 <span className="text-[#EB5757]">*</span></label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] bg-[#0F1011]"
               >
                 <option value="">파트 선택 (필수)</option>
                 <option value="물류">물류</option>
@@ -360,25 +360,25 @@ function SendTab() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 출근시간 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">계획 출근시간 <span className="text-[#EB5757]">*</span></label>
               <input
                 type="time"
                 value={plannedClockIn}
                 onChange={(e) => setPlannedClockIn(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">계획 퇴근시간 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">계획 퇴근시간 <span className="text-[#EB5757]">*</span></label>
               <input
                 type="time"
                 value={plannedClockOut}
                 onChange={(e) => setPlannedClockOut(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">발송 방법</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">발송 방법</label>
               <div className="flex gap-4 pt-1.5">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -388,7 +388,7 @@ function SendTab() {
                     onChange={(e) => setMessageType(e.target.value)}
                     className="accent-blue-600"
                   />
-                  <span className="text-sm text-gray-700">문자(SMS)</span>
+                  <span className="text-sm text-[#D0D6E0]">문자(SMS)</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -398,47 +398,47 @@ function SendTab() {
                     onChange={(e) => setMessageType(e.target.value)}
                     className="accent-blue-600"
                   />
-                  <span className="text-sm text-gray-700">카카오톡</span>
+                  <span className="text-sm text-[#D0D6E0]">카카오톡</span>
                 </label>
               </div>
             </div>
           </div>
-          <div className="space-y-2 pt-2 border-t border-gray-100 mt-2">
+          <div className="space-y-2 pt-2 border-t border-[#23252A] mt-2">
             <div className="flex gap-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="schedType" value="immediate" checked={scheduleType === 'immediate'}
                   onChange={() => setScheduleType('immediate')} className="accent-blue-600" />
-                <span className="text-sm text-gray-700">즉시 발송</span>
+                <span className="text-sm text-[#D0D6E0]">즉시 발송</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="schedType" value="single" checked={scheduleType === 'single'}
                   onChange={() => setScheduleType('single')} className="accent-blue-600" />
-                <span className="text-sm text-gray-700">예약 발송</span>
+                <span className="text-sm text-[#D0D6E0]">예약 발송</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="schedType" value="range" checked={scheduleType === 'range'}
                   onChange={() => setScheduleType('range')} className="accent-blue-600" />
-                <span className="text-sm text-gray-700">기간 예약</span>
+                <span className="text-sm text-[#D0D6E0]">기간 예약</span>
               </label>
             </div>
 
             {scheduleType === 'single' && (
               <div className="flex items-center gap-2">
                 <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             )}
 
             {scheduleType === 'range' && (
               <div className="flex flex-wrap items-center gap-2">
                 <input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <span className="text-gray-400">~</span>
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <span className="text-[#62666D]">~</span>
                 <input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 <input type="time" value={rangeDailyTime} onChange={(e) => setRangeDailyTime(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <span className="text-xs text-gray-500">매일 발송</span>
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <span className="text-xs text-[#8A8F98]">매일 발송</span>
               </div>
             )}
 
@@ -452,8 +452,8 @@ function SendTab() {
               onClick={() => setMode("single")}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 mode === "single"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[#5E6AD2] text-white"
+                  : "bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7"
               }`}
             >
               개별 발송
@@ -462,8 +462,8 @@ function SendTab() {
               onClick={() => setMode("batch")}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 mode === "batch"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-[#5E6AD2] text-white"
+                  : "bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7"
               }`}
             >
               일괄 발송
@@ -473,20 +473,20 @@ function SendTab() {
           {mode === "single" ? (
             <div className="flex gap-3 items-end">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">전화번호</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">전화번호</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="010-1234-5678"
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2]"
                 />
               </div>
               <button
                 onClick={handleSend}
                 disabled={sending || !phone.trim()}
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2 whitespace-nowrap"
+                className="px-5 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] disabled:bg-[#28282C] disabled:cursor-not-allowed transition-colors flex items-center gap-2 whitespace-nowrap"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 발송
@@ -495,21 +495,21 @@ function SendTab() {
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  전화번호 목록 <span className="text-gray-400">(줄바꿈으로 구분)</span>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">
+                  전화번호 목록 <span className="text-[#62666D]">(줄바꿈으로 구분)</span>
                 </label>
                 <textarea
                   value={bulkPhones}
                   onChange={(e) => setBulkPhones(e.target.value)}
                   placeholder={"010-1234-5678\n010-9876-5432\n010-1111-2222"}
                   rows={5}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] font-mono"
                 />
               </div>
               <button
                 onClick={handleBatchSend}
                 disabled={sending || bulkCount === 0}
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                className="px-5 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] disabled:bg-[#28282C] disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 {bulkCount}건 일괄 발송
@@ -520,21 +520,21 @@ function SendTab() {
       </div>
 
       {/* Recent Sends */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 space-y-3">
-          <h2 className="text-base font-semibold text-gray-900">발송 내역</h2>
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#23252A] space-y-3">
+          <h2 className="text-base font-semibold text-[#F7F8F8]">발송 내역</h2>
           <div className="flex flex-wrap gap-2 items-end">
             <div>
-              <label className="block text-[10px] text-gray-500 mb-0.5">시작일</label>
-              <input type="date" value={recentDateStart} onChange={e => setRecentDateStart(e.target.value)} className="px-2 py-1 border border-gray-300 rounded text-xs" />
+              <label className="block text-[10px] text-[#8A8F98] mb-0.5">시작일</label>
+              <input type="date" value={recentDateStart} onChange={e => setRecentDateStart(e.target.value)} className="px-2 py-1 border border-[#23252A] rounded text-xs" />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 mb-0.5">종료일</label>
-              <input type="date" value={recentDateEnd} onChange={e => setRecentDateEnd(e.target.value)} className="px-2 py-1 border border-gray-300 rounded text-xs" />
+              <label className="block text-[10px] text-[#8A8F98] mb-0.5">종료일</label>
+              <input type="date" value={recentDateEnd} onChange={e => setRecentDateEnd(e.target.value)} className="px-2 py-1 border border-[#23252A] rounded text-xs" />
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 mb-0.5">부서</label>
-              <select value={recentDeptFilter} onChange={e => setRecentDeptFilter(e.target.value)} className="px-2 py-1 border border-gray-300 rounded text-xs bg-white">
+              <label className="block text-[10px] text-[#8A8F98] mb-0.5">부서</label>
+              <select value={recentDeptFilter} onChange={e => setRecentDeptFilter(e.target.value)} className="px-2 py-1 border border-[#23252A] rounded text-xs bg-[#0F1011]">
                 <option value="">전체</option>
                 <option value="물류">물류</option>
                 <option value="생산2층">생산2층</option>
@@ -542,49 +542,49 @@ function SendTab() {
               </select>
             </div>
             <div>
-              <label className="block text-[10px] text-gray-500 mb-0.5">검색</label>
-              <input type="text" value={recentSearch} onChange={e => setRecentSearch(e.target.value)} placeholder="이름/번호" className="px-2 py-1 border border-gray-300 rounded text-xs w-24" />
+              <label className="block text-[10px] text-[#8A8F98] mb-0.5">검색</label>
+              <input type="text" value={recentSearch} onChange={e => setRecentSearch(e.target.value)} placeholder="이름/번호" className="px-2 py-1 border border-[#23252A] rounded text-xs w-24" />
             </div>
-            <button onClick={loadRecentSends} className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium">조회</button>
+            <button onClick={loadRecentSends} className="px-3 py-1 bg-[#5E6AD2] text-white rounded text-xs font-medium">조회</button>
           </div>
         </div>
 
         {recentSends.length === 0 ? (
           <div className="px-5 py-10 text-center">
-            <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">발송 내역이 없습니다.</p>
+            <Users className="w-10 h-10 text-[#62666D] mx-auto mb-2" />
+            <p className="text-sm text-[#8A8F98]">발송 내역이 없습니다.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">전화번호</th>
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">근무일</th>
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">근무지</th>
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">이름</th>
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">출근</th>
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">퇴근</th>
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">상태</th>
-                  <th className="py-2.5 px-4 font-medium text-gray-600 whitespace-nowrap">관리</th>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">전화번호</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">근무일</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">근무지</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">이름</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">출근</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">퇴근</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">상태</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">관리</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {recentSends.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-gray-50/50">
+                  <tr key={r.id} className="hover:bg-[#141516]/5/50">
                     <td className="py-2.5 px-4 whitespace-nowrap">
-                      <span className="flex items-center gap-1.5 text-gray-700">
-                        <Phone className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <span className="flex items-center gap-1.5 text-[#D0D6E0]">
+                        <Phone className="w-3.5 h-3.5 text-[#62666D] shrink-0" />
                         {r.phone}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.date}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-gray-900">{r.worker_name_ko || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">{r.date}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98]">{r.workplace_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-[#F7F8F8]">{r.worker_name_ko || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">
                       {r.clock_in_time ? new Date(r.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-"}
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">
                       {r.clock_out_time ? new Date(r.clock_out_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-"}
                     </td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
@@ -602,7 +602,7 @@ function SendTab() {
                                 getSurveyStats().then(setStats);
                               } catch (err: any) { alert(err.message); }
                             }}
-                            className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                            className="px-2 py-1 text-xs font-medium text-[#7070FF] bg-[#4EA7FC]/10 rounded hover:bg-[#4EA7FC]/15"
                           >
                             재발송
                           </button>
@@ -617,7 +617,7 @@ function SendTab() {
                               getSurveyStats().then(setStats);
                             } catch (err: any) { alert(err.message); }
                           }}
-                          className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100"
+                          className="px-2 py-1 text-xs font-medium text-[#EB5757] bg-[#EB5757]/10 rounded hover:bg-[#EB5757]/15"
                         >
                           삭제
                         </button>
@@ -632,29 +632,29 @@ function SendTab() {
       </div>
 
       {/* Reminder Section */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">미출근자 리마인더</h2>
-          <p className="text-xs text-gray-500 mt-0.5">설문 발송 후 출근하지 않은 근무자에게 리마인드 문자를 발송합니다.</p>
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#23252A]">
+          <h2 className="text-base font-semibold text-[#F7F8F8]">미출근자 리마인더</h2>
+          <p className="text-xs text-[#8A8F98] mt-0.5">설문 발송 후 출근하지 않은 근무자에게 리마인드 문자를 발송합니다.</p>
         </div>
         <div className="p-5">
           <div className="flex items-center gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">기준 시간 (시간)</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1">기준 시간 (시간)</label>
               <input
                 type="number"
                 value={reminderHours}
                 onChange={(e) => setReminderHours(Number(e.target.value))}
                 min={1}
                 max={24}
-                className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-20 px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex items-end">
               <button
                 onClick={handleRemind}
                 disabled={reminding}
-                className="px-5 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
+                className="px-5 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-[#28282C] transition-colors flex items-center gap-2"
               >
                 {reminding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
                 리마인더 발송
@@ -662,7 +662,7 @@ function SendTab() {
             </div>
           </div>
           {reminderResult && (
-            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+            <div className="mt-3 p-3 bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg text-sm text-[#F0BF00]">
               미출근 {reminderResult.total_pending}명 중 {reminderResult.reminders_sent}명에게 리마인더를 발송했습니다.
             </div>
           )}
@@ -767,52 +767,52 @@ function ResponsesTab() {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">시작일</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">시작일</label>
             <input
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">종료일</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">종료일</label>
             <input
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">전화번호</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">전화번호</label>
             <input
               type="text"
               value={filters.phone}
               onChange={(e) => setFilters({ ...filters, phone: e.target.value })}
               placeholder="검색..."
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">이름</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름</label>
             <input
               type="text"
               value={filters.name}
               onChange={(e) => setFilters({ ...filters, name: e.target.value })}
               placeholder="이름 검색..."
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">상태</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">상태</label>
             <select
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">전체</option>
               <option value="sent">발송완료</option>
@@ -822,11 +822,11 @@ function ResponsesTab() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">근무지</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">근무지</label>
             <select
               value={filters.workplace}
               onChange={(e) => setFilters({ ...filters, workplace: e.target.value })}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">전체</option>
               {workplaces.map((w: any) => (
@@ -836,13 +836,13 @@ function ResponsesTab() {
           </div>
           <button
             onClick={() => load(1)}
-            className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] transition-colors"
           >
             조회
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-1.5"
+            className="px-4 py-1.5 bg-[#27A644] text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
             엑셀 다운로드
@@ -852,10 +852,10 @@ function ResponsesTab() {
 
       {/* Batch Actions */}
       {selectedIds.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium text-blue-700">{selectedIds.length}건 선택</span>
+        <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-xl p-4 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-[#828FFF]">{selectedIds.length}건 선택</span>
           <select value={batchTimeType} onChange={(e) => setBatchTimeType(e.target.value as 'clock_in' | 'clock_out')}
-            className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+            className="px-2 py-1.5 border border-blue-300 rounded-lg text-xs bg-[#0F1011] focus:outline-none focus:ring-1 focus:ring-blue-500">
             <option value="clock_in">출근시간</option>
             <option value="clock_out">퇴근시간</option>
           </select>
@@ -872,7 +872,7 @@ function ResponsesTab() {
               setSelectedIds([]);
               load(pagination.page);
             } catch (err: any) { alert(err.message); }
-          }} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+          }} className="px-3 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-xs font-medium hover:bg-[#828FFF]">
             일괄 수정
           </button>
           <button onClick={async () => {
@@ -882,85 +882,85 @@ function ResponsesTab() {
               setSelectedIds([]);
               load(pagination.page);
             } catch (err: any) { alert(err.message); }
-          }} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700">
+          }} className="px-3 py-1.5 bg-[#EB5757] text-white rounded-lg text-xs font-medium hover:bg-[#F07070]">
             일괄 삭제
           </button>
           <button onClick={() => setSelectedIds([])}
-            className="px-3 py-1.5 text-gray-600 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200">
+            className="px-3 py-1.5 text-[#8A8F98] bg-[#141516] rounded-lg text-xs font-medium hover:bg-[#141516]/7">
             선택 해제
           </button>
         </div>
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
         {loading ? (
           <div className="py-16 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-            <p className="mt-2 text-sm text-gray-500">불러오는 중...</p>
+            <Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" />
+            <p className="mt-2 text-sm text-[#8A8F98]">불러오는 중...</p>
           </div>
         ) : responses.length === 0 ? (
           <div className="py-16 text-center">
-            <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">데이터가 없습니다.</p>
+            <ClipboardList className="w-10 h-10 text-[#62666D] mx-auto mb-2" />
+            <p className="text-sm text-[#8A8F98]">데이터가 없습니다.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
+                <tr className="bg-[#08090A] text-left">
                   <th className="py-3 px-3 w-10">
                     <input type="checkbox"
                       checked={selectedIds.length === responses.length && responses.length > 0}
                       onChange={(e) => setSelectedIds(e.target.checked ? responses.map((r: any) => r.id) : [])}
                       className="accent-blue-600" />
                   </th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무일</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">유형</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">전화번호</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">한글이름</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">영문이름</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">출근시간</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">출근GPS</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">퇴근시간</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">퇴근GPS</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계획출근</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계획퇴근</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">근무지</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">파트</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">성별</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">출생연도</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">연결업체</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">잔업희망</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">은행</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">계좌</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">상태</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">관리</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">근무일</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">유형</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">전화번호</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">한글이름</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">영문이름</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">출근시간</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap text-center">출근GPS</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">퇴근시간</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap text-center">퇴근GPS</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">계획출근</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">계획퇴근</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">근무지</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">파트</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">성별</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">출생연도</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">연결업체</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">잔업희망</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">은행</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">계좌</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">상태</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">관리</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {responses.map((r: any, i: number) => (
-                  <tr key={i} className="hover:bg-gray-50/50">
+                  <tr key={i} className="hover:bg-[#141516]/5/50">
                     <td className="py-2.5 px-3">
                       <input type="checkbox"
                         checked={selectedIds.includes(r.id)}
                         onChange={(e) => setSelectedIds(e.target.checked ? [...selectedIds, r.id] : selectedIds.filter(x => x !== r.id))}
                         className="accent-blue-600" />
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.date}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">{r.date}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                        r.worker_type === 'alba' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
-                        r.worker_type === 'dispatch' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                        'bg-gray-50 text-gray-500'
+                        r.worker_type === 'alba' ? 'bg-[#FC7840]/10 text-[#FC7840] border border-[#FC7840]/30' :
+                        r.worker_type === 'dispatch' ? 'bg-[#4EA7FC]/10 text-[#828FFF] border border-[#5E6AD2]/30' :
+                        'bg-[#08090A] text-[#8A8F98]'
                       }`}>
                         {r.worker_type === 'alba' ? '알바' : r.worker_type === 'dispatch' ? '파견' : '-'}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.phone}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-gray-900">{r.worker_name_ko || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">{r.worker_name_en || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">{r.phone}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap font-medium text-[#F7F8F8]">{r.worker_name_ko || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">{r.worker_name_en || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">
                       {editingId === r.id ? (
                         <input
                           type="datetime-local"
@@ -977,15 +977,15 @@ function ResponsesTab() {
                     <td className="py-2.5 px-4 text-center">
                       {r.clock_in_time ? (
                         r.clock_in_gps_valid ? (
-                          <Check className="w-4 h-4 text-green-600 mx-auto" />
+                          <Check className="w-4 h-4 text-[#27A644] mx-auto" />
                         ) : (
                           <X className="w-4 h-4 text-red-400 mx-auto" />
                         )
                       ) : (
-                        <span className="text-gray-300">-</span>
+                        <span className="text-[#62666D]">-</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-700">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">
                       {editingId === r.id ? (
                         <input
                           type="datetime-local"
@@ -1002,38 +1002,38 @@ function ResponsesTab() {
                     <td className="py-2.5 px-4 text-center">
                       {r.clock_out_time ? (
                         r.clock_out_gps_valid ? (
-                          <Check className="w-4 h-4 text-green-600 mx-auto" />
+                          <Check className="w-4 h-4 text-[#27A644] mx-auto" />
                         ) : (
                           <X className="w-4 h-4 text-red-400 mx-auto" />
                         )
                       ) : (
-                        <span className="text-gray-300">-</span>
+                        <span className="text-[#62666D]">-</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{formatPlannedTime(r.planned_clock_in)}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-500 text-xs">{formatPlannedTime(r.planned_clock_out)}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.workplace_name || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">{r.department || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98] text-xs">{formatPlannedTime(r.planned_clock_in)}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98] text-xs">{formatPlannedTime(r.planned_clock_out)}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98]">{r.workplace_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98] text-xs">{r.department || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98] text-xs">
                       {editingId === r.id ? <select value={editGender} onChange={e => setEditGender(e.target.value)} className="px-1 py-0.5 border rounded text-xs"><option value="">-</option><option value="male">남</option><option value="female">여</option></select> : (r.gender === 'male' ? '남' : r.gender === 'female' ? '여' : r.gender || "-")}
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98] text-xs">
                       {editingId === r.id ? <input type="text" value={editBirthYear} onChange={e => setEditBirthYear(e.target.value)} className="w-14 px-1 py-0.5 border rounded text-xs" /> : (r.birth_year || "-")}
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600 text-xs">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98] text-xs">
                       {editingId === r.id ? <input type="text" value={editAgency} onChange={e => setEditAgency(e.target.value)} className="w-20 px-1 py-0.5 border rounded text-xs" /> : (r.agency || "-")}
                     </td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       {editingId === r.id ? (
                         <select value={editOvertimeWilling} onChange={e => setEditOvertimeWilling(e.target.value)} className="px-1 py-0.5 border rounded text-xs"><option value="">-</option><option value="가능">가능</option><option value="불가">불가</option></select>
                       ) : r.overtime_willing ? (
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${r.overtime_willing === '가능' ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-600'}`}>
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${r.overtime_willing === '가능' ? 'bg-[#27A644]/10 text-[#27A644]' : 'bg-[#08090A] text-[#8A8F98]'}`}>
                           {r.overtime_willing}
                         </span>
                       ) : "-"}
                     </td>
-                    <td className="py-2.5 px-4 whitespace-nowrap text-gray-600">{r.bank_name || "-"}</td>
-                    <td className="py-2.5 px-4 whitespace-nowrap font-mono text-xs text-gray-600">{r.bank_account || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98]">{r.bank_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap font-mono text-xs text-[#8A8F98]">{r.bank_account || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       <StatusBadge status={r.status} />
                     </td>
@@ -1042,13 +1042,13 @@ function ResponsesTab() {
                         <div className="flex gap-1">
                           <button
                             onClick={handleTimeSave}
-                            className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+                            className="px-2 py-1 text-xs font-medium text-white bg-[#5E6AD2] rounded hover:bg-[#828FFF]"
                           >
                             저장
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
-                            className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                            className="px-2 py-1 text-xs font-medium text-[#8A8F98] bg-[#141516] rounded hover:bg-[#141516]/7"
                           >
                             취소
                           </button>
@@ -1064,7 +1064,7 @@ function ResponsesTab() {
                             setEditBirthYear(r.birth_year ? String(r.birth_year) : "");
                             setEditOvertimeWilling(r.overtime_willing || "");
                           }}
-                          className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                          className="px-2.5 py-1 text-xs font-medium text-[#7070FF] bg-[#4EA7FC]/10 rounded-md hover:bg-[#4EA7FC]/15 transition-colors"
                         >
                           수정
                         </button>
@@ -1079,8 +1079,8 @@ function ResponsesTab() {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
-            <p className="text-sm text-gray-600">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#23252A] bg-[#08090A]/50">
+            <p className="text-sm text-[#8A8F98]">
               총 <span className="font-medium">{pagination.total}</span>건 중{" "}
               {(pagination.page - 1) * pagination.limit + 1}-
               {Math.min(pagination.page * pagination.limit, pagination.total)}건
@@ -1089,17 +1089,17 @@ function ResponsesTab() {
               <button
                 onClick={() => load(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded hover:bg-[#141516]/7 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-3 py-1 text-sm font-medium text-gray-700">
+              <span className="px-3 py-1 text-sm font-medium text-[#D0D6E0]">
                 {pagination.page} / {pagination.totalPages}
               </span>
               <button
                 onClick={() => load(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
-                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded hover:bg-[#141516]/7 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1212,12 +1212,12 @@ function WorkplacesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">등록된 근무지</h2>
-          <p className="text-xs text-gray-500 mt-0.5">GPS 기반 출퇴근 위치 검증에 사용됩니다.</p>
+          <h2 className="text-base font-semibold text-[#F7F8F8]">등록된 근무지</h2>
+          <p className="text-xs text-[#8A8F98] mt-0.5">GPS 기반 출퇴근 위치 검증에 사용됩니다.</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+          className="px-4 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] transition-colors flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" />
           근무지 추가
@@ -1226,36 +1226,36 @@ function WorkplacesTab() {
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="bg-white rounded-xl border border-blue-200 p-5 shadow-sm">
-          <h3 className="font-semibold text-gray-900 mb-4">
+        <div className="bg-[#0F1011] rounded-xl border border-[#5E6AD2]/30 p-5 shadow-[0px_1px_3px_rgba(0,0,0,0.2)]">
+          <h3 className="font-semibold text-[#F7F8F8] mb-4">
             {editing ? "근무지 수정" : "새 근무지 등록"}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                근무지 이름 <span className="text-red-500">*</span>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">
+                근무지 이름 <span className="text-[#EB5757]">*</span>
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="예: 조인앤조인 본사"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">주소</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">주소</label>
               <input
                 type="text"
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 placeholder="예: 서울시 강남구 테헤란로 123"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                위도 <span className="text-red-500">*</span>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">
+                위도 <span className="text-[#EB5757]">*</span>
               </label>
               <input
                 type="number"
@@ -1263,12 +1263,12 @@ function WorkplacesTab() {
                 value={form.latitude}
                 onChange={(e) => setForm({ ...form, latitude: e.target.value })}
                 placeholder="37.5665"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                경도 <span className="text-red-500">*</span>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">
+                경도 <span className="text-[#EB5757]">*</span>
               </label>
               <input
                 type="number"
@@ -1276,39 +1276,39 @@ function WorkplacesTab() {
                 value={form.longitude}
                 onChange={(e) => setForm({ ...form, longitude: e.target.value })}
                 placeholder="126.9780"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">허용 반경 (m)</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">허용 반경 (m)</label>
               <input
                 type="number"
                 value={form.radius_meters}
                 onChange={(e) => setForm({ ...form, radius_meters: e.target.value })}
                 placeholder="200"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="flex items-end">
               <button
                 onClick={handleGetCurrentLocation}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-[#141516] text-[#D0D6E0] rounded-lg text-sm hover:bg-[#141516]/7 transition-colors flex items-center gap-1.5"
               >
                 <MapPin className="w-4 h-4" />
                 현재 위치 가져오기
               </button>
             </div>
           </div>
-          <div className="flex gap-2 mt-5 pt-4 border-t border-gray-100">
+          <div className="flex gap-2 mt-5 pt-4 border-t border-[#23252A]">
             <button
               onClick={handleSave}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-5 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] transition-colors"
             >
               {editing ? "수정 완료" : "등록하기"}
             </button>
             <button
               onClick={resetForm}
-              className="px-4 py-2 text-gray-600 rounded-lg text-sm hover:bg-gray-100 transition-colors"
+              className="px-4 py-2 text-[#8A8F98] rounded-lg text-sm hover:bg-[#141516]/5 transition-colors"
             >
               취소
             </button>
@@ -1317,48 +1317,48 @@ function WorkplacesTab() {
       )}
 
       {/* Workplaces List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
         {loading ? (
           <div className="py-16 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+            <Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" />
           </div>
         ) : workplaces.length === 0 ? (
           <div className="py-16 text-center">
-            <MapPin className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">등록된 근무지가 없습니다.</p>
-            <p className="text-xs text-gray-400 mt-1">위의 &quot;근무지 추가&quot; 버튼을 눌러 등록해주세요.</p>
+            <MapPin className="w-10 h-10 text-[#62666D] mx-auto mb-2" />
+            <p className="text-sm text-[#8A8F98]">등록된 근무지가 없습니다.</p>
+            <p className="text-xs text-[#62666D] mt-1">위의 &quot;근무지 추가&quot; 버튼을 눌러 등록해주세요.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">이름</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">주소</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">좌표</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap">반경</th>
-                  <th className="py-3 px-4 font-medium text-gray-600 whitespace-nowrap text-center">관리</th>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">이름</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">주소</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">좌표</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap">반경</th>
+                  <th className="py-3 px-4 font-medium text-[#8A8F98] whitespace-nowrap text-center">관리</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {workplaces.map((w) => (
-                  <tr key={w.id} className="hover:bg-gray-50/50">
+                  <tr key={w.id} className="hover:bg-[#141516]/5/50">
                     <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
-                          <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        <div className="w-7 h-7 bg-[#4EA7FC]/10 rounded-lg flex items-center justify-center shrink-0">
+                          <MapPin className="w-3.5 h-3.5 text-[#7070FF]" />
                         </div>
-                        <span className="font-medium text-gray-900">{w.name}</span>
+                        <span className="font-medium text-[#F7F8F8]">{w.name}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-gray-600">{w.address || "-"}</td>
+                    <td className="py-3 px-4 text-[#8A8F98]">{w.address || "-"}</td>
                     <td className="py-3 px-4">
-                      <span className="font-mono text-xs text-gray-500">
+                      <span className="font-mono text-xs text-[#8A8F98]">
                         {w.latitude.toFixed(4)}, {w.longitude.toFixed(4)}
                       </span>
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-0.5 bg-gray-100 rounded text-xs font-medium text-gray-700">
+                      <span className="inline-flex px-2 py-0.5 bg-[#141516] rounded text-xs font-medium text-[#D0D6E0]">
                         {w.radius_meters}m
                       </span>
                     </td>
@@ -1366,14 +1366,14 @@ function WorkplacesTab() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleEdit(w)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          className="p-1.5 text-[#62666D] hover:text-[#7070FF] hover:bg-[#4EA7FC]/10 rounded-md transition-colors"
                           title="수정"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(w.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          className="p-1.5 text-[#62666D] hover:text-[#EB5757] hover:bg-[#EB5757]/10 rounded-md transition-colors"
                           title="삭제"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1492,10 +1492,10 @@ function SafetyTab() {
   return (
     <div className="space-y-6">
       {/* Send Section */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">안전위생 안내 발송</h2>
-          <p className="text-xs text-gray-500 mt-0.5">근무 전날 근무자에게 안전/위생 안내 문자를 발송합니다.</p>
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#23252A]">
+          <h2 className="text-base font-semibold text-[#F7F8F8]">안전위생 안내 발송</h2>
+          <p className="text-xs text-[#8A8F98] mt-0.5">근무 전날 근무자에게 안전/위생 안내 문자를 발송합니다.</p>
         </div>
         <div className="p-5 space-y-4">
           {/* Mode Toggle */}
@@ -1503,7 +1503,7 @@ function SafetyTab() {
             <button
               onClick={() => setSendMode("direct")}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                sendMode === "direct" ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                sendMode === "direct" ? "bg-[#27A644] text-white" : "bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7"
               }`}
             >
               연락처 직접 입력
@@ -1511,7 +1511,7 @@ function SafetyTab() {
             <button
               onClick={() => setSendMode("survey")}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                sendMode === "survey" ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                sendMode === "survey" ? "bg-[#27A644] text-white" : "bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7"
               }`}
             >
               설문 대상자 자동
@@ -1521,21 +1521,21 @@ function SafetyTab() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {sendMode === "survey" && (
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">근무일 (설문 대상 조회)</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">근무일 (설문 대상 조회)</label>
                 <input
                   type="date"
                   value={sendDate}
                   onChange={(e) => setSendDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             )}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">안내문 선택</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">안내문 선택</label>
               <select
                 value={selectedNotice ?? ""}
                 onChange={(e) => setSelectedNotice(e.target.value ? Number(e.target.value) : null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">선택하세요</option>
                 {notices.map((n) => (
@@ -1548,58 +1548,58 @@ function SafetyTab() {
           {/* Direct phone input */}
           {sendMode === "direct" && (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                전화번호 <span className="text-gray-400">(줄바꿈으로 구분, 여러 명 가능)</span>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1.5">
+                전화번호 <span className="text-[#62666D]">(줄바꿈으로 구분, 여러 명 가능)</span>
               </label>
               <textarea
                 value={directPhones}
                 onChange={(e) => setDirectPhones(e.target.value)}
                 placeholder={"010-1234-5678\n010-9876-5432"}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
               />
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-[#62666D] mt-1">
                 {directPhones.split("\n").filter(l => l.trim()).length}명 입력됨
               </p>
             </div>
           )}
 
-          <div className="space-y-2 pt-2 border-t border-gray-100 mt-2">
+          <div className="space-y-2 pt-2 border-t border-[#23252A] mt-2">
             <div className="flex gap-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="safetySchedType" value="immediate" checked={scheduleType === 'immediate'}
                   onChange={() => setScheduleType('immediate')} className="accent-green-600" />
-                <span className="text-sm text-gray-700">즉시 발송</span>
+                <span className="text-sm text-[#D0D6E0]">즉시 발송</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="safetySchedType" value="single" checked={scheduleType === 'single'}
                   onChange={() => setScheduleType('single')} className="accent-green-600" />
-                <span className="text-sm text-gray-700">예약 발송</span>
+                <span className="text-sm text-[#D0D6E0]">예약 발송</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="safetySchedType" value="range" checked={scheduleType === 'range'}
                   onChange={() => setScheduleType('range')} className="accent-green-600" />
-                <span className="text-sm text-gray-700">기간 예약</span>
+                <span className="text-sm text-[#D0D6E0]">기간 예약</span>
               </label>
             </div>
 
             {scheduleType === 'single' && (
               <div className="flex items-center gap-2">
                 <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
             )}
 
             {scheduleType === 'range' && (
               <div className="flex flex-wrap items-center gap-2">
                 <input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <span className="text-gray-400">~</span>
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <span className="text-[#62666D]">~</span>
                 <input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 <input type="time" value={rangeDailyTime} onChange={(e) => setRangeDailyTime(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <span className="text-xs text-gray-500">매일 발송</span>
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <span className="text-xs text-[#8A8F98]">매일 발송</span>
               </div>
             )}
 
@@ -1608,7 +1608,7 @@ function SafetyTab() {
           <button
             onClick={handleSend}
             disabled={sending || !selectedNotice}
-            className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 transition-colors flex items-center gap-2"
+            className="px-5 py-2 bg-[#27A644] text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-[#28282C] transition-colors flex items-center gap-2"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             {scheduleType !== 'immediate' ? '예약 발송' : '안내 발송'}
@@ -1616,8 +1616,8 @@ function SafetyTab() {
           {sendResult && (
             <div className={`p-3 rounded-lg text-sm ${
               sendResult.scheduled || sendResult.scheduled_range
-                ? 'bg-purple-50 border border-purple-200 text-purple-700'
-                : sendResult.sent > 0 ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'
+                ? 'bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 text-[#828FFF]'
+                : sendResult.sent > 0 ? 'bg-[#27A644]/10 border border-[#27A644]/30 text-[#27A644]' : 'bg-[#F0BF00]/10 border border-[#F0BF00]/30 text-[#F0BF00]'
             }`}>
               {sendResult.scheduled_range
                 ? sendResult.message
@@ -1633,21 +1633,21 @@ function SafetyTab() {
 
       {/* Preview selected notice */}
       {selectedNotice && notices.find(n => n.id === selectedNotice) && (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">발송 미리보기</h3>
-          <pre className="whitespace-pre-wrap text-sm text-gray-600 bg-white rounded-lg p-4 border border-gray-200 font-sans">
+        <div className="bg-[#08090A] rounded-xl border border-[#23252A] p-5">
+          <h3 className="text-sm font-semibold text-[#D0D6E0] mb-2">발송 미리보기</h3>
+          <pre className="whitespace-pre-wrap text-sm text-[#8A8F98] bg-[#0F1011] rounded-lg p-4 border border-[#23252A] font-sans">
             {notices.find(n => n.id === selectedNotice)?.content}
           </pre>
         </div>
       )}
 
       {/* Templates Management */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">안내문 템플릿</h2>
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#23252A]">
+          <h2 className="text-base font-semibold text-[#F7F8F8]">안내문 템플릿</h2>
           <button
             onClick={() => { setShowForm(true); setEditing(null); setTitle(""); setContent(""); }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+            className="px-4 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] transition-colors flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             새 안내문
@@ -1655,33 +1655,33 @@ function SafetyTab() {
         </div>
 
         {showForm && (
-          <div className="p-5 border-b border-gray-200 bg-blue-50/30">
+          <div className="p-5 border-b border-[#23252A] bg-[#4EA7FC]/10/30">
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">제목</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">제목</label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="예: 위생관리 안내"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">내용 (문자 발송 내용)</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">내용 (문자 발송 내용)</label>
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={10}
                   placeholder="근무자에게 발송될 문자 내용을 입력하세요."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                 />
               </div>
               <div className="flex gap-2">
-                <button onClick={handleSave} className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                <button onClick={handleSave} className="px-5 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF]">
                   {editing ? "수정 완료" : "등록"}
                 </button>
-                <button onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 text-gray-600 rounded-lg text-sm hover:bg-gray-100">
+                <button onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 text-[#8A8F98] rounded-lg text-sm hover:bg-[#141516]/5">
                   취소
                 </button>
               </div>
@@ -1691,35 +1691,35 @@ function SafetyTab() {
 
         {loading ? (
           <div className="py-10 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+            <Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" />
           </div>
         ) : notices.length === 0 ? (
           <div className="py-10 text-center">
-            <ShieldAlert className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">등록된 안내문이 없습니다.</p>
+            <ShieldAlert className="w-10 h-10 text-[#62666D] mx-auto mb-2" />
+            <p className="text-sm text-[#8A8F98]">등록된 안내문이 없습니다.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[#23252A]">
             {notices.map((n) => (
-              <div key={n.id} className="px-5 py-4 hover:bg-gray-50/50">
+              <div key={n.id} className="px-5 py-4 hover:bg-[#141516]/5/50">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-gray-900">{n.title}</h3>
+                  <h3 className="font-medium text-[#F7F8F8]">{n.title}</h3>
                   <div className="flex gap-1">
                     <button
                       onClick={() => { setEditing(n); setTitle(n.title); setContent(n.content); setShowForm(true); }}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                      className="p-1.5 text-[#62666D] hover:text-[#7070FF] hover:bg-[#4EA7FC]/10 rounded-md"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(n.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                      className="p-1.5 text-[#62666D] hover:text-[#EB5757] hover:bg-[#EB5757]/10 rounded-md"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                <pre className="whitespace-pre-wrap text-xs text-gray-500 line-clamp-3 font-sans">{n.content}</pre>
+                <pre className="whitespace-pre-wrap text-xs text-[#8A8F98] line-clamp-3 font-sans">{n.content}</pre>
               </div>
             ))}
           </div>
@@ -1799,70 +1799,70 @@ function WorkersTab() {
   return (
     <div className="space-y-4">
       {/* Search */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
         <div className="flex gap-3 items-end">
           <div className="flex-1">
-            <label className="block text-xs font-medium text-gray-600 mb-1">검색 (이름/연락처)</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">검색 (이름/연락처)</label>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="이름 또는 연락처로 검색"
-              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button onClick={handleSearch} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+          <button onClick={handleSearch} className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF]">
             검색
           </button>
         </div>
       </div>
 
       {/* Worker List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">등록 직원 목록 ({pagination.total}명)</h3>
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+        <div className="px-4 py-3 border-b border-[#23252A] flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[#F7F8F8]">등록 직원 목록 ({pagination.total}명)</h3>
         </div>
 
         {loading ? (
           <div className="py-12 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+            <Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" />
           </div>
         ) : workers.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400">등록된 직원이 없습니다.</div>
+          <div className="py-12 text-center text-sm text-[#62666D]">등록된 직원이 없습니다.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="py-2 px-4 font-medium text-gray-600">이름</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">영문이름</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">은행</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">계좌번호</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">비상연락처</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">구분</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">부서</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-center">관리</th>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">이름</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">영문이름</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">연락처</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">은행</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">계좌번호</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">비상연락처</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">구분</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">부서</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-center">관리</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {workers.map((w: any) => (
-                  <tr key={w.id} className="hover:bg-gray-50">
-                    <td className="py-2.5 px-4 font-medium text-gray-900">{w.name_ko}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{w.name_en}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{w.phone}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{w.bank_name}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{w.bank_account}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{w.emergency_contact}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{w.category}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{w.department}</td>
+                  <tr key={w.id} className="hover:bg-[#141516]/5">
+                    <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{w.name_ko}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{w.name_en}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{w.phone}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{w.bank_name}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{w.bank_account}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{w.emergency_contact}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{w.category}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{w.department}</td>
                     <td className="py-2.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => startEdit(w)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="수정">
+                        <button onClick={() => startEdit(w)} className="p-1.5 text-[#7070FF] hover:bg-[#4EA7FC]/10 rounded" title="수정">
                           <Edit3 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(w.id, w.name_ko)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="삭제">
+                        <button onClick={() => handleDelete(w.id, w.name_ko)} className="p-1.5 text-[#EB5757] hover:bg-[#EB5757]/10 rounded" title="삭제">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -1876,8 +1876,8 @@ function WorkersTab() {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-            <p className="text-xs text-gray-500">총 {pagination.total}명 중 {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)}</p>
+          <div className="px-4 py-3 border-t border-[#23252A] flex items-center justify-between">
+            <p className="text-xs text-[#8A8F98]">총 {pagination.total}명 중 {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)}</p>
             <div className="flex gap-1">
               <button disabled={pagination.page <= 1} onClick={() => { setPage(pagination.page - 1); load(pagination.page - 1); }} className="px-2 py-1 text-xs border rounded disabled:opacity-30">
                 <ChevronLeft className="w-4 h-4" />
@@ -1893,8 +1893,8 @@ function WorkersTab() {
       {/* Edit Modal */}
       {editingWorker && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900">직원 정보 수정</h3>
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-[#F7F8F8]">직원 정보 수정</h3>
 
             {[
               { label: "이름", key: "name_ko" },
@@ -1908,21 +1908,21 @@ function WorkersTab() {
               { label: "메모", key: "memo" },
             ].map((f) => (
               <div key={f.key}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{f.label}</label>
                 <input
                   type="text"
                   value={(editForm as any)[f.key]}
                   onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             ))}
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setEditingWorker(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button onClick={() => setEditingWorker(null)} className="flex-1 py-2 border border-[#23252A] rounded-lg text-sm font-medium text-[#D0D6E0] hover:bg-[#141516]/5">
                 취소
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2">
+              <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] disabled:bg-[#28282C] flex items-center justify-center gap-2">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 저장
               </button>

@@ -57,16 +57,16 @@ function ReportContent() {
   }, [load]);
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+      <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
     </div>
   );
 
   if (!data || !data.totals) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
       <div className="text-center">
-        <p className="text-lg font-semibold text-gray-700">데이터 없음</p>
-        <p className="text-sm text-gray-500 mt-1">{dateParam} 발송된 설문이 없습니다.</p>
+        <p className="text-lg font-semibold text-[#D0D6E0]">데이터 없음</p>
+        <p className="text-sm text-[#8A8F98] mt-1">{dateParam} 발송된 설문이 없습니다.</p>
       </div>
     </div>
   );
@@ -96,15 +96,15 @@ function ReportContent() {
   };
 
   const statusStyle = (s: string) => {
-    if (s === 'completed') return { bg: 'bg-green-500', text: 'text-white', label: '퇴근' };
-    if (s === 'clock_in') return { bg: 'bg-amber-500', text: 'text-white', label: '출근' };
-    return { bg: 'bg-red-500', text: 'text-white', label: '미출근' };
+    if (s === 'completed') return { bg: 'bg-[#27A644]', text: 'text-white', label: '퇴근' };
+    if (s === 'clock_in') return { bg: 'bg-[#F0BF00]/100', text: 'text-white', label: '출근' };
+    return { bg: 'bg-[#EB5757]', text: 'text-white', label: '미출근' };
   };
 
   const rate = displayTotals.total > 0 ? Math.round(((displayTotals.clocked_in + displayTotals.completed) / displayTotals.total) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#08090A]">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 pt-6 pb-8">
         <div className="max-w-lg mx-auto">
@@ -117,7 +117,7 @@ function ReportContent() {
               type="date"
               value={dateParam}
               onChange={(e) => setDateParam(e.target.value)}
-              className="px-2 py-1 rounded-lg text-sm bg-blue-500/30 border border-blue-400/40 text-white focus:outline-none"
+              className="px-2 py-1 rounded-lg text-sm bg-[#4EA7FC]/30 border border-blue-400/40 text-white focus:outline-none"
             />
           </div>
 
@@ -144,7 +144,7 @@ function ReportContent() {
         {/* Summary Cards */}
         <div className="grid grid-cols-4 gap-2">
           {[
-            { key: "all" as const, count: displayTotals.total, label: "전체", border: "border-gray-200" },
+            { key: "all" as const, count: displayTotals.total, label: "전체", border: "border-[#23252A]" },
             { key: "clock_in" as const, count: displayTotals.clocked_in, label: "출근중", border: "border-amber-300" },
             { key: "completed" as const, count: displayTotals.completed, label: "퇴근", border: "border-green-300" },
             { key: "sent" as const, count: displayTotals.not_clocked_in, label: "미출근", border: "border-red-300" },
@@ -152,12 +152,12 @@ function ReportContent() {
             <button
               key={card.key}
               onClick={() => setFilter(card.key)}
-              className={`bg-white rounded-xl border-2 p-3 text-center transition-all ${
-                filter === card.key ? card.border + ' shadow-sm scale-[1.02]' : 'border-gray-100'
+              className={`bg-[#0F1011] rounded-xl border-2 p-3 text-center transition-all ${
+                filter === card.key ? card.border + ' shadow-[0px_1px_3px_rgba(0,0,0,0.2)] scale-[1.02]' : 'border-[#23252A]'
               }`}
             >
-              <p className="text-xl font-bold text-gray-900">{card.count}</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">{card.label}</p>
+              <p className="text-xl font-bold text-[#F7F8F8]">{card.count}</p>
+              <p className="text-[10px] text-[#8A8F98] mt-0.5">{card.label}</p>
             </button>
           ))}
         </div>
@@ -168,7 +168,7 @@ function ReportContent() {
             <button
               onClick={() => setDeptFilter("all")}
               className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                deptFilter === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200"
+                deptFilter === "all" ? "bg-[#5E6AD2] text-white" : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A]"
               }`}
             >
               전체
@@ -178,7 +178,7 @@ function ReportContent() {
                 key={dept}
                 onClick={() => setDeptFilter(dept)}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  deptFilter === dept ? "bg-purple-600 text-white" : "bg-white text-gray-600 border border-gray-200"
+                  deptFilter === dept ? "bg-purple-600 text-white" : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A]"
                 }`}
               >
                 {dept}
@@ -189,35 +189,35 @@ function ReportContent() {
 
         {/* Worker List - Mobile Card Style */}
         <div className="space-y-2">
-          <p className="text-xs text-gray-500 px-1">
+          <p className="text-xs text-[#8A8F98] px-1">
             {filter === 'all' ? '전체' : filter === 'sent' ? '미출근' : filter === 'clock_in' ? '출근중' : '퇴근완료'} {filteredWorkers.length}명
           </p>
 
           {filteredWorkers.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center">
-              <p className="text-sm text-gray-400">해당 상태의 근무자가 없습니다.</p>
+            <div className="bg-[#0F1011] rounded-xl p-8 text-center">
+              <p className="text-sm text-[#62666D]">해당 상태의 근무자가 없습니다.</p>
             </div>
           ) : (
             filteredWorkers.map((w) => {
               const st = statusStyle(w.status);
               return (
-                <div key={w.id} className="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                <div key={w.id} className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3.5 shadow-[0px_1px_3px_rgba(0,0,0,0.2)]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-8 h-8 rounded-full ${st.bg} flex items-center justify-center`}>
                         <span className={`text-xs font-bold ${st.text}`}>{st.label.charAt(0)}</span>
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900 text-sm">{w.worker_name_ko || w.phone}</p>
+                        <p className="font-semibold text-[#F7F8F8] text-sm">{w.worker_name_ko || w.phone}</p>
                         {w.phone && (
-                          <a href={`tel:${w.phone}`} className="text-[11px] text-blue-600 font-medium">{w.phone}</a>
+                          <a href={`tel:${w.phone}`} className="text-[11px] text-[#7070FF] font-medium">{w.phone}</a>
                         )}
                         <div className="flex items-center gap-2 mt-0.5">
                           {w.department && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">{w.department}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-[#5E6AD2]/10 text-[#7070FF] rounded font-medium">{w.department}</span>
                           )}
                           {w.workplace_name && (
-                            <span className="text-[10px] text-gray-400">{w.workplace_name}</span>
+                            <span className="text-[10px] text-[#62666D]">{w.workplace_name}</span>
                           )}
                         </div>
                       </div>
@@ -228,19 +228,19 @@ function ReportContent() {
                   </div>
 
                   {(w.clock_in_time || w.clock_out_time || w.planned_clock_in) && (
-                    <div className="mt-2.5 pt-2.5 border-t border-gray-100 flex gap-4 text-xs">
+                    <div className="mt-2.5 pt-2.5 border-t border-[#23252A] flex gap-4 text-xs">
                       <div>
-                        <span className="text-gray-400">출근</span>
-                        <p className="font-semibold text-gray-800 mt-0.5">
+                        <span className="text-[#62666D]">출근</span>
+                        <p className="font-semibold text-[#F7F8F8] mt-0.5">
                           {formatTime(w.clock_in_time) || "-"}
-                          {w.planned_clock_in && <span className="text-gray-400 font-normal ml-1">/ {formatPlannedTime(w.planned_clock_in)}</span>}
+                          {w.planned_clock_in && <span className="text-[#62666D] font-normal ml-1">/ {formatPlannedTime(w.planned_clock_in)}</span>}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-400">퇴근</span>
-                        <p className="font-semibold text-gray-800 mt-0.5">
+                        <span className="text-[#62666D]">퇴근</span>
+                        <p className="font-semibold text-[#F7F8F8] mt-0.5">
                           {formatTime(w.clock_out_time) || "-"}
-                          {w.planned_clock_out && <span className="text-gray-400 font-normal ml-1">/ {formatPlannedTime(w.planned_clock_out)}</span>}
+                          {w.planned_clock_out && <span className="text-[#62666D] font-normal ml-1">/ {formatPlannedTime(w.planned_clock_out)}</span>}
                         </p>
                       </div>
                     </div>
@@ -251,7 +251,7 @@ function ReportContent() {
           )}
         </div>
 
-        <p className="text-center text-[10px] text-gray-300 mt-4 pb-4">조인앤조인 근태관리</p>
+        <p className="text-center text-[10px] text-[#62666D] mt-4 pb-4">조인앤조인 근태관리</p>
       </div>
     </div>
   );
@@ -260,8 +260,8 @@ function ReportContent() {
 export default function ReportPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
       </div>
     }>
       <ReportContent />

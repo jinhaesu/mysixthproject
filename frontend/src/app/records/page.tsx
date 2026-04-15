@@ -65,32 +65,32 @@ function RecordsContent() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">기록 조회</h2>
-      <p className="text-gray-500 mb-8">전체 근태 기록을 필터링하여 조회합니다.</p>
+      <h2 className="text-2xl font-bold text-[#F7F8F8] mb-2">기록 조회</h2>
+      <p className="text-[#8A8F98] mb-8">전체 근태 기록을 필터링하여 조회합니다.</p>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 mb-6">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">시작일</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">시작일</label>
             <input
               type="date"
               onChange={(e) => handleFilterChange("startDate", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">종료일</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">종료일</label>
             <input
               type="date"
               onChange={(e) => handleFilterChange("endDate", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">이름 검색</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름 검색</label>
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]" />
               <input
                 type="text"
                 value={nameSearch}
@@ -103,7 +103,7 @@ function RecordsContent() {
                   }, 400);
                 }}
                 placeholder="이름을 입력하세요"
-                className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-2 text-sm"
+                className="w-full border border-[#23252A] rounded-lg pl-8 pr-3 py-2 text-sm"
                 list="name-suggestions"
               />
               <datalist id="name-suggestions">
@@ -114,10 +114,10 @@ function RecordsContent() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">구분</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">구분</label>
             <select
               onChange={(e) => handleFilterChange("category", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             >
               <option value="">전체</option>
               {filters?.categories.map((c) => (
@@ -126,10 +126,10 @@ function RecordsContent() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">부서</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">부서</label>
             <select
               onChange={(e) => handleFilterChange("department", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             >
               <option value="">전체</option>
               {filters?.departments.map((d) => (
@@ -138,10 +138,10 @@ function RecordsContent() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">근무지</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">근무지</label>
             <select
               onChange={(e) => handleFilterChange("workplace", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             >
               <option value="">전체</option>
               {filters?.workplaces.map((w) => (
@@ -153,69 +153,69 @@ function RecordsContent() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-medium text-gray-700">날짜</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700">이름</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700">출근</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700">퇴근</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700">구분</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700">부서</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-700">근무지</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-700">총시간</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-700">정규</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-700">연장</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-700">휴게</th>
-                <th className="text-center px-4 py-3 font-medium text-gray-700">연차</th>
+              <tr className="bg-[#08090A] border-b border-[#23252A]">
+                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">날짜</th>
+                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">이름</th>
+                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">출근</th>
+                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">퇴근</th>
+                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">구분</th>
+                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">부서</th>
+                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">근무지</th>
+                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">총시간</th>
+                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">정규</th>
+                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">연장</th>
+                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">휴게</th>
+                <th className="text-center px-4 py-3 font-medium text-[#D0D6E0]">연차</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-12 text-gray-400">
-                    <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
+                  <td colSpan={12} className="text-center py-12 text-[#62666D]">
+                    <div className="w-6 h-6 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin mx-auto" />
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-12 text-gray-400">
+                  <td colSpan={12} className="text-center py-12 text-[#62666D]">
                     데이터가 없습니다.
                   </td>
                 </tr>
               ) : (
                 records.map((r) => (
-                  <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-900">{r.date}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.clock_in}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.clock_out}</td>
+                  <tr key={r.id} className="border-b border-[#23252A] hover:bg-[#141516]/5">
+                    <td className="px-4 py-3 text-[#F7F8F8]">{r.date}</td>
+                    <td className="px-4 py-3 font-medium text-[#F7F8F8]">{r.name}</td>
+                    <td className="px-4 py-3 text-[#8A8F98]">{r.clock_in}</td>
+                    <td className="px-4 py-3 text-[#8A8F98]">{r.clock_out}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
                         r.category === "정규직"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-orange-100 text-orange-700"
+                          ? "bg-[#4EA7FC]/15 text-[#828FFF]"
+                          : "bg-[#FC7840]/15 text-[#FC7840]"
                       }`}>
                         {r.category}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{r.department}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.workplace}</td>
-                    <td className="text-right px-4 py-3 text-gray-900 tabular-nums">{r.total_hours.toFixed(1)}</td>
-                    <td className="text-right px-4 py-3 text-gray-600 tabular-nums">{r.regular_hours.toFixed(1)}</td>
+                    <td className="px-4 py-3 text-[#8A8F98]">{r.department}</td>
+                    <td className="px-4 py-3 text-[#8A8F98]">{r.workplace}</td>
+                    <td className="text-right px-4 py-3 text-[#F7F8F8] tabular-nums">{r.total_hours.toFixed(1)}</td>
+                    <td className="text-right px-4 py-3 text-[#8A8F98] tabular-nums">{r.regular_hours.toFixed(1)}</td>
                     <td className="text-right px-4 py-3 tabular-nums">
-                      <span className={r.overtime_hours > 0 ? "text-red-600 font-medium" : "text-gray-400"}>
+                      <span className={r.overtime_hours > 0 ? "text-[#EB5757] font-medium" : "text-[#62666D]"}>
                         {r.overtime_hours.toFixed(1)}
                       </span>
                     </td>
-                    <td className="text-right px-4 py-3 text-gray-600 tabular-nums">{r.break_time.toFixed(1)}</td>
+                    <td className="text-right px-4 py-3 text-[#8A8F98] tabular-nums">{r.break_time.toFixed(1)}</td>
                     <td className="text-center px-4 py-3">
                       {r.annual_leave === "O" ? (
-                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-medium">O</span>
+                        <span className="bg-[#27A644]/15 text-[#27A644] px-2 py-0.5 rounded text-xs font-medium">O</span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-[#62666D]">-</span>
                       )}
                     </td>
                   </tr>
@@ -227,8 +227,8 @@ function RecordsContent() {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-            <span className="text-sm text-gray-500">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[#23252A]">
+            <span className="text-sm text-[#8A8F98]">
               총 {pagination.total.toLocaleString()}건 중 {(pagination.page - 1) * pagination.limit + 1}-
               {Math.min(pagination.page * pagination.limit, pagination.total)}건
             </span>
@@ -236,17 +236,17 @@ function RecordsContent() {
               <button
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-2 rounded-lg hover:bg-[#141516]/5 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-[#D0D6E0]">
                 {pagination.page} / {pagination.totalPages}
               </span>
               <button
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
-                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-2 rounded-lg hover:bg-[#141516]/5 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronRight size={16} />
               </button>
@@ -260,7 +260,7 @@ function RecordsContent() {
 
 export default function RecordsPage() {
   return (
-    <Suspense fallback={<div className="py-20 text-center text-gray-400">로딩 중...</div>}>
+    <Suspense fallback={<div className="py-20 text-center text-[#62666D]">로딩 중...</div>}>
       <RecordsContent />
     </Suspense>
   );

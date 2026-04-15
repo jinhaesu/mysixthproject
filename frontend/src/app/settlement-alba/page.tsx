@@ -205,26 +205,26 @@ export default function SettlementAlbaPage() {
   return (
     <div className="min-w-0">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Calculator className="w-6 h-6 text-orange-600" />
+        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+          <Calculator className="w-6 h-6 text-[#FC7840]" />
           알바(사업소득) 정산관리
         </h1>
-        <div className="mt-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-800">
+        <div className="mt-2 bg-[#FC7840]/10 border border-[#FC7840]/30 rounded-lg px-3 py-2 text-xs text-orange-800">
           <b>수당 계산:</b> 시급×1.5배 | <b>30분 내림</b> | 주5일 이하 휴일→수당없음 | 주5일 초과+휴일→휴일수당 | 공휴일→무조건 휴일수당 | 야간(22~06)→연장 | 소득세3.3%+지방세0.33%
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">
+      <div className="bg-[#0F1011] rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">연월</label>
-          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연월</label>
+          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">시간당 급여</label>
-          <input type="number" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">시간당 급여</label>
+          <input type="number" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
         </div>
         {rows.length > 0 && (
-          <button onClick={handleExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium flex items-center gap-1">
+          <button onClick={handleExcel} className="px-4 py-2 bg-[#27A644] text-white rounded-lg text-sm font-medium flex items-center gap-1">
             <Download className="w-4 h-4" /> 엑셀 다운로드
           </button>
         )}
@@ -232,10 +232,10 @@ export default function SettlementAlbaPage() {
 
       {rows.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div className="bg-white rounded-xl border p-3 text-center"><p className="text-xl font-bold">{rows.length}</p><p className="text-xs text-gray-500">인원</p></div>
-          <div className="bg-orange-50 rounded-xl border border-orange-200 p-3 text-center"><p className="text-lg font-bold text-orange-700">{fmt.format(totals.grossPay)}</p><p className="text-xs text-orange-600">급여 합계</p></div>
-          <div className="bg-red-50 rounded-xl border border-red-200 p-3 text-center"><p className="text-lg font-bold text-red-700">{fmt.format(totals.incomeTax + totals.localTax)}</p><p className="text-xs text-red-600">세금 합계</p></div>
-          <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><p className="text-lg font-bold text-green-700">{fmt.format(totals.netPay)}</p><p className="text-xs text-green-600">실지급 합계</p></div>
+          <div className="bg-[#0F1011] rounded-xl border p-3 text-center"><p className="text-xl font-bold">{rows.length}</p><p className="text-xs text-[#8A8F98]">인원</p></div>
+          <div className="bg-[#FC7840]/10 rounded-xl border border-[#FC7840]/30 p-3 text-center"><p className="text-lg font-bold text-[#FC7840]">{fmt.format(totals.grossPay)}</p><p className="text-xs text-[#FC7840]">급여 합계</p></div>
+          <div className="bg-[#EB5757]/10 rounded-xl border border-[#EB5757]/30 p-3 text-center"><p className="text-lg font-bold text-[#EB5757]">{fmt.format(totals.incomeTax + totals.localTax)}</p><p className="text-xs text-[#EB5757]">세금 합계</p></div>
+          <div className="bg-[#27A644]/10 rounded-xl border border-[#27A644]/30 p-3 text-center"><p className="text-lg font-bold text-[#27A644]">{fmt.format(totals.netPay)}</p><p className="text-xs text-[#27A644]">실지급 합계</p></div>
         </div>
       )}
 
@@ -263,9 +263,9 @@ export default function SettlementAlbaPage() {
       })()}
 
       {loading ? (
-        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-orange-600 mx-auto" /></div>
+        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-[#FC7840] mx-auto" /></div>
       ) : rows.length > 0 ? (
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="bg-[#0F1011] rounded-xl border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[10px] table-fixed">
               <colgroup>
@@ -289,7 +289,7 @@ export default function SettlementAlbaPage() {
                 <col className="w-[75px]" />{/* 실지급 */}
               </colgroup>
               <thead>
-                <tr className="bg-gray-50 text-left">
+                <tr className="bg-[#08090A] text-left">
                   <th className="py-2 px-1.5">이름</th>
                   <th className="py-2 px-1.5">은행</th>
                   <th className="py-2 px-1.5">계좌번호</th>
@@ -307,38 +307,38 @@ export default function SettlementAlbaPage() {
                   <th className="py-2 px-1.5 text-right">식대공제</th>
                   <th className="py-2 px-1.5 text-right">소득세</th>
                   <th className="py-2 px-1.5 text-right">지방세</th>
-                  <th className="py-2 px-1.5 text-right font-bold text-green-700">실지급</th>
+                  <th className="py-2 px-1.5 text-right font-bold text-[#27A644]">실지급</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {rows.map((r: any) => (
-                  <tr key={r.idx} className="hover:bg-gray-50">
-                    <td className="py-1.5 px-1.5 font-medium text-gray-900 truncate">{r.name}</td>
-                    <td className="py-1.5 px-1.5 text-gray-500 truncate">{r.bank_name || '-'}</td>
-                    <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px] truncate">{r.bank_account || '-'}</td>
-                    <td className="py-1.5 px-1.5 text-gray-500 font-mono text-[9px] truncate">{r.id_number || '-'}</td>
+                  <tr key={r.idx} className="hover:bg-[#141516]/5">
+                    <td className="py-1.5 px-1.5 font-medium text-[#F7F8F8] truncate">{r.name}</td>
+                    <td className="py-1.5 px-1.5 text-[#8A8F98] truncate">{r.bank_name || '-'}</td>
+                    <td className="py-1.5 px-1.5 text-[#8A8F98] font-mono text-[9px] truncate">{r.bank_account || '-'}</td>
+                    <td className="py-1.5 px-1.5 text-[#8A8F98] font-mono text-[9px] truncate">{r.id_number || '-'}</td>
                     <td className="py-1.5 px-1.5 text-right">{r.work_days}</td>
                     <td className="py-1.5 px-1.5 text-right">{r.regular_hours}</td>
-                    <td className="py-1.5 px-1.5 text-right text-amber-700">{r.overtime_hours}</td>
-                    <td className="py-1.5 px-1.5 text-right text-indigo-700">{(r.night_hours || 0).toFixed(1)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-purple-700">{r.weekly_holiday_hours}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#F0BF00]">{r.overtime_hours}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{(r.night_hours || 0).toFixed(1)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{r.weekly_holiday_hours}</td>
                     <td className="py-1.5 px-1.5 text-right">{fmt.format(r.basePay)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-amber-700">{fmt.format(r.overtimePay)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-indigo-700">{fmt.format(r.nightPay)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-purple-700">{fmt.format(r.whPay)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#F0BF00]">{fmt.format(r.overtimePay)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{fmt.format(r.nightPay)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{fmt.format(r.whPay)}</td>
                     <td className="py-1.5 px-1.5 text-right font-medium">{fmt.format(r.grossPay)}</td>
                     <td className="py-1.5 px-1.5">
                       <input type="number" value={mealDeductions[r.idx] || ''} onChange={e => setMealDeductions({...mealDeductions, [r.idx]: parseInt(e.target.value) || 0})}
-                        className="w-full px-1 py-0.5 border border-gray-200 rounded text-[10px] text-right" placeholder="0" />
+                        className="w-full px-1 py-0.5 border border-[#23252A] rounded text-[10px] text-right" placeholder="0" />
                     </td>
-                    <td className="py-1.5 px-1.5 text-right text-red-500">{fmt.format(r.incomeTax)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-red-500">{fmt.format(r.localTax)}</td>
-                    <td className="py-1.5 px-1.5 text-right font-bold text-green-700">{fmt.format(r.netPay)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#EB5757]">{fmt.format(r.incomeTax)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#EB5757]">{fmt.format(r.localTax)}</td>
+                    <td className="py-1.5 px-1.5 text-right font-bold text-[#27A644]">{fmt.format(r.netPay)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-orange-50 border-t-2 border-orange-200 font-bold text-[10px]">
+                <tr className="bg-[#FC7840]/10 border-t-2 border-[#FC7840]/30 font-bold text-[10px]">
                   <td className="py-2 px-1.5 text-orange-900" colSpan={4}>합계 ({rows.length}명)</td>
                   <td className="py-2 px-1.5 text-right">{totals.work_days}</td>
                   <td className="py-2 px-1.5 text-right">{(totals.regular_hours || 0).toFixed(1)}</td>
@@ -350,17 +350,17 @@ export default function SettlementAlbaPage() {
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.nightPay || 0)}</td>
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.whPay || 0)}</td>
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.grossPay || 0)}</td>
-                  <td className="py-2 px-1.5 text-right text-red-600">{fmt.format(totals.meal || 0)}</td>
+                  <td className="py-2 px-1.5 text-right text-[#EB5757]">{fmt.format(totals.meal || 0)}</td>
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.incomeTax || 0)}</td>
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.localTax || 0)}</td>
-                  <td className="py-2 px-1.5 text-right text-green-800">{fmt.format(totals.netPay || 0)}</td>
+                  <td className="py-2 px-1.5 text-right text-[#27A644]">{fmt.format(totals.netPay || 0)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
       ) : data ? (
-        <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">확정된 알바 근태 데이터가 없습니다.</div>
+        <div className="bg-[#0F1011] rounded-xl border py-16 text-center text-sm text-[#62666D]">확정된 알바 근태 데이터가 없습니다.</div>
       ) : null}
     </div>
   );

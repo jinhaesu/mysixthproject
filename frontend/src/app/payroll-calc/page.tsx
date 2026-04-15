@@ -76,28 +76,28 @@ export default function PayrollCalcPage() {
   return (
     <div className="min-w-0">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Calculator className="w-6 h-6 text-indigo-600" />
+        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+          <Calculator className="w-6 h-6 text-[#7070FF]" />
           정규직 급여 계산
         </h1>
-        <p className="text-sm text-gray-500 mt-1">확정 근태 + 기본급 설정 기반 급여 자동 계산</p>
-        <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-xs text-indigo-800">
+        <p className="text-sm text-[#8A8F98] mt-1">확정 근태 + 기본급 설정 기반 급여 자동 계산</p>
+        <div className="mt-2 bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 rounded-lg px-3 py-2 text-xs text-indigo-800">
           <b>수당 계산:</b> 연장/휴일/야간 각 <b>시급 × 1.5배</b> | <b>30분 단위 내림</b> (0.1~0.4h → 0, 0.5h = 30분) | 토/일/공휴일 근무 = <b>휴일(h) 별도 집계</b> (연장 제외) | 22:00~06:00 = 야간(h) 별도 | 연장 2h 초과 시 저녁식사 30분 휴게 자동 추가
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">
+      <div className="bg-[#0F1011] rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">연월</label>
-          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연월</label>
+          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">연장/휴일 시급 (원)</label>
-          <input type="number" value={overtimeRate} onChange={e => setOvertimeRate(parseInt(e.target.value) || 0)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연장/휴일 시급 (원)</label>
+          <input type="number" value={overtimeRate} onChange={e => setOvertimeRate(parseInt(e.target.value) || 0)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
         </div>
-        <div className="text-xs text-gray-500 py-2">× 1.5배 = {fmt.format(Math.round(overtimeRate * 1.5))}원/h</div>
+        <div className="text-xs text-[#8A8F98] py-2">× 1.5배 = {fmt.format(Math.round(overtimeRate * 1.5))}원/h</div>
         {results.length > 0 && (
-          <button onClick={handleExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium flex items-center gap-1 ml-auto">
+          <button onClick={handleExcel} className="px-4 py-2 bg-[#27A644] text-white rounded-lg text-sm font-medium flex items-center gap-1 ml-auto">
             <Download className="w-4 h-4" /> 엑셀 다운로드
           </button>
         )}
@@ -105,11 +105,11 @@ export default function PayrollCalcPage() {
 
       {results.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-          <div className="bg-white rounded-xl border p-3 text-center"><p className="text-xl font-bold">{results.length}</p><p className="text-xs text-gray-500">인원</p></div>
-          <div className="bg-blue-50 rounded-xl border border-blue-200 p-3 text-center"><p className="text-lg font-bold text-blue-700">{fmt.format(sum('gross_pay'))}</p><p className="text-xs text-blue-600">총 지급액</p></div>
-          <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 text-center"><p className="text-lg font-bold text-amber-700">{fmt.format(sum('overtime_pay'))}</p><p className="text-xs text-amber-600">총 연장수당</p></div>
-          <div className="bg-red-50 rounded-xl border border-red-200 p-3 text-center"><p className="text-lg font-bold text-red-700">{fmt.format(sum('total_deductions'))}</p><p className="text-xs text-red-600">총 공제액</p></div>
-          <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><p className="text-lg font-bold text-green-700">{fmt.format(sum('net_pay'))}</p><p className="text-xs text-green-600">총 실지급액</p></div>
+          <div className="bg-[#0F1011] rounded-xl border p-3 text-center"><p className="text-xl font-bold">{results.length}</p><p className="text-xs text-[#8A8F98]">인원</p></div>
+          <div className="bg-[#4EA7FC]/10 rounded-xl border border-[#5E6AD2]/30 p-3 text-center"><p className="text-lg font-bold text-[#828FFF]">{fmt.format(sum('gross_pay'))}</p><p className="text-xs text-[#7070FF]">총 지급액</p></div>
+          <div className="bg-[#F0BF00]/10 rounded-xl border border-[#F0BF00]/30 p-3 text-center"><p className="text-lg font-bold text-[#F0BF00]">{fmt.format(sum('overtime_pay'))}</p><p className="text-xs text-[#F0BF00]">총 연장수당</p></div>
+          <div className="bg-[#EB5757]/10 rounded-xl border border-[#EB5757]/30 p-3 text-center"><p className="text-lg font-bold text-[#EB5757]">{fmt.format(sum('total_deductions'))}</p><p className="text-xs text-[#EB5757]">총 공제액</p></div>
+          <div className="bg-[#27A644]/10 rounded-xl border border-[#27A644]/30 p-3 text-center"><p className="text-lg font-bold text-[#27A644]">{fmt.format(sum('net_pay'))}</p><p className="text-xs text-[#27A644]">총 실지급액</p></div>
         </div>
       )}
 
@@ -140,13 +140,13 @@ export default function PayrollCalcPage() {
       })()}
 
       {loading ? (
-        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
+        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" /></div>
       ) : results.length > 0 ? (
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="bg-[#0F1011] rounded-xl border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[10px]">
               <thead>
-                <tr className="bg-gray-50 text-left">
+                <tr className="bg-[#08090A] text-left">
                   <th className="py-2 px-2">성명</th>
                   <th className="py-2 px-2">부서</th>
                   <th className="py-2 px-2">은행</th>
@@ -163,48 +163,48 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right">휴일h</th>
                   <th className="py-2 px-2 text-right">휴일수당</th>
                   <th className="py-2 px-2 text-right font-bold">지급액</th>
-                  <th className="py-2 px-2 text-right">국민연금<br/><span className="text-[8px] text-gray-400">4.5%</span></th>
-                  <th className="py-2 px-2 text-right">건강보험<br/><span className="text-[8px] text-gray-400">3.545%</span></th>
-                  <th className="py-2 px-2 text-right">장기요양<br/><span className="text-[8px] text-gray-400">12.81%</span></th>
-                  <th className="py-2 px-2 text-right">고용보험<br/><span className="text-[8px] text-gray-400">0.9%</span></th>
+                  <th className="py-2 px-2 text-right">국민연금<br/><span className="text-[8px] text-[#62666D]">4.5%</span></th>
+                  <th className="py-2 px-2 text-right">건강보험<br/><span className="text-[8px] text-[#62666D]">3.545%</span></th>
+                  <th className="py-2 px-2 text-right">장기요양<br/><span className="text-[8px] text-[#62666D]">12.81%</span></th>
+                  <th className="py-2 px-2 text-right">고용보험<br/><span className="text-[8px] text-[#62666D]">0.9%</span></th>
                   <th className="py-2 px-2 text-right">소득세</th>
                   <th className="py-2 px-2 text-right">주민세</th>
-                  <th className="py-2 px-2 text-right text-red-600">공제계</th>
-                  <th className="py-2 px-2 text-right font-bold text-green-700">실지급</th>
+                  <th className="py-2 px-2 text-right text-[#EB5757]">공제계</th>
+                  <th className="py-2 px-2 text-right font-bold text-[#27A644]">실지급</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {results.map((r: any, i: number) => (
-                  <tr key={i} className="hover:bg-gray-50">
-                    <td className="py-1.5 px-2 font-medium text-gray-900 whitespace-nowrap">{r.name}</td>
-                    <td className="py-1.5 px-2 text-gray-500">{r.department} {r.team}</td>
-                    <td className="py-1.5 px-2 text-gray-500 text-[9px]">{r.bank_name || '-'}</td>
-                    <td className="py-1.5 px-2 text-gray-500 font-mono text-[9px]">{r.bank_account || '-'}</td>
-                    <td className="py-1.5 px-2 text-gray-500 font-mono text-[9px]">{r.id_number || '-'}</td>
+                  <tr key={i} className="hover:bg-[#141516]/5">
+                    <td className="py-1.5 px-2 font-medium text-[#F7F8F8] whitespace-nowrap">{r.name}</td>
+                    <td className="py-1.5 px-2 text-[#8A8F98]">{r.department} {r.team}</td>
+                    <td className="py-1.5 px-2 text-[#8A8F98] text-[9px]">{r.bank_name || '-'}</td>
+                    <td className="py-1.5 px-2 text-[#8A8F98] font-mono text-[9px]">{r.bank_account || '-'}</td>
+                    <td className="py-1.5 px-2 text-[#8A8F98] font-mono text-[9px]">{r.id_number || '-'}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.base_pay)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.meal_allowance)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.bonus)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.position_allowance || 0)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.other_allowance || 0)}</td>
                     <td className="py-1.5 px-2 text-right">{r.work_days}</td>
-                    <td className="py-1.5 px-2 text-right text-amber-700">{(r.overtime_hours || 0).toFixed(1)}</td>
-                    <td className="py-1.5 px-2 text-right text-amber-700">{fmt.format(r.overtime_pay)}</td>
-                    <td className="py-1.5 px-2 text-right text-red-700">{(r.holiday_hours || 0).toFixed(1)}</td>
-                    <td className="py-1.5 px-2 text-right text-red-600">{fmt.format(r.holiday_pay)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#F0BF00]">{(r.overtime_hours || 0).toFixed(1)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#F0BF00]">{fmt.format(r.overtime_pay)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#EB5757]">{(r.holiday_hours || 0).toFixed(1)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#EB5757]">{fmt.format(r.holiday_pay)}</td>
                     <td className="py-1.5 px-2 text-right font-medium">{fmt.format(r.gross_pay)}</td>
-                    <td className="py-1.5 px-2 text-right text-gray-500">{fmt.format(r.national_pension)}</td>
-                    <td className="py-1.5 px-2 text-right text-gray-500">{fmt.format(r.health_insurance)}</td>
-                    <td className="py-1.5 px-2 text-right text-gray-500">{fmt.format(r.long_term_care)}</td>
-                    <td className="py-1.5 px-2 text-right text-gray-500">{fmt.format(r.employment_insurance)}</td>
-                    <td className="py-1.5 px-2 text-right text-gray-500">{fmt.format(r.income_tax)}</td>
-                    <td className="py-1.5 px-2 text-right text-gray-500">{fmt.format(r.local_tax)}</td>
-                    <td className="py-1.5 px-2 text-right text-red-600 font-medium">{fmt.format(r.total_deductions)}</td>
-                    <td className="py-1.5 px-2 text-right font-bold text-green-700">{fmt.format(r.net_pay)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8A8F98]">{fmt.format(r.national_pension)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8A8F98]">{fmt.format(r.health_insurance)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8A8F98]">{fmt.format(r.long_term_care)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8A8F98]">{fmt.format(r.employment_insurance)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8A8F98]">{fmt.format(r.income_tax)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8A8F98]">{fmt.format(r.local_tax)}</td>
+                    <td className="py-1.5 px-2 text-right text-[#EB5757] font-medium">{fmt.format(r.total_deductions)}</td>
+                    <td className="py-1.5 px-2 text-right font-bold text-[#27A644]">{fmt.format(r.net_pay)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-bold text-[10px]">
+                <tr className="bg-[#5E6AD2]/10 border-t-2 border-[#5E6AD2]/30 font-bold text-[10px]">
                   <td className="py-2 px-2 text-indigo-900" colSpan={10}>합계 ({results.length}명)</td>
                   <td className="py-2 px-2 text-right">{sum('work_days')}</td>
                   <td className="py-2 px-2 text-right">{sum('overtime_hours').toFixed(1)}</td>
@@ -218,15 +218,15 @@ export default function PayrollCalcPage() {
                   <td className="py-2 px-2 text-right">{fmt.format(sum('employment_insurance'))}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('income_tax'))}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('local_tax'))}</td>
-                  <td className="py-2 px-2 text-right text-red-700">{fmt.format(sum('total_deductions'))}</td>
-                  <td className="py-2 px-2 text-right text-green-800">{fmt.format(sum('net_pay'))}</td>
+                  <td className="py-2 px-2 text-right text-[#EB5757]">{fmt.format(sum('total_deductions'))}</td>
+                  <td className="py-2 px-2 text-right text-[#27A644]">{fmt.format(sum('net_pay'))}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
         </div>
       ) : data ? (
-        <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">해당 월에 확정된 근태 데이터가 없습니다.</div>
+        <div className="bg-[#0F1011] rounded-xl border py-16 text-center text-sm text-[#62666D]">해당 월에 확정된 근태 데이터가 없습니다.</div>
       ) : null}
     </div>
   );

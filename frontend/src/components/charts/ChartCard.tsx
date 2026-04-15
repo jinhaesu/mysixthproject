@@ -10,10 +10,10 @@ interface Props {
 
 export default function ChartCard({ title, subtitle, height = 280, children }: Props) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
+    <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
-        {subtitle && <p className="text-[10px] text-gray-500 mt-0.5">{subtitle}</p>}
+        <h3 className="text-sm font-semibold text-[#F7F8F8]">{title}</h3>
+        {subtitle && <p className="text-[10px] text-[#8A8F98] mt-0.5">{subtitle}</p>}
       </div>
       <div style={{ width: "100%", height }}>
         <ResponsiveContainer width="100%" height="100%">

@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f9fafb;
-  --foreground: #111827;
+  --background: #08090A;
+  --foreground: #F7F8F8;
+  --color-bg-level-0: #08090A;
+  --color-bg-level-1: #0F1011;
+  --color-bg-level-2: #141516;
+  --color-bg-secondary: #1C1C1F;
+  --color-bg-tertiary: #232326;
+  --color-bg-quaternary: #28282C;
+  --color-text-primary: #F7F8F8;
+  --color-text-secondary: #D0D6E0;
+  --color-text-tertiary: #8A8F98;
+  --color-text-quaternary: #62666D;
+  --color-border-primary: #23252A;
+  --color-border-secondary: #34343A;
+  --color-border-tertiary: #3E3E44;
+  --color-brand-bg: #5E6AD2;
+  --color-link-primary: #7070FF;
+  --color-accent-hover: #828FFF;
 }
 
 @theme inline {
@@ -13,15 +29,36 @@
 }
 
 html {
-  font-size: 14px; /* 기본 16px → 14px 축소 (모든 rem 단위에 영향) */
+  font-size: 14px;
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
-  font-size: 0.875rem; /* body 기본 텍스트 = 약 12.25px */
+  font-family: var(--font-sans), "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.875rem;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(94, 106, 210, 0.35);
+}
+
+input, textarea, select {
+  background-color: #141516;
+  color: #F7F8F8;
+  border-color: #23252A;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #62666D;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-bg);
+  outline-offset: 2px;
 }
 
 /* Scrollbar */
@@ -29,10 +66,13 @@ body {
   width: 6px;
   height: 6px;
 }
+::-webkit-scrollbar-track {
+  background: #0F1011;
+}
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: #34343A;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #3E3E44;
 }

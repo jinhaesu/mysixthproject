@@ -113,21 +113,21 @@ export default function ConfirmedListRegularPage() {
   return (
     <div className="min-w-0">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Table2 className="w-6 h-6 text-indigo-600" />
+        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+          <Table2 className="w-6 h-6 text-[#7070FF]" />
           정규직 근태 정보 확정 리스트
         </h1>
-        <p className="text-sm text-gray-500 mt-1">확정된 근태 정보를 확인하고 최종 수정합니다.</p>
+        <p className="text-sm text-[#8A8F98] mt-1">확정된 근태 정보를 확인하고 최종 수정합니다.</p>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end mb-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">연월</label>
-          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연월</label>
+          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">부서</label>
-          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">부서</label>
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value="">전체</option>
             <option value="물류">물류</option>
             <option value="생산2층">생산2층</option>
@@ -137,17 +137,17 @@ export default function ConfirmedListRegularPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름 검색</label>
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
+            className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
         </div>
         <button onClick={() => { delete _cache[`clr-${yearMonth}`]; load(); }} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
 
       {loading ? (
-        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
+        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" /></div>
       ) : data.length === 0 ? (
-        <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">확정된 데이터가 없습니다.</div>
+        <div className="bg-[#0F1011] rounded-xl border py-16 text-center text-sm text-[#62666D]">확정된 데이터가 없습니다.</div>
       ) : (() => {
         const filtered = data.filter((e: any) =>
           (!nameSearch || (e.name || '').includes(nameSearch)) &&
@@ -186,45 +186,45 @@ export default function ConfirmedListRegularPage() {
         <>
           {/* Stats Board */}
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{filtered.length}</p>
-              <p className="text-xs text-gray-500 mt-1">총 근무자</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 text-center">
+              <p className="text-2xl font-bold text-[#F7F8F8]">{filtered.length}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">총 근무자</p>
             </div>
-            <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
-              <p className="text-2xl font-bold text-blue-700">{totals.regular.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">기본시간(h)</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#5E6AD2]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#828FFF]">{totals.regular.toFixed(1)}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">기본시간(h)</p>
             </div>
-            <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
-              <p className="text-2xl font-bold text-amber-700">{totals.overtime.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">연장시간(h)</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#F0BF00]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#F0BF00]">{totals.overtime.toFixed(1)}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">연장시간(h)</p>
             </div>
-            <div className="bg-white rounded-xl border border-red-200 p-4 text-center">
-              <p className="text-2xl font-bold text-red-700">{totals.holiday.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">휴일근무(h)</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#EB5757]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#EB5757]">{totals.holiday.toFixed(1)}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">휴일근무(h)</p>
             </div>
-            <div className="bg-white rounded-xl border border-purple-200 p-4 text-center">
-              <p className="text-2xl font-bold text-purple-700">{totals.night.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">야간시간(h)</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#5E6AD2]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#828FFF]">{totals.night.toFixed(1)}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">야간시간(h)</p>
             </div>
-            <div className="bg-white rounded-xl border border-violet-200 p-4 text-center">
+            <div className="bg-[#0F1011] rounded-xl border border-violet-200 p-4 text-center">
               <p className="text-2xl font-bold text-violet-700">{vacCount % 1 === 0 ? vacCount : vacCount.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">휴가 사용(일)</p>
+              <p className="text-xs text-[#8A8F98] mt-1">휴가 사용(일)</p>
             </div>
           </div>
 
           {/* Summary Table */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden mb-4">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="py-2 px-4 font-medium text-gray-600">이름</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">근무일</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">기본(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">연장(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">야간(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">휴게(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">휴일(h)</th>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">이름</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">연락처</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">근무일</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">기본(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">연장(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">야간(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">휴게(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">휴일(h)</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,11 +232,11 @@ export default function ConfirmedListRegularPage() {
                   const isExpanded = expandedEmp === emp.name;
                   return (
                     <React.Fragment key={emp.name}>
-                      <tr className={`hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${isExpanded ? 'bg-indigo-50/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : emp.name)}>
-                        <td className="py-2.5 px-4 font-medium text-gray-900">{emp.name}{emp.department && <span className="ml-1 text-[10px] text-gray-500">{emp.department}</span>}</td>
-                        <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
+                      <tr className={`hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] ${isExpanded ? 'bg-[#5E6AD2]/10/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : emp.name)}>
+                        <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{emp.name}{emp.department && <span className="ml-1 text-[10px] text-[#8A8F98]">{emp.department}</span>}</td>
+                        <td className="py-2.5 px-4 text-[#8A8F98]">{emp.phone}</td>
                         <td className="py-2.5 px-4 text-right">{emp.days}</td>
-                        <td className="py-2.5 px-4 text-right text-blue-700">
+                        <td className="py-2.5 px-4 text-right text-[#828FFF]">
                           {(() => {
                             const ym = yearMonth;
                             // 레코드 날짜 set — confirmed_attendance에 이미 저장된 날짜는 휴가 별도 가산 금지
@@ -252,26 +252,26 @@ export default function ConfirmedListRegularPage() {
                             }
                             const weekdayReg = emp._weekday_regular || 0;
                             const total = weekdayReg + unconfirmedVacH;
-                            if (unconfirmedVacH > 0) return <>{total.toFixed(1)} <span className="text-[9px] text-red-600 font-medium">(미확정 휴가{unconfirmedVacH}h 포함)</span></>;
+                            if (unconfirmedVacH > 0) return <>{total.toFixed(1)} <span className="text-[9px] text-[#EB5757] font-medium">(미확정 휴가{unconfirmedVacH}h 포함)</span></>;
                             return <>{weekdayReg.toFixed(1)}</>;
                           })()}
                         </td>
-                        <td className="py-2.5 px-4 text-right text-amber-700">{(emp._weekday_overtime || 0).toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-purple-700">{(emp.night_hours || 0).toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-gray-500">{(emp.break_hours || 0).toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-red-600 font-medium">{(emp._holiday_hours || 0).toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#F0BF00]">{(emp._weekday_overtime || 0).toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#828FFF]">{(emp.night_hours || 0).toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#8A8F98]">{(emp.break_hours || 0).toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#EB5757] font-medium">{(emp._holiday_hours || 0).toFixed(1)}</td>
                       </tr>
                       {isExpanded && (
                         <tr>
                           <td colSpan={8} className="p-0">
                             {/* colSpan=8 matches the outer summary table's 8 columns, not the inner detail's 10 */}
-                            <div className="bg-indigo-50/30 border-b border-indigo-200">
-                              <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
+                            <div className="bg-[#5E6AD2]/10/30 border-b border-[#5E6AD2]/30">
+                              <div className="px-4 py-2 bg-[#5E6AD2]/10 border-b border-[#5E6AD2]/30">
                                 <span className="text-xs font-semibold text-indigo-800">{emp.name} 일별 상세</span>
                               </div>
                               <table className="w-full text-xs">
                                 <thead>
-                                  <tr className="bg-gray-50/80 text-left">
+                                  <tr className="bg-[#08090A]/80 text-left">
                                     <th className="py-1.5 px-3">날짜</th>
                                     <th className="py-1.5 px-3">출근</th>
                                     <th className="py-1.5 px-3">퇴근</th>
@@ -284,7 +284,7 @@ export default function ConfirmedListRegularPage() {
                                     <th className="py-1.5 px-3">관리</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-[#23252A]">
                                   {/* Merge records + vacation-only days */}
                                   {(() => {
                                     const recordDates = new Set((emp.records || []).map((r: any) => r.date));
@@ -331,12 +331,12 @@ export default function ConfirmedListRegularPage() {
                                       return '공휴일';
                                     })();
                                     return (
-                                    <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-50/50' : isHoliday ? 'bg-red-50/40 hover:bg-red-50' : vType?.includes('반차') ? 'bg-amber-50/50 hover:bg-amber-50' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-white/60'}>
+                                    <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-50/50' : isHoliday ? 'bg-[#EB5757]/10/40 hover:bg-[#EB5757]/10' : vType?.includes('반차') ? 'bg-[#F0BF00]/10/50 hover:bg-[#F0BF00]/10' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-[#141516]/60'}>
                                       <td className="py-1.5 px-3">
                                         {r.date}
-                                        {holidayLabel && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-red-100 text-red-700">{holidayLabel}</span>}
+                                        {holidayLabel && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[#EB5757]/15 text-[#EB5757]">{holidayLabel}</span>}
                                         {r.source === 'vacation' && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-100 text-violet-700">{r.memo || '연차'}</span>}
-                                        {r.source !== 'vacation' && vType && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vType.includes('반차') ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>{vType}</span>}
+                                        {r.source !== 'vacation' && vType && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vType.includes('반차') ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-violet-100 text-violet-700'}`}>{vType}</span>}
                                       </td>
                                       <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
                                         const ci = e.target.value; const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);
@@ -346,32 +346,32 @@ export default function ConfirmedListRegularPage() {
                                         const co = e.target.value; const calc = calcFromTimes(editForm.confirmed_clock_in, co, r.date);
                                         setEditForm({...editForm, confirmed_clock_out: co, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
                                       }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_out}</td>
-                                      <td className="py-1.5 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
+                                      <td className="py-1.5 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-[#27A644]/10 text-[#27A644]' : 'bg-[#4EA7FC]/10 text-[#828FFF]'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
                                       <td className="py-1.5 px-3 text-right">
-                                        {isHoliday ? '0.0' : (editingId === r.id ? <span className="text-xs text-blue-700 font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1))}
-                                        {vType?.includes('반차') && <span className="ml-0.5 text-[9px] text-red-600 font-medium">+반차4h</span>}
-                                        {vType === '연차' && <span className="ml-0.5 text-[9px] text-red-600 font-medium">+휴가8h</span>}
+                                        {isHoliday ? '0.0' : (editingId === r.id ? <span className="text-xs text-[#828FFF] font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1))}
+                                        {vType?.includes('반차') && <span className="ml-0.5 text-[9px] text-[#EB5757] font-medium">+반차4h</span>}
+                                        {vType === '연차' && <span className="ml-0.5 text-[9px] text-[#EB5757] font-medium">+휴가8h</span>}
                                       </td>
-                                      <td className="py-1.5 px-3 text-right text-amber-700">
+                                      <td className="py-1.5 px-3 text-right text-[#F0BF00]">
                                         {isHoliday ? '0.0' : (editingId === r.id ? editForm.overtime_hours : parseFloat(r.overtime_hours).toFixed(1))}
                                       </td>
-                                      <td className="py-1.5 px-3 text-right text-red-700 font-medium">
+                                      <td className="py-1.5 px-3 text-right text-[#EB5757] font-medium">
                                         {isHoliday ? ((parseFloat(r.regular_hours) || 0) + (parseFloat(r.overtime_hours) || 0)).toFixed(1) : '0.0'}
                                       </td>
-                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-purple-700 font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
-                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-gray-500">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-[#828FFF] font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-[#8A8F98]">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
                                       <td className="py-1.5 px-3">
                                         {editingId === r.id ? (
                                           <div className="flex gap-1">
-                                            <button onClick={handleSave} className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]">저장</button>
-                                            <button onClick={() => setEditingId(null)} className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">취소</button>
+                                            <button onClick={handleSave} className="px-1.5 py-0.5 bg-[#5E6AD2] text-white rounded text-[10px]">저장</button>
+                                            <button onClick={() => setEditingId(null)} className="px-1.5 py-0.5 bg-[#141516] rounded text-[10px]">취소</button>
                                           </div>
                                         ) : (
                                           <div className="flex gap-1">
                                             <button onClick={() => { setEditingId(r.id); setEditForm({ confirmed_clock_in: r.confirmed_clock_in, confirmed_clock_out: r.confirmed_clock_out, regular_hours: parseFloat(r.regular_hours), overtime_hours: parseFloat(r.overtime_hours), night_hours: parseFloat(r.night_hours), break_hours: parseFloat(r.break_hours) }); }}
-                                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit3 className="w-3 h-3" /></button>
+                                              className="p-1 text-[#7070FF] hover:bg-[#4EA7FC]/10 rounded"><Edit3 className="w-3 h-3" /></button>
                                             <button onClick={async () => { if (!confirm('삭제하시겠습니까?')) return; try { await deleteConfirmedRecord(r.id); load(); } catch (e: any) { alert(e.message); } }}
-                                              className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3" /></button>
+                                              className="p-1 text-[#EB5757] hover:bg-[#EB5757]/10 rounded"><Trash2 className="w-3 h-3" /></button>
                                           </div>
                                         )}
                                       </td>

@@ -817,10 +817,10 @@ function RegularContent() {
   // ── Loading state ──────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
-          <p className="mt-3 text-gray-600">{t(lang, "loading")}</p>
+          <Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" />
+          <p className="mt-3 text-[#8A8F98]">{t(lang, "loading")}</p>
         </div>
       </div>
     );
@@ -829,13 +829,13 @@ function RegularContent() {
   // ── Error state ────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-xl shadow-sm p-8 max-w-sm w-full text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
+        <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-8 max-w-sm w-full text-center">
+          <AlertCircle className="w-12 h-12 text-[#EB5757] mx-auto" />
+          <h2 className="mt-4 text-lg font-semibold text-[#F7F8F8]">
             {t(lang, "error")}
           </h2>
-          <p className="mt-2 text-gray-600">{error}</p>
+          <p className="mt-2 text-[#8A8F98]">{error}</p>
         </div>
       </div>
     );
@@ -846,13 +846,13 @@ function RegularContent() {
   // ── Deactivated employee ───────────────────────────────────────
   if (data.status === "deactivated") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white rounded-xl shadow-sm p-8 max-w-sm w-full text-center">
-          <Ban className="w-12 h-12 text-red-500 mx-auto" />
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
+        <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-8 max-w-sm w-full text-center">
+          <Ban className="w-12 h-12 text-[#EB5757] mx-auto" />
+          <h2 className="mt-4 text-lg font-semibold text-[#F7F8F8]">
             {t(lang, "deactivated")}
           </h2>
-          <p className="mt-2 text-gray-600">{t(lang, "deactivatedDesc")}</p>
+          <p className="mt-2 text-[#8A8F98]">{t(lang, "deactivatedDesc")}</p>
         </div>
       </div>
     );
@@ -872,12 +872,12 @@ function RegularContent() {
   const showForm = (data.status === "ready" || data.status === "clocked_in") && !contractMissing && personalInfoDone;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#08090A]">
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-5">
         <h1 className="text-lg font-bold">{t(lang, "pageTitle")}</h1>
         <p className="text-indigo-200 text-sm mt-0.5">{data.date} {t(lang, "workDate")}</p>
-        <div className="mt-2 bg-indigo-500/30 rounded-lg px-3 py-2 space-y-1">
+        <div className="mt-2 bg-[#5E6AD2]/100/30 rounded-lg px-3 py-2 space-y-1">
           <div className="flex items-center gap-2">
             <p className="text-base font-semibold">{data.employee_name}</p>
             {data.role && data.role !== '일반' && (
@@ -904,7 +904,7 @@ function RegularContent() {
 
         {/* Parking Notice */}
         {showForm && (
-          <div className="mt-3 bg-amber-500/20 border border-amber-400/40 rounded-lg px-3 py-2 flex items-start gap-2">
+          <div className="mt-3 bg-[#F0BF00]/100/20 border border-amber-400/40 rounded-lg px-3 py-2 flex items-start gap-2">
             <Car className="w-4 h-4 text-amber-200 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-100">
               {t(lang, "parkingNotice")}
@@ -923,7 +923,7 @@ function RegularContent() {
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 lang === l
                   ? "bg-indigo-600 text-white"
-                  : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+                  : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A] hover:bg-[#141516]/5"
               }`}
             >
               {t(l, `lang${l.charAt(0).toUpperCase() + l.slice(1)}`)}
@@ -933,39 +933,39 @@ function RegularContent() {
 
         {/* Personal Info Required (FIRST - before contract check) */}
         {data && !personalInfoDone && (data.status as string) !== "deactivated" && (
-          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-            <div className="flex items-center gap-2 text-indigo-700 mb-2">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
+            <div className="flex items-center gap-2 text-[#828FFF] mb-2">
               <Users className="w-5 h-5" />
               <h2 className="font-semibold">{t(lang, "personalInfo") || "개인정보 입력"}</h2>
             </div>
-            <p className="text-sm text-gray-600">출퇴근 기록을 위해 개인정보를 먼저 입력해주세요. (최초 1회)</p>
+            <p className="text-sm text-[#8A8F98]">출퇴근 기록을 위해 개인정보를 먼저 입력해주세요. (최초 1회)</p>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">영문이름</label>
+              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">영문이름</label>
               <input type="text" value={piNameEn} onChange={e => setPiNameEn(e.target.value)} placeholder="Hong Gildong"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">주민번호 <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">주민번호 <span className="text-[#EB5757]">*</span></label>
               <input type="password" value={piIdNumber} onChange={e => setPiIdNumber(e.target.value)} placeholder="000000-0000000"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" inputMode="numeric" />
+                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" inputMode="numeric" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">은행명 <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">은행명 <span className="text-[#EB5757]">*</span></label>
               <select value={piBankName} onChange={e => setPiBankName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base bg-white">
+                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base bg-[#0F1011]">
                 <option value="">은행 선택</option>
                 {["국민은행","신한은행","우리은행","하나은행","농협은행","기업은행","카카오뱅크","토스뱅크","SC제일은행","대구은행","부산은행","경남은행","광주은행","전북은행","제주은행","새마을금고","신협","우체국","수협은행"].map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">계좌번호 <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">계좌번호 <span className="text-[#EB5757]">*</span></label>
               <input type="text" value={piBankAccount} onChange={e => setPiBankAccount(e.target.value)} placeholder="계좌번호 입력"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" inputMode="numeric" />
+                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" inputMode="numeric" />
             </div>
 
             <button onClick={handleSavePersonalInfo} disabled={piSaving || !piIdNumber.trim() || !piBankName || !piBankAccount.trim()}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-gray-300">
+              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-[#28282C]">
               {piSaving ? "저장 중..." : "개인정보 저장"}
             </button>
           </div>
@@ -973,12 +973,12 @@ function RegularContent() {
 
         {/* ── Contract Missing Warning (shown after personal info is done) ── */}
         {contractMissing && personalInfoDone && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
-            <ShieldAlert className="w-10 h-10 text-red-500 mx-auto mb-2" />
-            <h2 className="font-semibold text-red-800">근로계약서 미체결</h2>
-            <p className="text-sm text-red-600 mt-2">개인정보가 등록되었습니다. 감사합니다.</p>
-            <p className="text-sm text-red-600 mt-1">근로계약서 체결 후 출퇴근을 시작할 수 있습니다.</p>
-            <p className="text-xs text-red-500 mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
+          <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-5 text-center">
+            <ShieldAlert className="w-10 h-10 text-[#EB5757] mx-auto mb-2" />
+            <h2 className="font-semibold text-[#EB5757]">근로계약서 미체결</h2>
+            <p className="text-sm text-[#EB5757] mt-2">개인정보가 등록되었습니다. 감사합니다.</p>
+            <p className="text-sm text-[#EB5757] mt-1">근로계약서 체결 후 출퇴근을 시작할 수 있습니다.</p>
+            <p className="text-xs text-[#EB5757] mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
           </div>
         )}
 
@@ -987,9 +987,9 @@ function RegularContent() {
           <>
             {/* GPS acquiring */}
             {gpsStatus === "acquiring" && (
-              <div className="rounded-lg p-5 bg-indigo-50 border border-indigo-200 text-center">
+              <div className="rounded-lg p-5 bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 text-center">
                 <Navigation className="w-8 h-8 text-indigo-500 animate-pulse mx-auto" />
-                <p className="mt-3 text-sm font-medium text-indigo-700">
+                <p className="mt-3 text-sm font-medium text-[#828FFF]">
                   {t(lang, "gpsAcquiring")}
                 </p>
                 <p className="text-xs text-indigo-500 mt-1">
@@ -1000,18 +1000,18 @@ function RegularContent() {
 
             {/* GPS denied / error */}
             {(gpsStatus === "denied" || gpsStatus === "error") && (
-              <div className="rounded-lg p-5 bg-red-50 border border-red-200 text-center">
-                <ShieldAlert className="w-8 h-8 text-red-500 mx-auto" />
-                <p className="mt-3 text-sm font-medium text-red-700">
+              <div className="rounded-lg p-5 bg-[#EB5757]/10 border border-[#EB5757]/30 text-center">
+                <ShieldAlert className="w-8 h-8 text-[#EB5757] mx-auto" />
+                <p className="mt-3 text-sm font-medium text-[#EB5757]">
                   {gpsStatus === "denied"
                     ? t(lang, "gpsDenied")
                     : t(lang, "gpsUnavailable")}
                 </p>
-                <p className="text-xs text-red-500 mt-1">
+                <p className="text-xs text-[#EB5757] mt-1">
                   {t(lang, "gpsRequiredNotice")}
                 </p>
                 {hasWorkplace && (
-                  <p className="text-xs text-red-600 mt-2 font-medium">
+                  <p className="text-xs text-[#EB5757] mt-2 font-medium">
                     {t(lang, "gpsCannotRecord")}
                   </p>
                 )}
@@ -1020,13 +1020,13 @@ function RegularContent() {
 
             {/* GPS acquired + within range */}
             {gpsReady && isWithinRadius && (
-              <div className="rounded-lg p-4 bg-green-50 border border-green-200 flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+              <div className="rounded-lg p-4 bg-[#27A644]/10 border border-[#27A644]/30 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-[#27A644] shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-green-700">
+                  <p className="text-sm font-medium text-[#27A644]">
                     {data.workplace!.name} — {distance}m {t(lang, "distance")}
                   </p>
-                  <p className="text-xs text-green-600 mt-0.5">
+                  <p className="text-xs text-[#27A644] mt-0.5">
                     {t(lang, "withinRange")}
                   </p>
                 </div>
@@ -1035,16 +1035,16 @@ function RegularContent() {
 
             {/* GPS acquired + out of range */}
             {isOutOfRange && (
-              <div className="rounded-lg p-5 bg-red-50 border border-red-200 text-center">
-                <XCircle className="w-8 h-8 text-red-500 mx-auto" />
-                <p className="mt-3 text-sm font-medium text-red-700">
+              <div className="rounded-lg p-5 bg-[#EB5757]/10 border border-[#EB5757]/30 text-center">
+                <XCircle className="w-8 h-8 text-[#EB5757] mx-auto" />
+                <p className="mt-3 text-sm font-medium text-[#EB5757]">
                   {t(lang, "outOfRange")}
                 </p>
-                <p className="text-base font-bold text-red-800 mt-1">
+                <p className="text-base font-bold text-[#EB5757] mt-1">
                   {distance}m {t(lang, "distance")} ({t(lang, "allowed")}:{" "}
                   {data.workplace!.radius_meters}m)
                 </p>
-                <p className="text-xs text-red-500 mt-2">
+                <p className="text-xs text-[#EB5757] mt-2">
                   {data.workplace!.name} {t(lang, "moveCloser")}
                 </p>
               </div>
@@ -1052,12 +1052,12 @@ function RegularContent() {
 
             {/* No workplace assigned */}
             {!hasWorkplace && (
-              <div className="rounded-lg p-5 bg-yellow-50 border border-yellow-200 text-center">
+              <div className="rounded-lg p-5 bg-[#F0BF00]/10 border border-[#F0BF00]/30 text-center">
                 <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto" />
-                <p className="mt-3 text-sm font-medium text-yellow-700">
+                <p className="mt-3 text-sm font-medium text-[#F0BF00]">
                   {t(lang, "noWorkplace")}
                 </p>
-                <p className="text-xs text-yellow-600 mt-1">
+                <p className="text-xs text-[#F0BF00] mt-1">
                   {t(lang, "contactAdmin")}
                 </p>
               </div>
@@ -1067,17 +1067,17 @@ function RegularContent() {
 
         {/* ── Safety Agreement (daily, before clock-in) ───────────── */}
         {data.status === "ready" && !agreementAccepted && (
-          <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-            <div className="flex items-center gap-2 text-red-700 mb-2">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
+            <div className="flex items-center gap-2 text-[#EB5757] mb-2">
               <Shield className="w-5 h-5" />
               <h2 className="font-semibold">
                 {t(lang, "safetyAgreementTitle")}
               </h2>
             </div>
 
-            <div className="max-h-72 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4 text-sm text-gray-700">
+            <div className="max-h-72 overflow-y-auto border border-[#23252A] rounded-lg p-4 bg-[#08090A] space-y-4 text-sm text-[#D0D6E0]">
               <div>
-                <p className="font-bold text-gray-900">
+                <p className="font-bold text-[#F7F8F8]">
                   {t(lang, "safetyRule1Title")}
                 </p>
                 <p className="whitespace-pre-line mt-1">
@@ -1085,7 +1085,7 @@ function RegularContent() {
                 </p>
               </div>
               <div>
-                <p className="font-bold text-gray-900">
+                <p className="font-bold text-[#F7F8F8]">
                   {t(lang, "safetyRule2Title")}
                 </p>
                 <p className="whitespace-pre-line mt-1">
@@ -1093,7 +1093,7 @@ function RegularContent() {
                 </p>
               </div>
               <div>
-                <p className="font-bold text-gray-900">
+                <p className="font-bold text-[#F7F8F8]">
                   {t(lang, "safetyRule3Title")}
                 </p>
                 <p className="whitespace-pre-line mt-1">
@@ -1101,7 +1101,7 @@ function RegularContent() {
                 </p>
               </div>
               <div>
-                <p className="font-bold text-gray-900">
+                <p className="font-bold text-[#F7F8F8]">
                   {t(lang, "safetyRule4Title")}
                 </p>
                 <p className="whitespace-pre-line mt-1">
@@ -1109,7 +1109,7 @@ function RegularContent() {
                 </p>
               </div>
               <div>
-                <p className="font-bold text-gray-900">
+                <p className="font-bold text-[#F7F8F8]">
                   {t(lang, "safetyRule5Title")}
                 </p>
                 <p className="whitespace-pre-line mt-1">
@@ -1123,15 +1123,15 @@ function RegularContent() {
                 type="checkbox"
                 checked={agreementAccepted}
                 onChange={(e) => setAgreementAccepted(e.target.checked)}
-                className="mt-1 w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                className="mt-1 w-5 h-5 text-[#7070FF] rounded border-[#23252A] focus:ring-indigo-500"
               />
-              <span className="text-sm font-medium text-gray-800">
+              <span className="text-sm font-medium text-[#F7F8F8]">
                 {t(lang, "agreementCheckbox")}
               </span>
             </label>
 
             {!agreementAccepted && (
-              <p className="text-xs text-red-500 font-medium">
+              <p className="text-xs text-[#EB5757] font-medium">
                 {t(lang, "agreementRequired")}
               </p>
             )}
@@ -1140,12 +1140,12 @@ function RegularContent() {
 
         {/* ── Factory Guide Video ─────────────────────────────────── */}
         {data.status === "ready" && agreementAccepted && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] overflow-hidden">
             <div className="px-5 pt-4 pb-2">
-              <h2 className="font-semibold text-gray-900 text-sm">
+              <h2 className="font-semibold text-[#F7F8F8] text-sm">
                 {t(lang, "videoTitle")}
               </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-[#8A8F98] mt-0.5">
                 {t(lang, "videoDesc")}
               </p>
             </div>
@@ -1167,10 +1167,10 @@ function RegularContent() {
         {data.status === "ready" &&
           agreementAccepted &&
           (data.notices?.length ?? 0) > 0 && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-center gap-2 text-indigo-700 mb-3">
+            <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
+              <div className="flex items-center gap-2 text-[#828FFF] mb-3">
                 <Megaphone className="w-5 h-5" />
-                <h2 className="font-semibold text-gray-900 text-sm">
+                <h2 className="font-semibold text-[#F7F8F8] text-sm">
                   {t(lang, "noticesTitle")}
                 </h2>
               </div>
@@ -1179,10 +1179,10 @@ function RegularContent() {
                   key={notice.id}
                   className="border-l-4 border-indigo-500 pl-3 py-2 mb-2"
                 >
-                  <p className="font-medium text-sm text-gray-900">
+                  <p className="font-medium text-sm text-[#F7F8F8]">
                     {notice.title}
                   </p>
-                  <pre className="text-xs text-gray-600 whitespace-pre-wrap mt-1 font-sans">
+                  <pre className="text-xs text-[#8A8F98] whitespace-pre-wrap mt-1 font-sans">
                     {notice.content}
                   </pre>
                 </div>
@@ -1194,10 +1194,10 @@ function RegularContent() {
         {data.status === "ready" &&
           agreementAccepted &&
           (data.org_chart?.length ?? 0) > 0 && (
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-center gap-2 text-indigo-700 mb-3">
+            <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
+              <div className="flex items-center gap-2 text-[#828FFF] mb-3">
                 <Users className="w-5 h-5" />
-                <h2 className="font-semibold text-gray-900 text-sm">
+                <h2 className="font-semibold text-[#F7F8F8] text-sm">
                   {t(lang, "orgChartTitle")}
                 </h2>
               </div>
@@ -1205,14 +1205,14 @@ function RegularContent() {
                 {(data.org_chart || []).map((dept: any) => (
                   <div
                     key={dept.department}
-                    className="border border-gray-200 rounded-lg overflow-hidden"
+                    className="border border-[#23252A] rounded-lg overflow-hidden"
                   >
                     <button
                       onClick={() => toggleDept(dept.department)}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                      className="w-full flex items-center justify-between px-4 py-3 bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/15 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-indigo-600" />
+                        <Building2 className="w-4 h-4 text-[#7070FF]" />
                         <span className="font-semibold text-sm text-indigo-900">
                           {dept.department}
                         </span>
@@ -1228,13 +1228,13 @@ function RegularContent() {
                         {(dept.teams || []).map((team: any) => (
                           <div
                             key={team.team}
-                            className="flex items-center gap-2 py-1.5 border-b border-gray-100 last:border-b-0"
+                            className="flex items-center gap-2 py-1.5 border-b border-[#23252A] last:border-b-0"
                           >
-                            <span className="text-sm font-medium text-gray-800">
+                            <span className="text-sm font-medium text-[#F7F8F8]">
                               {team.team}
                             </span>
                             {team.leader && (
-                              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                              <span className="text-xs bg-[#5E6AD2]/15 text-[#828FFF] px-2 py-0.5 rounded-full">
                                 {team.leader_role || '반장'}: {team.leader}
                               </span>
                             )}
@@ -1253,15 +1253,15 @@ function RegularContent() {
           <div className="space-y-4">
             {/* Phone Verification */}
             {!phoneVerified ? (
-              <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-                <div className="flex items-center gap-2 text-indigo-700 mb-2">
+              <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
+                <div className="flex items-center gap-2 text-[#828FFF] mb-2">
                   <Shield className="w-5 h-5" />
                   <h2 className="font-semibold">{t(lang, "phoneVerification")}</h2>
                 </div>
-                <p className="text-sm text-gray-600">{t(lang, "phoneVerificationDesc")}</p>
+                <p className="text-sm text-[#8A8F98]">{t(lang, "phoneVerificationDesc")}</p>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     {t(lang, "phoneVerification")}
                   </label>
                   <input
@@ -1270,12 +1270,12 @@ function RegularContent() {
                     onChange={(e) => setPhoneInput(e.target.value)}
                     placeholder="010-0000-0000"
                     disabled={phoneVerified}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                    className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
                   />
                   <button
                     onClick={handleSendOtp}
                     disabled={otpSending || !phoneInput.trim()}
-                    className="w-full mt-2 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-indigo-700"
+                    className="w-full mt-2 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:bg-[#28282C] hover:bg-indigo-700"
                   >
                     {otpSending ? "..." : otpSent ? t(lang, "resendOtp") : t(lang, "requestOtp")}
                   </button>
@@ -1283,7 +1283,7 @@ function RegularContent() {
 
                 {otpSent && (
                   <div className="space-y-2">
-                    <p className="text-xs text-green-600 font-medium">{t(lang, "otpSent")}</p>
+                    <p className="text-xs text-[#27A644] font-medium">{t(lang, "otpSent")}</p>
                     <input
                       type="text"
                       value={otpCode}
@@ -1291,12 +1291,12 @@ function RegularContent() {
                       placeholder={t(lang, "otpPlaceholder")}
                       maxLength={6}
                       inputMode="numeric"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base text-center tracking-widest font-mono"
+                      className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base text-center tracking-widest font-mono"
                     />
                     <button
                       onClick={handleVerifyOtp}
                       disabled={otpVerifying || otpCode.length !== 6}
-                      className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 hover:bg-green-700"
+                      className="w-full py-2.5 bg-[#27A644] text-white rounded-lg text-sm font-medium disabled:bg-[#28282C] hover:bg-green-700"
                     >
                       {otpVerifying ? "..." : t(lang, "verifyOtp")}
                     </button>
@@ -1304,18 +1304,18 @@ function RegularContent() {
                 )}
 
                 {otpError && (
-                  <p className="text-xs text-red-600 font-medium">{otpError}</p>
+                  <p className="text-xs text-[#EB5757] font-medium">{otpError}</p>
                 )}
               </div>
             ) : (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
-                <p className="text-sm font-medium text-green-700">{t(lang, "phoneVerified")}</p>
+              <div className="bg-[#27A644]/10 border border-[#27A644]/30 rounded-xl p-4 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-[#27A644] shrink-0" />
+                <p className="text-sm font-medium text-[#27A644]">{t(lang, "phoneVerified")}</p>
               </div>
             )}
 
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-center gap-2 text-indigo-700 mb-2">
+            <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
+              <div className="flex items-center gap-2 text-[#828FFF] mb-2">
                 <LogIn className="w-5 h-5" />
                 <h2 className="font-semibold">
                   {lang === "ko"
@@ -1328,8 +1328,8 @@ function RegularContent() {
                 </h2>
               </div>
 
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <p className="text-xs text-red-700 font-bold">
+              <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg p-3 mb-4">
+                <p className="text-xs text-[#EB5757] font-bold">
                   {t(lang, "clockInWarning")}
                 </p>
               </div>
@@ -1337,7 +1337,7 @@ function RegularContent() {
               <button
                 onClick={handleClockIn}
                 disabled={submitting || !agreementAccepted || !phoneVerified}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold text-base disabled:bg-[#28282C] disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -1355,12 +1355,12 @@ function RegularContent() {
         {/* ── Clocked-in: show clock-out ──────────────────────────── */}
         {data.status === "clocked_in" && (
           <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-              <div className="flex items-center gap-2 text-green-700 mb-3">
+            <div className="bg-[#27A644]/10 border border-[#27A644]/30 rounded-xl p-5">
+              <div className="flex items-center gap-2 text-[#27A644] mb-3">
                 <CheckCircle className="w-5 h-5" />
                 <h2 className="font-semibold">{t(lang, "clockInComplete")}</h2>
               </div>
-              <div className="space-y-1 text-sm text-green-800">
+              <div className="space-y-1 text-sm text-[#27A644]">
                 <p>
                   <span className="font-medium">{t(lang, "name")}:</span>{" "}
                   {data.employee_name}
@@ -1397,20 +1397,20 @@ function RegularContent() {
 
             {/* Clock-out button */}
             {canAct && (
-              <div className="bg-white rounded-xl shadow-sm p-5">
-                <div className="flex items-center gap-2 text-orange-700 mb-4">
+              <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
+                <div className="flex items-center gap-2 text-[#FC7840] mb-4">
                   <LogOut className="w-5 h-5" />
                   <h2 className="font-semibold">
                     {t(lang, "clockOutTitle")}
                   </h2>
                 </div>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-[#8A8F98] mb-4">
                   {t(lang, "clockOutDesc")}
                 </p>
                 <button
                   onClick={handleClockOut}
                   disabled={submitting}
-                  className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-gray-300 hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-[#28282C] hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -1421,8 +1421,8 @@ function RegularContent() {
                     </>
                   )}
                 </button>
-                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-xs text-red-700 font-bold text-center">
+                <div className="mt-3 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg p-3">
+                  <p className="text-xs text-[#EB5757] font-bold text-center">
                     {t(lang, "clockOutWarning")}
                   </p>
                 </div>
@@ -1433,12 +1433,12 @@ function RegularContent() {
 
         {/* ── Completed ───────────────────────────────────────────── */}
         {data.status === "completed" && (
-          <div className="bg-white rounded-xl shadow-sm p-6 text-center">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-6 text-center">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="mt-4 text-xl font-bold text-gray-900">
+            <h2 className="mt-4 text-xl font-bold text-[#F7F8F8]">
               {t(lang, "completedTitle")}
             </h2>
-            <div className="mt-4 space-y-2 text-sm text-gray-700">
+            <div className="mt-4 space-y-2 text-sm text-[#D0D6E0]">
               <p>
                 <span className="font-medium">{t(lang, "name")}:</span>{" "}
                 {data.employee_name}
@@ -1475,7 +1475,7 @@ function RegularContent() {
               </p>
               {data.attendance?.clock_in_time &&
                 data.attendance?.clock_out_time && (
-                  <p className="font-medium text-indigo-700 mt-2">
+                  <p className="font-medium text-[#828FFF] mt-2">
                     {t(lang, "totalWorkHours")}:{" "}
                     {(
                       (new Date(data.attendance.clock_out_time).getTime() -
@@ -1486,7 +1486,7 @@ function RegularContent() {
                   </p>
                 )}
             </div>
-            <p className="mt-6 text-gray-500 text-sm">
+            <p className="mt-6 text-[#8A8F98] text-sm">
               {t(lang, "thankYou")}
             </p>
           </div>
@@ -1504,104 +1504,104 @@ function RegularContent() {
             </button>
 
             {showVacation && (
-              <div className="mt-3 bg-white rounded-xl shadow-sm p-5 space-y-4">
-                <p className="text-sm text-gray-600">{t(lang, "vacationDesc")}</p>
+              <div className="mt-3 bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
+                <p className="text-sm text-[#8A8F98]">{t(lang, "vacationDesc")}</p>
 
                 {/* Balance display */}
                 {vacData?.balance && (
                   <div className="flex gap-3">
-                    <div className="flex-1 bg-blue-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-blue-700">{vacData.balance.total}</p>
-                      <p className="text-xs text-blue-600">{t(lang, "vacationBalance")}</p>
+                    <div className="flex-1 bg-[#4EA7FC]/10 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-[#828FFF]">{vacData.balance.total}</p>
+                      <p className="text-xs text-[#7070FF]">{t(lang, "vacationBalance")}</p>
                     </div>
-                    <div className="flex-1 bg-amber-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-amber-700">{vacData.balance.used}</p>
-                      <p className="text-xs text-amber-600">{t(lang, "vacationUsed")}</p>
+                    <div className="flex-1 bg-[#F0BF00]/10 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-[#F0BF00]">{vacData.balance.used}</p>
+                      <p className="text-xs text-[#F0BF00]">{t(lang, "vacationUsed")}</p>
                     </div>
-                    <div className="flex-1 bg-green-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-green-700">{(vacData.balance.total - vacData.balance.used).toFixed(1)}</p>
-                      <p className="text-xs text-green-600">{t(lang, "vacationRemaining")}</p>
+                    <div className="flex-1 bg-[#27A644]/10 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-[#27A644]">{(vacData.balance.total - vacData.balance.used).toFixed(1)}</p>
+                      <p className="text-xs text-[#27A644]">{t(lang, "vacationRemaining")}</p>
                     </div>
                   </div>
                 )}
 
                 {/* Request form */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">휴가 종류</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">휴가 종류</label>
                   <div className="grid grid-cols-3 gap-2">
                     {(['연차', '오전반차', '오후반차'] as const).map(t => (
                       <button key={t} onClick={() => setVacType(t)}
-                        className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${vacType === t ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                        className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${vacType === t ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#0F1011] text-[#D0D6E0] border-[#23252A] hover:bg-[#141516]/5'}`}>
                         {t}
                       </button>
                     ))}
                   </div>
                   {vacType === '오전반차' && (
-                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                    <div className="mt-2 bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg px-3 py-2 text-xs text-[#F0BF00]">
                       오전 09:00 ~ 14:00 (0.5일) · 오후 정상 출근
                     </div>
                   )}
                   {vacType === '오후반차' && (
-                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                    <div className="mt-2 bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg px-3 py-2 text-xs text-[#F0BF00]">
                       오후 14:00 ~ 18:00 (0.5일) · 오전 정상 근무 후 퇴근
                     </div>
                   )}
                 </div>
                 <div className={`grid gap-3 ${vacType === '연차' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{vacType === '연차' ? '시작일' : '날짜'}</label>
+                    <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{vacType === '연차' ? '시작일' : '날짜'}</label>
                     <input type="date" value={vacStartDate} onChange={(e) => setVacStartDate(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                      className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
                   </div>
                   {vacType === '연차' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                      <label className="block text-sm font-medium text-[#D0D6E0] mb-1">종료일</label>
                       <input type="date" value={vacEndDate} onChange={(e) => setVacEndDate(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base" />
+                        className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
                     </div>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{vacType === '연차' ? '일수' : '사용 일수'}</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{vacType === '연차' ? '일수' : '사용 일수'}</label>
                   <input type="number" step="0.5" min="0.5" value={vacDays} readOnly={vacType !== '연차'}
                     onChange={(e) => setVacDays(e.target.value)}
-                    className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base ${vacType !== '연차' ? 'bg-gray-50' : ''}`} />
+                    className={`w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base ${vacType !== '연차' ? 'bg-[#08090A]' : ''}`} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t(lang, "vacationReason")}</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{t(lang, "vacationReason")}</label>
                   <textarea value={vacReason} onChange={(e) => setVacReason(e.target.value)}
                     placeholder={t(lang, "vacationReasonPlaceholder")}
-                    rows={2} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-base resize-none" />
+                    rows={2} className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base resize-none" />
                 </div>
                 <button onClick={handleVacationSubmit} disabled={vacSubmitting || !vacStartDate || !vacEndDate}
-                  className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold disabled:bg-gray-300 hover:bg-purple-700 transition-colors">
+                  className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold disabled:bg-[#28282C] hover:bg-purple-700 transition-colors">
                   {vacSubmitting ? "..." : t(lang, "vacationSubmit")}
                 </button>
 
                 {/* History */}
                 {vacData?.requests && vacData.requests.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">{t(lang, "vacationHistory")}</h3>
+                    <h3 className="text-sm font-semibold text-[#D0D6E0] mb-2">{t(lang, "vacationHistory")}</h3>
                     <div className="space-y-2">
                       {vacData.requests.map((r: any) => (
-                        <div key={r.id} className="bg-gray-50 rounded-lg p-3 text-sm">
+                        <div key={r.id} className="bg-[#08090A] rounded-lg p-3 text-sm">
                           <div className="flex justify-between items-center">
                             <span className="font-medium">
-                              {r.type && r.type !== '연차' && <span className={`mr-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${r.type === '오전반차' ? 'bg-amber-100 text-amber-700' : 'bg-orange-100 text-orange-700'}`}>{r.type}</span>}
+                              {r.type && r.type !== '연차' && <span className={`mr-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${r.type === '오전반차' ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-[#FC7840]/15 text-[#FC7840]'}`}>{r.type}</span>}
                               {r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''} ({r.days}{t(lang, "vacationDaysUnit")})
                             </span>
                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              r.status === 'approved' ? 'bg-green-100 text-green-700' :
-                              r.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                              'bg-amber-100 text-amber-700'
+                              r.status === 'approved' ? 'bg-[#27A644]/15 text-[#27A644]' :
+                              r.status === 'rejected' ? 'bg-[#EB5757]/15 text-[#EB5757]' :
+                              'bg-[#F0BF00]/15 text-[#F0BF00]'
                             }`}>
                               {r.status === 'approved' ? t(lang, "vacationApproved") :
                                r.status === 'rejected' ? t(lang, "vacationRejected") :
                                t(lang, "vacationPending")}
                             </span>
                           </div>
-                          {r.reason && <p className="text-gray-500 text-xs mt-1">{r.reason}</p>}
-                          {r.admin_memo && <p className="text-blue-600 text-xs mt-1">관리자: {r.admin_memo}</p>}
+                          {r.reason && <p className="text-[#8A8F98] text-xs mt-1">{r.reason}</p>}
+                          {r.admin_memo && <p className="text-[#7070FF] text-xs mt-1">관리자: {r.admin_memo}</p>}
                         </div>
                       ))}
                     </div>
@@ -1621,8 +1621,8 @@ export default function RegularPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
         </div>
       }
     >

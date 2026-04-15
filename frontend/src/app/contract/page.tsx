@@ -22,44 +22,44 @@ function ContractContent() {
   }, [id]);
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+      <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
     </div>
   );
 
   if (error || !contract) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="bg-white rounded-xl shadow-sm p-8 max-w-sm w-full text-center">
-        <p className="text-lg font-semibold text-gray-700">오류</p>
-        <p className="text-sm text-gray-500 mt-2">{error}</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
+      <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-8 max-w-sm w-full text-center">
+        <p className="text-lg font-semibold text-[#D0D6E0]">오류</p>
+        <p className="text-sm text-[#8A8F98] mt-2">{error}</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+    <div className="min-h-screen bg-[#141516] py-8 px-4">
+      <div className="max-w-2xl mx-auto bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] overflow-hidden">
         {/* Header */}
-        <div className="bg-gray-900 text-white px-6 py-4 text-center">
+        <div className="bg-[#08090A] text-white px-6 py-4 text-center">
           <h1 className="text-lg font-bold">단시간 근로자 표준근로계약서</h1>
-          <p className="text-gray-400 text-xs mt-1">전자문서 | 조인앤조인</p>
+          <p className="text-[#62666D] text-xs mt-1">전자문서 | 조인앤조인</p>
         </div>
 
-        <div className="px-6 py-6 space-y-4 text-sm text-gray-800 leading-relaxed">
+        <div className="px-6 py-6 space-y-4 text-sm text-[#F7F8F8] leading-relaxed">
           <p>
-            <b>조인앤조인</b> (이하 "사업주"라 함)과 <b className="text-blue-700">{contract.worker_name}</b> (이하 "근로자"이라 함)은 다음과 같이 근로계약을 체결한다.
+            <b>조인앤조인</b> (이하 "사업주"라 함)과 <b className="text-[#828FFF]">{contract.worker_name}</b> (이하 "근로자"이라 함)은 다음과 같이 근로계약을 체결한다.
           </p>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="font-bold text-blue-800">1. 근로계약기간</p>
-            <p className="text-blue-700 font-semibold mt-1">{contract.contract_start} ~ {contract.contract_end}</p>
+          <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-lg p-3">
+            <p className="font-bold text-[#828FFF]">1. 근로계약기간</p>
+            <p className="text-[#828FFF] font-semibold mt-1">{contract.contract_start} ~ {contract.contract_end}</p>
           </div>
 
           <p>- 본 계약은 위 기간 내에서 사업주의 업무 지시가 있는 날에 한하여 근로를 제공하는 호출형 단시간 근로계약이다.</p>
           <p>- 계약기간 만료 시 별도의 갱신 합의가 없는 한 본 계약은 자동 종료된다.</p>
 
           <p><b>2. 근무 장소:</b> 경기도 안산시 단원구 신길동 1122</p>
-          <p className="text-xs text-gray-500">- 사업주는 업무상 필요에 따라 근무 장소를 변경할 수 있으며, 사전에 근로자에게 통보한다.</p>
+          <p className="text-xs text-[#8A8F98]">- 사업주는 업무상 필요에 따라 근무 장소를 변경할 수 있으며, 사전에 근로자에게 통보한다.</p>
 
           <p><b>3. 업무의 내용(직종):</b> 제조, 포장 및 이에 부수하는 업무</p>
 
@@ -107,7 +107,7 @@ function ContractContent() {
           </div>
 
           {/* Date */}
-          <div className="text-center text-gray-700 font-medium pt-4 border-t border-gray-200">
+          <div className="text-center text-[#D0D6E0] font-medium pt-4 border-t border-[#23252A]">
             {contract.contract_start && (() => {
               const d = new Date(contract.created_at || contract.contract_start);
               return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
@@ -115,27 +115,27 @@ function ContractContent() {
           </div>
 
           {/* Employer */}
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <p className="font-bold text-gray-900">(사업주)</p>
+          <div className="bg-[#08090A] rounded-lg p-4 border border-[#23252A]">
+            <p className="font-bold text-[#F7F8F8]">(사업주)</p>
             <p>사업체명: (주)조인앤조인</p>
             <p>주소: 전북특별자치도 전주시 덕진구 기린대로 458 (전화: 1533-791)</p>
             <div className="flex items-center justify-between mt-2">
               <p>대표자: 진해수</p>
-              <div className="px-4 py-1 border border-gray-400 rounded text-xs text-gray-500">직인</div>
+              <div className="px-4 py-1 border border-[#34343A] rounded text-xs text-[#8A8F98]">직인</div>
             </div>
           </div>
 
           {/* Worker */}
-          <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-            <p className="font-bold text-gray-900">(근로자)</p>
+          <div className="bg-[#FC7840]/10 rounded-lg p-4 border border-[#FC7840]/30">
+            <p className="font-bold text-[#F7F8F8]">(근로자)</p>
             <p>성명: <b className="text-orange-800">{contract.worker_name}</b></p>
             {contract.address && <p>주소: {contract.address}</p>}
             <p>연락처: {contract.phone}</p>
             {/* Signature */}
             {contract.signature_data && (
               <div className="mt-3">
-                <p className="text-xs text-gray-500 mb-1">서명:</p>
-                <div className="bg-white rounded border border-orange-300 p-2 inline-block">
+                <p className="text-xs text-[#8A8F98] mb-1">서명:</p>
+                <div className="bg-[#0F1011] rounded border border-orange-300 p-2 inline-block">
                   <img src={contract.signature_data} alt="서명" className="max-h-20" />
                 </div>
               </div>
@@ -143,7 +143,7 @@ function ContractContent() {
           </div>
 
           {/* Footer */}
-          <div className="text-center text-xs text-gray-400 pt-4">
+          <div className="text-center text-xs text-[#62666D] pt-4">
             <p>본 계약서는 전자적으로 작성되었으며 법적 효력을 가집니다.</p>
             <p className="mt-1">조인앤조인 근태관리시스템</p>
           </div>
@@ -156,8 +156,8 @@ function ContractContent() {
 export default function ContractPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
       </div>
     }>
       <ContractContent />

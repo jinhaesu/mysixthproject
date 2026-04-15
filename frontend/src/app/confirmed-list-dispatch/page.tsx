@@ -111,21 +111,21 @@ export default function ConfirmedListDispatchPage() {
   return (
     <div className="min-w-0">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Table2 className="w-6 h-6 text-indigo-600" />
+        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+          <Table2 className="w-6 h-6 text-[#7070FF]" />
           사업소득(알바)/파견 근태 정보 확정 리스트
         </h1>
-        <p className="text-sm text-gray-500 mt-1">확정된 근태 정보를 확인하고 최종 수정합니다.</p>
+        <p className="text-sm text-[#8A8F98] mt-1">확정된 근태 정보를 확인하고 최종 수정합니다.</p>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end mb-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">연월</label>
-          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연월</label>
+          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">부서</label>
-          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">부서</label>
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value="">전체</option>
             <option value="물류">물류</option>
             <option value="생산2층">생산2층</option>
@@ -133,25 +133,25 @@ export default function ConfirmedListDispatchPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">분류</label>
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">분류</label>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value="">전체</option>
             <option value="파견">파견</option>
             <option value="알바">사업소득(알바)</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름 검색</label>
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
+            className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
         </div>
         <button onClick={() => load()} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
       </div>
 
       {loading ? (
-        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
+        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" /></div>
       ) : data.length === 0 ? (
-        <div className="bg-white rounded-xl border py-16 text-center text-sm text-gray-400">확정된 데이터가 없습니다.</div>
+        <div className="bg-[#0F1011] rounded-xl border py-16 text-center text-sm text-[#62666D]">확정된 데이터가 없습니다.</div>
       ) : (() => {
         // 레코드 단위 분류: 이 페이지가 source of truth.
         // 로직 = settlement endpoint의 getEffectiveType과 동일:
@@ -251,40 +251,40 @@ export default function ConfirmedListDispatchPage() {
         <>
           {/* Stats Board - filter 적용 시 해당 분류만 표시 */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{filtered.length}</p>
-              <p className="text-xs text-gray-500 mt-1">근무자 {typeFilter ? `(${typeFilter})` : '(전체)'}</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 text-center">
+              <p className="text-2xl font-bold text-[#F7F8F8]">{filtered.length}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">근무자 {typeFilter ? `(${typeFilter})` : '(전체)'}</p>
             </div>
-            <div className="bg-white rounded-xl border border-blue-200 p-4 text-center">
-              <p className="text-2xl font-bold text-blue-700">{totals.regular.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">기본시간(h)</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.regByType.dispatch || 0).toFixed(1)} / 알바 {(totals.regByType.alba || 0).toFixed(1)}</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#5E6AD2]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#828FFF]">{totals.regular.toFixed(1)}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">기본시간(h)</p>
+              <p className="text-[10px] text-[#62666D] mt-0.5">파견 {(totals.regByType.dispatch || 0).toFixed(1)} / 알바 {(totals.regByType.alba || 0).toFixed(1)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-amber-200 p-4 text-center">
-              <p className="text-2xl font-bold text-amber-700">{totals.overtime.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">연장시간(h)</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.otByType.dispatch || 0).toFixed(1)} / 알바 {(totals.otByType.alba || 0).toFixed(1)}</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#F0BF00]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#F0BF00]">{totals.overtime.toFixed(1)}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">연장시간(h)</p>
+              <p className="text-[10px] text-[#62666D] mt-0.5">파견 {(totals.otByType.dispatch || 0).toFixed(1)} / 알바 {(totals.otByType.alba || 0).toFixed(1)}</p>
             </div>
-            <div className="bg-white rounded-xl border border-purple-200 p-4 text-center">
-              <p className="text-2xl font-bold text-purple-700">{totals.night.toFixed(1)}</p>
-              <p className="text-xs text-gray-500 mt-1">야간시간(h)</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">파견 {(totals.ntByType.dispatch || 0).toFixed(1)} / 알바 {(totals.ntByType.alba || 0).toFixed(1)}</p>
+            <div className="bg-[#0F1011] rounded-xl border border-[#5E6AD2]/30 p-4 text-center">
+              <p className="text-2xl font-bold text-[#828FFF]">{totals.night.toFixed(1)}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">야간시간(h)</p>
+              <p className="text-[10px] text-[#62666D] mt-0.5">파견 {(totals.ntByType.dispatch || 0).toFixed(1)} / 알바 {(totals.ntByType.alba || 0).toFixed(1)}</p>
             </div>
           </div>
 
           {/* Summary Table */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden mb-4">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="py-2 px-4 font-medium text-gray-600">이름</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">근무일</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">기본(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">연장(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">야간(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">휴게(h)</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">휴일</th>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">이름</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">연락처</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">근무일</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">기본(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">연장(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">야간(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">휴게(h)</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">휴일</th>
                 </tr>
               </thead>
               <tbody>
@@ -293,31 +293,31 @@ export default function ConfirmedListDispatchPage() {
                   const isExpanded = expandedEmp === rowKey;
                   return (
                     <React.Fragment key={rowKey}>
-                      <tr className={`hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${isExpanded ? 'bg-indigo-50/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : rowKey)}>
-                        <td className="py-2.5 px-4 font-medium text-gray-900">
+                      <tr className={`hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] ${isExpanded ? 'bg-[#5E6AD2]/10/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : rowKey)}>
+                        <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">
                           {emp.name}
-                          <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-blue-50 text-blue-700' : emp.type === '알바' ? 'bg-orange-50 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{emp.type || '?'}</span>
-                          {emp.department && <span className="ml-1 text-[10px] text-gray-500">{emp.department}</span>}
+                          <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-[#4EA7FC]/10 text-[#828FFF]' : emp.type === '알바' ? 'bg-[#FC7840]/10 text-[#FC7840]' : 'bg-[#141516] text-[#8A8F98]'}`}>{emp.type || '?'}</span>
+                          {emp.department && <span className="ml-1 text-[10px] text-[#8A8F98]">{emp.department}</span>}
                         </td>
-                        <td className="py-2.5 px-4 text-gray-600">{emp.phone}</td>
+                        <td className="py-2.5 px-4 text-[#8A8F98]">{emp.phone}</td>
                         <td className="py-2.5 px-4 text-right">{emp.days}</td>
-                        <td className="py-2.5 px-4 text-right text-blue-700">{emp.regular_hours.toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-amber-700">{emp.overtime_hours.toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-purple-700">{emp.night_hours.toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-gray-500">{emp.break_hours.toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right text-red-600">{emp.holiday_days}</td>
+                        <td className="py-2.5 px-4 text-right text-[#828FFF]">{emp.regular_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#F0BF00]">{emp.overtime_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#828FFF]">{emp.night_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#8A8F98]">{emp.break_hours.toFixed(1)}</td>
+                        <td className="py-2.5 px-4 text-right text-[#EB5757]">{emp.holiday_days}</td>
                       </tr>
                       {isExpanded && (
                         <tr>
                           <td colSpan={8} className="p-0">
-                            <div className="bg-indigo-50/30 border-b border-indigo-200">
-                              <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+                            <div className="bg-[#5E6AD2]/10/30 border-b border-[#5E6AD2]/30">
+                              <div className="px-4 py-2 bg-[#5E6AD2]/10 border-b border-[#5E6AD2]/30 flex items-center justify-between">
                                 <span className="text-xs font-semibold text-indigo-800">{emp.name} 일별 상세</span>
-                                <span className="text-[10px] text-indigo-600">타입 뱃지 클릭 → 드롭다운에서 변경 가능</span>
+                                <span className="text-[10px] text-[#7070FF]">타입 뱃지 클릭 → 드롭다운에서 변경 가능</span>
                               </div>
                               <table className="w-full text-xs">
                                 <thead>
-                                  <tr className="bg-gray-50/80 text-left">
+                                  <tr className="bg-[#08090A]/80 text-left">
                                     <th className="py-1.5 px-3">날짜</th>
                                     <th className="py-1.5 px-3">타입</th>
                                     <th className="py-1.5 px-3">출근</th>
@@ -330,16 +330,16 @@ export default function ConfirmedListDispatchPage() {
                                     <th className="py-1.5 px-3">관리</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-[#23252A]">
                                   {(emp.records || []).map((r: any) => {
                                     const rawType = r.employee_type || '';
                                     const effType = (r as any).__computed_type || r.effective_type || '(미분류)';
-                                    const typeColor = rawType === '파견' ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                      : (rawType === '알바' || rawType === '사업소득') ? 'bg-orange-50 text-orange-700 border-orange-200'
-                                      : rawType === '정규직' ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-red-50 text-red-700 border-red-200';
+                                    const typeColor = rawType === '파견' ? 'bg-[#4EA7FC]/10 text-[#828FFF] border-[#5E6AD2]/30'
+                                      : (rawType === '알바' || rawType === '사업소득') ? 'bg-[#FC7840]/10 text-[#FC7840] border-[#FC7840]/30'
+                                      : rawType === '정규직' ? 'bg-[#5E6AD2]/10 text-[#828FFF] border-[#5E6AD2]/30'
+                                      : 'bg-[#EB5757]/10 text-[#EB5757] border-[#EB5757]/30';
                                     return (
-                                    <tr key={r.id} className="hover:bg-white/60">
+                                    <tr key={r.id} className="hover:bg-[#141516]/60">
                                       <td className="py-1.5 px-3">{r.date}</td>
                                       <td className="py-1.5 px-3">
                                         <select
@@ -360,7 +360,7 @@ export default function ConfirmedListDispatchPage() {
                                           <option value="사업소득">사업소득</option>
                                           <option value="정규직">정규직</option>
                                         </select>
-                                        <span className="ml-1 text-[9px] text-gray-500">→{effType}</span>
+                                        <span className="ml-1 text-[9px] text-[#8A8F98]">→{effType}</span>
                                       </td>
                                       <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
                                         const ci = e.target.value; const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);
@@ -370,23 +370,23 @@ export default function ConfirmedListDispatchPage() {
                                         const co = e.target.value; const calc = calcFromTimes(editForm.confirmed_clock_in, co, r.date);
                                         setEditForm({...editForm, confirmed_clock_out: co, regular_hours: calc.regular, overtime_hours: calc.overtime, night_hours: calc.night, break_hours: calc.breakH});
                                       }} className="w-20 px-1 py-0.5 border rounded text-xs" /> : r.confirmed_clock_out}</td>
-                                      <td className="py-1.5 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
-                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-blue-700 font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1)}</td>
-                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-amber-700 font-medium">{editForm.overtime_hours}</span> : parseFloat(r.overtime_hours).toFixed(1)}</td>
-                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-purple-700 font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
-                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-gray-500">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${r.source === 'actual' ? 'bg-[#27A644]/10 text-[#27A644]' : 'bg-[#4EA7FC]/10 text-[#828FFF]'}`}>{r.source === 'actual' ? '실제' : '계획'}</span></td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-[#828FFF] font-medium">{editForm.regular_hours}</span> : parseFloat(r.regular_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-[#F0BF00] font-medium">{editForm.overtime_hours}</span> : parseFloat(r.overtime_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-[#828FFF] font-medium">{editForm.night_hours}</span> : parseFloat(r.night_hours).toFixed(1)}</td>
+                                      <td className="py-1.5 px-3 text-right">{editingId === r.id ? <span className="text-xs text-[#8A8F98]">{editForm.break_hours}</span> : parseFloat(r.break_hours).toFixed(1)}</td>
                                       <td className="py-1.5 px-3">
                                         {editingId === r.id ? (
                                           <div className="flex gap-1">
-                                            <button onClick={handleSave} className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]">저장</button>
-                                            <button onClick={() => setEditingId(null)} className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">취소</button>
+                                            <button onClick={handleSave} className="px-1.5 py-0.5 bg-[#5E6AD2] text-white rounded text-[10px]">저장</button>
+                                            <button onClick={() => setEditingId(null)} className="px-1.5 py-0.5 bg-[#141516] rounded text-[10px]">취소</button>
                                           </div>
                                         ) : (
                                           <div className="flex gap-1">
                                             <button onClick={() => { setEditingId(r.id); setEditForm({ confirmed_clock_in: r.confirmed_clock_in, confirmed_clock_out: r.confirmed_clock_out, regular_hours: parseFloat(r.regular_hours), overtime_hours: parseFloat(r.overtime_hours), night_hours: parseFloat(r.night_hours), break_hours: parseFloat(r.break_hours) }); }}
-                                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Edit3 className="w-3 h-3" /></button>
+                                              className="p-1 text-[#7070FF] hover:bg-[#4EA7FC]/10 rounded"><Edit3 className="w-3 h-3" /></button>
                                             <button onClick={async () => { if (!confirm('삭제하시겠습니까?')) return; try { await deleteConfirmedRecord(r.id); load(); } catch (e: any) { alert(e.message); } }}
-                                              className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash2 className="w-3 h-3" /></button>
+                                              className="p-1 text-[#EB5757] hover:bg-[#EB5757]/10 rounded"><Trash2 className="w-3 h-3" /></button>
                                           </div>
                                         )}
                                       </td>

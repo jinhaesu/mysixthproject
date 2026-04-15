@@ -58,17 +58,17 @@ function ReportRegularContent() {
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#27A644]" />
       </div>
     );
 
   if (!data || !data.workers)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
         <div className="text-center">
-          <p className="text-lg font-semibold text-gray-700">데이터 없음</p>
-          <p className="text-sm text-gray-500 mt-1">{dateParam} 등록된 정규직 데이터가 없습니다.</p>
+          <p className="text-lg font-semibold text-[#D0D6E0]">데이터 없음</p>
+          <p className="text-sm text-[#8A8F98] mt-1">{dateParam} 등록된 정규직 데이터가 없습니다.</p>
         </div>
       </div>
     );
@@ -107,9 +107,9 @@ function ReportRegularContent() {
   };
 
   const statusStyle = (status: WorkerStatus) => {
-    if (status === "completed") return { bg: "bg-green-500", text: "text-white", label: "퇴근" };
-    if (status === "clock_in") return { bg: "bg-amber-500", text: "text-white", label: "출근" };
-    return { bg: "bg-red-500", text: "text-white", label: "미출근" };
+    if (status === "completed") return { bg: "bg-[#27A644]", text: "text-white", label: "퇴근" };
+    if (status === "clock_in") return { bg: "bg-[#F0BF00]/100", text: "text-white", label: "출근" };
+    return { bg: "bg-[#EB5757]", text: "text-white", label: "미출근" };
   };
 
   const rate =
@@ -124,7 +124,7 @@ function ReportRegularContent() {
     if (!role) return null;
     if (role === "반장" || role === "조장") {
       return (
-        <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded font-bold border border-green-200">
+        <span className="text-[10px] px-1.5 py-0.5 bg-[#27A644]/10 text-[#27A644] rounded font-bold border border-[#27A644]/30">
           {role}
         </span>
       );
@@ -133,7 +133,7 @@ function ReportRegularContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#08090A]">
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 pt-6 pb-8">
         <div className="max-w-lg mx-auto">
@@ -141,7 +141,7 @@ function ReportRegularContent() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold">정규직 출퇴근 현황 리포트</h1>
-                <span className="shrink-0 text-[11px] font-bold bg-white text-green-700 px-2 py-0.5 rounded-full">
+                <span className="shrink-0 text-[11px] font-bold bg-[#0F1011] text-[#27A644] px-2 py-0.5 rounded-full">
                   정규직
                 </span>
               </div>
@@ -151,7 +151,7 @@ function ReportRegularContent() {
               type="date"
               value={dateParam}
               onChange={(e) => setDateParam(e.target.value)}
-              className="px-2 py-1 rounded-lg text-sm bg-green-500/30 border border-green-400/40 text-white focus:outline-none"
+              className="px-2 py-1 rounded-lg text-sm bg-[#27A644]/30 border border-green-400/40 text-white focus:outline-none"
             />
           </div>
 
@@ -187,7 +187,7 @@ function ReportRegularContent() {
         {/* Summary Cards */}
         <div className="grid grid-cols-4 gap-2">
           {[
-            { key: "all" as const, count: displayTotals.total, label: "전체", border: "border-gray-200" },
+            { key: "all" as const, count: displayTotals.total, label: "전체", border: "border-[#23252A]" },
             { key: "clock_in" as const, count: displayTotals.clocked_in, label: "출근중", border: "border-amber-300" },
             { key: "completed" as const, count: displayTotals.completed, label: "퇴근", border: "border-green-300" },
             { key: "not_clocked_in" as const, count: displayTotals.not_clocked_in, label: "미출근", border: "border-red-300" },
@@ -195,12 +195,12 @@ function ReportRegularContent() {
             <button
               key={card.key}
               onClick={() => setFilter(card.key)}
-              className={`bg-white rounded-xl border-2 p-3 text-center transition-all ${
-                filter === card.key ? card.border + " shadow-sm scale-[1.02]" : "border-gray-100"
+              className={`bg-[#0F1011] rounded-xl border-2 p-3 text-center transition-all ${
+                filter === card.key ? card.border + " shadow-[0px_1px_3px_rgba(0,0,0,0.2)] scale-[1.02]" : "border-[#23252A]"
               }`}
             >
-              <p className="text-xl font-bold text-gray-900">{card.count}</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">{card.label}</p>
+              <p className="text-xl font-bold text-[#F7F8F8]">{card.count}</p>
+              <p className="text-[10px] text-[#8A8F98] mt-0.5">{card.label}</p>
             </button>
           ))}
         </div>
@@ -212,8 +212,8 @@ function ReportRegularContent() {
               onClick={() => setDeptFilter("all")}
               className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                 deptFilter === "all"
-                  ? "bg-green-600 text-white"
-                  : "bg-white text-gray-600 border border-gray-200"
+                  ? "bg-[#27A644] text-white"
+                  : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A]"
               }`}
             >
               전체
@@ -224,8 +224,8 @@ function ReportRegularContent() {
                 onClick={() => setDeptFilter(dept)}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   deptFilter === dept
-                    ? "bg-green-600 text-white"
-                    : "bg-white text-gray-600 border border-gray-200"
+                    ? "bg-[#27A644] text-white"
+                    : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A]"
                 }`}
               >
                 {dept}
@@ -236,13 +236,13 @@ function ReportRegularContent() {
 
         {/* Vacation List */}
         {data.vacations && data.vacations.length > 0 && (
-          <div className="bg-purple-50 rounded-xl border border-purple-200 p-3">
+          <div className="bg-[#5E6AD2]/10 rounded-xl border border-[#5E6AD2]/30 p-3">
             <p className="text-xs font-semibold text-purple-800 mb-2">🏖️ 휴가중 ({data.vacations.length}명)</p>
             {data.vacations.map((v: any) => (
-              <div key={v.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 mb-1 border border-purple-100">
+              <div key={v.id} className="flex items-center justify-between bg-[#0F1011] rounded-lg px-3 py-2 mb-1 border border-purple-100">
                 <div>
                   <span className="font-medium text-sm text-purple-900">{v.employee_name}</span>
-                  {v.phone && <a href={`tel:${v.phone}`} className="text-xs text-purple-600 ml-2">{v.phone}</a>}
+                  {v.phone && <a href={`tel:${v.phone}`} className="text-xs text-[#7070FF] ml-2">{v.phone}</a>}
                 </div>
                 <span className="text-xs text-purple-500">{v.start_date}~{v.end_date}</span>
               </div>
@@ -252,7 +252,7 @@ function ReportRegularContent() {
 
         {/* Worker List */}
         <div className="space-y-2">
-          <p className="text-xs text-gray-500 px-1">
+          <p className="text-xs text-[#8A8F98] px-1">
             {filter === "all"
               ? "전체"
               : filter === "not_clocked_in"
@@ -264,8 +264,8 @@ function ReportRegularContent() {
           </p>
 
           {filteredWorkers.length === 0 ? (
-            <div className="bg-white rounded-xl p-8 text-center">
-              <p className="text-sm text-gray-400">해당 상태의 근무자가 없습니다.</p>
+            <div className="bg-[#0F1011] rounded-xl p-8 text-center">
+              <p className="text-sm text-[#62666D]">해당 상태의 근무자가 없습니다.</p>
             </div>
           ) : (
             filteredWorkers.map((w) => {
@@ -274,7 +274,7 @@ function ReportRegularContent() {
               return (
                 <div
                   key={w.id}
-                  className="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm"
+                  className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3.5 shadow-[0px_1px_3px_rgba(0,0,0,0.2)]"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -287,25 +287,25 @@ function ReportRegularContent() {
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <p className="font-semibold text-gray-900 text-sm">{w.name || w.phone}</p>
+                          <p className="font-semibold text-[#F7F8F8] text-sm">{w.name || w.phone}</p>
                           {roleBadge(w.role)}
                         </div>
                         {w.phone && (
                           <a
                             href={`tel:${w.phone}`}
-                            className="text-[11px] text-green-600 font-medium"
+                            className="text-[11px] text-[#27A644] font-medium"
                           >
                             {w.phone}
                           </a>
                         )}
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           {w.department && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded font-medium">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-[#27A644]/10 text-[#27A644] rounded font-medium">
                               {w.department}
                             </span>
                           )}
                           {w.team && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-[#141516] text-[#8A8F98] rounded font-medium">
                               {w.team}
                             </span>
                           )}
@@ -320,16 +320,16 @@ function ReportRegularContent() {
                   </div>
 
                   {(w.clock_in_time || w.clock_out_time) && (
-                    <div className="mt-2.5 pt-2.5 border-t border-gray-100 flex gap-4 text-xs">
+                    <div className="mt-2.5 pt-2.5 border-t border-[#23252A] flex gap-4 text-xs">
                       <div>
-                        <span className="text-gray-400">출근</span>
-                        <p className="font-semibold text-gray-800 mt-0.5">
+                        <span className="text-[#62666D]">출근</span>
+                        <p className="font-semibold text-[#F7F8F8] mt-0.5">
                           {formatTime(w.clock_in_time) || "-"}
                         </p>
                       </div>
                       <div>
-                        <span className="text-gray-400">퇴근</span>
-                        <p className="font-semibold text-gray-800 mt-0.5">
+                        <span className="text-[#62666D]">퇴근</span>
+                        <p className="font-semibold text-[#F7F8F8] mt-0.5">
                           {formatTime(w.clock_out_time) || "-"}
                         </p>
                       </div>
@@ -341,7 +341,7 @@ function ReportRegularContent() {
           )}
         </div>
 
-        <p className="text-center text-[10px] text-gray-300 mt-4 pb-4">조인앤조인 근태관리</p>
+        <p className="text-center text-[10px] text-[#62666D] mt-4 pb-4">조인앤조인 근태관리</p>
       </div>
     </div>
   );
@@ -351,8 +351,8 @@ export default function ReportRegularPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+        <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#27A644]" />
         </div>
       }
     >

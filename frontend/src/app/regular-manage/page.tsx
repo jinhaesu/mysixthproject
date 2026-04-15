@@ -390,23 +390,23 @@ export default function RegularManagePage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <MessageSquare size={28} className="text-blue-600" />
+        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+          <MessageSquare size={28} className="text-[#7070FF]" />
           정규직 관리
         </h1>
-        <p className="text-gray-500 mt-1">현장 정규직 직원 등록, 공지문, 조직도를 관리합니다.</p>
+        <p className="text-[#8A8F98] mt-1">현장 정규직 직원 등록, 공지문, 조직도를 관리합니다.</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6">
+      <div className="flex border-b border-[#23252A] mb-6">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                ? "border-blue-600 text-[#7070FF]"
+                : "border-transparent text-[#8A8F98] hover:text-[#D0D6E0]"
             }`}
           >
             {t.icon}
@@ -419,35 +419,35 @@ export default function RegularManagePage() {
       {tab === "employees" && (
         <div className="space-y-6">
           {/* Register Form */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-4">직원 등록</h3>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+            <h3 className="text-sm font-semibold text-[#F7F8F8] mb-4">직원 등록</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">이름 <span className="text-red-500">*</span></label>
+                <label className="block text-xs text-[#8A8F98] mb-1">이름 <span className="text-[#EB5757]">*</span></label>
                 <input
                   type="text"
                   value={empForm.name}
                   onChange={(e) => setEmpForm({ ...empForm, name: e.target.value })}
                   placeholder="홍길동"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">전화번호 <span className="text-red-500">*</span></label>
+                <label className="block text-xs text-[#8A8F98] mb-1">전화번호 <span className="text-[#EB5757]">*</span></label>
                 <input
                   type="text"
                   value={empForm.phone}
                   onChange={(e) => setEmpForm({ ...empForm, phone: e.target.value })}
                   placeholder="010-0000-0000"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">부서</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">부서</label>
                 <select
                   value={empForm.department}
                   onChange={(e) => setEmpForm({ ...empForm, department: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 >
                   {DEPARTMENTS.map((d) => (
                     <option key={d} value={d}>{d}</option>
@@ -455,11 +455,11 @@ export default function RegularManagePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">조</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">조</label>
                 <select
                   value={empForm.team}
                   onChange={(e) => setEmpForm({ ...empForm, team: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 >
                   {TEAMS.map((t) => (
                     <option key={t} value={t}>{t}</option>
@@ -467,11 +467,11 @@ export default function RegularManagePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">직책</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">직책</label>
                 <select
                   value={empForm.role}
                   onChange={(e) => setEmpForm({ ...empForm, role: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -479,13 +479,13 @@ export default function RegularManagePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">근무지</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">근무지</label>
                 <select
                   value={empForm.workplace_id ?? ""}
                   onChange={(e) =>
                     setEmpForm({ ...empForm, workplace_id: e.target.value ? Number(e.target.value) : null })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 >
                   <option value="">선택</option>
                   {workplaces.map((wp) => (
@@ -494,12 +494,12 @@ export default function RegularManagePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">입사일자</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">입사일자</label>
                 <input
                   type="date"
                   value={empForm.hire_date}
                   onChange={(e) => setEmpForm({ ...empForm, hire_date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 />
               </div>
             </div>
@@ -507,7 +507,7 @@ export default function RegularManagePage() {
               <button
                 onClick={handleAddEmployee}
                 disabled={empSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-sm font-medium disabled:opacity-50"
               >
                 {empSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 등록
@@ -524,7 +524,7 @@ export default function RegularManagePage() {
                   value={empSearch}
                   onChange={(e) => setEmpSearch(e.target.value)}
                   placeholder="이름/연락처 검색..."
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-48 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-48 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
               <button
@@ -535,14 +535,14 @@ export default function RegularManagePage() {
                     try { const data = await getResignedEmployees(); setResignedEmployees(data || []); } catch {}
                   }
                 }}
-                className={`px-3 py-2 rounded-lg text-sm font-medium ${showResigned ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium ${showResigned ? 'bg-[#FC7840]/15 text-[#FC7840]' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}
               >
                 {showResigned ? '재직자 보기' : '퇴사자 조회'}
               </button>
               <button
                 onClick={handleBatchSend}
                 disabled={batchSending || selectedIds.size === 0}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#27A644] text-white hover:bg-green-700 text-sm font-medium disabled:opacity-50"
               >
                 {batchSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 일괄 링크발송 ({selectedIds.size}명)
@@ -562,7 +562,7 @@ export default function RegularManagePage() {
                   }
                 }}
                 disabled={selectedIds.size === 0}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#EB5757] text-white hover:bg-[#F07070] text-sm font-medium disabled:opacity-50"
               >
                 <Trash2 size={14} />
                 일괄 삭제 ({selectedIds.size}명)
@@ -573,83 +573,83 @@ export default function RegularManagePage() {
           {/* Employee List */}
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <Loader2 size={32} className="animate-spin text-blue-600" />
+              <Loader2 size={32} className="animate-spin text-[#7070FF]" />
             </div>
           ) : employees.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center text-[#62666D]">
               등록된 직원이 없습니다.
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
+                    <tr className="bg-[#08090A] border-b border-[#23252A]">
                       <th className="px-4 py-3 text-left">
                         <input
                           type="checkbox"
                           checked={selectedIds.size === employees.length && employees.length > 0}
                           onChange={toggleSelectAll}
-                          className="rounded border-gray-300"
+                          className="rounded border-[#23252A]"
                         />
                       </th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">이름</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">전화번호</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">부서</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">조</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">직책</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">입사일</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">은행</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">계좌번호</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">주민번호</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-600">관리</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">이름</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">전화번호</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">부서</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">조</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">직책</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">입사일</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">은행</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">계좌번호</th>
+                      <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">주민번호</th>
+                      <th className="px-4 py-3 text-right font-medium text-[#8A8F98]">관리</th>
                     </tr>
                   </thead>
                   <tbody>
                     {employees.filter((emp) => !empSearch || emp.name.includes(empSearch) || emp.phone.includes(empSearch)).map((emp) => (
-                      <tr key={emp.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr key={emp.id} className="border-b border-[#23252A] hover:bg-[#141516]/5">
                         <td className="px-4 py-3">
                           <input
                             type="checkbox"
                             checked={selectedIds.has(emp.id)}
                             onChange={() => toggleSelect(emp.id)}
-                            className="rounded border-gray-300"
+                            className="rounded border-[#23252A]"
                           />
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
-                        <td className="px-4 py-3 text-gray-700">{emp.phone}</td>
-                        <td className="px-4 py-3 text-gray-700">{emp.department}</td>
-                        <td className="px-4 py-3 text-gray-700">{emp.team}</td>
+                        <td className="px-4 py-3 font-medium text-[#F7F8F8]">{emp.name}</td>
+                        <td className="px-4 py-3 text-[#D0D6E0]">{emp.phone}</td>
+                        <td className="px-4 py-3 text-[#D0D6E0]">{emp.department}</td>
+                        <td className="px-4 py-3 text-[#D0D6E0]">{emp.team}</td>
                         <td className="px-4 py-3">
                           <span
                             className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                               emp.role === "반장"
-                                ? "bg-purple-50 text-purple-700"
+                                ? "bg-[#5E6AD2]/10 text-[#828FFF]"
                                 : emp.role === "조장"
-                                ? "bg-blue-50 text-blue-700"
-                                : "bg-gray-50 text-gray-600"
+                                ? "bg-[#4EA7FC]/10 text-[#828FFF]"
+                                : "bg-[#08090A] text-[#8A8F98]"
                             }`}
                           >
                             {emp.role}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-700 text-xs">{(emp as any).hire_date || "-"}</td>
-                        <td className="px-4 py-3 text-gray-700 text-xs">{(emp as any).bank_name || "-"}</td>
-                        <td className="px-4 py-3 text-gray-700 text-xs font-mono">{(emp as any).bank_account || "-"}</td>
-                        <td className="px-4 py-3 text-gray-700 text-xs">{(emp as any).id_number ? "●●●●●●-●●●●●●●" : "-"}</td>
+                        <td className="px-4 py-3 text-[#D0D6E0] text-xs">{(emp as any).hire_date || "-"}</td>
+                        <td className="px-4 py-3 text-[#D0D6E0] text-xs">{(emp as any).bank_name || "-"}</td>
+                        <td className="px-4 py-3 text-[#D0D6E0] text-xs font-mono">{(emp as any).bank_account || "-"}</td>
+                        <td className="px-4 py-3 text-[#D0D6E0] text-xs">{(emp as any).id_number ? "●●●●●●-●●●●●●●" : "-"}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => handleSendLink(emp.id)}
                               disabled={sendingId === emp.id}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 text-xs font-medium disabled:opacity-50"
+                              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[#27A644]/10 text-[#27A644] hover:bg-[#27A644]/15 text-xs font-medium disabled:opacity-50"
                             >
                               {sendingId === emp.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                               발송
                             </button>
                             <button
                               onClick={() => startEditEmp(emp)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                              className="p-1.5 text-[#7070FF] hover:bg-[#4EA7FC]/10 rounded"
                               title="수정"
                             >
                               <Edit3 size={14} />
@@ -660,14 +660,14 @@ export default function RegularManagePage() {
                                 if (!date) return;
                                 try { await resignRegularEmployee(emp.id, date); loadEmployees(); } catch (e: any) { alert(e.message); }
                               }}
-                              className="px-1.5 py-1 text-xs text-orange-600 hover:bg-orange-50 rounded font-medium"
+                              className="px-1.5 py-1 text-xs text-[#FC7840] hover:bg-[#FC7840]/10 rounded font-medium"
                               title="퇴사처리"
                             >
                               퇴사
                             </button>
                             <button
                               onClick={() => handleDeleteEmp(emp.id, emp.name)}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                              className="p-1.5 text-[#EB5757] hover:bg-[#EB5757]/10 rounded"
                               title="삭제"
                             >
                               <Trash2 size={14} />
@@ -684,34 +684,34 @@ export default function RegularManagePage() {
 
           {/* Resigned Employees */}
           {showResigned && (
-            <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
-              <div className="px-4 py-3 bg-orange-50 border-b border-orange-200">
+            <div className="bg-[#0F1011] rounded-xl border border-[#FC7840]/30 overflow-hidden">
+              <div className="px-4 py-3 bg-[#FC7840]/10 border-b border-[#FC7840]/30">
                 <h3 className="text-sm font-semibold text-orange-800">퇴사자 목록 ({resignedEmployees.filter(e => !empSearch || e.name?.includes(empSearch) || e.phone?.includes(empSearch)).length}명)</h3>
               </div>
               {resignedEmployees.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">퇴사자가 없습니다.</div>
+                <div className="py-8 text-center text-sm text-[#62666D]">퇴사자가 없습니다.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-orange-50/50 text-left">
-                        <th className="px-4 py-2 font-medium text-gray-600">이름</th>
-                        <th className="px-4 py-2 font-medium text-gray-600">연락처</th>
-                        <th className="px-4 py-2 font-medium text-gray-600">부서</th>
-                        <th className="px-4 py-2 font-medium text-gray-600">조</th>
-                        <th className="px-4 py-2 font-medium text-gray-600">입사일</th>
-                        <th className="px-4 py-2 font-medium text-gray-600">퇴사일</th>
+                      <tr className="bg-[#FC7840]/10/50 text-left">
+                        <th className="px-4 py-2 font-medium text-[#8A8F98]">이름</th>
+                        <th className="px-4 py-2 font-medium text-[#8A8F98]">연락처</th>
+                        <th className="px-4 py-2 font-medium text-[#8A8F98]">부서</th>
+                        <th className="px-4 py-2 font-medium text-[#8A8F98]">조</th>
+                        <th className="px-4 py-2 font-medium text-[#8A8F98]">입사일</th>
+                        <th className="px-4 py-2 font-medium text-[#8A8F98]">퇴사일</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[#23252A]">
                       {resignedEmployees.filter(e => !empSearch || e.name?.includes(empSearch) || e.phone?.includes(empSearch)).map((e: any) => (
-                        <tr key={e.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2.5 font-medium text-gray-900">{e.name}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{e.phone}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{e.department}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{e.team}</td>
-                          <td className="px-4 py-2.5 text-gray-600 text-xs">{e.hire_date || '-'}</td>
-                          <td className="px-4 py-2.5 text-orange-600 font-medium text-xs">{e.resign_date}</td>
+                        <tr key={e.id} className="hover:bg-[#141516]/5">
+                          <td className="px-4 py-2.5 font-medium text-[#F7F8F8]">{e.name}</td>
+                          <td className="px-4 py-2.5 text-[#8A8F98]">{e.phone}</td>
+                          <td className="px-4 py-2.5 text-[#8A8F98]">{e.department}</td>
+                          <td className="px-4 py-2.5 text-[#8A8F98]">{e.team}</td>
+                          <td className="px-4 py-2.5 text-[#8A8F98] text-xs">{e.hire_date || '-'}</td>
+                          <td className="px-4 py-2.5 text-[#FC7840] font-medium text-xs">{e.resign_date}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -724,59 +724,59 @@ export default function RegularManagePage() {
           {/* Edit Employee Modal */}
           {editingEmp && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">직원 정보 수정</h3>
+              <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-md w-full p-6 space-y-4">
+                <h3 className="text-lg font-semibold text-[#F7F8F8]">직원 정보 수정</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">이름</label>
+                    <label className="block text-xs text-[#8A8F98] mb-1">이름</label>
                     <input type="text" value={editEmpForm.name} onChange={(e) => setEditEmpForm({ ...editEmpForm, name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">전화번호</label>
+                    <label className="block text-xs text-[#8A8F98] mb-1">전화번호</label>
                     <input type="text" value={editEmpForm.phone} onChange={(e) => setEditEmpForm({ ...editEmpForm, phone: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">부서</label>
+                      <label className="block text-xs text-[#8A8F98] mb-1">부서</label>
                       <select value={editEmpForm.department} onChange={(e) => setEditEmpForm({ ...editEmpForm, department: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 outline-none">
                         {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">조</label>
+                      <label className="block text-xs text-[#8A8F98] mb-1">조</label>
                       <select value={editEmpForm.team} onChange={(e) => setEditEmpForm({ ...editEmpForm, team: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 outline-none">
                         {TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">직책</label>
+                      <label className="block text-xs text-[#8A8F98] mb-1">직책</label>
                       <select value={editEmpForm.role} onChange={(e) => setEditEmpForm({ ...editEmpForm, role: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 outline-none">
                         {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">근무지</label>
+                    <label className="block text-xs text-[#8A8F98] mb-1">근무지</label>
                     <select value={editEmpForm.workplace_id ?? ""} onChange={(e) => setEditEmpForm({ ...editEmpForm, workplace_id: e.target.value ? Number(e.target.value) : null })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                      className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 outline-none">
                       <option value="">선택</option>
                       {workplaces.map((wp) => <option key={wp.id} value={wp.id}>{wp.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">입사일자</label>
+                    <label className="block text-xs text-[#8A8F98] mb-1">입사일자</label>
                     <input type="date" value={(editEmpForm as any).hire_date || ""} onChange={(e) => setEditEmpForm({ ...editEmpForm, hire_date: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <button onClick={() => setEditingEmp(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">취소</button>
-                  <button onClick={handleSaveEmp} disabled={empSaving} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2">
+                  <button onClick={() => setEditingEmp(null)} className="flex-1 py-2 border border-[#23252A] rounded-lg text-sm font-medium text-[#D0D6E0] hover:bg-[#141516]/5">취소</button>
+                  <button onClick={handleSaveEmp} disabled={empSaving} className="flex-1 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] disabled:bg-[#28282C] flex items-center justify-center gap-2">
                     {empSaving && <Loader2 size={14} className="animate-spin" />}
                     저장
                   </button>
@@ -791,32 +791,32 @@ export default function RegularManagePage() {
       {tab === "notices" && (
         <div className="space-y-6">
           {/* Date + Form */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
             <div className="flex items-center gap-4 mb-4">
-              <h3 className="text-sm font-semibold text-gray-800">공지문 작성</h3>
+              <h3 className="text-sm font-semibold text-[#F7F8F8]">공지문 작성</h3>
               <input
                 type="date"
                 value={noticeDate}
                 onChange={(e) => setNoticeDate(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">제목</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">제목</label>
                 <input
                   type="text"
                   value={noticeForm.title}
                   onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
                   placeholder="공지문 제목"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">날짜 유형</label>
+                  <label className="block text-xs text-[#8A8F98] mb-1">날짜 유형</label>
                   <select value={noticeForm.date_type} onChange={(e) => setNoticeForm({ ...noticeForm, date_type: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value="specific">특정 날짜</option>
                     <option value="daily">매일 고정</option>
                     <option value="range">기간 설정</option>
@@ -824,16 +824,16 @@ export default function RegularManagePage() {
                 </div>
                 {noticeForm.date_type === 'range' && (
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">종료일</label>
+                    <label className="block text-xs text-[#8A8F98] mb-1">종료일</label>
                     <input type="date" value={noticeForm.end_date}
                       onChange={(e) => setNoticeForm({ ...noticeForm, end_date: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">대상 부서</label>
+                  <label className="block text-xs text-[#8A8F98] mb-1">대상 부서</label>
                   <select value={noticeForm.target_department} onChange={(e) => setNoticeForm({ ...noticeForm, target_department: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value="">전체 (모든 부서)</option>
                     <option value="생산2층">생산2층</option>
                     <option value="생산3층">생산3층</option>
@@ -844,13 +844,13 @@ export default function RegularManagePage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">내용</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">내용</label>
                 <textarea
                   value={noticeForm.content}
                   onChange={(e) => setNoticeForm({ ...noticeForm, content: e.target.value })}
                   placeholder="공지문 내용을 입력하세요..."
                   rows={5}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none resize-none"
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -860,7 +860,7 @@ export default function RegularManagePage() {
                       setEditingNotice(null);
                       setNoticeForm({ ...emptyNoticeForm });
                     }}
-                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                    className="px-4 py-2 rounded-lg border border-[#23252A] text-[#D0D6E0] hover:bg-[#141516]/5 text-sm font-medium"
                   >
                     취소
                   </button>
@@ -868,7 +868,7 @@ export default function RegularManagePage() {
                 <button
                   onClick={handleSaveNotice}
                   disabled={noticeSaving}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-sm font-medium disabled:opacity-50"
                 >
                   {noticeSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                   {editingNotice ? "수정" : "등록"}
@@ -881,15 +881,15 @@ export default function RegularManagePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* List */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">
+              <h3 className="text-sm font-semibold text-[#F7F8F8] mb-3">
                 {noticeDate} 공지문 목록
               </h3>
               {loading ? (
                 <div className="flex items-center justify-center h-32">
-                  <Loader2 size={32} className="animate-spin text-blue-600" />
+                  <Loader2 size={32} className="animate-spin text-[#7070FF]" />
                 </div>
               ) : notices.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+                <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-8 text-center text-[#62666D]">
                   해당 날짜에 공지문이 없습니다.
                 </div>
               ) : (
@@ -898,21 +898,21 @@ export default function RegularManagePage() {
                     <div
                       key={notice.id}
                       onClick={() => setPreviewNotice(notice)}
-                      className={`bg-white rounded-xl border p-4 cursor-pointer transition-colors ${
+                      className={`bg-[#0F1011] rounded-xl border p-4 cursor-pointer transition-colors ${
                         previewNotice?.id === notice.id
-                          ? "border-blue-400 bg-blue-50/30"
-                          : "border-gray-200 hover:border-gray-300"
+                          ? "border-blue-400 bg-[#4EA7FC]/10/30"
+                          : "border-[#23252A] hover:border-[#23252A]"
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium text-gray-900">{notice.title}</h4>
+                        <h4 className="text-sm font-medium text-[#F7F8F8]">{notice.title}</h4>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               startEditNotice(notice);
                             }}
-                            className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
+                            className="p-1.5 rounded-lg hover:bg-[#4EA7FC]/10 text-[#7070FF]"
                           >
                             <Edit3 size={14} />
                           </button>
@@ -921,13 +921,13 @@ export default function RegularManagePage() {
                               e.stopPropagation();
                               handleDeleteNotice(notice.id);
                             }}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                            className="p-1.5 rounded-lg hover:bg-[#EB5757]/10 text-[#EB5757]"
                           >
                             <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notice.content}</p>
+                      <p className="text-xs text-[#8A8F98] mt-1 line-clamp-2">{notice.content}</p>
                     </div>
                   ))}
                 </div>
@@ -936,17 +936,17 @@ export default function RegularManagePage() {
 
             {/* Preview */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">미리보기</h3>
+              <h3 className="text-sm font-semibold text-[#F7F8F8] mb-3">미리보기</h3>
               {previewNotice ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h4 className="text-lg font-bold text-gray-900 mb-3">{previewNotice.title}</h4>
-                  <p className="text-xs text-gray-400 mb-4">{previewNotice.date}</p>
-                  <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+                  <h4 className="text-lg font-bold text-[#F7F8F8] mb-3">{previewNotice.title}</h4>
+                  <p className="text-xs text-[#62666D] mb-4">{previewNotice.date}</p>
+                  <div className="text-sm text-[#D0D6E0] whitespace-pre-wrap leading-relaxed">
                     {previewNotice.content}
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+                <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-8 text-center text-[#62666D]">
                   공지문을 선택하면 미리보기가 표시됩니다.
                 </div>
               )}
@@ -959,17 +959,17 @@ export default function RegularManagePage() {
       {tab === "org" && (
         <div className="space-y-6">
           {/* Add/Edit Form */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-800 mb-4">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+            <h3 className="text-sm font-semibold text-[#F7F8F8] mb-4">
               {editingOrg ? "조직 수정" : "조직 추가"}
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">부서</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">부서</label>
                 <select
                   value={orgForm.department}
                   onChange={(e) => setOrgForm({ ...orgForm, department: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 >
                   {DEPARTMENTS.map((d) => (
                     <option key={d} value={d}>{d}</option>
@@ -977,31 +977,31 @@ export default function RegularManagePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">조/팀</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">조/팀</label>
                 <input
                   type="text"
                   value={orgForm.team}
                   onChange={(e) => setOrgForm({ ...orgForm, team: e.target.value })}
                   placeholder="1조"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">리더 이름</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">리더 이름</label>
                 <input
                   type="text"
                   value={orgForm.leader_name}
                   onChange={(e) => setOrgForm({ ...orgForm, leader_name: e.target.value })}
                   placeholder="홍길동"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">직책</label>
+                <label className="block text-xs text-[#8A8F98] mb-1">직책</label>
                 <select
                   value={orgForm.leader_role}
                   onChange={(e) => setOrgForm({ ...orgForm, leader_role: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 >
                   {LEADER_ROLES.map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -1016,7 +1016,7 @@ export default function RegularManagePage() {
                     setEditingOrg(null);
                     setOrgForm({ ...emptyOrgForm });
                   }}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                  className="px-4 py-2 rounded-lg border border-[#23252A] text-[#D0D6E0] hover:bg-[#141516]/5 text-sm font-medium"
                 >
                   취소
                 </button>
@@ -1024,7 +1024,7 @@ export default function RegularManagePage() {
               <button
                 onClick={handleSaveOrg}
                 disabled={orgSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-sm font-medium disabled:opacity-50"
               >
                 {orgSaving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 {editingOrg ? "수정" : "추가"}
@@ -1035,43 +1035,43 @@ export default function RegularManagePage() {
           {/* Org List Grouped by Department */}
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <Loader2 size={32} className="animate-spin text-blue-600" />
+              <Loader2 size={32} className="animate-spin text-[#7070FF]" />
             </div>
           ) : Object.keys(orgByDept).length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center text-[#62666D]">
               등록된 조직 설정이 없습니다.
             </div>
           ) : (
             <div className="space-y-4">
               {Object.entries(orgByDept).map(([dept, items]) => (
-                <div key={dept} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <Network size={16} className="text-blue-600" />
+                <div key={dept} className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+                  <div className="px-5 py-3 bg-[#08090A] border-b border-[#23252A]">
+                    <h4 className="text-sm font-semibold text-[#F7F8F8] flex items-center gap-2">
+                      <Network size={16} className="text-[#7070FF]" />
                       {dept}
-                      <span className="text-xs text-gray-400 font-normal">({items.length}개 조)</span>
+                      <span className="text-xs text-[#62666D] font-normal">({items.length}개 조)</span>
                     </h4>
                   </div>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-gray-50/50 border-b border-gray-100">
-                        <th className="px-5 py-2.5 text-left font-medium text-gray-600">조/팀</th>
-                        <th className="px-4 py-2.5 text-left font-medium text-gray-600">리더</th>
-                        <th className="px-4 py-2.5 text-left font-medium text-gray-600">직책</th>
-                        <th className="px-4 py-2.5 text-right font-medium text-gray-600">관리</th>
+                      <tr className="bg-[#08090A]/50 border-b border-[#23252A]">
+                        <th className="px-5 py-2.5 text-left font-medium text-[#8A8F98]">조/팀</th>
+                        <th className="px-4 py-2.5 text-left font-medium text-[#8A8F98]">리더</th>
+                        <th className="px-4 py-2.5 text-left font-medium text-[#8A8F98]">직책</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-[#8A8F98]">관리</th>
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((org) => (
-                        <tr key={org.id} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="px-5 py-2.5 font-medium text-gray-900">{org.team}</td>
-                          <td className="px-4 py-2.5 text-gray-700">{org.leader_name}</td>
+                        <tr key={org.id} className="border-b border-[#23252A] hover:bg-[#141516]/5">
+                          <td className="px-5 py-2.5 font-medium text-[#F7F8F8]">{org.team}</td>
+                          <td className="px-4 py-2.5 text-[#D0D6E0]">{org.leader_name}</td>
                           <td className="px-4 py-2.5">
                             <span
                               className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                                 org.leader_role === "반장"
-                                  ? "bg-purple-50 text-purple-700"
-                                  : "bg-blue-50 text-blue-700"
+                                  ? "bg-[#5E6AD2]/10 text-[#828FFF]"
+                                  : "bg-[#4EA7FC]/10 text-[#828FFF]"
                               }`}
                             >
                               {org.leader_role}
@@ -1081,13 +1081,13 @@ export default function RegularManagePage() {
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => startEditOrg(org)}
-                                className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
+                                className="p-1.5 rounded-lg hover:bg-[#4EA7FC]/10 text-[#7070FF]"
                               >
                                 <Edit3 size={14} />
                               </button>
                               <button
                                 onClick={() => handleDeleteOrg(org.id)}
-                                className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                                className="p-1.5 rounded-lg hover:bg-[#EB5757]/10 text-[#EB5757]"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -1153,9 +1153,9 @@ function AttendanceTab() {
   };
 
   const getStatus = (r: any) => {
-    if (r.clock_out_time) return { label: "퇴근완료", cls: "bg-green-50 text-green-700 border border-green-200" };
-    if (r.clock_in_time) return { label: "출근중", cls: "bg-amber-50 text-amber-700 border border-amber-200" };
-    return { label: "미출근", cls: "bg-red-50 text-red-700 border border-red-200" };
+    if (r.clock_out_time) return { label: "퇴근완료", cls: "bg-[#27A644]/10 text-[#27A644] border border-[#27A644]/30" };
+    if (r.clock_in_time) return { label: "출근중", cls: "bg-[#F0BF00]/10 text-[#F0BF00] border border-[#F0BF00]/30" };
+    return { label: "미출근", cls: "bg-[#EB5757]/10 text-[#EB5757] border border-[#EB5757]/30" };
   };
 
   const clockInChartData = useMemo(() => {
@@ -1174,28 +1174,28 @@ function AttendanceTab() {
       <HourlyChart clockInData={clockInChartData} clockOutData={clockOutChartData} title={`${date} 시간대별 출퇴근 인원`}
         departments={DEPARTMENTS} selectedDept={chartDept} onDeptChange={setChartDept} />
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">날짜</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">날짜</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">이름/연락처 검색</label>
+            <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름/연락처 검색</label>
             <input
               type="text"
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
               placeholder="검색..."
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button onClick={load} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+          <button onClick={load} className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF]">
             조회
           </button>
         </div>
@@ -1204,66 +1204,66 @@ function AttendanceTab() {
       {/* Summary */}
       {!loading && records.length > 0 && (
         <div className="grid grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{records.length}</p>
-            <p className="text-xs text-gray-500 mt-1">전체</p>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 text-center">
+            <p className="text-2xl font-bold text-[#F7F8F8]">{records.length}</p>
+            <p className="text-xs text-[#8A8F98] mt-1">전체</p>
           </div>
-          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 text-center">
-            <p className="text-2xl font-bold text-amber-600">{records.filter((r: any) => r.clock_in_time && !r.clock_out_time).length}</p>
-            <p className="text-xs text-amber-600 mt-1">출근중</p>
+          <div className="bg-[#F0BF00]/10 rounded-xl border border-[#F0BF00]/30 p-4 text-center">
+            <p className="text-2xl font-bold text-[#F0BF00]">{records.filter((r: any) => r.clock_in_time && !r.clock_out_time).length}</p>
+            <p className="text-xs text-[#F0BF00] mt-1">출근중</p>
           </div>
-          <div className="bg-green-50 rounded-xl border border-green-200 p-4 text-center">
-            <p className="text-2xl font-bold text-green-600">{records.filter((r: any) => r.clock_out_time).length}</p>
-            <p className="text-xs text-green-600 mt-1">퇴근완료</p>
+          <div className="bg-[#27A644]/10 rounded-xl border border-[#27A644]/30 p-4 text-center">
+            <p className="text-2xl font-bold text-[#27A644]">{records.filter((r: any) => r.clock_out_time).length}</p>
+            <p className="text-xs text-[#27A644] mt-1">퇴근완료</p>
           </div>
-          <div className="bg-red-50 rounded-xl border border-red-200 p-4 text-center">
-            <p className="text-2xl font-bold text-red-600">{records.filter((r: any) => !r.clock_in_time).length}</p>
-            <p className="text-xs text-red-600 mt-1">미출근</p>
+          <div className="bg-[#EB5757]/10 rounded-xl border border-[#EB5757]/30 p-4 text-center">
+            <p className="text-2xl font-bold text-[#EB5757]">{records.filter((r: any) => !r.clock_in_time).length}</p>
+            <p className="text-xs text-[#EB5757] mt-1">미출근</p>
           </div>
         </div>
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
         {loading ? (
           <div className="py-12 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
+            <Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400">데이터가 없습니다.</div>
+          <div className="py-12 text-center text-sm text-[#62666D]">데이터가 없습니다.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="py-2 px-4 font-medium text-gray-600">이름</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">부서</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">조</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">직책</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">계획출근</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">계획퇴근</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">출근시간</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">퇴근시간</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">상태</th>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">이름</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">연락처</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">부서</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">조</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">직책</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">계획출근</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">계획퇴근</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">출근시간</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">퇴근시간</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">상태</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {filtered.map((r: any) => {
                   const st = getStatus(r);
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="py-2.5 px-4 font-medium text-gray-900">{r.name}</td>
-                      <td className="py-2.5 px-4 text-gray-600">
-                        <a href={`tel:${r.phone}`} className="text-blue-600 hover:underline">{r.phone}</a>
+                    <tr key={r.id} className="hover:bg-[#141516]/5">
+                      <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{r.name}</td>
+                      <td className="py-2.5 px-4 text-[#8A8F98]">
+                        <a href={`tel:${r.phone}`} className="text-[#7070FF] hover:underline">{r.phone}</a>
                       </td>
-                      <td className="py-2.5 px-4 text-gray-600">{r.department}</td>
-                      <td className="py-2.5 px-4 text-gray-600">{r.team}</td>
-                      <td className="py-2.5 px-4 text-gray-600">{r.role}</td>
-                      <td className="py-2.5 px-4 text-gray-500 text-xs">{shiftPlans[r.id]?.planned_clock_in || '-'}</td>
-                      <td className="py-2.5 px-4 text-gray-500 text-xs">{shiftPlans[r.id]?.planned_clock_out || '-'}</td>
-                      <td className="py-2.5 px-4 text-gray-700">{formatTime(r.clock_in_time)}</td>
-                      <td className="py-2.5 px-4 text-gray-700">{formatTime(r.clock_out_time)}</td>
+                      <td className="py-2.5 px-4 text-[#8A8F98]">{r.department}</td>
+                      <td className="py-2.5 px-4 text-[#8A8F98]">{r.team}</td>
+                      <td className="py-2.5 px-4 text-[#8A8F98]">{r.role}</td>
+                      <td className="py-2.5 px-4 text-[#8A8F98] text-xs">{shiftPlans[r.id]?.planned_clock_in || '-'}</td>
+                      <td className="py-2.5 px-4 text-[#8A8F98] text-xs">{shiftPlans[r.id]?.planned_clock_out || '-'}</td>
+                      <td className="py-2.5 px-4 text-[#D0D6E0]">{formatTime(r.clock_in_time)}</td>
+                      <td className="py-2.5 px-4 text-[#D0D6E0]">{formatTime(r.clock_out_time)}</td>
                       <td className="py-2.5 px-4">
                         <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${st.cls}`}>{st.label}</span>
                       </td>
@@ -1358,24 +1358,24 @@ function VacationTab() {
   return (
     <div className="space-y-4">
       {/* 연차 규칙 안내 */}
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+      <div className="bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 rounded-xl p-4">
         <h4 className="text-sm font-semibold text-indigo-900 mb-2">연차휴가 기준 (근로기준법 제60조)</h4>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-indigo-800">
-          <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
-            <p className="font-semibold text-indigo-700">1년 미만</p>
+          <div className="bg-[#0F1011] rounded-lg p-2.5 border border-indigo-100">
+            <p className="font-semibold text-[#828FFF]">1년 미만</p>
             <p>1개월 개근 시 <b>1일</b> 발생 (최대 11일)</p>
           </div>
-          <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
-            <p className="font-semibold text-indigo-700">1년 이상 ~ 3년 미만</p>
+          <div className="bg-[#0F1011] rounded-lg p-2.5 border border-indigo-100">
+            <p className="font-semibold text-[#828FFF]">1년 이상 ~ 3년 미만</p>
             <p>연 <b>15일</b></p>
           </div>
-          <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
-            <p className="font-semibold text-indigo-700">3년 이상</p>
+          <div className="bg-[#0F1011] rounded-lg p-2.5 border border-indigo-100">
+            <p className="font-semibold text-[#828FFF]">3년 이상</p>
             <p>15일 + 2년마다 <b>1일 추가</b> (최대 25일)</p>
           </div>
         </div>
-        <p className="text-xs text-indigo-600 mt-2.5 flex items-center gap-1">
-          <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+        <p className="text-xs text-[#7070FF] mt-2.5 flex items-center gap-1">
+          <span className="inline-block w-1.5 h-1.5 bg-[#27A644] rounded-full"></span>
           입사일자 등록 및 초기 사용일수 세팅 이후, 매일 서버에서 자동으로 입사일 기준 보유 연차가 갱신됩니다.
         </p>
       </div>
@@ -1383,15 +1383,15 @@ function VacationTab() {
       {/* Sub tabs */}
       <div className="flex gap-2">
         <button onClick={() => setSubTab('requests')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'requests' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'requests' ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>
           휴가 신청 목록
         </button>
         <button onClick={() => setSubTab('balances')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'balances' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'balances' ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>
           보유 휴가 설정
         </button>
         <button onClick={() => setSubTab('calendar')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${subTab === 'calendar' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${subTab === 'calendar' ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>
           <Calendar size={14} /> 휴가 캘린더
         </button>
       </div>
@@ -1400,45 +1400,45 @@ function VacationTab() {
         <>
           <div className="flex gap-3 items-end">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">상태</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1">상태</label>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                 <option value="">전체</option>
                 <option value="pending">대기중</option>
                 <option value="approved">승인</option>
                 <option value="rejected">반려</option>
               </select>
             </div>
-            <button onClick={loadRequests} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">조회</button>
+            <button onClick={loadRequests} className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">조회</button>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
             {loading ? (
-              <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+              <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" /></div>
             ) : requests.length === 0 ? (
-              <div className="py-12 text-center text-sm text-gray-400">휴가 신청이 없습니다.</div>
+              <div className="py-12 text-center text-sm text-[#62666D]">휴가 신청이 없습니다.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 text-left">
-                      <th className="py-2 px-4 font-medium text-gray-600">이름</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">부서</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">종류</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">기간</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">일수</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">사유</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">상태</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">관리</th>
+                    <tr className="bg-[#08090A] text-left">
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">이름</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">부서</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">연락처</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">종류</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">기간</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">일수</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">사유</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">상태</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">관리</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[#23252A]">
                     {requests.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="py-2.5 px-4 font-medium text-gray-900">{r.employee_name}</td>
-                        <td className="py-2.5 px-4 text-gray-600">{r.department} {r.team}</td>
-                        <td className="py-2.5 px-4 text-gray-600">{r.phone}</td>
+                      <tr key={r.id} className="hover:bg-[#141516]/5">
+                        <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{r.employee_name}</td>
+                        <td className="py-2.5 px-4 text-[#8A8F98]">{r.department} {r.team}</td>
+                        <td className="py-2.5 px-4 text-[#8A8F98]">{r.phone}</td>
                         <td className="py-2.5 px-4">
                           <select value={r.type || '연차'} onChange={async (e) => {
                             const newType = e.target.value;
@@ -1450,20 +1450,20 @@ function VacationTab() {
                               });
                               loadRequests();
                             } catch (err: any) { alert(err.message); }
-                          }} className="px-1.5 py-1 border border-gray-200 rounded text-xs bg-white">
+                          }} className="px-1.5 py-1 border border-[#23252A] rounded text-xs bg-[#0F1011]">
                             <option value="연차">연차</option>
                             <option value="오전반차">오전반차 (09~14시)</option>
                             <option value="오후반차">오후반차 (14~18시)</option>
                           </select>
                         </td>
-                        <td className="py-2.5 px-4 text-gray-700">{r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''}</td>
-                        <td className="py-2.5 px-4 text-gray-700">{r.days}일</td>
-                        <td className="py-2.5 px-4 text-gray-600 max-w-[150px] truncate">{r.reason || "-"}</td>
+                        <td className="py-2.5 px-4 text-[#D0D6E0]">{r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''}</td>
+                        <td className="py-2.5 px-4 text-[#D0D6E0]">{r.days}일</td>
+                        <td className="py-2.5 px-4 text-[#8A8F98] max-w-[150px] truncate">{r.reason || "-"}</td>
                         <td className="py-2.5 px-4">
                           <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                            r.status === 'approved' ? 'bg-green-50 text-green-700' :
-                            r.status === 'rejected' ? 'bg-red-50 text-red-700' :
-                            'bg-amber-50 text-amber-700'
+                            r.status === 'approved' ? 'bg-[#27A644]/10 text-[#27A644]' :
+                            r.status === 'rejected' ? 'bg-[#EB5757]/10 text-[#EB5757]' :
+                            'bg-[#F0BF00]/10 text-[#F0BF00]'
                           }`}>
                             {r.status === 'approved' ? '승인' : r.status === 'rejected' ? '반려' : '대기중'}
                           </span>
@@ -1472,9 +1472,9 @@ function VacationTab() {
                           {r.status === 'pending' && (
                             <div className="flex gap-1">
                               <button onClick={() => handleApprove(r.id)}
-                                className="px-2.5 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100">승인</button>
+                                className="px-2.5 py-1 text-xs font-medium text-[#27A644] bg-[#27A644]/10 rounded hover:bg-[#27A644]/15">승인</button>
                               <button onClick={() => handleReject(r.id)}
-                                className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100">반려</button>
+                                className="px-2.5 py-1 text-xs font-medium text-[#EB5757] bg-[#EB5757]/10 rounded hover:bg-[#EB5757]/15">반려</button>
                             </div>
                           )}
                         </td>
@@ -1487,41 +1487,41 @@ function VacationTab() {
           </div>
 
           {/* Vacation Update Logs */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
             <button onClick={() => setLogsOpen(!logsOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left">
-              <span className="text-sm font-semibold text-gray-800">휴가 변동 이력</span>
-              <span className="text-xs text-gray-400">{logsOpen ? '접기' : '펼치기'} ({vacLogs.length}건)</span>
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#141516]/5 text-left">
+              <span className="text-sm font-semibold text-[#F7F8F8]">휴가 변동 이력</span>
+              <span className="text-xs text-[#62666D]">{logsOpen ? '접기' : '펼치기'} ({vacLogs.length}건)</span>
             </button>
             {logsOpen && (
-              <div className="border-t border-gray-100 max-h-64 overflow-y-auto">
+              <div className="border-t border-[#23252A] max-h-64 overflow-y-auto">
                 {vacLogs.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-gray-400">변동 이력이 없습니다.</div>
+                  <div className="py-6 text-center text-xs text-[#62666D]">변동 이력이 없습니다.</div>
                 ) : (
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50 sticky top-0">
+                    <thead className="bg-[#08090A] sticky top-0">
                       <tr>
-                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">일시</th>
-                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">이름</th>
-                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">구분</th>
-                        <th className="py-1.5 px-3 text-right font-medium text-gray-600">이전</th>
-                        <th className="py-1.5 px-3 text-right font-medium text-gray-600">변경</th>
-                        <th className="py-1.5 px-3 text-left font-medium text-gray-600">사유</th>
+                        <th className="py-1.5 px-3 text-left font-medium text-[#8A8F98]">일시</th>
+                        <th className="py-1.5 px-3 text-left font-medium text-[#8A8F98]">이름</th>
+                        <th className="py-1.5 px-3 text-left font-medium text-[#8A8F98]">구분</th>
+                        <th className="py-1.5 px-3 text-right font-medium text-[#8A8F98]">이전</th>
+                        <th className="py-1.5 px-3 text-right font-medium text-[#8A8F98]">변경</th>
+                        <th className="py-1.5 px-3 text-left font-medium text-[#8A8F98]">사유</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[#23252A]">
                       {vacLogs.map((log: any) => (
-                        <tr key={log.id} className="hover:bg-gray-50">
-                          <td className="py-1.5 px-3 text-gray-500">{log.created_at ? new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                          <td className="py-1.5 px-3 font-medium text-gray-900">{log.employee_name}</td>
+                        <tr key={log.id} className="hover:bg-[#141516]/5">
+                          <td className="py-1.5 px-3 text-[#8A8F98]">{log.created_at ? new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                          <td className="py-1.5 px-3 font-medium text-[#F7F8F8]">{log.employee_name}</td>
                           <td className="py-1.5 px-3">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${log.action === '자동갱신' ? 'bg-blue-50 text-blue-700' : log.action === '신규생성' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${log.action === '자동갱신' ? 'bg-[#4EA7FC]/10 text-[#828FFF]' : log.action === '신규생성' ? 'bg-[#27A644]/10 text-[#27A644]' : 'bg-[#F0BF00]/10 text-[#F0BF00]'}`}>
                               {log.action}
                             </span>
                           </td>
-                          <td className="py-1.5 px-3 text-right text-gray-600">{parseFloat(log.prev_days || 0).toFixed(1)}일</td>
-                          <td className="py-1.5 px-3 text-right font-medium text-blue-700">{parseFloat(log.new_days || 0).toFixed(1)}일</td>
-                          <td className="py-1.5 px-3 text-gray-500">{log.reason || '-'}</td>
+                          <td className="py-1.5 px-3 text-right text-[#8A8F98]">{parseFloat(log.prev_days || 0).toFixed(1)}일</td>
+                          <td className="py-1.5 px-3 text-right font-medium text-[#828FFF]">{parseFloat(log.new_days || 0).toFixed(1)}일</td>
+                          <td className="py-1.5 px-3 text-[#8A8F98]">{log.reason || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1567,75 +1567,75 @@ function VacationTab() {
             {/* Controls */}
             <div className="flex flex-wrap gap-3 items-end">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">연도</label>
                 <input type="number" value={calYear} onChange={e => setCalYear(parseInt(e.target.value))}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-24" />
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-24" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">월</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">월</label>
                 <select value={calMonth} onChange={e => setCalMonth(parseInt(e.target.value))}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                     <option key={m} value={m}>{m}월</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">부서</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">부서</label>
                 <select value={calDept} onChange={e => setCalDept(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                   <option value="">전체</option>
                   {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <button onClick={loadCalVacations}
-                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">새로고침</button>
-              <div className="ml-auto flex items-center gap-3 text-xs text-gray-500">
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-blue-500"></span> 연차</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-green-500"></span> 반차</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-purple-500"></span> 기타</span>
+                className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">새로고침</button>
+              <div className="ml-auto flex items-center gap-3 text-xs text-[#8A8F98]">
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-[#4EA7FC]"></span> 연차</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-[#27A644]"></span> 반차</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-[#5E6AD2]/100"></span> 기타</span>
               </div>
             </div>
 
             {/* Calendar grid */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-800">{calYear}년 {calMonth}월 휴가 현황</h3>
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+              <div className="bg-[#08090A] px-4 py-2 border-b border-[#23252A]">
+                <h3 className="text-sm font-semibold text-[#F7F8F8]">{calYear}년 {calMonth}월 휴가 현황</h3>
               </div>
               {calLoading ? (
-                <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+                <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" /></div>
               ) : (
                 <div className="p-3">
                   {/* Header row */}
                   <div className="grid grid-cols-7 gap-px mb-px">
                     {DOW_LABELS.map((label, i) => (
-                      <div key={label} className={`text-center text-xs font-semibold py-1.5 rounded ${i === 5 ? 'text-blue-600' : i === 6 ? 'text-red-500' : 'text-gray-600'}`}>
+                      <div key={label} className={`text-center text-xs font-semibold py-1.5 rounded ${i === 5 ? 'text-[#7070FF]' : i === 6 ? 'text-[#EB5757]' : 'text-[#8A8F98]'}`}>
                         {label}
                       </div>
                     ))}
                   </div>
                   {/* Date cells */}
-                  <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-7 gap-px bg-[#232326] rounded-lg overflow-hidden">
                     {cells.map((day, idx) => {
                       const colIdx = idx % 7; // 0=Mon, 5=Sat, 6=Sun
                       const isSat = colIdx === 5;
                       const isSun = colIdx === 6;
                       const vacsOnDay = day ? (vacsByDate.get(day) || []) : [];
                       return (
-                        <div key={idx} className={`bg-white min-h-[72px] p-1.5 ${!day ? 'bg-gray-50' : ''}`}>
+                        <div key={idx} className={`bg-[#0F1011] min-h-[72px] p-1.5 ${!day ? 'bg-[#08090A]' : ''}`}>
                           {day && (
                             <>
                               <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
-                                ${isSun ? 'text-red-500' : isSat ? 'text-blue-600' : 'text-gray-700'}`}>
+                                ${isSun ? 'text-[#EB5757]' : isSat ? 'text-[#7070FF]' : 'text-[#D0D6E0]'}`}>
                                 {day}
                               </div>
                               <div className="space-y-0.5">
                                 {vacsOnDay.slice(0, 4).map((v: any, vi: number) => {
                                   const typeColor = (v.type || '').includes('반차')
-                                    ? 'bg-green-100 text-green-800'
+                                    ? 'bg-[#27A644]/15 text-[#27A644]'
                                     : (v.type || '') === '연차' || (v.type || '').includes('연차')
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-purple-100 text-purple-800';
+                                    ? 'bg-[#4EA7FC]/15 text-[#828FFF]'
+                                    : 'bg-[#5E6AD2]/15 text-purple-800';
                                   return (
                                     <div key={vi} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium ${typeColor}`}
                                       title={`${v.employee_name} (${v.type || '휴가'})`}>
@@ -1644,7 +1644,7 @@ function VacationTab() {
                                   );
                                 })}
                                 {vacsOnDay.length > 4 && (
-                                  <div className="text-[10px] text-gray-400 px-1">+{vacsOnDay.length - 4}명</div>
+                                  <div className="text-[10px] text-[#62666D] px-1">+{vacsOnDay.length - 4}명</div>
                                 )}
                               </div>
                             </>
@@ -1664,27 +1664,27 @@ function VacationTab() {
         <>
           <div className="flex flex-wrap gap-3 items-end">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1">연도</label>
               <input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value))}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-24" />
+                className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-24" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름 검색</label>
               <input type="text" value={balanceSearch} onChange={(e) => setBalanceSearch(e.target.value)}
                 placeholder="이름으로 검색..."
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-36" />
+                className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-36" />
             </div>
-            <button onClick={loadBalances} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">조회</button>
+            <button onClick={loadBalances} className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">조회</button>
             <div className="flex items-end gap-2 ml-auto">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">일괄 설정 일수</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">일괄 설정 일수</label>
                 <input type="number" step="0.5" value={initDays} onChange={(e) => setInitDays(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-20" />
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-20" />
               </div>
               <button onClick={async () => {
                 if (!confirm(`${year}년 전체 직원에게 ${initDays}일을 일괄 설정하시겠습니까?`)) return;
                 try { await initVacationBalances({ year, total_days: parseFloat(initDays) }); loadBalances(); } catch (e: any) { alert(e.message); }
-              }} className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium">일괄 초기화</button>
+              }} className="px-4 py-1.5 bg-[#27A644] text-white rounded-lg text-sm font-medium">일괄 초기화</button>
               <button onClick={async () => {
                 if (!confirm(`${year}년 연차를 입사일자 기준 근로기준법으로 자동 계산하시겠습니까?`)) return;
                 try {
@@ -1698,11 +1698,11 @@ function VacationTab() {
 
           {/* Batch update for selected employees */}
           {selectedEmpIds.size > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
-              <span className="text-sm font-medium text-blue-700">{selectedEmpIds.size}명 선택</span>
+            <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-xl p-4 flex items-center gap-3">
+              <span className="text-sm font-medium text-[#828FFF]">{selectedEmpIds.size}명 선택</span>
               <input type="number" step="0.5" value={batchDays} onChange={(e) => setBatchDays(e.target.value)}
                 className="px-3 py-1.5 border border-blue-300 rounded-lg text-sm w-20" />
-              <span className="text-sm text-blue-600">일</span>
+              <span className="text-sm text-[#7070FF]">일</span>
               <button onClick={async () => {
                 if (!confirm(`선택한 ${selectedEmpIds.size}명의 보유 휴가를 ${batchDays}일로 변경하시겠습니까?`)) return;
                 try {
@@ -1712,39 +1712,39 @@ function VacationTab() {
                   setSelectedEmpIds(new Set());
                   loadBalances();
                 } catch (e: any) { alert(e.message); }
-              }} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">일괄 변경</button>
-              <button onClick={() => setSelectedEmpIds(new Set())} className="px-3 py-1.5 text-gray-600 bg-gray-100 rounded-lg text-sm">선택 해제</button>
+              }} className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">일괄 변경</button>
+              <button onClick={() => setSelectedEmpIds(new Set())} className="px-3 py-1.5 text-[#8A8F98] bg-[#141516] rounded-lg text-sm">선택 해제</button>
             </div>
           )}
 
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
             {loading ? (
-              <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+              <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" /></div>
             ) : balances.length === 0 ? (
-              <div className="py-12 text-center text-sm text-gray-400">등록된 직원이 없습니다.</div>
+              <div className="py-12 text-center text-sm text-[#62666D]">등록된 직원이 없습니다.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 text-left">
+                    <tr className="bg-[#08090A] text-left">
                       <th className="py-2 px-3 w-10">
                         <input type="checkbox"
                           checked={selectedEmpIds.size === balances.length && balances.length > 0}
                           onChange={(e) => setSelectedEmpIds(e.target.checked ? new Set(balances.map((b: any) => b.employee_id)) : new Set())}
-                          className="rounded border-gray-300" />
+                          className="rounded border-[#23252A]" />
                       </th>
-                      <th className="py-2 px-4 font-medium text-gray-600">이름</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">부서</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">연락처</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">보유(일)</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">사용(일)</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">잔여(일)</th>
-                      <th className="py-2 px-4 font-medium text-gray-600">관리</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">이름</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">부서</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">연락처</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">보유(일)</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">사용(일)</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">잔여(일)</th>
+                      <th className="py-2 px-4 font-medium text-[#8A8F98]">관리</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[#23252A]">
                     {balances.filter((b: any) => !balanceSearch || b.employee_name?.includes(balanceSearch) || b.phone?.includes(balanceSearch)).map((b: any) => (
-                      <tr key={b.employee_id} className={`hover:bg-gray-50 ${selectedEmpIds.has(b.employee_id) ? 'bg-blue-50/50' : ''}`}>
+                      <tr key={b.employee_id} className={`hover:bg-[#141516]/5 ${selectedEmpIds.has(b.employee_id) ? 'bg-[#4EA7FC]/10/50' : ''}`}>
                         <td className="py-2.5 px-3">
                           <input type="checkbox"
                             checked={selectedEmpIds.has(b.employee_id)}
@@ -1753,17 +1753,17 @@ function VacationTab() {
                               if (e.target.checked) next.add(b.employee_id); else next.delete(b.employee_id);
                               setSelectedEmpIds(next);
                             }}
-                            className="rounded border-gray-300" />
+                            className="rounded border-[#23252A]" />
                         </td>
-                        <td className="py-2.5 px-4 font-medium text-gray-900">{b.employee_name}</td>
-                        <td className="py-2.5 px-4 text-gray-600">{b.department} {b.team}</td>
-                        <td className="py-2.5 px-4 text-gray-600">{b.phone}</td>
+                        <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{b.employee_name}</td>
+                        <td className="py-2.5 px-4 text-[#8A8F98]">{b.department} {b.team}</td>
+                        <td className="py-2.5 px-4 text-[#8A8F98]">{b.phone}</td>
                         <td className="py-2.5 px-4">
                           {editingBalance === b.employee_id ? (
                             <input type="number" step="0.5" value={editDays} onChange={(e) => setEditDays(e.target.value)}
                               className="w-16 px-2 py-1 border border-blue-300 rounded text-sm" />
                           ) : (
-                            <span className="font-medium text-blue-700">{parseFloat(b.total_days)}</span>
+                            <span className="font-medium text-[#828FFF]">{parseFloat(b.total_days)}</span>
                           )}
                         </td>
                         <td className="py-2.5 px-4">
@@ -1771,21 +1771,21 @@ function VacationTab() {
                             <input type="number" step="0.5" min="0" value={editUsedDays} onChange={(e) => setEditUsedDays(e.target.value)}
                               className="w-16 px-2 py-1 border border-amber-300 rounded text-sm" />
                           ) : (
-                            <span className="text-amber-600">{parseFloat(b.used_days)}</span>
+                            <span className="text-[#F0BF00]">{parseFloat(b.used_days)}</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-4 font-medium text-green-700">{(parseFloat(b.total_days) - parseFloat(b.used_days)).toFixed(1)}</td>
+                        <td className="py-2.5 px-4 font-medium text-[#27A644]">{(parseFloat(b.total_days) - parseFloat(b.used_days)).toFixed(1)}</td>
                         <td className="py-2.5 px-4">
                           {editingBalance === b.employee_id ? (
                             <div className="flex gap-1">
                               <button onClick={async () => {
                                 try { await setVacationBalance(b.employee_id, { year, total_days: parseFloat(editDays), used_days: parseFloat(editUsedDays) } as any); setEditingBalance(null); loadBalances(); } catch (e: any) { alert(e.message); }
-                              }} className="px-2 py-1 text-xs bg-blue-600 text-white rounded">저장</button>
-                              <button onClick={() => setEditingBalance(null)} className="px-2 py-1 text-xs bg-gray-100 rounded">취소</button>
+                              }} className="px-2 py-1 text-xs bg-[#5E6AD2] text-white rounded">저장</button>
+                              <button onClick={() => setEditingBalance(null)} className="px-2 py-1 text-xs bg-[#141516] rounded">취소</button>
                             </div>
                           ) : (
                             <button onClick={() => { setEditingBalance(b.employee_id); setEditDays(String(parseFloat(b.total_days))); setEditUsedDays(String(parseFloat(b.used_days))); }}
-                              className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100">수정</button>
+                              className="px-2.5 py-1 text-xs font-medium text-[#7070FF] bg-[#4EA7FC]/10 rounded hover:bg-[#4EA7FC]/15">수정</button>
                           )}
                         </td>
                       </tr>
@@ -2060,22 +2060,22 @@ function ShiftsTab() {
         extraControls={
           <div className="flex items-center gap-1">
             <input type="date" value={chartStartDate} onChange={e => setChartStartDate(e.target.value)}
-              className="px-1.5 py-1 border border-gray-300 rounded text-xs" />
-            <span className="text-gray-400 text-xs">~</span>
+              className="px-1.5 py-1 border border-[#23252A] rounded text-xs" />
+            <span className="text-[#62666D] text-xs">~</span>
             <input type="date" value={chartEndDate} onChange={e => setChartEndDate(e.target.value)}
-              className="px-1.5 py-1 border border-gray-300 rounded text-xs" />
+              className="px-1.5 py-1 border border-[#23252A] rounded text-xs" />
           </div>
         }
       />
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">월/주차별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
+        <p className="text-sm text-[#8A8F98]">월/주차별 계획 출퇴근 시간을 설정하고 직원을 배정합니다.</p>
         <div className="flex gap-2">
           <button onClick={() => setShiftSubTab('list')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${shiftSubTab === 'list' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${shiftSubTab === 'list' ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>
             배치 목록
           </button>
           <button onClick={() => setShiftSubTab('calendar')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${shiftSubTab === 'calendar' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${shiftSubTab === 'calendar' ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>
             <Calendar size={14} /> 배치 캘린더
           </button>
         </div>
@@ -2114,49 +2114,49 @@ function ShiftsTab() {
         const isWeekend = dow === 0 || dow === 6;
 
         return (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
             <button onClick={() => setUnassignedOpen(!unassignedOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#141516]/5 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-orange-600" />
+                <div className="w-8 h-8 rounded-lg bg-[#FC7840]/10 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-[#FC7840]" />
                 </div>
                 <div className="text-left">
-                  <span className="text-sm font-semibold text-gray-900">미배치 인력 확인</span>
-                  <span className="ml-2 text-xs text-gray-500">{unassignedDate} ({dayNames[dow]})</span>
+                  <span className="text-sm font-semibold text-[#F7F8F8]">미배치 인력 확인</span>
+                  <span className="ml-2 text-xs text-[#8A8F98]">{unassignedDate} ({dayNames[dow]})</span>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${unassigned.length > 0 ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${unassigned.length > 0 ? 'bg-[#FC7840]/15 text-[#FC7840]' : 'bg-[#27A644]/15 text-[#27A644]'}`}>
                   {unassigned.length > 0 ? `${unassigned.length}명 미배치` : '전원 배치 완료'}
                 </span>
               </div>
-              {unassignedOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+              {unassignedOpen ? <ChevronUp className="w-4 h-4 text-[#62666D]" /> : <ChevronDown className="w-4 h-4 text-[#62666D]" />}
             </button>
 
             {unassignedOpen && (
-              <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+              <div className="border-t border-[#23252A] px-4 py-3 space-y-3">
                 <div className="flex flex-wrap gap-2 items-end">
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-0.5">날짜</label>
+                    <label className="block text-[10px] text-[#8A8F98] mb-0.5">날짜</label>
                     <input type="date" value={unassignedDate} onChange={e => setUnassignedDate(e.target.value)}
-                      className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm" />
+                      className="px-2 py-1.5 border border-[#23252A] rounded-lg text-sm" />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-0.5">부서</label>
+                    <label className="block text-[10px] text-[#8A8F98] mb-0.5">부서</label>
                     <select value={unassignedDept} onChange={e => setUnassignedDept(e.target.value)}
-                      className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                      className="px-2 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                       <option value="">전체</option>
                       {DEPARTMENTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}
                     </select>
                   </div>
-                  <div className="text-xs text-gray-500 py-1.5">
+                  <div className="text-xs text-[#8A8F98] py-1.5">
                     총 {allEmployees.filter((e: any) => e.is_active !== 0 && (!unassignedDept || (e.department || '').includes(unassignedDept))).length}명 중{' '}
-                    <span className="font-semibold text-blue-700">{assignedIds.size}명 배치</span>,{' '}
-                    <span className={`font-semibold ${unassigned.length > 0 ? 'text-orange-700' : 'text-green-700'}`}>{unassigned.length}명 미배치</span>
+                    <span className="font-semibold text-[#828FFF]">{assignedIds.size}명 배치</span>,{' '}
+                    <span className={`font-semibold ${unassigned.length > 0 ? 'text-[#FC7840]' : 'text-[#27A644]'}`}>{unassigned.length}명 미배치</span>
                   </div>
                 </div>
 
                 {isWeekend && (
-                  <div className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                  <div className="text-xs text-[#F0BF00] bg-[#F0BF00]/10 rounded-lg px-3 py-2">
                     {dayNames[dow]}요일 (주말)입니다. 주말 근무 배치가 없는 것이 정상일 수 있습니다.
                   </div>
                 )}
@@ -2164,26 +2164,26 @@ function ShiftsTab() {
                 {unassigned.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
                     {unassigned.map((e: any) => (
-                      <div key={e.id} className="flex items-center gap-2 bg-orange-50 rounded-lg px-2.5 py-2 border border-orange-100">
+                      <div key={e.id} className="flex items-center gap-2 bg-[#FC7840]/10 rounded-lg px-2.5 py-2 border border-orange-100">
                         <div className="w-6 h-6 rounded-full bg-orange-200 flex items-center justify-center text-[10px] font-bold text-orange-800">
                           {(e.name || '?')[0]}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-gray-900 truncate">{e.name}</p>
-                          <p className="text-[10px] text-gray-500 truncate">{e.department} {e.team}</p>
+                          <p className="text-xs font-medium text-[#F7F8F8] truncate">{e.name}</p>
+                          <p className="text-[10px] text-[#8A8F98] truncate">{e.department} {e.team}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-sm text-green-600 font-medium">
+                  <div className="text-center py-4 text-sm text-[#27A644] font-medium">
                     해당 날짜에 모든 인원이 배치되었습니다.
                   </div>
                 )}
 
                 {/* Vacation list for the date */}
                 {vacOnDate.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
+                  <div className="mt-3 pt-3 border-t border-[#23252A]">
                     <h5 className="text-xs font-semibold text-violet-700 mb-2">휴가자 ({vacOnDate.length}명)</h5>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
                       {vacOnDate.map((v: any) => (
@@ -2192,7 +2192,7 @@ function ShiftsTab() {
                             {(v.employee_name || '?')[0]}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-medium text-gray-900 truncate">{v.employee_name}</p>
+                            <p className="text-xs font-medium text-[#F7F8F8] truncate">{v.employee_name}</p>
                             <p className="text-[10px] text-violet-600 truncate">
                               {v.type === '오전반차' ? '오전반차 09~14시' : v.type === '오후반차' ? '오후반차 14~18시' : '연차'}
                             </p>
@@ -2243,53 +2243,53 @@ function ShiftsTab() {
         }
 
         const DOW_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
-        const SHIFT_COLORS = ['bg-blue-100 text-blue-800', 'bg-emerald-100 text-emerald-800', 'bg-amber-100 text-amber-800', 'bg-purple-100 text-purple-800', 'bg-rose-100 text-rose-800'];
+        const SHIFT_COLORS = ['bg-[#4EA7FC]/15 text-[#828FFF]', 'bg-emerald-100 text-emerald-800', 'bg-[#F0BF00]/15 text-amber-800', 'bg-[#5E6AD2]/15 text-purple-800', 'bg-rose-100 text-rose-800'];
 
         return (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-3 items-end">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">연도</label>
                 <input type="number" value={shiftCalYear} onChange={e => setShiftCalYear(parseInt(e.target.value))}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-24" />
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-24" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">월</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">월</label>
                 <select value={shiftCalMonth} onChange={e => setShiftCalMonth(parseInt(e.target.value))}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                     <option key={m} value={m}>{m}월</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">부서 필터</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">부서 필터</label>
                 <select value={shiftCalDept} onChange={e => setShiftCalDept(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                  className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                   <option value="">전체</option>
                   {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <button onClick={() => loadShiftCalAssignments(shifts)}
-                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium">새로고침</button>
+                className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">새로고침</button>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-800">{shiftCalYear}년 {shiftCalMonth}월 배치 캘린더</h3>
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+              <div className="bg-[#08090A] px-4 py-2 border-b border-[#23252A]">
+                <h3 className="text-sm font-semibold text-[#F7F8F8]">{shiftCalYear}년 {shiftCalMonth}월 배치 캘린더</h3>
               </div>
               {shiftCalLoading ? (
-                <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+                <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" /></div>
               ) : (
                 <div className="p-3">
                   <div className="grid grid-cols-7 gap-px mb-px">
                     {DOW_LABELS.map((label, i) => (
-                      <div key={label} className={`text-center text-xs font-semibold py-1.5 rounded ${i === 5 ? 'text-blue-600' : i === 6 ? 'text-red-500' : 'text-gray-600'}`}>
+                      <div key={label} className={`text-center text-xs font-semibold py-1.5 rounded ${i === 5 ? 'text-[#7070FF]' : i === 6 ? 'text-[#EB5757]' : 'text-[#8A8F98]'}`}>
                         {label}
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+                  <div className="grid grid-cols-7 gap-px bg-[#232326] rounded-lg overflow-hidden">
                     {cells.map((day, idx) => {
                       const colIdx = idx % 7;
                       const isSat = colIdx === 5;
@@ -2299,17 +2299,17 @@ function ShiftsTab() {
                       const cellDow = cellDate ? cellDate.getDay() : 0;
                       const cellWeekNum = day ? Math.ceil((day + startOffset) / 7) : 0;
                       return (
-                        <div key={idx} className={`bg-white min-h-[120px] p-1.5 relative group ${!day ? 'bg-gray-50' : ''}`}>
+                        <div key={idx} className={`bg-[#0F1011] min-h-[120px] p-1.5 relative group ${!day ? 'bg-[#08090A]' : ''}`}>
                           {day && (
                             <>
                               <div className="flex items-center justify-between mb-1">
                                 <div className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full
-                                  ${isSun ? 'text-red-500' : isSat ? 'text-blue-600' : 'text-gray-700'}`}>
+                                  ${isSun ? 'text-[#EB5757]' : isSat ? 'text-[#7070FF]' : 'text-[#D0D6E0]'}`}>
                                   {day}
                                 </div>
                                 <button
                                   onClick={() => { setCalAddDate({ day, dow: cellDow, weekNum: cellWeekNum }); setCalAddForm({ name: "", planned_clock_in: "08:00", planned_clock_out: "17:00" }); }}
-                                  className="w-5 h-5 flex items-center justify-center rounded bg-blue-50 text-blue-600 hover:bg-blue-100 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-[#4EA7FC]/10 text-[#7070FF] hover:bg-[#4EA7FC]/15 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold"
                                   title="배치 추가">+</button>
                               </div>
                               <div className="space-y-0.5">
@@ -2326,13 +2326,13 @@ function ShiftsTab() {
                                 })}
                                 {calExpandedDay !== day && shiftsOnDay.length > 5 && (
                                   <button onClick={() => setCalExpandedDay(day)}
-                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-medium px-1 hover:underline">
+                                    className="text-[10px] text-[#7070FF] hover:text-[#828FFF] font-medium px-1 hover:underline">
                                     +{shiftsOnDay.length - 5}개 더보기
                                   </button>
                                 )}
                                 {calExpandedDay === day && shiftsOnDay.length > 5 && (
                                   <button onClick={() => setCalExpandedDay(null)}
-                                    className="text-[10px] text-gray-500 hover:text-gray-700 font-medium px-1 hover:underline">
+                                    className="text-[10px] text-[#8A8F98] hover:text-[#D0D6E0] font-medium px-1 hover:underline">
                                     접기
                                   </button>
                                 )}
@@ -2353,24 +2353,24 @@ function ShiftsTab() {
       {/* Calendar Shift Detail Popup */}
       {calPopupShift && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-lg font-semibold text-gray-900">{calPopupShift.name}</h3>
-              <button onClick={() => setCalPopupShift(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+              <h3 className="text-lg font-semibold text-[#F7F8F8]">{calPopupShift.name}</h3>
+              <button onClick={() => setCalPopupShift(null)} className="text-[#62666D] hover:text-[#D0D6E0] text-xl">&times;</button>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[#8A8F98] mb-4">
               {calPopupShift.planned_clock_in}~{calPopupShift.planned_clock_out} · {shiftCalMonth}월 {calPopupShift.week_number}주차 · {parseDays(calPopupShift.days_of_week || String(calPopupShift.day_of_week)).map((d: number) => DAY_NAMES[d]).join('/')}요일
             </p>
 
             {/* Assigned employees */}
             {calPopupAssignments.length > 0 && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-gray-600 mb-2">배정된 직원 ({calPopupAssignments.length}명)</h4>
+                <h4 className="text-xs font-semibold text-[#8A8F98] mb-2">배정된 직원 ({calPopupAssignments.length}명)</h4>
                 <div className="space-y-1">
                   {calPopupAssignments.map((a: any) => (
-                    <div key={a.employee_id} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2">
-                      <span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-green-600">{a.department} {a.team}</span></span>
-                      <button onClick={() => handleCalPopupRemove(a.employee_id)} className="text-xs text-red-600 hover:text-red-800">해제</button>
+                    <div key={a.employee_id} className="flex items-center justify-between bg-[#27A644]/10 rounded-lg px-3 py-2">
+                      <span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-[#27A644]">{a.department} {a.team}</span></span>
+                      <button onClick={() => handleCalPopupRemove(a.employee_id)} className="text-xs text-[#EB5757] hover:text-[#EB5757]">해제</button>
                     </div>
                   ))}
                 </div>
@@ -2379,30 +2379,30 @@ function ShiftsTab() {
 
             {/* Add employees */}
             <div>
-              <h4 className="text-xs font-semibold text-gray-600 mb-2">직원 추가</h4>
+              <h4 className="text-xs font-semibold text-[#8A8F98] mb-2">직원 추가</h4>
               <div className="flex gap-2 mb-2">
-                <select value={assignDeptFilter} onChange={e => setAssignDeptFilter(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                <select value={assignDeptFilter} onChange={e => setAssignDeptFilter(e.target.value)} className="px-2 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                   <option value="all">전체 부서</option>
                   {Array.from(new Set([...DEPARTMENTS, ...allEmployees.map((e: any) => e.department).filter(Boolean)])).map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+                <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-[#23252A] rounded-lg text-sm" />
               </div>
-              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+              <div className="max-h-48 overflow-y-auto border border-[#23252A] rounded-lg">
                 {allEmployees
                   .filter((e: any) => !calPopupAssignments.find((a: any) => a.employee_id === e.id))
                   .filter((e: any) => assignDeptFilter === 'all' || (e.department || '').includes(assignDeptFilter))
                   .filter((e: any) => !assignSearch || (e.name || '').includes(assignSearch) || (e.phone || '').includes(assignSearch))
                   .map((e: any) => (
-                    <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
-                      <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-gray-300" />
-                      <span className="text-sm">{e.name}</span><span className="text-xs text-gray-500">{e.department} {e.team}</span>
+                    <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] last:border-0">
+                      <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-[#23252A]" />
+                      <span className="text-sm">{e.name}</span><span className="text-xs text-[#8A8F98]">{e.department} {e.team}</span>
                     </label>
                   ))}
               </div>
-              {assignIds.size > 0 && <button onClick={handleCalPopupAssign} className="mt-2 w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">{assignIds.size}명 배정하기</button>}
+              {assignIds.size > 0 && <button onClick={handleCalPopupAssign} className="mt-2 w-full py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">{assignIds.size}명 배정하기</button>}
             </div>
 
-            <button onClick={() => setCalPopupShift(null)} className="mt-4 w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">닫기</button>
+            <button onClick={() => setCalPopupShift(null)} className="mt-4 w-full py-2 border border-[#23252A] rounded-lg text-sm text-[#D0D6E0] hover:bg-[#141516]/5">닫기</button>
           </div>
         </div>
       )}
@@ -2410,34 +2410,34 @@ function ShiftsTab() {
       {/* Calendar Add Shift Popup */}
       {calAddDate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-sm w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">배치 추가</h3>
-              <button onClick={() => setCalAddDate(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+              <h3 className="text-lg font-semibold text-[#F7F8F8]">배치 추가</h3>
+              <button onClick={() => setCalAddDate(null)} className="text-[#62666D] hover:text-[#D0D6E0] text-xl">&times;</button>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-[#8A8F98] mb-4">
               {shiftCalYear}년 {shiftCalMonth}월 {calAddDate.day}일 ({DAY_NAMES[calAddDate.dow]}요일) · {calAddDate.weekNum}주차
             </p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">배치명 <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">배치명 <span className="text-[#EB5757]">*</span></label>
                 <input type="text" value={calAddForm.name} onChange={e => setCalAddForm({ ...calAddForm, name: e.target.value })}
-                  placeholder="예: A조 오전" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                  placeholder="예: A조 오전" className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">출근</label>
+                  <label className="block text-xs font-medium text-[#8A8F98] mb-1">출근</label>
                   <input type="time" value={calAddForm.planned_clock_in} onChange={e => setCalAddForm({ ...calAddForm, planned_clock_in: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                    className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">퇴근</label>
+                  <label className="block text-xs font-medium text-[#8A8F98] mb-1">퇴근</label>
                   <input type="time" value={calAddForm.planned_clock_out} onChange={e => setCalAddForm({ ...calAddForm, planned_clock_out: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                    className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
                 </div>
               </div>
               <button onClick={handleCalAddShift}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                className="w-full py-2.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] transition-colors">
                 배치 추가
               </button>
             </div>
@@ -2450,15 +2450,15 @@ function ShiftsTab() {
       {/* List Filters */}
       <div className="flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">월</label>
-          <select value={listMonthFilter} onChange={e => setListMonthFilter(parseInt(e.target.value))} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">월</label>
+          <select value={listMonthFilter} onChange={e => setListMonthFilter(parseInt(e.target.value))} className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value={0}>전체</option>
             {MONTHS.map(m => <option key={m} value={m}>{m}월</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">주차</label>
-          <select value={listWeekFilter} onChange={e => setListWeekFilter(parseInt(e.target.value))} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">주차</label>
+          <select value={listWeekFilter} onChange={e => setListWeekFilter(parseInt(e.target.value))} className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value={0}>전체</option>
             {[1,2,3,4,5].map(w => <option key={w} value={w}>{w}주차</option>)}
           </select>
@@ -2466,86 +2466,86 @@ function ShiftsTab() {
       </div>
 
       {/* Create Form */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">배치 추가</h3>
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
+        <h3 className="text-sm font-semibold text-[#F7F8F8] mb-3">배치 추가</h3>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">배치명 <span className="text-red-500">*</span></label>
-            <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="예: A조 오전 3월1주차" className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-44" />
+            <label className="block text-xs text-[#8A8F98] mb-1">배치명 <span className="text-[#EB5757]">*</span></label>
+            <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="예: A조 오전 3월1주차" className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm w-44" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">월</label>
-            <select value={form.month} onChange={e => setForm({...form, month: parseInt(e.target.value)})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+            <label className="block text-xs text-[#8A8F98] mb-1">월</label>
+            <select value={form.month} onChange={e => setForm({...form, month: parseInt(e.target.value)})} className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
               {MONTHS.map(m => <option key={m} value={m}>{m}월</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">주차</label>
-            <select value={form.week_number} onChange={e => setForm({...form, week_number: parseInt(e.target.value)})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+            <label className="block text-xs text-[#8A8F98] mb-1">주차</label>
+            <select value={form.week_number} onChange={e => setForm({...form, week_number: parseInt(e.target.value)})} className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
               {[1,2,3,4,5].map(w => <option key={w} value={w}>{w}주차</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">출근 <span className="text-red-500">*</span></label>
-            <input type="time" value={form.planned_clock_in} onChange={e => setForm({...form, planned_clock_in: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+            <label className="block text-xs text-[#8A8F98] mb-1">출근 <span className="text-[#EB5757]">*</span></label>
+            <input type="time" value={form.planned_clock_in} onChange={e => setForm({...form, planned_clock_in: e.target.value})} className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm" />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">퇴근 <span className="text-red-500">*</span></label>
-            <input type="time" value={form.planned_clock_out} onChange={e => setForm({...form, planned_clock_out: e.target.value})} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+            <label className="block text-xs text-[#8A8F98] mb-1">퇴근 <span className="text-[#EB5757]">*</span></label>
+            <input type="time" value={form.planned_clock_out} onChange={e => setForm({...form, planned_clock_out: e.target.value})} className="px-3 py-1.5 border border-[#23252A] rounded-lg text-sm" />
           </div>
         </div>
         <div className="mt-3">
-          <label className="block text-xs text-gray-500 mb-1">요일 선택 <span className="text-red-500">*</span></label>
+          <label className="block text-xs text-[#8A8F98] mb-1">요일 선택 <span className="text-[#EB5757]">*</span></label>
           <div className="flex gap-1">
             {DAY_NAMES.map((d, i) => (
               <button key={i} type="button" onClick={() => toggleDay(i, 'form')}
-                className={`w-9 h-9 rounded-lg text-xs font-medium ${form.days_of_week.includes(i) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{d}</button>
+                className={`w-9 h-9 rounded-lg text-xs font-medium ${form.days_of_week.includes(i) ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>{d}</button>
             ))}
           </div>
         </div>
         <div className="mt-3 flex justify-end">
-          <button onClick={handleCreate} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-1"><Plus size={14} /> 추가</button>
+          <button onClick={handleCreate} className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] flex items-center gap-1"><Plus size={14} /> 추가</button>
         </div>
       </div>
 
       {/* Shifts List */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto" /></div>
+          <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" /></div>
         ) : shifts.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400">등록된 배치가 없습니다.</div>
+          <div className="py-12 text-center text-sm text-[#62666D]">등록된 배치가 없습니다.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead><tr className="bg-gray-50 text-left">
-              <th className="py-2 px-4 font-medium text-gray-600">배치명</th>
-              <th className="py-2 px-4 font-medium text-gray-600">월/주차</th>
-              <th className="py-2 px-4 font-medium text-gray-600">요일</th>
-              <th className="py-2 px-4 font-medium text-gray-600">출근</th>
-              <th className="py-2 px-4 font-medium text-gray-600">퇴근</th>
-              <th className="py-2 px-4 font-medium text-gray-600">배정</th>
-              <th className="py-2 px-4 font-medium text-gray-600">관리</th>
+            <thead><tr className="bg-[#08090A] text-left">
+              <th className="py-2 px-4 font-medium text-[#8A8F98]">배치명</th>
+              <th className="py-2 px-4 font-medium text-[#8A8F98]">월/주차</th>
+              <th className="py-2 px-4 font-medium text-[#8A8F98]">요일</th>
+              <th className="py-2 px-4 font-medium text-[#8A8F98]">출근</th>
+              <th className="py-2 px-4 font-medium text-[#8A8F98]">퇴근</th>
+              <th className="py-2 px-4 font-medium text-[#8A8F98]">배정</th>
+              <th className="py-2 px-4 font-medium text-[#8A8F98]">관리</th>
             </tr></thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#23252A]">
               {[...shifts]
                 .filter((s: any) => (listMonthFilter === 0 || s.month === listMonthFilter) && (listWeekFilter === 0 || s.week_number === listWeekFilter))
                 .sort((a: any, b: any) => b.month === a.month ? b.week_number - a.week_number : b.month - a.month)
                 .map((s: any) => {
                 const days = parseDays(s.days_of_week || String(s.day_of_week));
                 return (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="py-2.5 px-4 font-medium text-gray-900">{s.name}</td>
-                    <td className="py-2.5 px-4 text-gray-600">{s.month || '-'}월 {s.week_number}주차</td>
-                    <td className="py-2.5 px-4"><div className="flex gap-0.5">{days.map(d => <span key={d} className="inline-flex w-6 h-6 items-center justify-center rounded text-[10px] font-medium bg-blue-50 text-blue-700">{DAY_NAMES[d]}</span>)}</div></td>
-                    <td className="py-2.5 px-4 text-gray-700">{s.planned_clock_in}</td>
-                    <td className="py-2.5 px-4 text-gray-700">{s.planned_clock_out}</td>
-                    <td className="py-2.5 px-4 text-gray-700">{s.assigned_count || 0}명</td>
+                  <tr key={s.id} className="hover:bg-[#141516]/5">
+                    <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{s.name}</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98]">{s.month || '-'}월 {s.week_number}주차</td>
+                    <td className="py-2.5 px-4"><div className="flex gap-0.5">{days.map(d => <span key={d} className="inline-flex w-6 h-6 items-center justify-center rounded text-[10px] font-medium bg-[#4EA7FC]/10 text-[#828FFF]">{DAY_NAMES[d]}</span>)}</div></td>
+                    <td className="py-2.5 px-4 text-[#D0D6E0]">{s.planned_clock_in}</td>
+                    <td className="py-2.5 px-4 text-[#D0D6E0]">{s.planned_clock_out}</td>
+                    <td className="py-2.5 px-4 text-[#D0D6E0]">{s.assigned_count || 0}명</td>
                     <td className="py-2.5 px-4">
                       <div className="flex gap-1 flex-wrap">
-                        <button onClick={() => openAssign(s)} className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded hover:bg-blue-100">배정</button>
+                        <button onClick={() => openAssign(s)} className="px-2 py-1 text-xs font-medium text-[#7070FF] bg-[#4EA7FC]/10 rounded hover:bg-[#4EA7FC]/15">배정</button>
                         <button onClick={() => { setEditingShift(s); setEditForm({ name: s.name, month: s.month || 1, week_number: s.week_number, days_of_week: parseDays(s.days_of_week || String(s.day_of_week)), planned_clock_in: s.planned_clock_in, planned_clock_out: s.planned_clock_out }); }}
-                          className="px-2 py-1 text-xs font-medium text-green-600 bg-green-50 rounded hover:bg-green-100">수정</button>
-                        <button onClick={() => handleCopy(s)} className="px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100">복사</button>
-                        <button onClick={async () => { await deleteRegularShift(s.id); loadShifts(); }} className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 rounded hover:bg-red-100">삭제</button>
+                          className="px-2 py-1 text-xs font-medium text-[#27A644] bg-[#27A644]/10 rounded hover:bg-[#27A644]/15">수정</button>
+                        <button onClick={() => handleCopy(s)} className="px-2 py-1 text-xs font-medium text-[#7070FF] bg-[#5E6AD2]/10 rounded hover:bg-[#5E6AD2]/15">복사</button>
+                        <button onClick={async () => { await deleteRegularShift(s.id); loadShifts(); }} className="px-2 py-1 text-xs font-medium text-[#EB5757] bg-[#EB5757]/10 rounded hover:bg-[#EB5757]/15">삭제</button>
                       </div>
                     </td>
                   </tr>
@@ -2559,21 +2559,21 @@ function ShiftsTab() {
       {/* Edit Modal */}
       {editingShift && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-md w-full p-6 space-y-4">
             <h3 className="text-lg font-semibold">배치 수정</h3>
             <div className="space-y-3">
-              <div><label className="block text-xs text-gray-500 mb-1">배치명</label><input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+              <div><label className="block text-xs text-[#8A8F98] mb-1">배치명</label><input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs text-gray-500 mb-1">월</label><select value={editForm.month} onChange={e => setEditForm({...editForm, month: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">{MONTHS.map(m => <option key={m} value={m}>{m}월</option>)}</select></div>
-                <div><label className="block text-xs text-gray-500 mb-1">주차</label><select value={editForm.week_number} onChange={e => setEditForm({...editForm, week_number: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">{[1,2,3,4,5].map(w => <option key={w} value={w}>{w}주차</option>)}</select></div>
+                <div><label className="block text-xs text-[#8A8F98] mb-1">월</label><select value={editForm.month} onChange={e => setEditForm({...editForm, month: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">{MONTHS.map(m => <option key={m} value={m}>{m}월</option>)}</select></div>
+                <div><label className="block text-xs text-[#8A8F98] mb-1">주차</label><select value={editForm.week_number} onChange={e => setEditForm({...editForm, week_number: parseInt(e.target.value)})} className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">{[1,2,3,4,5].map(w => <option key={w} value={w}>{w}주차</option>)}</select></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs text-gray-500 mb-1">출근</label><input type="time" value={editForm.planned_clock_in} onChange={e => setEditForm({...editForm, planned_clock_in: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
-                <div><label className="block text-xs text-gray-500 mb-1">퇴근</label><input type="time" value={editForm.planned_clock_out} onChange={e => setEditForm({...editForm, planned_clock_out: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" /></div>
+                <div><label className="block text-xs text-[#8A8F98] mb-1">출근</label><input type="time" value={editForm.planned_clock_in} onChange={e => setEditForm({...editForm, planned_clock_in: e.target.value})} className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" /></div>
+                <div><label className="block text-xs text-[#8A8F98] mb-1">퇴근</label><input type="time" value={editForm.planned_clock_out} onChange={e => setEditForm({...editForm, planned_clock_out: e.target.value})} className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" /></div>
               </div>
-              <div><label className="block text-xs text-gray-500 mb-1">요일</label><div className="flex gap-1">{DAY_NAMES.map((d, i) => (<button key={i} type="button" onClick={() => toggleDay(i, 'edit')} className={`w-9 h-9 rounded-lg text-xs font-medium ${editForm.days_of_week.includes(i) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{d}</button>))}</div></div>
+              <div><label className="block text-xs text-[#8A8F98] mb-1">요일</label><div className="flex gap-1">{DAY_NAMES.map((d, i) => (<button key={i} type="button" onClick={() => toggleDay(i, 'edit')} className={`w-9 h-9 rounded-lg text-xs font-medium ${editForm.days_of_week.includes(i) ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98]'}`}>{d}</button>))}</div></div>
             </div>
-            <div className="flex gap-3"><button onClick={() => setEditingShift(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">취소</button><button onClick={handleEdit} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">저장</button></div>
+            <div className="flex gap-3"><button onClick={() => setEditingShift(null)} className="flex-1 py-2 border border-[#23252A] rounded-lg text-sm">취소</button><button onClick={handleEdit} className="flex-1 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">저장</button></div>
           </div>
         </div>
       )}
@@ -2581,34 +2581,34 @@ function ShiftsTab() {
       {/* Assignment Modal */}
       {selectedShift && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">직원 배정</h3>
-            <p className="text-sm text-gray-500 mb-4">{selectedShift.name} · {parseDays(selectedShift.days_of_week || String(selectedShift.day_of_week)).map((d: number) => DAY_NAMES[d]).join('/')}요일 · {selectedShift.planned_clock_in}~{selectedShift.planned_clock_out}</p>
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-[#F7F8F8] mb-1">직원 배정</h3>
+            <p className="text-sm text-[#8A8F98] mb-4">{selectedShift.name} · {parseDays(selectedShift.days_of_week || String(selectedShift.day_of_week)).map((d: number) => DAY_NAMES[d]).join('/')}요일 · {selectedShift.planned_clock_in}~{selectedShift.planned_clock_out}</p>
             {assignments.length > 0 && (
-              <div className="mb-4"><h4 className="text-xs font-semibold text-gray-600 mb-2">배정된 직원 ({assignments.length}명)</h4><div className="space-y-1">{assignments.map((a: any) => (
-                <div key={a.employee_id} className="flex items-center justify-between bg-green-50 rounded-lg px-3 py-2"><span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-green-600">{a.department} {a.team}</span></span><button onClick={() => handleRemove(a.employee_id)} className="text-xs text-red-600 hover:text-red-800">해제</button></div>
+              <div className="mb-4"><h4 className="text-xs font-semibold text-[#8A8F98] mb-2">배정된 직원 ({assignments.length}명)</h4><div className="space-y-1">{assignments.map((a: any) => (
+                <div key={a.employee_id} className="flex items-center justify-between bg-[#27A644]/10 rounded-lg px-3 py-2"><span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-[#27A644]">{a.department} {a.team}</span></span><button onClick={() => handleRemove(a.employee_id)} className="text-xs text-[#EB5757] hover:text-[#EB5757]">해제</button></div>
               ))}</div></div>
             )}
             <div>
-              <h4 className="text-xs font-semibold text-gray-600 mb-2">직원 추가</h4>
+              <h4 className="text-xs font-semibold text-[#8A8F98] mb-2">직원 추가</h4>
               <div className="flex gap-2 mb-2">
-                <select value={assignDeptFilter} onChange={e => setAssignDeptFilter(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+                <select value={assignDeptFilter} onChange={e => setAssignDeptFilter(e.target.value)} className="px-2 py-1.5 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
                   <option value="all">전체 부서</option>
                   {Array.from(new Set([...DEPARTMENTS, ...allEmployees.map((e: any) => e.department).filter(Boolean)])).map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+                <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)} placeholder="이름 검색..." className="flex-1 px-3 py-1.5 border border-[#23252A] rounded-lg text-sm" />
               </div>
-              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+              <div className="max-h-48 overflow-y-auto border border-[#23252A] rounded-lg">
                 {allEmployees.filter((e: any) => !assignments.find((a: any) => a.employee_id === e.id)).filter((e: any) => assignDeptFilter === 'all' || (e.department || '').includes(assignDeptFilter)).filter((e: any) => !assignSearch || (e.name || '').includes(assignSearch) || (e.phone || '').includes(assignSearch)).map((e: any) => (
-                  <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
-                    <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-gray-300" />
-                    <span className="text-sm">{e.name}</span><span className="text-xs text-gray-500">{e.department} {e.team}</span>
+                  <label key={e.id} className="flex items-center gap-2 px-3 py-2 hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] last:border-0">
+                    <input type="checkbox" checked={assignIds.has(e.id)} onChange={ev => { const n = new Set(assignIds); if (ev.target.checked) n.add(e.id); else n.delete(e.id); setAssignIds(n); }} className="rounded border-[#23252A]" />
+                    <span className="text-sm">{e.name}</span><span className="text-xs text-[#8A8F98]">{e.department} {e.team}</span>
                   </label>
                 ))}
               </div>
-              {assignIds.size > 0 && <button onClick={handleAssign} className="mt-2 w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">{assignIds.size}명 배정하기</button>}
+              {assignIds.size > 0 && <button onClick={handleAssign} className="mt-2 w-full py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium">{assignIds.size}명 배정하기</button>}
             </div>
-            <button onClick={() => setSelectedShift(null)} className="mt-4 w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">닫기</button>
+            <button onClick={() => setSelectedShift(null)} className="mt-4 w-full py-2 border border-[#23252A] rounded-lg text-sm text-[#D0D6E0] hover:bg-[#141516]/5">닫기</button>
           </div>
         </div>
       )}

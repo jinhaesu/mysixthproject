@@ -59,15 +59,15 @@ export default function UploadPage() {
   );
 
   const severityConfig = {
-    high: { icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50 border-red-200" },
-    medium: { icon: AlertCircle, color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200" },
-    low: { icon: Info, color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
+    high: { icon: AlertTriangle, color: "text-[#EB5757]", bg: "bg-[#EB5757]/10 border-[#EB5757]/30" },
+    medium: { icon: AlertCircle, color: "text-[#F0BF00]", bg: "bg-[#F0BF00]/10 border-[#F0BF00]/30" },
+    low: { icon: Info, color: "text-[#7070FF]", bg: "bg-[#4EA7FC]/10 border-[#5E6AD2]/30" },
   };
 
   return (
     <div className="max-w-4xl">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">정규직 엑셀 업로드</h2>
-      <p className="text-gray-500 mb-8">
+      <h2 className="text-2xl font-bold text-[#F7F8F8] mb-2">정규직 엑셀 업로드</h2>
+      <p className="text-[#8A8F98] mb-8">
         근태 엑셀 파일을 업로드하면 자동으로 데이터를 파싱하고 AI가 분석합니다.
       </p>
 
@@ -78,23 +78,23 @@ export default function UploadPage() {
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
           isDragging
-            ? "border-blue-400 bg-blue-50"
-            : "border-gray-300 bg-white hover:border-gray-400"
+            ? "border-blue-400 bg-[#4EA7FC]/10"
+            : "border-[#23252A] bg-[#0F1011] hover:border-[#34343A]"
         }`}
       >
         {isUploading ? (
           <div className="flex flex-col items-center">
-            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4" />
-            <p className="text-gray-600 font-medium">파일 처리 중...</p>
-            <p className="text-sm text-gray-400 mt-1">엑셀 파싱 및 AI 분석이 진행됩니다</p>
+            <div className="w-12 h-12 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin mb-4" />
+            <p className="text-[#8A8F98] font-medium">파일 처리 중...</p>
+            <p className="text-sm text-[#62666D] mt-1">엑셀 파싱 및 AI 분석이 진행됩니다</p>
           </div>
         ) : (
           <label className="cursor-pointer flex flex-col items-center">
-            <UploadCloud size={48} className="text-gray-400 mb-4" />
-            <p className="text-gray-600 font-medium mb-1">
+            <UploadCloud size={48} className="text-[#62666D] mb-4" />
+            <p className="text-[#8A8F98] font-medium mb-1">
               파일을 드래그하거나 클릭하여 업로드
             </p>
-            <p className="text-sm text-gray-400">.xlsx, .xls, .csv (최대 10MB)</p>
+            <p className="text-sm text-[#62666D]">.xlsx, .xls, .csv (최대 10MB)</p>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -107,9 +107,9 @@ export default function UploadPage() {
 
       {/* Error */}
       {error && (
-        <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertTriangle size={20} className="text-red-600 mt-0.5 shrink-0" />
-          <p className="text-red-700">{error}</p>
+        <div className="mt-6 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle size={20} className="text-[#EB5757] mt-0.5 shrink-0" />
+          <p className="text-[#EB5757]">{error}</p>
         </div>
       )}
 
@@ -117,11 +117,11 @@ export default function UploadPage() {
       {result && (
         <div className="mt-8 space-y-6">
           {/* Summary */}
-          <div className="bg-green-50 border border-green-200 rounded-xl p-5 flex items-start gap-3">
-            <CheckCircle2 size={20} className="text-green-600 mt-0.5 shrink-0" />
+          <div className="bg-[#27A644]/10 border border-[#27A644]/30 rounded-xl p-5 flex items-start gap-3">
+            <CheckCircle2 size={20} className="text-[#27A644] mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium text-green-800">업로드 완료</p>
-              <p className="text-sm text-green-600 mt-1">
+              <p className="font-medium text-[#27A644]">업로드 완료</p>
+              <p className="text-sm text-[#27A644] mt-1">
                 <FileSpreadsheet size={14} className="inline mr-1" />
                 {result.filename} - {result.recordCount}건의 근태 기록이 저장되었습니다.
               </p>
@@ -129,28 +129,28 @@ export default function UploadPage() {
           </div>
 
           {/* AI Analysis */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="font-semibold text-gray-900">AI 분석 결과</h3>
+          <div className="bg-[#0F1011] border border-[#23252A] rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#23252A] bg-[#08090A]">
+              <h3 className="font-semibold text-[#F7F8F8]">AI 분석 결과</h3>
             </div>
             <div className="p-5 space-y-4">
               {/* Summary */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800 whitespace-pre-wrap">{result.analysis.summary}</p>
+              <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-lg p-4">
+                <p className="text-sm text-[#828FFF] whitespace-pre-wrap">{result.analysis.summary}</p>
               </div>
 
               {/* Duplicates */}
               {result.analysis.duplicates.length > 0 && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                    <AlertTriangle size={16} className="text-red-500" />
+                  <h4 className="font-medium text-[#F7F8F8] mb-2 flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-[#EB5757]" />
                     중복 기록 ({result.analysis.duplicates.length}건)
                   </h4>
                   <div className="space-y-2">
                     {result.analysis.duplicates.map((dup, i) => (
                       <div
                         key={i}
-                        className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700"
+                        className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg p-3 text-sm text-[#EB5757]"
                       >
                         {dup.details}
                       </div>
@@ -162,7 +162,7 @@ export default function UploadPage() {
               {/* Warnings */}
               {result.analysis.warnings.length > 0 && (
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                  <h4 className="font-medium text-[#F7F8F8] mb-2 flex items-center gap-2">
                     <AlertCircle size={16} className="text-yellow-500" />
                     주의사항 ({result.analysis.warnings.length}건)
                   </h4>
@@ -186,7 +186,7 @@ export default function UploadPage() {
 
               {result.analysis.duplicates.length === 0 &&
                 result.analysis.warnings.length === 0 && (
-                  <p className="text-gray-500 text-sm">특별한 이상사항이 발견되지 않았습니다.</p>
+                  <p className="text-[#8A8F98] text-sm">특별한 이상사항이 발견되지 않았습니다.</p>
                 )}
             </div>
           </div>
@@ -194,36 +194,36 @@ export default function UploadPage() {
       )}
 
       {/* Upload History */}
-      <div className="mt-8 bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">업로드 기록</h3>
+      <div className="mt-8 bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#23252A]">
+          <h3 className="text-lg font-semibold text-[#F7F8F8]">업로드 기록</h3>
         </div>
         {uploads.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">업로드된 파일이 없습니다.</div>
+          <div className="p-8 text-center text-[#62666D] text-sm">업로드된 파일이 없습니다.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="py-2 px-4 font-medium text-gray-600">파일명</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-right">레코드 수</th>
-                  <th className="py-2 px-4 font-medium text-gray-600">업로드 일시</th>
-                  <th className="py-2 px-4 font-medium text-gray-600 text-center">관리</th>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">파일명</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">레코드 수</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98]">업로드 일시</th>
+                  <th className="py-2 px-4 font-medium text-[#8A8F98] text-center">관리</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#23252A]">
                 {uploads.map((u: any) => (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="py-2.5 px-4 font-medium text-gray-900">{u.original_filename || u.filename}</td>
-                    <td className="py-2.5 px-4 text-right text-gray-700">{u.record_count}건</td>
-                    <td className="py-2.5 px-4 text-gray-500 text-xs">{u.uploaded_at ? new Date(u.uploaded_at).toLocaleString('ko-KR') : '-'}</td>
+                  <tr key={u.id} className="hover:bg-[#141516]/5">
+                    <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{u.original_filename || u.filename}</td>
+                    <td className="py-2.5 px-4 text-right text-[#D0D6E0]">{u.record_count}건</td>
+                    <td className="py-2.5 px-4 text-[#8A8F98] text-xs">{u.uploaded_at ? new Date(u.uploaded_at).toLocaleString('ko-KR') : '-'}</td>
                     <td className="py-2.5 px-4 text-center">
                       <button
                         onClick={async () => {
                           if (!confirm('이 업로드를 삭제하시겠습니까? 관련 데이터도 함께 삭제됩니다.')) return;
                           try { await deleteUpload(u.id); loadUploads(); } catch (e: any) { alert(e.message); }
                         }}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="삭제">
+                        className="p-1.5 text-[#EB5757] hover:bg-[#EB5757]/10 rounded" title="삭제">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>

@@ -571,20 +571,20 @@ export default function ConfirmCalendarRegularPage() {
       {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
             <CalendarCheck className="w-6 h-6 text-emerald-600" />
             미확정 캘린더 관리 (정규직)
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[#8A8F98] mt-1">
             날짜를 클릭하여 미확정 근태를 확인하고 확정하세요.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month navigator */}
-          <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-2 py-1.5">
+          <div className="flex items-center gap-1 bg-[#0F1011] border border-[#23252A] rounded-lg px-2 py-1.5">
             <button
               onClick={prevMonth}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-[#141516]/5 rounded"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -593,7 +593,7 @@ export default function ConfirmCalendarRegularPage() {
             </span>
             <button
               onClick={nextMonth}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-[#141516]/5 rounded"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -602,7 +602,7 @@ export default function ConfirmCalendarRegularPage() {
           <select
             value={deptFilter}
             onChange={(e) => setDeptFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+            className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]"
           >
             {DEPT_OPTIONS.map((d) => (
               <option key={d} value={d}>
@@ -638,18 +638,18 @@ export default function ConfirmCalendarRegularPage() {
       {!loading && (
         <>
           {/* Calendar */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden mb-6">
             {/* Day-of-week header */}
-            <div className="grid grid-cols-7 border-b border-gray-200">
+            <div className="grid grid-cols-7 border-b border-[#23252A]">
               {["월", "화", "수", "목", "금", "토", "일"].map((d, i) => (
                 <div
                   key={d}
                   className={`py-2 text-center text-xs font-semibold ${
                     i === 5
-                      ? "text-blue-600"
+                      ? "text-[#7070FF]"
                       : i === 6
-                      ? "text-red-600"
-                      : "text-gray-600"
+                      ? "text-[#EB5757]"
+                      : "text-[#8A8F98]"
                   }`}
                 >
                   {d}
@@ -664,7 +664,7 @@ export default function ConfirmCalendarRegularPage() {
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className="min-h-[80px] border-b border-r border-gray-100 bg-gray-50/50"
+                      className="min-h-[80px] border-b border-r border-[#23252A] bg-[#08090A]/50"
                     />
                   );
                 }
@@ -700,10 +700,10 @@ export default function ConfirmCalendarRegularPage() {
                         selectedDate === dateStr ? null : dateStr
                       )
                     }
-                    className={`min-h-[80px] border-b border-r border-gray-100 p-1.5 text-left flex flex-col gap-1 transition-colors ${
+                    className={`min-h-[80px] border-b border-r border-[#23252A] p-1.5 text-left flex flex-col gap-1 transition-colors ${
                       isSelected
                         ? "bg-emerald-50 border-emerald-200"
-                        : "hover:bg-gray-50"
+                        : "hover:bg-[#141516]/5"
                     }`}
                   >
                     <span
@@ -711,21 +711,21 @@ export default function ConfirmCalendarRegularPage() {
                         isToday
                           ? "bg-emerald-600 text-white"
                           : isSun
-                          ? "text-red-600"
+                          ? "text-[#EB5757]"
                           : isSat
-                          ? "text-blue-600"
-                          : "text-gray-700"
+                          ? "text-[#7070FF]"
+                          : "text-[#D0D6E0]"
                       }`}
                     >
                       {day.getDate()}
                     </span>
                     {filteredUnconfirmed > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700 w-fit">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#EB5757]/15 text-[#EB5757] w-fit">
                         미확정 {filteredUnconfirmed}
                       </span>
                     )}
                     {filteredConfirmed > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 w-fit">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#27A644]/15 text-[#27A644] w-fit">
                         확정 {filteredConfirmed}
                       </span>
                     )}
@@ -737,9 +737,9 @@ export default function ConfirmCalendarRegularPage() {
 
           {/* Selected date detail panel */}
           {selectedDate && (
-            <div className="bg-white rounded-xl border border-gray-200">
-              <div className="px-4 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                <h2 className="text-base font-semibold text-gray-900">
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A]">
+              <div className="px-4 py-3 border-b border-[#23252A] flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                <h2 className="text-base font-semibold text-[#F7F8F8]">
                   {selectedDate} 근태 목록
                 </h2>
                 <div className="flex gap-1">
@@ -750,7 +750,7 @@ export default function ConfirmCalendarRegularPage() {
                       className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                         tabFilter === t
                           ? "bg-emerald-600 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          : "bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7"
                       }`}
                     >
                       {t}
@@ -760,11 +760,11 @@ export default function ConfirmCalendarRegularPage() {
               </div>
 
               {selectedEntries.length === 0 ? (
-                <div className="py-12 text-center text-sm text-gray-400">
+                <div className="py-12 text-center text-sm text-[#62666D]">
                   해당 날짜에 근태 기록이 없습니다.
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-[#23252A]">
                   {selectedEntries.map((entry) => {
                     const key = buildDayKey(entry.emp.name, entry.date);
                     const isActioning = actionLoading === key;
@@ -781,7 +781,7 @@ export default function ConfirmCalendarRegularPage() {
                           {entry.emp.name}
                         </button>
                         {/* Dept */}
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-[#8A8F98]">
                           {entry.emp.department}
                         </span>
                         {/* Type badge */}
@@ -790,12 +790,12 @@ export default function ConfirmCalendarRegularPage() {
                         </span>
                         {/* Times: actual + planned */}
                         <div className="flex flex-col text-xs">
-                          <span className="text-gray-700">실제: <b>{entry.actualClockIn || "--:--"} ~ {entry.actualClockOut || "--:--"}</b></span>
-                          {entry.plannedClockIn && <span className="text-blue-600">계획: {entry.plannedClockIn} ~ {entry.plannedClockOut}</span>}
+                          <span className="text-[#D0D6E0]">실제: <b>{entry.actualClockIn || "--:--"} ~ {entry.actualClockOut || "--:--"}</b></span>
+                          {entry.plannedClockIn && <span className="text-[#7070FF]">계획: {entry.plannedClockIn} ~ {entry.plannedClockOut}</span>}
                         </div>
                         {/* Source of confirmed */}
                         {entry.isConfirmed && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${entry.source === "actual" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${entry.source === "actual" ? "bg-[#27A644]/10 text-[#27A644]" : "bg-[#4EA7FC]/10 text-[#828FFF]"}`}>
                             {entry.source === "actual" ? "실제확정" : "계획확정"}
                           </span>
                         )}
@@ -803,26 +803,26 @@ export default function ConfirmCalendarRegularPage() {
                         <div className="ml-auto flex items-center gap-2">
                           {entry.isConfirmed ? (
                             <>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#27A644]/15 text-[#27A644]">
                                 확정 ({entry.clockIn}~{entry.clockOut})
                               </span>
                               <button onClick={() => handleCancelConfirm(entry)} disabled={isActioning}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#EB5757]/10 text-[#EB5757] hover:bg-[#EB5757]/15 disabled:opacity-50">
                                 {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
                                 취소
                               </button>
                             </>
                           ) : (
                             <>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">미확정</span>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#EB5757]/15 text-[#EB5757]">미확정</span>
                               <button onClick={() => handleConfirm(entry, "actual")} disabled={isActioning}
-                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-[#27A644] text-white hover:bg-green-700 disabled:opacity-50">
                                 {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                                 실제확정
                               </button>
                               {entry.plannedClockIn && (
                                 <button onClick={() => handleConfirm(entry, "planned")} disabled={isActioning}
-                                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-[#5E6AD2] text-white hover:bg-[#828FFF] disabled:opacity-50">
                                   {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                                   계획확정
                                 </button>
@@ -848,23 +848,23 @@ export default function ConfirmCalendarRegularPage() {
             if (e.target === e.currentTarget) setPopupEmp(null);
           }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+          <div className="bg-[#0F1011] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
             {/* Popup header */}
-            <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-[#23252A] flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-gray-900">
+                <h3 className="text-base font-bold text-[#F7F8F8]">
                   {popupEmp.name}{" "}
-                  <span className="text-sm font-normal text-gray-500">
+                  <span className="text-sm font-normal text-[#8A8F98]">
                     {popupEmp.department}
                   </span>
                 </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-[#8A8F98] mt-0.5">
                   {year}년 {month}월 전체 근태
                 </p>
               </div>
               <button
                 onClick={() => setPopupEmp(null)}
-                className="text-gray-400 hover:text-gray-700 text-lg leading-none"
+                className="text-[#62666D] hover:text-[#D0D6E0] text-lg leading-none"
               >
                 ✕
               </button>
@@ -873,54 +873,54 @@ export default function ConfirmCalendarRegularPage() {
             {/* Popup body */}
             <div className="overflow-y-auto flex-1">
               {popupEntries.length === 0 ? (
-                <div className="py-12 text-center text-sm text-gray-400">
+                <div className="py-12 text-center text-sm text-[#62666D]">
                   이번 달 근태 기록이 없습니다.
                 </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 text-left sticky top-0">
-                      <th className="py-2 px-4 text-xs font-medium text-gray-600">
+                    <tr className="bg-[#08090A] text-left sticky top-0">
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
                         날짜
                       </th>
-                      <th className="py-2 px-4 text-xs font-medium text-gray-600">
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
                         출근
                       </th>
-                      <th className="py-2 px-4 text-xs font-medium text-gray-600">
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
                         퇴근
                       </th>
-                      <th className="py-2 px-4 text-xs font-medium text-gray-600">
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
                         기준
                       </th>
-                      <th className="py-2 px-4 text-xs font-medium text-gray-600">
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
                         상태
                       </th>
-                      <th className="py-2 px-4 text-xs font-medium text-gray-600">
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
                         관리
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[#23252A]">
                     {popupEntries.map((row) => {
                       const k = buildDayKey(popupEmp.name, row.date);
                       const isActioning = actionLoading === k;
                       return (
-                        <tr key={row.date} className="hover:bg-gray-50">
-                          <td className="py-2 px-4 text-gray-700">
+                        <tr key={row.date} className="hover:bg-[#141516]/5">
+                          <td className="py-2 px-4 text-[#D0D6E0]">
                             {row.date}
                           </td>
-                          <td className="py-2 px-4 text-gray-700">
+                          <td className="py-2 px-4 text-[#D0D6E0]">
                             {row.clockIn || "--:--"}
                           </td>
-                          <td className="py-2 px-4 text-gray-700">
+                          <td className="py-2 px-4 text-[#D0D6E0]">
                             {row.clockOut || "--:--"}
                           </td>
                           <td className="py-2 px-4">
                             <span
                               className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                 row.source === "actual"
-                                  ? "bg-green-50 text-green-700"
-                                  : "bg-blue-50 text-blue-700"
+                                  ? "bg-[#27A644]/10 text-[#27A644]"
+                                  : "bg-[#4EA7FC]/10 text-[#828FFF]"
                               }`}
                             >
                               {row.source === "actual" ? "실제" : "계획"}
@@ -930,8 +930,8 @@ export default function ConfirmCalendarRegularPage() {
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
                                 row.isConfirmed
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-red-100 text-red-700"
+                                  ? "bg-[#27A644]/15 text-[#27A644]"
+                                  : "bg-[#EB5757]/15 text-[#EB5757]"
                               }`}
                             >
                               {row.isConfirmed ? "확정" : "미확정"}
@@ -951,7 +951,7 @@ export default function ConfirmCalendarRegularPage() {
                                   )
                                 }
                                 disabled={isActioning}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
+                                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#EB5757]/10 text-[#EB5757] hover:bg-[#EB5757]/15 disabled:opacity-50"
                               >
                                 {isActioning ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />

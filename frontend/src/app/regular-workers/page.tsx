@@ -296,14 +296,14 @@ export default function RegularWorkersPage() {
     <div>
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Contact size={28} className="text-blue-600" />
+          <h2 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+            <Contact size={28} className="text-[#7070FF]" />
             정규직 DB
           </h2>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[#8A8F98] mt-1">
             현장 정규직 직원을 관리합니다.
             {pagination.total > 0 && (
-              <span className="ml-2 text-blue-600 font-medium">
+              <span className="ml-2 text-[#7070FF] font-medium">
                 총 {pagination.total}명
               </span>
             )}
@@ -311,7 +311,7 @@ export default function RegularWorkersPage() {
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-sm font-medium"
         >
           <Plus size={16} />
           직원 추가
@@ -323,14 +323,14 @@ export default function RegularWorkersPage() {
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]"
           />
           <input
             type="text"
             placeholder="이름 또는 전화번호 검색..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full pl-9 pr-4 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
           />
         </div>
         <select
@@ -339,7 +339,7 @@ export default function RegularWorkersPage() {
             setFilterDept(e.target.value);
             setPage(1);
           }}
-          className="px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
         >
           <option value="">전체 부서</option>
           {DEPARTMENTS.map((d) => (
@@ -352,7 +352,7 @@ export default function RegularWorkersPage() {
             setFilterTeam(e.target.value);
             setPage(1);
           }}
-          className="px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
         >
           <option value="">전체 조</option>
           {TEAMS.map((t) => (
@@ -365,7 +365,7 @@ export default function RegularWorkersPage() {
             setFilterRole(e.target.value);
             setPage(1);
           }}
-          className="px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
         >
           <option value="">전체 직책</option>
           {ROLES.map((r) => (
@@ -374,7 +374,7 @@ export default function RegularWorkersPage() {
         </select>
         <button
           type="submit"
-          className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium"
+          className="px-4 py-2 rounded-lg bg-[#141516] text-[#D0D6E0] hover:bg-[#141516]/7 text-sm font-medium"
         >
           검색
         </button>
@@ -383,68 +383,68 @@ export default function RegularWorkersPage() {
       {/* Table */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
-          <Loader2 size={32} className="animate-spin text-blue-600" />
+          <Loader2 size={32} className="animate-spin text-[#7070FF]" />
         </div>
       ) : employees.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center text-[#62666D]">
           {search ? `"${search}" 검색 결과가 없습니다.` : '등록된 정규직 직원이 없습니다.'}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">이름</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">입사일</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">전화번호</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">부서</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">조</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">직책</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">은행</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">계좌번호</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">주민번호</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">상태</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">계약서</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600">관리</th>
+                <tr className="bg-[#08090A] border-b border-[#23252A]">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">이름</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">입사일</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">전화번호</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">부서</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">조</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">직책</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">은행</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">계좌번호</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">주민번호</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">상태</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">계약서</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#8A8F98]">관리</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.map((emp) => (
                   <tr
                     key={emp.id}
-                    className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${emp.is_active === 0 ? 'opacity-50 bg-gray-50' : ''}`}
+                    className={`border-b border-[#23252A] hover:bg-[#141516]/5 cursor-pointer ${emp.is_active === 0 ? 'opacity-50 bg-[#08090A]' : ''}`}
                     onClick={() => openEditModal(emp)}
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-[#F7F8F8]">
                       {emp.name}
-                      {emp.is_active === 0 && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">퇴사자</span>}
+                      {emp.is_active === 0 && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#EB5757]/15 text-[#EB5757]">퇴사자</span>}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{emp.hire_date || "-"}</td>
-                    <td className="px-4 py-3 text-gray-700">{emp.phone}</td>
-                    <td className="px-4 py-3 text-gray-700">{emp.department || "-"}</td>
-                    <td className="px-4 py-3 text-gray-700">{emp.team || "-"}</td>
+                    <td className="px-4 py-3 text-[#8A8F98] text-xs">{emp.hire_date || "-"}</td>
+                    <td className="px-4 py-3 text-[#D0D6E0]">{emp.phone}</td>
+                    <td className="px-4 py-3 text-[#D0D6E0]">{emp.department || "-"}</td>
+                    <td className="px-4 py-3 text-[#D0D6E0]">{emp.team || "-"}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                           emp.role === "반장"
-                            ? "bg-purple-50 text-purple-700"
+                            ? "bg-[#5E6AD2]/10 text-[#828FFF]"
                             : emp.role === "조장"
-                            ? "bg-blue-50 text-blue-700"
-                            : "bg-gray-50 text-gray-600"
+                            ? "bg-[#4EA7FC]/10 text-[#828FFF]"
+                            : "bg-[#08090A] text-[#8A8F98]"
                         }`}
                       >
                         {emp.role || "-"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{emp.bank_name || "-"}</td>
-                    <td className="px-4 py-3 text-gray-700">{emp.bank_account || "-"}</td>
-                    <td className="px-4 py-3 text-gray-700" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-[#D0D6E0]">{emp.bank_name || "-"}</td>
+                    <td className="px-4 py-3 text-[#D0D6E0]">{emp.bank_account || "-"}</td>
+                    <td className="px-4 py-3 text-[#D0D6E0]" onClick={(e) => e.stopPropagation()}>
                       {emp.id_number ? (
                         revealedIds.has(emp.id) ? (
                           <span className="text-xs font-mono">{emp.id_number}</span>
                         ) : (
-                          <button onClick={() => handleRevealId(emp.id)} className="text-xs text-gray-400 hover:text-indigo-600 hover:underline cursor-pointer">
+                          <button onClick={() => handleRevealId(emp.id)} className="text-xs text-[#62666D] hover:text-[#7070FF] hover:underline cursor-pointer">
                             ●●●●●●-●●●●●●●
                           </button>
                         )
@@ -454,8 +454,8 @@ export default function RegularWorkersPage() {
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                           emp.status === "active"
-                            ? "bg-green-50 text-green-700"
-                            : "bg-gray-100 text-gray-500"
+                            ? "bg-[#27A644]/10 text-[#27A644]"
+                            : "bg-[#141516] text-[#8A8F98]"
                         }`}
                       >
                         {emp.is_active === 0 ? "퇴사" : emp.status === "active" ? "활성" : "비활성"}
@@ -469,11 +469,11 @@ export default function RegularWorkersPage() {
                           <FileCheck size={11} /> 체결 (열람)
                         </button>
                       ) : contractMap[emp.id]?.status === "pending" ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#F0BF00]/10 text-[#F0BF00]">
                           <FileText size={11} /> 발송됨
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#141516] text-[#8A8F98]">
                           미체결
                         </span>
                       )}
@@ -485,7 +485,7 @@ export default function RegularWorkersPage() {
                       >
                         <button
                           onClick={() => openEditModal(emp)}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
+                          className="p-1.5 rounded-lg hover:bg-[#4EA7FC]/10 text-[#7070FF]"
                           title="수정"
                         >
                           <Edit3 size={15} />
@@ -495,8 +495,8 @@ export default function RegularWorkersPage() {
                           disabled={togglingId === emp.id}
                           className={`px-2 py-1 rounded-lg text-xs font-medium ${
                             emp.status === "active"
-                              ? "hover:bg-gray-100 text-gray-600"
-                              : "hover:bg-green-50 text-green-600"
+                              ? "hover:bg-[#141516]/5 text-[#8A8F98]"
+                              : "hover:bg-[#27A644]/10 text-[#27A644]"
                           } disabled:opacity-50`}
                           title={emp.status === "active" ? "비활성화" : "활성화"}
                         >
@@ -511,7 +511,7 @@ export default function RegularWorkersPage() {
                         <button
                           onClick={() => handleSendLink(emp.id)}
                           disabled={sendingId === emp.id}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-green-50 text-green-600 text-xs font-medium disabled:opacity-50"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[#27A644]/10 text-[#27A644] text-xs font-medium disabled:opacity-50"
                           title="링크 발송"
                         >
                           {sendingId === emp.id ? (
@@ -524,7 +524,7 @@ export default function RegularWorkersPage() {
                         <button
                           onClick={async () => { if (!(await verifyContractPassword())) return; setContractModal(emp); setContractForm({...contractForm, department: emp.department || ''}); }}
                           disabled={sendingContractId === emp.id}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-purple-50 text-purple-600 text-xs font-medium disabled:opacity-50"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[#5E6AD2]/10 text-[#7070FF] text-xs font-medium disabled:opacity-50"
                           title="계약서 발송"
                         >
                           {sendingContractId === emp.id ? (
@@ -539,7 +539,7 @@ export default function RegularWorkersPage() {
                             if (!confirm(`${emp.name}을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
                             try { await deleteRegularEmployee(emp.id); loadEmployees(); } catch (e: any) { alert(e.message); }
                           }}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                          className="p-1.5 rounded-lg hover:bg-[#EB5757]/10 text-[#EB5757]"
                           title="삭제"
                         >
                           <Trash2 size={15} />
@@ -554,8 +554,8 @@ export default function RegularWorkersPage() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <p className="text-sm text-gray-500">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[#23252A]">
+              <p className="text-sm text-[#8A8F98]">
                 {pagination.total}명 중{" "}
                 {(pagination.page - 1) * pagination.limit + 1}-
                 {Math.min(pagination.page * pagination.limit, pagination.total)}명
@@ -564,17 +564,17 @@ export default function RegularWorkersPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1.5 rounded-lg hover:bg-[#141516]/5 text-[#8A8F98] disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <span className="text-sm text-gray-700 min-w-[80px] text-center">
+                <span className="text-sm text-[#D0D6E0] min-w-[80px] text-center">
                   {pagination.page} / {pagination.totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
                   disabled={page >= pagination.totalPages}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1.5 rounded-lg hover:bg-[#141516]/5 text-[#8A8F98] disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ChevronRight size={18} />
                 </button>
@@ -587,71 +587,71 @@ export default function RegularWorkersPage() {
       {/* Contract Send Modal */}
       {contractModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto space-y-3">
-            <h3 className="text-lg font-semibold text-gray-900">근로계약서 발송</h3>
-            <p className="text-sm text-gray-500">{contractModal.name} ({contractModal.phone})에게 근로계약서를 발송합니다.</p>
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-md w-full p-6 max-h-[90vh] overflow-y-auto space-y-3">
+            <h3 className="text-lg font-semibold text-[#F7F8F8]">근로계약서 발송</h3>
+            <p className="text-sm text-[#8A8F98]">{contractModal.name} ({contractModal.phone})에게 근로계약서를 발송합니다.</p>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">근로 개시일</label>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1">근로 개시일</label>
               <input type="date" value={contractForm.work_start_date} onChange={e => setContractForm({...contractForm, work_start_date: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">근무부서</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">근무부서</label>
                 <input type="text" value={contractForm.department} onChange={e => setContractForm({...contractForm, department: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">직책</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">직책</label>
                 <input type="text" value={contractForm.position_title} onChange={e => setContractForm({...contractForm, position_title: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                  className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">기본급 (월) <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">기본급 (월) <span className="text-[#EB5757]">*</span></label>
                 <input type="text" value={contractForm.base_pay} onChange={e => {
                   const bp = e.target.value;
                   const meal = contractForm.meal_allowance;
                   const bpNum = parseInt(bp.replace(/[^0-9]/g, '')) || 0;
                   const mealNum = parseInt(meal.replace(/[^0-9]/g, '')) || 0;
                   setContractForm({...contractForm, base_pay: bp, annual_salary: ((bpNum + mealNum) * 12).toLocaleString()});
-                }} placeholder="예: 2,000,000" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                }} placeholder="예: 2,000,000" className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">식대 (월)</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">식대 (월)</label>
                 <input type="text" value={contractForm.meal_allowance} onChange={e => {
                   const meal = e.target.value;
                   const bp = contractForm.base_pay;
                   const bpNum = parseInt(bp.replace(/[^0-9]/g, '')) || 0;
                   const mealNum = parseInt(meal.replace(/[^0-9]/g, '')) || 0;
                   setContractForm({...contractForm, meal_allowance: meal, annual_salary: ((bpNum + mealNum) * 12).toLocaleString()});
-                }} placeholder="예: 200,000" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                }} placeholder="예: 200,000" className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">연봉총액 (자동계산)</label>
-              <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-medium">
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1">연봉총액 (자동계산)</label>
+              <div className="w-full px-3 py-2 bg-[#08090A] border border-[#23252A] rounded-lg text-sm text-[#D0D6E0] font-medium">
                 {contractForm.annual_salary ? `${contractForm.annual_salary}원` : '기본급+식대 입력 시 자동 계산'}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">급여일</label>
-                <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-500">매월 10일</div>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">급여일</label>
+                <div className="w-full px-3 py-2 bg-[#08090A] border border-[#23252A] rounded-lg text-sm text-[#8A8F98]">매월 10일</div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">근무시간</label>
+                <label className="block text-xs font-medium text-[#8A8F98] mb-1">근무시간</label>
                 <input type="text" value={contractForm.work_hours} onChange={e => setContractForm({...contractForm, work_hours: e.target.value})}
-                  placeholder="09:00~18:00" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                  placeholder="09:00~18:00" className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
               </div>
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setContractModal(null)} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm">취소</button>
+              <button onClick={() => setContractModal(null)} className="flex-1 py-2 border border-[#23252A] rounded-lg text-sm">취소</button>
               <button onClick={handleSendContract} disabled={sendingContractId !== null}
-                className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300">
+                className="flex-1 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium disabled:bg-[#28282C]">
                 {sendingContractId ? '발송 중...' : '계약서 발송'}
               </button>
             </div>
@@ -662,46 +662,46 @@ export default function RegularWorkersPage() {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-[#23252A]">
+              <h3 className="text-lg font-bold text-[#F7F8F8]">
                 {editingEmployee ? "직원 수정" : "직원 추가"}
               </h3>
             </div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    이름 <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
+                    이름 <span className="text-[#EB5757]">*</span>
                   </label>
                   <input
                     type="text"
                     value={form.name}
                     onChange={(e) => updateForm("name", e.target.value)}
                     placeholder="홍길동"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    전화번호 <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
+                    전화번호 <span className="text-[#EB5757]">*</span>
                   </label>
                   <input
                     type="text"
                     value={form.phone}
                     onChange={(e) => updateForm("phone", e.target.value)}
                     placeholder="010-0000-0000"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">부서</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">부서</label>
                   <select
                     value={form.department}
                     onChange={(e) => updateForm("department", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   >
                     {DEPARTMENTS.map((d) => (
                       <option key={d} value={d}>{d}</option>
@@ -709,11 +709,11 @@ export default function RegularWorkersPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">조</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">조</label>
                   <select
                     value={form.team}
                     onChange={(e) => updateForm("team", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   >
                     {TEAMS.map((t) => (
                       <option key={t} value={t}>{t}</option>
@@ -722,11 +722,11 @@ export default function RegularWorkersPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">직책</label>
+                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">직책</label>
                 <select
                   value={form.role}
                   onChange={(e) => updateForm("role", e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -735,23 +735,23 @@ export default function RegularWorkersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">은행</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">은행</label>
                   <input
                     type="text"
                     value={form.bank_name}
                     onChange={(e) => updateForm("bank_name", e.target.value)}
                     placeholder="국민은행"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">계좌번호</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">계좌번호</label>
                   <input
                     type="text"
                     value={form.bank_account}
                     onChange={(e) => updateForm("bank_account", e.target.value)}
                     placeholder="000-00-000000"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
               </div>
@@ -759,40 +759,40 @@ export default function RegularWorkersPage() {
 
             {/* Attendance History */}
             {editingEmployee && (
-              <div className="px-6 py-4 border-t border-gray-200">
+              <div className="px-6 py-4 border-t border-[#23252A]">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-800">출퇴근 이력 (확정)</h4>
+                  <h4 className="text-sm font-semibold text-[#F7F8F8]">출퇴근 이력 (확정)</h4>
                   <input type="month" value={historyMonth} onChange={e => {
                     setHistoryMonth(e.target.value);
                     if (editingEmployee) loadAttendanceHistory(editingEmployee.name, e.target.value);
-                  }} className="px-2 py-1 border border-gray-300 rounded-lg text-xs" />
+                  }} className="px-2 py-1 border border-[#23252A] rounded-lg text-xs" />
                 </div>
                 {historyLoading ? (
-                  <div className="py-4 text-center text-xs text-gray-400">로딩중...</div>
+                  <div className="py-4 text-center text-xs text-[#62666D]">로딩중...</div>
                 ) : attendanceHistory.length === 0 ? (
-                  <div className="py-4 text-center text-xs text-gray-400">해당 월 확정 이력이 없습니다.</div>
+                  <div className="py-4 text-center text-xs text-[#62666D]">해당 월 확정 이력이 없습니다.</div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                  <div className="max-h-48 overflow-y-auto border border-[#23252A] rounded-lg">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-[#08090A] sticky top-0">
                         <tr>
-                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">날짜</th>
-                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">출근</th>
-                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">퇴근</th>
-                          <th className="py-1.5 px-2 text-right font-medium text-gray-600">기본</th>
-                          <th className="py-1.5 px-2 text-right font-medium text-gray-600">연장</th>
-                          <th className="py-1.5 px-2 text-right font-medium text-gray-600">야간</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-[#8A8F98]">날짜</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-[#8A8F98]">출근</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-[#8A8F98]">퇴근</th>
+                          <th className="py-1.5 px-2 text-right font-medium text-[#8A8F98]">기본</th>
+                          <th className="py-1.5 px-2 text-right font-medium text-[#8A8F98]">연장</th>
+                          <th className="py-1.5 px-2 text-right font-medium text-[#8A8F98]">야간</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-[#23252A]">
                         {attendanceHistory.map((r: any) => (
-                          <tr key={r.id} className="hover:bg-gray-50">
-                            <td className="py-1.5 px-2 text-gray-700">{r.date?.slice(5)}</td>
-                            <td className="py-1.5 px-2 text-gray-700">{r.confirmed_clock_in || '-'}</td>
-                            <td className="py-1.5 px-2 text-gray-700">{r.confirmed_clock_out || '-'}</td>
-                            <td className="py-1.5 px-2 text-right text-blue-700">{parseFloat(r.regular_hours || 0).toFixed(1)}</td>
-                            <td className="py-1.5 px-2 text-right text-amber-700">{parseFloat(r.overtime_hours || 0).toFixed(1)}</td>
-                            <td className="py-1.5 px-2 text-right text-purple-700">{parseFloat(r.night_hours || 0).toFixed(1)}</td>
+                          <tr key={r.id} className="hover:bg-[#141516]/5">
+                            <td className="py-1.5 px-2 text-[#D0D6E0]">{r.date?.slice(5)}</td>
+                            <td className="py-1.5 px-2 text-[#D0D6E0]">{r.confirmed_clock_in || '-'}</td>
+                            <td className="py-1.5 px-2 text-[#D0D6E0]">{r.confirmed_clock_out || '-'}</td>
+                            <td className="py-1.5 px-2 text-right text-[#828FFF]">{parseFloat(r.regular_hours || 0).toFixed(1)}</td>
+                            <td className="py-1.5 px-2 text-right text-[#F0BF00]">{parseFloat(r.overtime_hours || 0).toFixed(1)}</td>
+                            <td className="py-1.5 px-2 text-right text-[#828FFF]">{parseFloat(r.night_hours || 0).toFixed(1)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -802,17 +802,17 @@ export default function RegularWorkersPage() {
               </div>
             )}
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-[#23252A] flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                className="px-4 py-2 rounded-lg border border-[#23252A] text-[#D0D6E0] hover:bg-[#141516]/5 text-sm font-medium"
               >
                 취소
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {editingEmployee ? "수정" : "추가"}

@@ -32,7 +32,7 @@ const PRESET_SHIFTS = [
 ];
 
 const TYPE_COLORS: Record<WorkerType, { bg: string; border: string; bar: string; barHex: string; text: string; light: string }> = {
-  "파견": { bg: "bg-orange-50", border: "border-orange-300", bar: "bg-orange-500", barHex: "#f97316", text: "text-orange-700", light: "bg-orange-100" },
+  "파견": { bg: "bg-[#FC7840]/10", border: "border-orange-300", bar: "bg-[#FC7840]", barHex: "#f97316", text: "text-[#FC7840]", light: "bg-[#FC7840]/15" },
   "알바(사업소득)": { bg: "bg-emerald-50", border: "border-emerald-300", bar: "bg-emerald-500", barHex: "#10b981", text: "text-emerald-700", light: "bg-emerald-100" },
 };
 
@@ -263,13 +263,13 @@ export default function WorkforcePlanPage() {
   // Mini 24h timeline bar for a day - split top/bottom for 파견/알바
   const MiniTimeline = ({ day }: { day: number }) => {
     const daySlots = slotsByDay[day] || [];
-    if (daySlots.length === 0) return <div className="h-4 bg-gray-100 rounded-sm" />;
+    if (daySlots.length === 0) return <div className="h-4 bg-[#141516] rounded-sm" />;
     const hasMultiTypes = new Set(daySlots.map(s => s.worker_type)).size > 1;
     return (
-      <div className="relative h-4 bg-gray-100 rounded-sm overflow-hidden">
+      <div className="relative h-4 bg-[#141516] rounded-sm overflow-hidden">
         {/* 6h grid markers */}
         {[6, 12, 18].map(h => (
-          <div key={h} className="absolute top-0 h-full w-px bg-gray-200" style={{ left: `${(h / 24) * 100}%` }} />
+          <div key={h} className="absolute top-0 h-full w-px bg-[#232326]" style={{ left: `${(h / 24) * 100}%` }} />
         ))}
         {daySlots.map(s => {
           const left = (s.start_hour / 24) * 100;
@@ -305,19 +305,19 @@ export default function WorkforcePlanPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">인력 조달 계획 수립</h2>
-            <p className="text-gray-500 mt-1 text-sm">일별 시간대 기반으로 인력 투입을 계획합니다.</p>
+            <h2 className="text-2xl font-bold text-[#F7F8F8]">인력 조달 계획 수립</h2>
+            <p className="text-[#8A8F98] mt-1 text-sm">일별 시간대 기반으로 인력 투입을 계획합니다.</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-3 py-2">
-              <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft size={18} /></button>
-              <span className="text-base font-semibold text-gray-900 min-w-[110px] text-center">{year}년 {month}월</span>
-              <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded"><ChevronRight size={18} /></button>
+            <div className="flex items-center gap-2 bg-[#0F1011] rounded-xl border border-[#23252A] px-3 py-2">
+              <button onClick={prevMonth} className="p-1 hover:bg-[#141516]/5 rounded"><ChevronLeft size={18} /></button>
+              <span className="text-base font-semibold text-[#F7F8F8] min-w-[110px] text-center">{year}년 {month}월</span>
+              <button onClick={nextMonth} className="p-1 hover:bg-[#141516]/5 rounded"><ChevronRight size={18} /></button>
             </div>
             <button
               onClick={() => { setShowComparison(!showComparison); if (!showComparison) loadComparison(); }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showComparison ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                showComparison ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#D0D6E0] hover:bg-[#141516]/7'
               }`}
             >
               계획 vs 실적
@@ -326,9 +326,9 @@ export default function WorkforcePlanPage() {
               onClick={handleSave}
               disabled={saving || !hasChanges}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                hasChanges ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : saved ? "bg-green-100 text-green-700 border border-green-200"
-                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                hasChanges ? "bg-[#5E6AD2] text-white hover:bg-[#828FFF]"
+                  : saved ? "bg-[#27A644]/15 text-[#27A644] border border-[#27A644]/30"
+                    : "bg-[#141516] text-[#62666D] cursor-not-allowed"
               }`}
             >
               <Save size={16} />
@@ -338,60 +338,60 @@ export default function WorkforcePlanPage() {
         </div>
 
         {/* Notice */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex items-start gap-3">
-          <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
-          <div className="text-xs text-blue-700">
+        <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-xl p-3 mb-4 flex items-start gap-3">
+          <Info size={16} className="text-[#7070FF] shrink-0 mt-0.5" />
+          <div className="text-xs text-[#828FFF]">
             <strong>계획 수립용</strong>이며, 실제 운영 결과는 <strong>대시보드</strong>를 참고하세요.
             날짜를 클릭하면 00~24시 시간대별로 인력을 배치할 수 있습니다.
           </div>
         </div>
 
         {!apiReady && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-start gap-3">
-            <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-700">
+          <div className="bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-xl p-3 mb-4 flex items-start gap-3">
+            <Info size={16} className="text-[#F0BF00] shrink-0 mt-0.5" />
+            <div className="text-xs text-[#F0BF00]">
               <strong>서버 배포 대기 중</strong> - PR을 머지하면 새 기능이 활성화됩니다.
               지금은 로컬에서 계획을 작성하고, 배포 후 저장할 수 있습니다.
             </div>
           </div>
         )}
-        {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm mb-4">{error}</div>}
+        {error && <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-3 text-[#EB5757] text-sm mb-4">{error}</div>}
 
         {/* Comparison Table */}
         {showComparison && comparison && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h2 className="text-base font-semibold text-gray-900">계획 vs 실적 비교</h2>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden mb-4">
+            <div className="px-5 py-4 border-b border-[#23252A]">
+              <h2 className="text-base font-semibold text-[#F7F8F8]">계획 vs 실적 비교</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="py-2.5 px-3 text-left font-medium text-gray-600">일</th>
-                    <th className="py-2.5 px-3 text-right font-medium text-blue-600">계획(h)</th>
-                    <th className="py-2.5 px-3 text-right font-medium text-green-600">실적(h)</th>
-                    <th className="py-2.5 px-3 text-right font-medium text-gray-600">인원</th>
-                    <th className="py-2.5 px-3 text-left font-medium text-gray-600">달성률</th>
+                  <tr className="bg-[#08090A]">
+                    <th className="py-2.5 px-3 text-left font-medium text-[#8A8F98]">일</th>
+                    <th className="py-2.5 px-3 text-right font-medium text-[#7070FF]">계획(h)</th>
+                    <th className="py-2.5 px-3 text-right font-medium text-[#27A644]">실적(h)</th>
+                    <th className="py-2.5 px-3 text-right font-medium text-[#8A8F98]">인원</th>
+                    <th className="py-2.5 px-3 text-left font-medium text-[#8A8F98]">달성률</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[#23252A]">
                   {comparison.days.filter((d: any) => d.planned_hours > 0 || d.actual_hours > 0).map((d: any) => {
                     const rate = d.planned_hours > 0 ? Math.round((d.actual_hours / d.planned_hours) * 100) : 0;
                     return (
-                      <tr key={d.day} className="hover:bg-gray-50/50">
+                      <tr key={d.day} className="hover:bg-[#141516]/5/50">
                         <td className="py-2 px-3 font-medium">{d.day}일</td>
-                        <td className="py-2 px-3 text-right text-blue-700">{d.planned_hours}</td>
-                        <td className="py-2 px-3 text-right text-green-700">{d.actual_hours}</td>
+                        <td className="py-2 px-3 text-right text-[#828FFF]">{d.planned_hours}</td>
+                        <td className="py-2 px-3 text-right text-[#27A644]">{d.actual_hours}</td>
                         <td className="py-2 px-3 text-right">{d.worker_count}명</td>
                         <td className="py-2 px-3">
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="flex-1 h-2 bg-[#141516] rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full ${rate >= 100 ? 'bg-green-500' : rate >= 70 ? 'bg-amber-500' : 'bg-red-400'}`}
+                                className={`h-full rounded-full ${rate >= 100 ? 'bg-[#27A644]' : rate >= 70 ? 'bg-[#F0BF00]/100' : 'bg-red-400'}`}
                                 style={{ width: `${Math.min(rate, 100)}%` }}
                               />
                             </div>
-                            <span className={`text-xs font-medium ${rate >= 100 ? 'text-green-600' : rate >= 70 ? 'text-amber-600' : 'text-red-500'}`}>
+                            <span className={`text-xs font-medium ${rate >= 100 ? 'text-[#27A644]' : rate >= 70 ? 'text-[#F0BF00]' : 'text-[#EB5757]'}`}>
                               {rate}%
                             </span>
                           </div>
@@ -407,26 +407,26 @@ export default function WorkforcePlanPage() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1"><Clock size={12} /> 월간 총 시수</div>
-            <div className="text-xl font-bold text-gray-900">{formatHours(monthlyTotals.total)}<span className="text-xs font-normal text-gray-400 ml-0.5">h</span></div>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3">
+            <div className="flex items-center gap-1.5 text-xs text-[#8A8F98] mb-1"><Clock size={12} /> 월간 총 시수</div>
+            <div className="text-xl font-bold text-[#F7F8F8]">{formatHours(monthlyTotals.total)}<span className="text-xs font-normal text-[#62666D] ml-0.5">h</span></div>
           </div>
-          <div className="bg-orange-50 rounded-xl border border-orange-200 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-orange-600 mb-1"><UserCheck size={12} /> 파견 시수</div>
-            <div className="text-xl font-bold text-orange-700">{formatHours(monthlyTotals.byType["파견"] || 0)}<span className="text-xs font-normal text-orange-400 ml-0.5">h</span></div>
+          <div className="bg-[#FC7840]/10 rounded-xl border border-[#FC7840]/30 p-3">
+            <div className="flex items-center gap-1.5 text-xs text-[#FC7840] mb-1"><UserCheck size={12} /> 파견 시수</div>
+            <div className="text-xl font-bold text-[#FC7840]">{formatHours(monthlyTotals.byType["파견"] || 0)}<span className="text-xs font-normal text-orange-400 ml-0.5">h</span></div>
           </div>
           <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-3">
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 mb-1"><UserCheck size={12} /> 알바 시수</div>
             <div className="text-xl font-bold text-emerald-700">{formatHours(monthlyTotals.byType["알바(사업소득)"] || 0)}<span className="text-xs font-normal text-emerald-400 ml-0.5">h</span></div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className="text-xs text-gray-500 mb-1">투입 일수</div>
-            <div className="text-xl font-bold text-gray-900">{activeDays}<span className="text-xs font-normal text-gray-400 ml-0.5">/ {daysInMonth}일</span></div>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3">
+            <div className="text-xs text-[#8A8F98] mb-1">투입 일수</div>
+            <div className="text-xl font-bold text-[#F7F8F8]">{activeDays}<span className="text-xs font-normal text-[#62666D] ml-0.5">/ {daysInMonth}일</span></div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className="text-xs text-gray-500 mb-1">일평균 시수</div>
-            <div className="text-xl font-bold text-gray-900">
-              {activeDays > 0 ? formatHours(monthlyTotals.total / activeDays) : "0"}<span className="text-xs font-normal text-gray-400 ml-0.5">h</span>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3">
+            <div className="text-xs text-[#8A8F98] mb-1">일평균 시수</div>
+            <div className="text-xl font-bold text-[#F7F8F8]">
+              {activeDays > 0 ? formatHours(monthlyTotals.total / activeDays) : "0"}<span className="text-xs font-normal text-[#62666D] ml-0.5">h</span>
             </div>
           </div>
         </div>
@@ -434,30 +434,30 @@ export default function WorkforcePlanPage() {
         {/* Weekly Calendar with Timeline */}
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin" />
           </div>
         ) : (
           <div className="space-y-3">
             {weeks.map((week, wi) => {
               const collapsed = collapsedWeeks.has(wi);
               return (
-                <div key={wi} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div key={wi} className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
                   <div
-                    className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-4 py-2.5 bg-[#08090A] border-b border-[#23252A] flex items-center justify-between cursor-pointer hover:bg-[#141516]/5 transition-colors"
                     onClick={() => toggleWeek(wi)}
                   >
                     <div className="flex items-center gap-2">
                       {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                      <h3 className="font-semibold text-gray-900 text-sm">{week.week}주차</h3>
+                      <h3 className="font-semibold text-[#F7F8F8] text-sm">{week.week}주차</h3>
                     </div>
                     <div className="flex items-center gap-3 text-xs">
-                      <span className="text-orange-600 font-medium">파견: {formatHours(weeklyTotals[wi]?.byType["파견"] || 0)}h</span>
+                      <span className="text-[#FC7840] font-medium">파견: {formatHours(weeklyTotals[wi]?.byType["파견"] || 0)}h</span>
                       <span className="text-emerald-600 font-medium">알바: {formatHours(weeklyTotals[wi]?.byType["알바(사업소득)"] || 0)}h</span>
-                      <span className="text-gray-700 font-semibold">합계: {formatHours(weeklyTotals[wi]?.total || 0)}h</span>
+                      <span className="text-[#D0D6E0] font-semibold">합계: {formatHours(weeklyTotals[wi]?.total || 0)}h</span>
                     </div>
                   </div>
                   {!collapsed && (
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-[#23252A]">
                       {week.days.map(day => {
                         const dow = getDayOfWeek(year, month, day);
                         const dayName = DAY_NAMES[dow];
@@ -468,17 +468,17 @@ export default function WorkforcePlanPage() {
                           <div
                             key={day}
                             className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
-                              isSelected ? "bg-blue-50 border-l-4 border-l-blue-500" : weekend ? "bg-orange-50/30 hover:bg-orange-50/60" : "hover:bg-gray-50"
+                              isSelected ? "bg-[#4EA7FC]/10 border-l-4 border-l-blue-500" : weekend ? "bg-[#FC7840]/10/30 hover:bg-[#FC7840]/10/60" : "hover:bg-[#141516]/5"
                             }`}
                             onClick={() => setSelectedDay(isSelected ? null : day)}
                           >
                             {/* Date label */}
                             <div className="flex items-center gap-1.5 w-16 shrink-0">
                               <span className={`text-sm font-semibold tabular-nums ${
-                                dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-gray-800"
+                                dow === 0 ? "text-[#EB5757]" : dow === 6 ? "text-blue-500" : "text-[#F7F8F8]"
                               }`}>{day}일</span>
                               <span className={`text-xs ${
-                                dow === 0 ? "text-red-400" : dow === 6 ? "text-blue-400" : "text-gray-400"
+                                dow === 0 ? "text-red-400" : dow === 6 ? "text-blue-400" : "text-[#62666D]"
                               }`}>{dayName}</span>
                             </div>
                             {/* Mini 24h timeline */}
@@ -490,7 +490,7 @@ export default function WorkforcePlanPage() {
                               {ds && ds.totalHours > 0 ? (
                                 <>
                                   {ds.byType["파견"] && (
-                                    <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
+                                    <span className="text-[10px] bg-[#FC7840]/15 text-[#FC7840] px-1.5 py-0.5 rounded font-medium">
                                       파견 {ds.byType["파견"].people}명 {formatHours(ds.byType["파견"].hours)}h
                                     </span>
                                   )}
@@ -499,10 +499,10 @@ export default function WorkforcePlanPage() {
                                       알바 {ds.byType["알바(사업소득)"].people}명 {formatHours(ds.byType["알바(사업소득)"].hours)}h
                                     </span>
                                   )}
-                                  <span className="text-xs font-bold text-gray-700 tabular-nums">{formatHours(ds.totalHours)}h</span>
+                                  <span className="text-xs font-bold text-[#D0D6E0] tabular-nums">{formatHours(ds.totalHours)}h</span>
                                 </>
                               ) : (
-                                <span className="text-xs text-gray-300">-</span>
+                                <span className="text-xs text-[#62666D]">-</span>
                               )}
                             </div>
                           </div>
@@ -541,36 +541,36 @@ export default function WorkforcePlanPage() {
       {/* Day Detail Side Panel */}
       {selectedDay && (
         <div className="w-[360px] shrink-0 sticky top-4 self-start">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_7px_32px_rgba(0,0,0,0.35)] overflow-hidden">
             {/* Panel header */}
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <div className="px-4 py-3 bg-[#08090A] border-b border-[#23252A] flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-gray-900">
+                <h3 className="font-bold text-[#F7F8F8]">
                   {month}월 {selectedDay}일
                   <span className={`ml-1.5 text-sm font-medium ${
-                    selectedDayDow === 0 ? "text-red-500" : selectedDayDow === 6 ? "text-blue-500" : "text-gray-500"
+                    selectedDayDow === 0 ? "text-[#EB5757]" : selectedDayDow === 6 ? "text-blue-500" : "text-[#8A8F98]"
                   }`}>({DAY_NAMES[selectedDayDow]})</span>
                 </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-[#8A8F98] mt-0.5">
                   총 {formatHours(dayStats[selectedDay]?.totalHours || 0)}h / {dayStats[selectedDay]?.totalPeople || 0}명
                 </p>
               </div>
-              <button onClick={() => { setSelectedDay(null); setAddForm(null); setEditingSlotId(null); }} className="p-1 hover:bg-gray-200 rounded">
+              <button onClick={() => { setSelectedDay(null); setAddForm(null); setEditingSlotId(null); }} className="p-1 hover:bg-[#141516]/7 rounded">
                 <X size={16} />
               </button>
             </div>
 
             {/* 24h Visual Timeline */}
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-4 py-3 border-b border-[#23252A]">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-gray-500 font-medium">24시간 타임라인</div>
+                <div className="text-xs text-[#8A8F98] font-medium">24시간 타임라인</div>
                 <div className="flex items-center gap-2">
                   {WORKER_TYPES.map(type => {
                     const colors = TYPE_COLORS[type];
                     return (
                       <div key={type} className="flex items-center gap-1">
                         <div className={`w-2.5 h-2.5 rounded-sm ${colors.bar}`} />
-                        <span className="text-[9px] text-gray-500">{type === "알바(사업소득)" ? "알바" : type}</span>
+                        <span className="text-[9px] text-[#8A8F98]">{type === "알바(사업소득)" ? "알바" : type}</span>
                       </div>
                     );
                   })}
@@ -578,15 +578,15 @@ export default function WorkforcePlanPage() {
               </div>
               <div className="relative">
                 {/* Hour markers */}
-                <div className="flex h-5 border-b border-gray-200">
+                <div className="flex h-5 border-b border-[#23252A]">
                   {Array.from({ length: 24 }, (_, i) => (
                     <div key={i} className={`flex-1 border-l text-center ${
-                      i % 6 === 0 ? "border-gray-300" : "border-gray-100"
+                      i % 6 === 0 ? "border-[#23252A]" : "border-[#23252A]"
                     }`}>
-                      {i % 3 === 0 && <span className="text-[9px] text-gray-400 tabular-nums">{String(i).padStart(2, "0")}</span>}
+                      {i % 3 === 0 && <span className="text-[9px] text-[#62666D] tabular-nums">{String(i).padStart(2, "0")}</span>}
                     </div>
                   ))}
-                  <div className="border-l border-gray-300 w-0" />
+                  <div className="border-l border-[#23252A] w-0" />
                 </div>
                 {/* Timeline bars - one row per type */}
                 {WORKER_TYPES.map(type => {
@@ -594,22 +594,22 @@ export default function WorkforcePlanPage() {
                   const colors = TYPE_COLORS[type];
                   return (
                     <div key={type} className="relative h-8 mt-px">
-                      <div className="absolute inset-0 bg-gray-50/50 rounded-sm" />
+                      <div className="absolute inset-0 bg-[#08090A]/50 rounded-sm" />
                       {/* Hour grid lines */}
                       <div className="absolute inset-0 flex">
                         {Array.from({ length: 24 }, (_, i) => (
-                          <div key={i} className={`flex-1 border-l ${i % 6 === 0 ? "border-gray-200" : "border-gray-100/50"}`} />
+                          <div key={i} className={`flex-1 border-l ${i % 6 === 0 ? "border-[#23252A]" : "border-[#23252A]/50"}`} />
                         ))}
                       </div>
                       {/* Type label on left */}
                       <div className="absolute -left-0 top-0 h-full flex items-center z-10">
-                        <span className={`text-[8px] font-semibold ${colors.text} bg-white/80 px-0.5 rounded`}>
+                        <span className={`text-[8px] font-semibold ${colors.text} bg-[#0F1011]/80 px-0.5 rounded`}>
                           {type === "알바(사업소득)" ? "알바" : type}
                         </span>
                       </div>
                       {typeSlots.length === 0 ? (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-[9px] text-gray-300">-</span>
+                          <span className="text-[9px] text-[#62666D]">-</span>
                         </div>
                       ) : (
                         typeSlots.map((s, si) => {
@@ -633,7 +633,7 @@ export default function WorkforcePlanPage() {
                               title={`${formatTimeRange(s.start_hour, s.duration)} ${s.headcount}명 (${formatHours(s.duration * s.headcount)}h)`}
                             >
                               <div className="flex items-center justify-center h-full gap-0.5 px-1">
-                                <span className="text-white text-[9px] font-bold truncate drop-shadow-sm">
+                                <span className="text-white text-[9px] font-bold truncate drop-shadow-[0px_1px_3px_rgba(0,0,0,0.2)]">
                                   {s.headcount}명
                                 </span>
                                 {width > 12 && (
@@ -650,23 +650,23 @@ export default function WorkforcePlanPage() {
                   );
                 })}
                 {selectedDaySlots.length === 0 && (
-                  <div className="h-10 flex items-center justify-center text-xs text-gray-400">시간 블록을 추가하세요</div>
+                  <div className="h-10 flex items-center justify-center text-xs text-[#62666D]">시간 블록을 추가하세요</div>
                 )}
               </div>
             </div>
 
             {/* Slot list */}
             <div className="px-4 py-2 max-h-[300px] overflow-y-auto">
-              <div className="text-xs text-gray-500 font-medium mb-2">배치 목록</div>
+              <div className="text-xs text-[#8A8F98] font-medium mb-2">배치 목록</div>
               {selectedDaySlots.length === 0 ? (
-                <div className="text-center py-4 text-xs text-gray-400">아직 배치된 인력이 없습니다</div>
+                <div className="text-center py-4 text-xs text-[#62666D]">아직 배치된 인력이 없습니다</div>
               ) : (
                 <div className="space-y-1.5">
                   {selectedDaySlots.map(s => {
                     const colors = TYPE_COLORS[s.worker_type as WorkerType];
                     const isEditing = editingSlotId === s._localId;
                     return (
-                      <div key={s._localId} className={`rounded-lg border p-2 ${isEditing ? "border-blue-300 bg-blue-50" : `${colors.border} ${colors.bg}`}`}>
+                      <div key={s._localId} className={`rounded-lg border p-2 ${isEditing ? "border-blue-300 bg-[#4EA7FC]/10" : `${colors.border} ${colors.bg}`}`}>
                         {isEditing ? (
                           <div className="space-y-2">
                             <div className="flex gap-2">
@@ -681,21 +681,21 @@ export default function WorkforcePlanPage() {
                                 onChange={e => updateSlot(s._localId, { start_hour: parseInt(e.target.value) || 0 })}
                                 className="w-14 text-xs border rounded px-1.5 py-1 text-center" placeholder="시작"
                               />
-                              <span className="text-xs text-gray-400 self-center">~</span>
+                              <span className="text-xs text-[#62666D] self-center">~</span>
                               <input type="number" min={1} max={24} value={s.duration}
                                 onChange={e => updateSlot(s._localId, { duration: parseFloat(e.target.value) || 1 })}
                                 className="w-14 text-xs border rounded px-1.5 py-1 text-center" placeholder="시간"
                               />
-                              <span className="text-[10px] text-gray-400 self-center">h</span>
+                              <span className="text-[10px] text-[#62666D] self-center">h</span>
                             </div>
                             <div className="flex gap-2 items-center">
-                              <span className="text-xs text-gray-500">인원:</span>
+                              <span className="text-xs text-[#8A8F98]">인원:</span>
                               <input type="number" min={1} max={99} value={s.headcount}
                                 onChange={e => updateSlot(s._localId, { headcount: parseInt(e.target.value) || 1 })}
                                 className="w-14 text-xs border rounded px-1.5 py-1 text-center"
                               />
-                              <span className="text-[10px] text-gray-400">명</span>
-                              <span className="text-[10px] text-gray-500 ml-auto">= {formatHours(s.duration * s.headcount)}h</span>
+                              <span className="text-[10px] text-[#62666D]">명</span>
+                              <span className="text-[10px] text-[#8A8F98] ml-auto">= {formatHours(s.duration * s.headcount)}h</span>
                             </div>
                           </div>
                         ) : (
@@ -704,15 +704,15 @@ export default function WorkforcePlanPage() {
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${colors.light} ${colors.text}`}>
                                 {s.worker_type === "알바(사업소득)" ? "알바" : s.worker_type}
                               </span>
-                              <span className="text-xs font-mono text-gray-700">{formatTimeRange(s.start_hour, s.duration)}</span>
-                              <span className="text-xs font-medium text-gray-800">{s.headcount}명</span>
+                              <span className="text-xs font-mono text-[#D0D6E0]">{formatTimeRange(s.start_hour, s.duration)}</span>
+                              <span className="text-xs font-medium text-[#F7F8F8]">{s.headcount}명</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-gray-500 mr-1">{formatHours(s.duration * s.headcount)}h</span>
-                              <button onClick={(e) => { e.stopPropagation(); setEditingSlotId(s._localId); }} className="p-0.5 hover:bg-gray-200 rounded">
-                                <Edit3 size={12} className="text-gray-400" />
+                              <span className="text-[10px] text-[#8A8F98] mr-1">{formatHours(s.duration * s.headcount)}h</span>
+                              <button onClick={(e) => { e.stopPropagation(); setEditingSlotId(s._localId); }} className="p-0.5 hover:bg-[#141516]/7 rounded">
+                                <Edit3 size={12} className="text-[#62666D]" />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); removeSlot(s._localId); }} className="p-0.5 hover:bg-red-100 rounded">
+                              <button onClick={(e) => { e.stopPropagation(); removeSlot(s._localId); }} className="p-0.5 hover:bg-[#EB5757]/15 rounded">
                                 <Trash2 size={12} className="text-red-400" />
                               </button>
                             </div>
@@ -726,10 +726,10 @@ export default function WorkforcePlanPage() {
             </div>
 
             {/* Add new slot */}
-            <div className="px-4 py-3 border-t border-gray-200">
+            <div className="px-4 py-3 border-t border-[#23252A]">
               {addForm ? (
                 <div className="space-y-3">
-                  <div className="text-xs font-medium text-gray-700">시간 블록 추가</div>
+                  <div className="text-xs font-medium text-[#D0D6E0]">시간 블록 추가</div>
                   {/* Presets */}
                   <div className="flex flex-wrap gap-1.5">
                     {PRESET_SHIFTS.map(p => (
@@ -738,18 +738,18 @@ export default function WorkforcePlanPage() {
                         onClick={() => setAddForm(f => f ? { ...f, start_hour: p.start, duration: p.dur } : f)}
                         className={`px-2 py-1 text-[10px] rounded-md border transition-colors ${
                           addForm.start_hour === p.start && addForm.duration === p.dur
-                            ? "bg-blue-100 border-blue-300 text-blue-700 font-medium"
-                            : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                            ? "bg-[#4EA7FC]/15 border-blue-300 text-[#828FFF] font-medium"
+                            : "bg-[#08090A] border-[#23252A] text-[#8A8F98] hover:bg-[#141516]/5"
                         }`}
                       >
-                        {p.label} <span className="text-gray-400">{p.desc}</span>
+                        {p.label} <span className="text-[#62666D]">{p.desc}</span>
                       </button>
                     ))}
                   </div>
                   {/* Custom inputs */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-gray-500">유형</label>
+                      <label className="text-[10px] text-[#8A8F98]">유형</label>
                       <select
                         value={addForm.worker_type}
                         onChange={e => setAddForm(f => f ? { ...f, worker_type: e.target.value as WorkerType } : f)}
@@ -759,13 +759,13 @@ export default function WorkforcePlanPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500">인원</label>
+                      <label className="text-[10px] text-[#8A8F98]">인원</label>
                       <input type="number" min={1} max={99} value={addForm.headcount}
                         onChange={e => setAddForm(f => f ? { ...f, headcount: parseInt(e.target.value) || 1 } : f)}
                         className="w-full text-xs border rounded-md px-2 py-1.5 mt-0.5 text-center" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500">시작 시간</label>
+                      <label className="text-[10px] text-[#8A8F98]">시작 시간</label>
                       <select
                         value={addForm.start_hour}
                         onChange={e => setAddForm(f => f ? { ...f, start_hour: parseInt(e.target.value) } : f)}
@@ -777,7 +777,7 @@ export default function WorkforcePlanPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500">근무 시간</label>
+                      <label className="text-[10px] text-[#8A8F98]">근무 시간</label>
                       <select
                         value={addForm.duration}
                         onChange={e => setAddForm(f => f ? { ...f, duration: parseFloat(e.target.value) } : f)}
@@ -789,7 +789,7 @@ export default function WorkforcePlanPage() {
                       </select>
                     </div>
                   </div>
-                  <div className="text-[10px] text-gray-500 bg-gray-50 rounded p-2">
+                  <div className="text-[10px] text-[#8A8F98] bg-[#08090A] rounded p-2">
                     {formatTimeRange(addForm.start_hour, addForm.duration)} | {addForm.headcount}명 x {addForm.duration}h = <strong>{formatHours(addForm.duration * addForm.headcount)}h</strong>
                   </div>
                   <div className="flex gap-2">
@@ -804,13 +804,13 @@ export default function WorkforcePlanPage() {
                         });
                         // Keep form open for quick adding
                       }}
-                      className="flex-1 bg-blue-600 text-white text-xs font-medium py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      className="flex-1 bg-[#5E6AD2] text-white text-xs font-medium py-2 rounded-lg hover:bg-[#828FFF] transition-colors"
                     >
                       추가
                     </button>
                     <button
                       onClick={() => setAddForm(null)}
-                      className="px-3 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="px-3 text-xs text-[#8A8F98] border border-[#23252A] rounded-lg hover:bg-[#141516]/5"
                     >
                       닫기
                     </button>
@@ -819,7 +819,7 @@ export default function WorkforcePlanPage() {
               ) : (
                 <button
                   onClick={() => setAddForm({ worker_type: "파견", start_hour: 8, duration: 9, headcount: 1, memo: "" })}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 border-2 border-dashed border-[#23252A] rounded-lg text-xs text-[#8A8F98] hover:border-blue-400 hover:text-[#7070FF] transition-colors"
                 >
                   <Plus size={14} />
                   시간 블록 추가
@@ -836,7 +836,7 @@ export default function WorkforcePlanPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg hover:bg-blue-700 transition-all hover:shadow-xl"
+            className="flex items-center gap-2 bg-[#5E6AD2] text-white px-6 py-3 rounded-xl text-sm font-medium shadow-[0px_7px_32px_rgba(0,0,0,0.35)] hover:bg-[#828FFF] transition-all hover:shadow-[0px_7px_32px_rgba(0,0,0,0.35)]"
           >
             {saving ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

@@ -80,24 +80,24 @@ export default function ManagePage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">데이터 관리</h2>
-      <p className="text-gray-500 mb-4">업로드된 파일과 기록을 관리합니다.</p>
+      <h2 className="text-2xl font-bold text-[#F7F8F8] mb-2">데이터 관리</h2>
+      <p className="text-[#8A8F98] mb-4">업로드된 파일과 기록을 관리합니다.</p>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+      <div className="bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-xl p-4 mb-6 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-amber-900">확정 데이터 근무시간 재계산</h3>
-          <p className="text-xs text-amber-700 mt-1">출근 30분 올림 / 퇴근 30분 내림 기준을 모든 기존 확정 데이터에 일괄 적용합니다.</p>
+          <p className="text-xs text-[#F0BF00] mt-1">출근 30분 올림 / 퇴근 30분 내림 기준을 모든 기존 확정 데이터에 일괄 적용합니다.</p>
         </div>
         <button onClick={handleRecalc} disabled={recalcing}
-          className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-gray-300 whitespace-nowrap">
+          className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-[#28282C] whitespace-nowrap">
           {recalcing ? "처리중..." : "재계산 실행"}
         </button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+      <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-xl p-4 mb-6 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-blue-900">근무자 DB 구분(파견/알바) 일괄 채우기</h3>
-          <p className="text-xs text-blue-700 mt-1">구분이 비어있는 근무자에 대해 출퇴근 기록에서 파견/알바 유형을 찾아 자동 채웁니다.</p>
+          <p className="text-xs text-[#828FFF] mt-1">구분이 비어있는 근무자에 대해 출퇴근 기록에서 파견/알바 유형을 찾아 자동 채웁니다.</p>
         </div>
         <button onClick={async () => {
           try {
@@ -112,17 +112,17 @@ export default function ManagePage() {
             alert(msg);
           } catch (e: any) { alert(e.message); }
         }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">
+          className="px-4 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] whitespace-nowrap">
           구분 채우기
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-32">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin" />
         </div>
       ) : uploads.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center text-[#62666D]">
           업로드된 데이터가 없습니다.
         </div>
       ) : (
@@ -132,13 +132,13 @@ export default function ManagePage() {
             const analysis = parseAnalysis(upload.ai_analysis);
 
             return (
-              <div key={upload.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={upload.id} className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
                 <div className="px-5 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <FileSpreadsheet size={20} className="text-green-600" />
+                    <FileSpreadsheet size={20} className="text-[#27A644]" />
                     <div>
-                      <p className="font-medium text-gray-900">{upload.original_filename}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-[#F7F8F8]">{upload.original_filename}</p>
+                      <p className="text-sm text-[#8A8F98]">
                         {upload.record_count}건 | {new Date(upload.uploaded_at).toLocaleString("ko-KR")}
                       </p>
                     </div>
@@ -146,14 +146,14 @@ export default function ManagePage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : upload.id)}
-                      className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+                      className="p-2 rounded-lg hover:bg-[#141516]/5 text-[#8A8F98]"
                     >
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     <button
                       onClick={() => handleDelete(upload.id)}
                       disabled={deleting === upload.id}
-                      className="p-2 rounded-lg hover:bg-red-50 text-red-500 disabled:opacity-50"
+                      className="p-2 rounded-lg hover:bg-[#EB5757]/10 text-[#EB5757] disabled:opacity-50"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -161,33 +161,33 @@ export default function ManagePage() {
                 </div>
 
                 {isExpanded && analysis && (
-                  <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-3">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-blue-800 whitespace-pre-wrap">{analysis.summary}</p>
+                  <div className="px-5 pb-5 border-t border-[#23252A] pt-4 space-y-3">
+                    <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-lg p-3">
+                      <p className="text-sm text-[#828FFF] whitespace-pre-wrap">{analysis.summary}</p>
                     </div>
 
                     {analysis.duplicates.length > 0 && (
                       <div>
-                        <p className="text-sm font-medium text-gray-900 mb-1 flex items-center gap-1">
-                          <AlertTriangle size={14} className="text-red-500" />
+                        <p className="text-sm font-medium text-[#F7F8F8] mb-1 flex items-center gap-1">
+                          <AlertTriangle size={14} className="text-[#EB5757]" />
                           중복 {analysis.duplicates.length}건
                         </p>
                         {analysis.duplicates.map((d, i) => (
-                          <p key={i} className="text-sm text-red-600 ml-5">{d.details}</p>
+                          <p key={i} className="text-sm text-[#EB5757] ml-5">{d.details}</p>
                         ))}
                       </div>
                     )}
 
                     {analysis.warnings.length > 0 && (
                       <div>
-                        <p className="text-sm font-medium text-gray-900 mb-1">
+                        <p className="text-sm font-medium text-[#F7F8F8] mb-1">
                           주의사항 {analysis.warnings.length}건
                         </p>
                         {analysis.warnings.slice(0, 10).map((w, i) => (
-                          <p key={i} className="text-sm text-yellow-700 ml-5">{w.message}</p>
+                          <p key={i} className="text-sm text-[#F0BF00] ml-5">{w.message}</p>
                         ))}
                         {analysis.warnings.length > 10 && (
-                          <p className="text-sm text-gray-400 ml-5">...외 {analysis.warnings.length - 10}건</p>
+                          <p className="text-sm text-[#62666D] ml-5">...외 {analysis.warnings.length - 10}건</p>
                         )}
                       </div>
                     )}

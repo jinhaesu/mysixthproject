@@ -230,14 +230,14 @@ export default function WorkersPage() {
     <div>
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Contact size={28} className="text-blue-600" />
+          <h2 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+            <Contact size={28} className="text-[#7070FF]" />
             근무자 DB
           </h2>
-          <p className="text-gray-500 mt-1">
+          <p className="text-[#8A8F98] mt-1">
             근무자 프로필을 관리합니다.
             {pagination.total > 0 && (
-              <span className="ml-2 text-blue-600 font-medium">
+              <span className="ml-2 text-[#7070FF] font-medium">
                 총 {pagination.total}명
               </span>
             )}
@@ -247,7 +247,7 @@ export default function WorkersPage() {
           <button
             onClick={handleImport}
             disabled={importing}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#23252A] bg-[#0F1011] text-[#D0D6E0] hover:bg-[#141516]/5 text-sm font-medium disabled:opacity-50"
           >
             {importing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -258,7 +258,7 @@ export default function WorkersPage() {
           </button>
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-sm font-medium"
           >
             <Plus size={16} />
             근무자 추가
@@ -267,7 +267,7 @@ export default function WorkersPage() {
       </div>
 
       {importResult && (
-        <div className="mb-4 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
+        <div className="mb-4 px-4 py-3 rounded-lg bg-[#27A644]/10 border border-[#27A644]/30 text-[#27A644] text-sm">
           {importResult}
         </div>
       )}
@@ -280,14 +280,14 @@ export default function WorkersPage() {
         <div className="relative flex-1 max-w-md">
           <Search
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]"
           />
           <input
             type="text"
             placeholder="이름 또는 전화번호 검색..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full pl-9 pr-4 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
           />
         </div>
         <select
@@ -296,7 +296,7 @@ export default function WorkersPage() {
             setCategory(e.target.value);
             setPage(1);
           }}
-          className="px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          className="px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
         >
           <option value="">전체 구분</option>
           <option value="파견">파견</option>
@@ -307,7 +307,7 @@ export default function WorkersPage() {
         </select>
         <button
           type="submit"
-          className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium"
+          className="px-4 py-2 rounded-lg bg-[#141516] text-[#D0D6E0] hover:bg-[#141516]/7 text-sm font-medium"
         >
           검색
         </button>
@@ -316,49 +316,49 @@ export default function WorkersPage() {
       {/* Table */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
-          <Loader2 size={32} className="animate-spin text-blue-600" />
+          <Loader2 size={32} className="animate-spin text-[#7070FF]" />
         </div>
       ) : workers.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center text-[#62666D]">
           등록된 근무자가 없습니다.
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                <tr className="bg-[#08090A] border-b border-[#23252A]">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     이름
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     전화번호
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     구분
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     부서
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     은행
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     계좌
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     주민번호
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     마지막 출근
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     비상연락처
                   </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
+                  <th className="px-4 py-3 text-left font-medium text-[#8A8F98]">
                     근로계약
                   </th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600">
+                  <th className="px-4 py-3 text-right font-medium text-[#8A8F98]">
                     관리
                   </th>
                 </tr>
@@ -367,62 +367,62 @@ export default function WorkersPage() {
                 {workers.map((worker) => (
                   <tr
                     key={worker.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                    className="border-b border-[#23252A] hover:bg-[#141516]/5 cursor-pointer"
                     onClick={() => openEditModal(worker)}
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-[#F7F8F8]">
                       {worker.name_ko || "-"}
                       {worker.name_en && (
-                        <span className="ml-1 text-xs text-gray-400">
+                        <span className="ml-1 text-xs text-[#62666D]">
                           ({worker.name_en})
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{worker.phone}</td>
+                    <td className="px-4 py-3 text-[#D0D6E0]">{worker.phone}</td>
                     <td className="px-4 py-3">
                       {worker.category ? (
-                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-[#4EA7FC]/10 text-[#828FFF]">
                           {worker.category}
                         </span>
                       ) : (
-                        <span className="text-gray-300">-</span>
+                        <span className="text-[#62666D]">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-[#D0D6E0]">
                       {worker.department || "-"}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-[#D0D6E0]">
                       {worker.bank_name || "-"}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-[#D0D6E0]">
                       {worker.bank_account || "-"}
                     </td>
-                    <td className="px-4 py-3 text-gray-700" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-[#D0D6E0]" onClick={(e) => e.stopPropagation()}>
                       {worker.id_number ? (
                         revealedIds.has(worker.id) ? (
                           <span className="text-xs font-mono">{worker.id_number}</span>
                         ) : (
-                          <button onClick={() => handleRevealId(worker.id)} className="text-xs text-gray-400 hover:text-indigo-600 hover:underline cursor-pointer">
+                          <button onClick={() => handleRevealId(worker.id)} className="text-xs text-[#62666D] hover:text-[#7070FF] hover:underline cursor-pointer">
                             ●●●●●●-●●●●●●●
                           </button>
                         )
                       ) : "-"}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
+                    <td className="px-4 py-3 text-[#8A8F98] text-xs">
                       {(worker as any).last_clock_in_date || "-"}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-[#D0D6E0]">
                       {worker.emergency_contact || "-"}
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       {(worker as any).contract_id ? (
                         <a href={`/contract?id=${(worker as any).contract_id}`} target="_blank" rel="noopener noreferrer"
                           className="block hover:opacity-80 transition-opacity" title="클릭하여 계약서 보기">
-                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 cursor-pointer">📋 체결</span>
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-[#27A644]/10 text-[#27A644] border border-[#27A644]/30 cursor-pointer">📋 체결</span>
                           <p className="text-[10px] text-blue-500 mt-0.5 underline">{(worker as any).contract_start}~{(worker as any).contract_end}</p>
                         </a>
                       ) : (
-                        <span className="text-xs text-gray-400">미체결</span>
+                        <span className="text-xs text-[#62666D]">미체결</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -432,7 +432,7 @@ export default function WorkersPage() {
                       >
                         <button
                           onClick={() => openEditModal(worker)}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
+                          className="p-1.5 rounded-lg hover:bg-[#4EA7FC]/10 text-[#7070FF]"
                           title="수정"
                         >
                           <Edit3 size={15} />
@@ -440,7 +440,7 @@ export default function WorkersPage() {
                         <button
                           onClick={() => handleDelete(worker.id)}
                           disabled={deleting === worker.id}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 disabled:opacity-50"
+                          className="p-1.5 rounded-lg hover:bg-[#EB5757]/10 text-[#EB5757] disabled:opacity-50"
                           title="삭제"
                         >
                           <Trash2 size={15} />
@@ -455,8 +455,8 @@ export default function WorkersPage() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <p className="text-sm text-gray-500">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[#23252A]">
+              <p className="text-sm text-[#8A8F98]">
                 {pagination.total}명 중{" "}
                 {(pagination.page - 1) * pagination.limit + 1}-
                 {Math.min(
@@ -469,11 +469,11 @@ export default function WorkersPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1.5 rounded-lg hover:bg-[#141516]/5 text-[#8A8F98] disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft size={18} />
                 </button>
-                <span className="text-sm text-gray-700 min-w-[80px] text-center">
+                <span className="text-sm text-[#D0D6E0] min-w-[80px] text-center">
                   {pagination.page} / {pagination.totalPages}
                 </span>
                 <button
@@ -481,7 +481,7 @@ export default function WorkersPage() {
                     setPage((p) => Math.min(pagination.totalPages, p + 1))
                   }
                   disabled={page >= pagination.totalPages}
-                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-1.5 rounded-lg hover:bg-[#141516]/5 text-[#8A8F98] disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ChevronRight size={18} />
                 </button>
@@ -494,28 +494,28 @@ export default function WorkersPage() {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900">
+          <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-[#23252A]">
+              <h3 className="text-lg font-bold text-[#F7F8F8]">
                 {editingWorker ? "근무자 수정" : "근무자 추가"}
               </h3>
             </div>
             <div className="px-6 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    전화번호 <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
+                    전화번호 <span className="text-[#EB5757]">*</span>
                   </label>
                   <input
                     type="text"
                     value={form.phone}
                     onChange={(e) => updateForm("phone", e.target.value)}
                     placeholder="010-0000-0000"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     한글 이름
                   </label>
                   <input
@@ -523,13 +523,13 @@ export default function WorkersPage() {
                     value={form.name_ko}
                     onChange={(e) => updateForm("name_ko", e.target.value)}
                     placeholder="홍길동"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     영문 이름
                   </label>
                   <input
@@ -537,17 +537,17 @@ export default function WorkersPage() {
                     value={form.name_en}
                     onChange={(e) => updateForm("name_en", e.target.value)}
                     placeholder="Hong Gildong"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     구분
                   </label>
                   <select
                     value={form.category}
                     onChange={(e) => updateForm("category", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm bg-[#0F1011] focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   >
                     <option value="">선택</option>
                     <option value="파견">파견</option>
@@ -560,7 +560,7 @@ export default function WorkersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     부서
                   </label>
                   <input
@@ -568,11 +568,11 @@ export default function WorkersPage() {
                     value={form.department}
                     onChange={(e) => updateForm("department", e.target.value)}
                     placeholder="부서명"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     근무지
                   </label>
                   <input
@@ -580,13 +580,13 @@ export default function WorkersPage() {
                     value={form.workplace}
                     onChange={(e) => updateForm("workplace", e.target.value)}
                     placeholder="근무지"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     은행명
                   </label>
                   <input
@@ -594,11 +594,11 @@ export default function WorkersPage() {
                     value={form.bank_name}
                     onChange={(e) => updateForm("bank_name", e.target.value)}
                     placeholder="국민은행"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                     계좌번호
                   </label>
                   <input
@@ -606,12 +606,12 @@ export default function WorkersPage() {
                     value={form.bank_account}
                     onChange={(e) => updateForm("bank_account", e.target.value)}
                     placeholder="000-000-000000"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                   비상연락처
                 </label>
                 <input
@@ -621,11 +621,11 @@ export default function WorkersPage() {
                     updateForm("emergency_contact", e.target.value)
                   }
                   placeholder="010-0000-0000"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                   메모
                 </label>
                 <textarea
@@ -633,40 +633,40 @@ export default function WorkersPage() {
                   onChange={(e) => updateForm("memo", e.target.value)}
                   placeholder="메모 입력..."
                   rows={2}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                  className="w-full px-3 py-2 rounded-lg border border-[#23252A] text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none resize-none"
                 />
               </div>
             </div>
             {/* Attendance History */}
             {editingWorker && (
-              <div className="px-6 py-4 border-t border-gray-200">
+              <div className="px-6 py-4 border-t border-[#23252A]">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-800">출퇴근 이력</h4>
+                  <h4 className="text-sm font-semibold text-[#F7F8F8]">출퇴근 이력</h4>
                   <input type="month" value={historyMonth} onChange={e => {
                     setHistoryMonth(e.target.value);
                     if (editingWorker) loadAttendanceHistory(editingWorker.phone, e.target.value);
-                  }} className="px-2 py-1 border border-gray-300 rounded-lg text-xs" />
+                  }} className="px-2 py-1 border border-[#23252A] rounded-lg text-xs" />
                 </div>
                 {historyLoading ? (
-                  <div className="py-4 text-center text-xs text-gray-400">로딩중...</div>
+                  <div className="py-4 text-center text-xs text-[#62666D]">로딩중...</div>
                 ) : attendanceHistory.length === 0 ? (
-                  <div className="py-4 text-center text-xs text-gray-400">해당 월 출퇴근 이력이 없습니다.</div>
+                  <div className="py-4 text-center text-xs text-[#62666D]">해당 월 출퇴근 이력이 없습니다.</div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                  <div className="max-h-48 overflow-y-auto border border-[#23252A] rounded-lg">
                     <table className="w-full text-xs">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-[#08090A] sticky top-0">
                         <tr>
-                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">날짜</th>
-                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">출근</th>
-                          <th className="py-1.5 px-2 text-left font-medium text-gray-600">퇴근</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-[#8A8F98]">날짜</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-[#8A8F98]">출근</th>
+                          <th className="py-1.5 px-2 text-left font-medium text-[#8A8F98]">퇴근</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-[#23252A]">
                         {attendanceHistory.map((r: any, i: number) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="py-1.5 px-2 text-gray-700">{r.date?.slice(5)}</td>
-                            <td className="py-1.5 px-2 text-gray-700">{r.clock_in_time ? new Date(r.clock_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
-                            <td className="py-1.5 px-2 text-gray-700">{r.clock_out_time ? new Date(r.clock_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                          <tr key={i} className="hover:bg-[#141516]/5">
+                            <td className="py-1.5 px-2 text-[#D0D6E0]">{r.date?.slice(5)}</td>
+                            <td className="py-1.5 px-2 text-[#D0D6E0]">{r.clock_in_time ? new Date(r.clock_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                            <td className="py-1.5 px-2 text-[#D0D6E0]">{r.clock_out_time ? new Date(r.clock_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -676,17 +676,17 @@ export default function WorkersPage() {
               </div>
             )}
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-[#23252A] flex justify-end gap-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                className="px-4 py-2 rounded-lg border border-[#23252A] text-[#D0D6E0] hover:bg-[#141516]/5 text-sm font-medium"
               >
                 취소
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {editingWorker ? "수정" : "추가"}

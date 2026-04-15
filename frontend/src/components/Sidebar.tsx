@@ -135,8 +135,8 @@ export default function Sidebar() {
         href={item.href}
         className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
           isActive
-            ? "bg-blue-50 text-blue-700"
-            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            ? "bg-[#5E6AD2]/15 text-[#828FFF]"
+            : "text-[#8A8F98] hover:bg-white/5 hover:text-[#F7F8F8]"
         }`}
       >
         <Icon size={18} />
@@ -146,10 +146,10 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 fixed h-full z-10 flex flex-col">
-      <div className="p-6 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">근태 관리 시스템</h1>
-        <p className="text-sm text-gray-500 mt-1">Attendance Manager</p>
+    <aside className="w-64 bg-[#0F1011] border-r border-[#23252A] fixed h-full z-10 flex flex-col">
+      <div className="p-6 border-b border-[#23252A]">
+        <h1 className="text-xl font-bold text-[#F7F8F8]">근태 관리 시스템</h1>
+        <p className="text-sm text-[#8A8F98] mt-1">Attendance Manager</p>
       </div>
       <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
         {/* Standalone top items */}
@@ -168,8 +168,8 @@ export default function Sidebar() {
                 onClick={() => toggleGroup(group.label)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                   hasActive
-                    ? "text-blue-700"
-                    : "text-gray-700 hover:bg-gray-50"
+                    ? "text-[#828FFF]"
+                    : "text-[#D0D6E0] hover:bg-white/5"
                 }`}
               >
                 <GroupIcon size={18} />
@@ -181,7 +181,7 @@ export default function Sidebar() {
                 )}
               </button>
               {isOpen && (
-                <div className="ml-3 mt-0.5 space-y-0.5 border-l-2 border-gray-100 pl-2">
+                <div className="ml-3 mt-0.5 space-y-0.5 border-l-2 border-[#23252A] pl-2">
                   {group.items.map(renderItem)}
                 </div>
               )}
@@ -190,20 +190,20 @@ export default function Sidebar() {
         })}
 
         {/* Bottom standalone items */}
-        <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="mt-3 pt-3 border-t border-[#23252A]">
           {bottomItems.map(renderItem)}
         </div>
       </nav>
       {user && (
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-[#23252A]">
           <div className="px-4 py-2 mb-2">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-sm font-medium text-[#F7F8F8] truncate">
               {user.email}
             </p>
           </div>
           <button
             onClick={logout}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors w-full"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-[#8A8F98] hover:bg-[#EB5757]/10 hover:text-[#EB5757] transition-colors w-full"
           >
             <LogOut size={20} />
             로그아웃

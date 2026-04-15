@@ -155,38 +155,38 @@ export default function OrgChartPage() {
     return (
       <div key={node.id} style={{ marginLeft: depth * 24 }}>
         <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg mb-1 group transition-colors ${
-          isDept ? "bg-blue-50 hover:bg-blue-100" : "bg-white hover:bg-gray-50 border border-gray-100"
+          isDept ? "bg-[#4EA7FC]/10 hover:bg-[#4EA7FC]/15" : "bg-[#0F1011] hover:bg-[#141516]/5 border border-[#23252A]"
         }`}>
           {isDept && node.children.length > 0 ? (
             <button onClick={() => toggleExpand(node.id)} className="p-0.5 hover:bg-blue-200 rounded">
-              {isExpanded ? <ChevronDown size={16} className="text-blue-600" /> : <ChevronRight size={16} className="text-blue-600" />}
+              {isExpanded ? <ChevronDown size={16} className="text-[#7070FF]" /> : <ChevronRight size={16} className="text-[#7070FF]" />}
             </button>
           ) : (
             <span className="w-5" />
           )}
 
           {isDept ? (
-            <Building2 size={18} className="text-blue-600 shrink-0" />
+            <Building2 size={18} className="text-[#7070FF] shrink-0" />
           ) : (
-            <User size={18} className="text-gray-500 shrink-0" />
+            <User size={18} className="text-[#8A8F98] shrink-0" />
           )}
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`font-medium ${isDept ? "text-blue-900" : "text-gray-900"}`}>{node.name}</span>
-              {node.position && <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{node.position}</span>}
+              <span className={`font-medium ${isDept ? "text-blue-900" : "text-[#F7F8F8]"}`}>{node.name}</span>
+              {node.position && <span className="text-xs text-[#8A8F98] bg-[#141516] px-1.5 py-0.5 rounded">{node.position}</span>}
               {node.employment_type && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${
-                  node.employment_type === "정규직" ? "bg-blue-100 text-blue-700" :
-                  node.employment_type === "파견" ? "bg-orange-100 text-orange-700" :
-                  node.employment_type.includes("알바") ? "bg-green-100 text-green-700" :
-                  "bg-gray-100 text-gray-600"
+                  node.employment_type === "정규직" ? "bg-[#4EA7FC]/15 text-[#828FFF]" :
+                  node.employment_type === "파견" ? "bg-[#FC7840]/15 text-[#FC7840]" :
+                  node.employment_type.includes("알바") ? "bg-[#27A644]/15 text-[#27A644]" :
+                  "bg-[#141516] text-[#8A8F98]"
                 }`}>{node.employment_type}</span>
               )}
               {isDept && <span className="text-xs text-blue-500">({peopleCount}명)</span>}
             </div>
             {(node.phone || node.memo) && (
-              <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-[#62666D]">
                 {node.phone && <span className="flex items-center gap-1"><Phone size={10} />{node.phone}</span>}
                 {node.memo && <span className="flex items-center gap-1"><FileText size={10} />{node.memo}</span>}
               </div>
@@ -199,15 +199,15 @@ export default function OrgChartPage() {
                 <button onClick={() => openCreate(node.id, "department")} className="p-1.5 text-blue-500 hover:bg-blue-200 rounded" title="하위 부서 추가">
                   <Building2 size={14} />
                 </button>
-                <button onClick={() => openCreate(node.id, "person")} className="p-1.5 text-green-500 hover:bg-green-100 rounded" title="인원 추가">
+                <button onClick={() => openCreate(node.id, "person")} className="p-1.5 text-green-500 hover:bg-[#27A644]/15 rounded" title="인원 추가">
                   <Plus size={14} />
                 </button>
               </>
             )}
-            <button onClick={() => openEdit(node)} className="p-1.5 text-gray-400 hover:bg-gray-200 rounded" title="수정">
+            <button onClick={() => openEdit(node)} className="p-1.5 text-[#62666D] hover:bg-[#141516]/7 rounded" title="수정">
               <Edit2 size={14} />
             </button>
-            <button onClick={() => handleDelete(node.id, node.name)} className="p-1.5 text-red-400 hover:bg-red-100 rounded" title="삭제">
+            <button onClick={() => handleDelete(node.id, node.name)} className="p-1.5 text-red-400 hover:bg-[#EB5757]/15 rounded" title="삭제">
               <Trash2 size={14} />
             </button>
           </div>
@@ -222,20 +222,20 @@ export default function OrgChartPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">조직도</h2>
-          <p className="text-gray-500 mt-1">조직 구조를 관리하고 인원을 배치합니다.</p>
+          <h2 className="text-2xl font-bold text-[#F7F8F8]">조직도</h2>
+          <p className="text-[#8A8F98] mt-1">조직 구조를 관리하고 인원을 배치합니다.</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => openCreate(null, "department")}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 bg-[#5E6AD2] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#828FFF] transition-colors"
           >
             <Building2 size={16} />
             부서 추가
           </button>
           <button
             onClick={() => openCreate(null, "person")}
-            className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2 bg-[#1C1C1F] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#141516]/5 transition-colors"
           >
             <Plus size={16} />
             인원 추가
@@ -243,19 +243,19 @@ export default function OrgChartPage() {
         </div>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm mb-4">{error}</div>}
+      {error && <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-4 text-[#EB5757] text-sm mb-4">{error}</div>}
 
       {/* Summary Cards */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            <p className="text-xs text-gray-500 mt-1">전체 인원</p>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 text-center">
+            <p className="text-2xl font-bold text-[#F7F8F8]">{stats.total}</p>
+            <p className="text-xs text-[#8A8F98] mt-1">전체 인원</p>
           </div>
           {stats.byType?.slice(0, 3).map((t: any) => (
-            <div key={t.employment_type} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-              <p className="text-2xl font-bold text-blue-600">{t.count}</p>
-              <p className="text-xs text-gray-500 mt-1">{t.employment_type}</p>
+            <div key={t.employment_type} className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 text-center">
+              <p className="text-2xl font-bold text-[#7070FF]">{t.count}</p>
+              <p className="text-xs text-[#8A8F98] mt-1">{t.employment_type}</p>
             </div>
           ))}
         </div>
@@ -264,21 +264,21 @@ export default function OrgChartPage() {
       {/* Tree View */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin" />
         </div>
       ) : tree.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <Network size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 mb-4">조직도가 비어있습니다. 부서를 추가하여 시작하세요.</p>
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center">
+          <Network size={48} className="mx-auto text-[#62666D] mb-4" />
+          <p className="text-[#8A8F98] mb-4">조직도가 비어있습니다. 부서를 추가하여 시작하세요.</p>
           <button
             onClick={() => openCreate(null, "department")}
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="bg-[#5E6AD2] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-[#828FFF]"
           >
             첫 부서 추가하기
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
           {tree.map(node => renderNode(node))}
         </div>
       )}
@@ -286,28 +286,28 @@ export default function OrgChartPage() {
       {/* Edit/Create Modal */}
       {editingNode && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
+          <div className="bg-[#0F1011] rounded-2xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#23252A]">
+              <h3 className="text-lg font-semibold text-[#F7F8F8]">
                 {isCreating
                   ? (editingNode.node_type === "department" ? "부서 추가" : "인원 추가")
                   : (editingNode.node_type === "department" ? "부서 수정" : "인원 수정")
                 }
               </h3>
-              <button onClick={() => setEditingNode(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X size={20} className="text-gray-500" />
+              <button onClick={() => setEditingNode(null)} className="p-2 hover:bg-[#141516]/5 rounded-lg">
+                <X size={20} className="text-[#8A8F98]" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
                   {editingNode.node_type === "department" ? "부서명" : "이름"} *
                 </label>
                 <input
                   type="text"
                   value={editingNode.name || ""}
                   onChange={(e) => setEditingNode({ ...editingNode, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900"
+                  className="w-full border border-[#23252A] rounded-lg px-3 py-2.5 text-sm text-[#F7F8F8]"
                   placeholder={editingNode.node_type === "department" ? "부서명을 입력하세요" : "이름을 입력하세요"}
                   autoFocus
                 />
@@ -315,22 +315,22 @@ export default function OrgChartPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">직위/직책</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">직위/직책</label>
                   <input
                     type="text"
                     value={editingNode.position || ""}
                     onChange={(e) => setEditingNode({ ...editingNode, position: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900"
+                    className="w-full border border-[#23252A] rounded-lg px-3 py-2.5 text-sm text-[#F7F8F8]"
                     placeholder="예: 팀장, 반장"
                   />
                 </div>
                 {editingNode.node_type === "person" && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">고용형태</label>
+                    <label className="block text-sm font-medium text-[#D0D6E0] mb-1">고용형태</label>
                     <select
                       value={editingNode.employment_type || ""}
                       onChange={(e) => setEditingNode({ ...editingNode, employment_type: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900"
+                      className="w-full border border-[#23252A] rounded-lg px-3 py-2.5 text-sm text-[#F7F8F8]"
                     >
                       <option value="">선택</option>
                       {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -341,36 +341,36 @@ export default function OrgChartPage() {
 
               {editingNode.node_type === "person" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">연락처</label>
+                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">연락처</label>
                   <input
                     type="text"
                     value={editingNode.phone || ""}
                     onChange={(e) => setEditingNode({ ...editingNode, phone: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900"
+                    className="w-full border border-[#23252A] rounded-lg px-3 py-2.5 text-sm text-[#F7F8F8]"
                     placeholder="010-0000-0000"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
+                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">메모</label>
                 <textarea
                   value={editingNode.memo || ""}
                   onChange={(e) => setEditingNode({ ...editingNode, memo: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-900"
+                  className="w-full border border-[#23252A] rounded-lg px-3 py-2.5 text-sm text-[#F7F8F8]"
                   rows={2}
                   placeholder="참고 사항을 입력하세요"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
-              <button onClick={() => setEditingNode(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#23252A] bg-[#08090A] rounded-b-2xl">
+              <button onClick={() => setEditingNode(null)} className="px-4 py-2 text-sm font-medium text-[#8A8F98] hover:bg-[#141516]/7 rounded-lg">
                 취소
               </button>
               <button
                 onClick={handleSave}
                 disabled={!editingNode.name || saving}
-                className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 bg-[#5E6AD2] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#828FFF] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save size={16} />
                 {saving ? "저장 중..." : "저장"}

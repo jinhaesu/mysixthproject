@@ -65,21 +65,21 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
   const barH = (count: number) => count > 0 ? Math.max((count / maxCount) * CHART_H, 4) : 0;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+      <div className="px-4 py-3 border-b border-[#23252A] flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[11px] font-medium">출근 {totalIn}명</span>
+          <h3 className="text-sm font-semibold text-[#F7F8F8]">{title}</h3>
+          <span className="px-2 py-0.5 bg-[#4EA7FC]/10 text-[#828FFF] rounded-full text-[11px] font-medium">출근 {totalIn}명</span>
           {clockOutData && <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[11px] font-medium">퇴근 {totalOut}명</span>}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {extraControls}
           {clockOutData && (
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+            <div className="flex rounded-lg border border-[#23252A] overflow-hidden">
               {([['both', '출퇴근'], ['in', '출근'], ['out', '퇴근']] as const).map(([k, label]) => (
                 <button key={k} onClick={() => setViewMode(k)}
-                  className={`px-2.5 py-1 text-[11px] font-medium ${viewMode === k ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  className={`px-2.5 py-1 text-[11px] font-medium ${viewMode === k ? 'bg-[#0F1011] text-white' : 'bg-[#0F1011] text-[#8A8F98] hover:bg-[#141516]/5'}`}>
                   {label}
                 </button>
               ))}
@@ -87,7 +87,7 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
           )}
           {onDeptChange && (
             <select value={selectedDept || ''} onChange={e => onDeptChange(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
+              className="px-2 py-1.5 border border-[#23252A] rounded-lg text-xs bg-[#0F1011]">
               <option value="">전체 부서</option>
               {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
@@ -100,23 +100,23 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
         <div className="flex flex-wrap items-center gap-3 mb-3">
           {(viewMode === 'both' || viewMode === 'in') && (
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-blue-500" />
-              <span className="text-[11px] text-gray-600 font-medium">출근</span>
+              <div className="w-3 h-3 rounded-sm bg-[#4EA7FC]" />
+              <span className="text-[11px] text-[#8A8F98] font-medium">출근</span>
             </div>
           )}
           {clockOutData && (viewMode === 'both' || viewMode === 'out') && (
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm bg-emerald-500" />
-              <span className="text-[11px] text-gray-600 font-medium">퇴근</span>
+              <span className="text-[11px] text-[#8A8F98] font-medium">퇴근</span>
             </div>
           )}
           {selectedDept && (
             <>
-              <span className="text-[11px] text-gray-400">|</span>
+              <span className="text-[11px] text-[#62666D]">|</span>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ backgroundColor: DEPT_COLORS[selectedDept] ? DEPT_COLORS[selectedDept] + '22' : '#f1f5f9', color: DEPT_COLORS[selectedDept] || '#475569' }}>
                 {selectedDept}
               </span>
-              <button onClick={() => onDeptChange?.('')} className="text-[11px] text-gray-400 hover:text-gray-600">✕</button>
+              <button onClick={() => onDeptChange?.('')} className="text-[11px] text-[#62666D] hover:text-[#D0D6E0]">✕</button>
             </>
           )}
         </div>
@@ -126,7 +126,7 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
           {/* Y-axis */}
           <div className="flex flex-col justify-between pr-2" style={{ height: `${CHART_H}px` }}>
             {[maxCount, Math.round(maxCount / 2), 0].map((v, i) => (
-              <span key={i} className="text-[10px] text-gray-400 leading-none text-right w-5">{v}</span>
+              <span key={i} className="text-[10px] text-[#62666D] leading-none text-right w-5">{v}</span>
             ))}
           </div>
 
@@ -134,7 +134,7 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
           <div className="flex-1 relative" style={{ height: `${CHART_H}px` }}>
             {/* Grid */}
             {[0, 50, 100].map(pct => (
-              <div key={pct} className="absolute w-full border-t border-dashed border-gray-100" style={{ top: `${pct}%` }} />
+              <div key={pct} className="absolute w-full border-t border-dashed border-[#23252A]" style={{ top: `${pct}%` }} />
             ))}
 
             {/* Bars */}
@@ -150,7 +150,7 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
                   <div key={h} className="flex-1 group relative" style={{ height: '100%' }}>
                     {/* Tooltip */}
                     {(iv > 0 || ov > 0) && (
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 bg-[#08090A] text-white text-xs rounded-lg px-3 py-2 shadow-[0px_7px_32px_rgba(0,0,0,0.35)] whitespace-nowrap">
                         <div className="font-bold mb-1">{h}:00 ~ {h + 1}:00</div>
                         {iv > 0 && <div className="flex items-center gap-2"><span className="w-2 h-2 rounded bg-blue-400" />출근 <span className="font-bold ml-auto">{iv}명</span></div>}
                         {ov > 0 && <div className="flex items-center gap-2"><span className="w-2 h-2 rounded bg-emerald-400" />퇴근 <span className="font-bold ml-auto">{ov}명</span></div>}
@@ -162,10 +162,10 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
                     <div className="absolute bottom-0 left-[5%] right-[5%] flex gap-[1px] items-end" style={{ height: '100%' }}>
                       {showIn && (
                         <div className={`${isBoth ? 'flex-1' : 'w-full'} relative`} style={{ height: '100%' }}>
-                          <div className="absolute bottom-0 w-full rounded-t bg-blue-500 group-hover:bg-blue-600 transition-colors"
+                          <div className="absolute bottom-0 w-full rounded-t bg-[#4EA7FC] group-hover:bg-[#828FFF] transition-colors"
                             style={{ height: `${barH(iv)}px` }} />
                           {iv > 0 && (
-                            <div className="absolute w-full text-center text-[9px] font-bold text-blue-700"
+                            <div className="absolute w-full text-center text-[9px] font-bold text-[#828FFF]"
                               style={{ bottom: `${barH(iv) + 1}px` }}>{iv}</div>
                           )}
                         </div>
@@ -192,11 +192,11 @@ export default function HourlyChart({ clockInData, clockOutData, title, departme
         <div className="flex ml-7 mt-1">
           {hours.map(h => (
             <div key={h} className="flex-1 text-center">
-              <span className={`text-[10px] ${h % 2 === 0 ? 'text-gray-600 font-medium' : 'text-transparent'}`}>{h}</span>
+              <span className={`text-[10px] ${h % 2 === 0 ? 'text-[#8A8F98] font-medium' : 'text-transparent'}`}>{h}</span>
             </div>
           ))}
         </div>
-        <div className="ml-7 text-center text-[10px] text-gray-400">(시)</div>
+        <div className="ml-7 text-center text-[10px] text-[#62666D]">(시)</div>
       </div>
     </div>
   );

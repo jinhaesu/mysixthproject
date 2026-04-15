@@ -62,33 +62,33 @@ export default function HomePage() {
   ];
 
   const colorMap: Record<string, string> = {
-    blue: "bg-blue-50 text-blue-600 group-hover:bg-blue-100",
-    green: "bg-green-50 text-green-600 group-hover:bg-green-100",
-    purple: "bg-purple-50 text-purple-600 group-hover:bg-purple-100",
-    orange: "bg-orange-50 text-orange-600 group-hover:bg-orange-100",
+    blue: "bg-[#4EA7FC]/10 text-[#7070FF] group-hover:bg-[#4EA7FC]/15",
+    green: "bg-[#27A644]/10 text-[#27A644] group-hover:bg-[#27A644]/15",
+    purple: "bg-[#5E6AD2]/10 text-[#7070FF] group-hover:bg-[#5E6AD2]/15",
+    orange: "bg-[#FC7840]/10 text-[#FC7840] group-hover:bg-[#FC7840]/15",
   };
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">근태 관리 시스템</h2>
-      <p className="text-gray-500 mb-8">엑셀 파일을 업로드하여 근태 데이터를 분석하고 관리합니다.</p>
+      <h2 className="text-2xl font-bold text-[#F7F8F8] mb-2">근태 관리 시스템</h2>
+      <p className="text-[#8A8F98] mb-8">엑셀 파일을 업로드하여 근태 데이터를 분석하고 관리합니다.</p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <p className="text-sm text-gray-500">업로드 횟수</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{stats.uploads}</p>
+        <div className="bg-[#0F1011] rounded-xl p-5 border border-[#23252A]">
+          <p className="text-sm text-[#8A8F98]">업로드 횟수</p>
+          <p className="text-2xl font-bold text-[#F7F8F8] mt-1">{stats.uploads}</p>
         </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <p className="text-sm text-gray-500">총 기록 수</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{stats.records.toLocaleString()}</p>
+        <div className="bg-[#0F1011] rounded-xl p-5 border border-[#23252A]">
+          <p className="text-sm text-[#8A8F98]">총 기록 수</p>
+          <p className="text-2xl font-bold text-[#F7F8F8] mt-1">{stats.records.toLocaleString()}</p>
         </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <p className="text-sm text-gray-500">등록 인원</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{stats.names}</p>
+        <div className="bg-[#0F1011] rounded-xl p-5 border border-[#23252A]">
+          <p className="text-sm text-[#8A8F98]">등록 인원</p>
+          <p className="text-2xl font-bold text-[#F7F8F8] mt-1">{stats.names}</p>
         </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <p className="text-sm text-gray-500">데이터 기간</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">{stats.dateRange}</p>
+        <div className="bg-[#0F1011] rounded-xl p-5 border border-[#23252A]">
+          <p className="text-sm text-[#8A8F98]">데이터 기간</p>
+          <p className="text-lg font-bold text-[#F7F8F8] mt-1">{stats.dateRange}</p>
         </div>
       </div>
 
@@ -99,13 +99,13 @@ export default function HomePage() {
             <Link
               key={card.href}
               href={card.href}
-              className="group bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all"
+              className="group bg-[#0F1011] rounded-xl p-6 border border-[#23252A] hover:border-[#23252A] hover:shadow-[0px_3px_12px_rgba(0,0,0,0.2)] transition-all"
             >
               <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${colorMap[card.color]}`}>
                 <Icon size={24} />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{card.title}</h3>
-              <p className="text-sm text-gray-500">{card.desc}</p>
+              <h3 className="text-lg font-semibold text-[#F7F8F8] mb-2">{card.title}</h3>
+              <p className="text-sm text-[#8A8F98]">{card.desc}</p>
             </Link>
           );
         })}

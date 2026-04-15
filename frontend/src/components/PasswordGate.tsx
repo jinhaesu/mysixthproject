@@ -42,12 +42,12 @@ export default function PasswordGate({ onVerified, verifyPassword, title = "접�
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-8 w-full max-w-sm shadow-sm">
+      <form onSubmit={handleSubmit} className="bg-[#0F1011] rounded-xl border border-[#23252A] p-8 w-full max-w-sm shadow-[0px_1px_3px_rgba(0,0,0,0.2)]">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
-            <Lock className="w-6 h-6 text-indigo-600" />
+          <div className="w-12 h-12 rounded-full bg-[#5E6AD2]/10 flex items-center justify-center mb-3">
+            <Lock className="w-6 h-6 text-[#7070FF]" />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-lg font-semibold text-[#F7F8F8]">{title}</h2>
         </div>
         <input
           ref={inputRef}
@@ -55,14 +55,14 @@ export default function PasswordGate({ onVerified, verifyPassword, title = "접�
           value={pw}
           onChange={e => setPw(e.target.value)}
           placeholder="비밀번호 입력"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-3"
+          className="w-full px-4 py-3 border border-[#23252A] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-3"
           autoComplete="off"
         />
-        {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+        {error && <p className="text-xs text-[#EB5757] mb-3">{error}</p>}
         <button
           type="submit"
           disabled={checking || !pw.trim()}
-          className="w-full py-3 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="w-full py-3 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:bg-[#28282C] disabled:cursor-not-allowed transition-colors"
         >
           {checking ? "확인 중..." : "확인"}
         </button>

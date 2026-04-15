@@ -299,42 +299,42 @@ export default function AttendanceSummaryDispatchPage() {
   return (
     <div className="min-w-0">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <ClipboardList className="w-6 h-6 text-indigo-600" />
+        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+          <ClipboardList className="w-6 h-6 text-[#7070FF]" />
           사업소득(알바)/파견 근태 정보 종합 요약
         </h1>
-        <p className="text-sm text-gray-500 mt-1">실제 출퇴근 기록이 있는 직원만 표시됩니다.</p>
+        <p className="text-sm text-[#8A8F98] mt-1">실제 출퇴근 기록이 있는 직원만 표시됩니다.</p>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end mb-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">연도</label>
-          <input type="number" value={year} onChange={e => setYear(parseInt(e.target.value))} className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-24" />
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연도</label>
+          <input type="number" value={year} onChange={e => setYear(parseInt(e.target.value))} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-24" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">월</label>
-          <select value={month} onChange={e => setMonth(parseInt(e.target.value))} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">월</label>
+          <select value={month} onChange={e => setMonth(parseInt(e.target.value))} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             {Array.from({length:12}, (_,i) => <option key={i+1} value={i+1}>{i+1}월</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">시간 보기</label>
-          <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">시간 보기</label>
+          <select value={viewMode} onChange={e => setViewMode(e.target.value as any)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value="actual">실제 기준</option>
             <option value="planned">계획 기준</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">유형</label>
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">유형</label>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value="all">전체</option>
             <option value="파견">파견</option>
             <option value="알바">알바(사업소득)</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">부서</label>
-          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">부서</label>
+          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value="">전체</option>
             <option value="물류">물류</option>
             <option value="생산2층">생산2층</option>
@@ -342,13 +342,13 @@ export default function AttendanceSummaryDispatchPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">이름 검색</label>
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름 검색</label>
           <input type="text" value={nameSearch} onChange={e => setNameSearch(e.target.value)} placeholder="이름"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-28" />
+            className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">확정 상태</label>
-          <select value={confirmFilter} onChange={e => setConfirmFilter(e.target.value as any)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">확정 상태</label>
+          <select value={confirmFilter} onChange={e => setConfirmFilter(e.target.value as any)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]">
             <option value="all">전체</option>
             <option value="unconfirmed">미확정만</option>
             <option value="confirmed">확정만</option>
@@ -358,36 +358,36 @@ export default function AttendanceSummaryDispatchPage() {
       </div>
 
       {visibleEmployees.length > 0 && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4 flex flex-wrap gap-3 items-end">
+        <div className="bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 rounded-xl p-4 mb-4 flex flex-wrap gap-3 items-end">
           <button onClick={() => {
             if (checkedEmps.size === visibleEmployees.length) setCheckedEmps(new Set());
             else setCheckedEmps(new Set(visibleEmployees.map((e: any) => e.id)));
-          }} className="px-3 py-1.5 bg-white border border-indigo-300 rounded-lg text-xs font-medium text-indigo-700 hover:bg-indigo-100">
+          }} className="px-3 py-1.5 bg-[#0F1011] border border-indigo-300 rounded-lg text-xs font-medium text-[#828FFF] hover:bg-[#5E6AD2]/15">
             {checkedEmps.size === visibleEmployees.length ? '전체 해제' : '전체 선택'}
           </button>
           <div>
-            <label className="block text-xs font-medium text-indigo-700 mb-1">기간</label>
+            <label className="block text-xs font-medium text-[#828FFF] mb-1">기간</label>
             <div className="flex items-center gap-1">
               <input type="number" min={1} max={lastDay} value={rangeStart} onChange={e => setRangeStart(parseInt(e.target.value) || 1)} className="px-2 py-1.5 border border-indigo-300 rounded text-sm w-14 text-center" />
-              <span className="text-indigo-600">~</span>
+              <span className="text-[#7070FF]">~</span>
               <input type="number" min={1} max={lastDay} value={rangeEnd} onChange={e => setRangeEnd(parseInt(e.target.value) || lastDay)} className="px-2 py-1.5 border border-indigo-300 rounded text-sm w-14 text-center" />
               <span className="text-xs text-indigo-500">일</span>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-indigo-700 mb-1">기준</label>
-            <select value={batchSource} onChange={e => setBatchSource(e.target.value as any)} className="px-3 py-1.5 border border-indigo-300 rounded-lg text-sm bg-white">
+            <label className="block text-xs font-medium text-[#828FFF] mb-1">기준</label>
+            <select value={batchSource} onChange={e => setBatchSource(e.target.value as any)} className="px-3 py-1.5 border border-indigo-300 rounded-lg text-sm bg-[#0F1011]">
               <option value="planned">계획 출퇴근</option>
               <option value="actual">실제 출퇴근</option>
             </select>
           </div>
           <button onClick={handleBatchConfirm} disabled={confirming || checkedEmps.size === 0}
-            className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 flex items-center gap-1">
+            className="px-4 py-1.5 bg-[#27A644] text-white rounded-lg text-sm font-medium disabled:bg-[#28282C] flex items-center gap-1">
             <Check className="w-4 h-4" /> {checkedEmps.size}명 일괄 확정
           </button>
           {checkedRows.size > 0 && (
             <button onClick={handleConfirmRows} disabled={confirming}
-              className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:bg-gray-300 flex items-center gap-1">
+              className="px-4 py-1.5 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium disabled:bg-[#28282C] flex items-center gap-1">
               <Check className="w-4 h-4" /> 개별 {checkedRows.size}건 확정
             </button>
           )}
@@ -395,7 +395,7 @@ export default function AttendanceSummaryDispatchPage() {
       )}
 
       {loading ? (
-        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>
+        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" /></div>
       ) : visibleEmployees.length > 0 ? (
         <div className="space-y-2">
           {visibleEmployees.map((emp: any) => {
@@ -403,27 +403,27 @@ export default function AttendanceSummaryDispatchPage() {
             const expanded = expandedEmp === emp.id;
             const isFullyConfirmed = confirmedEmpSet.has(emp.name);
             return (
-              <div key={emp.id} className={`rounded-xl border overflow-hidden ${isFullyConfirmed ? 'border-green-300 bg-green-50/30' : 'border-gray-200 bg-white'}`}>
-                <div className={`flex items-center px-4 py-3 hover:bg-gray-50 ${checkedEmps.has(emp.id) ? 'bg-indigo-50/50' : ''}`}>
+              <div key={emp.id} className={`rounded-xl border overflow-hidden ${isFullyConfirmed ? 'border-green-300 bg-[#27A644]/10/30' : 'border-[#23252A] bg-[#0F1011]'}`}>
+                <div className={`flex items-center px-4 py-3 hover:bg-[#141516]/5 ${checkedEmps.has(emp.id) ? 'bg-[#5E6AD2]/10/50' : ''}`}>
                   <div className="mr-3" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checkedEmps.has(emp.id)}
                       onChange={e => { const n = new Set(checkedEmps); if (e.target.checked) n.add(emp.id); else n.delete(emp.id); setCheckedEmps(n); }}
-                      className="rounded border-gray-300" />
+                      className="rounded border-[#23252A]" />
                   </div>
                   <button className="flex-1 flex items-center justify-between" onClick={() => setExpandedEmp(expanded ? null : emp.id)}>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-medium text-gray-900">{emp.name}</span>
-                      {isFullyConfirmed && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-3 h-3" />확정</span>}
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-blue-50 text-blue-700' : emp.type === '알바' ? 'bg-orange-50 text-orange-700' : 'bg-red-50 text-red-600'}`}>{emp.type || '정보없음'}</span>
-                      <span className="text-xs text-gray-500">{emp.department}</span>
-                      {(() => { const ac = getAnomalyCount(emp); return ac > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700">차이 발생 {ac}건</span> : null; })()}
+                      <span className="font-medium text-[#F7F8F8]">{emp.name}</span>
+                      {isFullyConfirmed && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#27A644]/15 text-[#27A644]"><CheckCircle2 className="w-3 h-3" />확정</span>}
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-[#4EA7FC]/10 text-[#828FFF]' : emp.type === '알바' ? 'bg-[#FC7840]/10 text-[#FC7840]' : 'bg-[#EB5757]/10 text-[#EB5757]'}`}>{emp.type || '정보없음'}</span>
+                      <span className="text-xs text-[#8A8F98]">{emp.department}</span>
+                      {(() => { const ac = getAnomalyCount(emp); return ac > 0 ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#EB5757]/15 text-[#EB5757]">차이 발생 {ac}건</span> : null; })()}
                     </div>
                     <div className="flex items-center gap-4 text-xs">
-                      <span className="text-gray-600">{summary.days}일</span>
-                      <span className="text-blue-700 font-medium">기본 {summary.regular}h</span>
-                      <span className="text-amber-700 font-medium">연장 {summary.overtime}h</span>
-                      <span className="text-red-600 font-medium">주말 {summary.weekend}h</span>
-                      {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                      <span className="text-[#8A8F98]">{summary.days}일</span>
+                      <span className="text-[#828FFF] font-medium">기본 {summary.regular}h</span>
+                      <span className="text-[#F0BF00] font-medium">연장 {summary.overtime}h</span>
+                      <span className="text-[#EB5757] font-medium">주말 {summary.weekend}h</span>
+                      {expanded ? <ChevronUp className="w-4 h-4 text-[#62666D]" /> : <ChevronDown className="w-4 h-4 text-[#62666D]" />}
                     </div>
                   </button>
                   {isFullyConfirmed && (
@@ -446,7 +446,7 @@ export default function AttendanceSummaryDispatchPage() {
                         setConfirmedEmpSet(cEmpSet);
                         alert('확정 취소 완료');
                       } catch (err: any) { alert(err.message); }
-                    }} className="ml-1 px-1.5 py-0.5 text-[10px] font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded" title="확정 취소">
+                    }} className="ml-1 px-1.5 py-0.5 text-[10px] font-medium text-[#EB5757] bg-[#EB5757]/10 hover:bg-[#EB5757]/15 rounded" title="확정 취소">
                       <XCircle className="w-3.5 h-3.5 inline mr-0.5" />취소
                     </button>
                   )}
@@ -464,28 +464,28 @@ export default function AttendanceSummaryDispatchPage() {
                     } catch {}
                     setHiddenEmps(new Set([...hiddenEmps, emp.id]));
                   }}
-                    className="ml-1 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded" title="리스트에서 제거 + 확정 삭제">
+                    className="ml-1 p-1 text-[#62666D] hover:text-[#EB5757] hover:bg-[#EB5757]/10 rounded" title="리스트에서 제거 + 확정 삭제">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
                 {expanded && (
-                  <div className="border-t border-indigo-200 bg-indigo-50/20 overflow-x-auto">
+                  <div className="border-t border-[#5E6AD2]/30 bg-[#5E6AD2]/10/20 overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-gray-50 text-left">
+                        <tr className="bg-[#08090A] text-left">
                           <th className="py-2 px-3 w-8"></th>
                           <th className="py-2 px-3">날짜</th>
                           <th className="py-2 px-3">요일</th>
-                          <th className="py-2 px-3 text-blue-600">계획출근</th>
-                          <th className="py-2 px-3 text-blue-600">계획퇴근</th>
-                          <th className="py-2 px-3 text-green-600">실제출근</th>
-                          <th className="py-2 px-3 text-green-600">실제퇴근</th>
+                          <th className="py-2 px-3 text-[#7070FF]">계획출근</th>
+                          <th className="py-2 px-3 text-[#7070FF]">계획퇴근</th>
+                          <th className="py-2 px-3 text-[#27A644]">실제출근</th>
+                          <th className="py-2 px-3 text-[#27A644]">실제퇴근</th>
                           <th className="py-2 px-3">식사</th>
                           <th className="py-2 px-3">기준</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-[#23252A]">
                         {emp.actuals.map((actual: any) => {
                           const date = actual.date;
                           const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
@@ -506,40 +506,40 @@ export default function AttendanceSummaryDispatchPage() {
                           const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);
                           const mealChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
                           return (
-                            <tr key={date} className={isDayConfirmed ? 'bg-green-50' : isAnomaly ? 'bg-red-50' : 'bg-white'}>
+                            <tr key={date} className={isDayConfirmed ? 'bg-[#27A644]/10' : isAnomaly ? 'bg-[#EB5757]/10' : 'bg-[#0F1011]'}>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <CheckCircle2 className="w-4 h-4 text-green-500" />
                                 ) : (
                                   <input type="checkbox" checked={checkedRows.has(key)}
                                     onChange={e => { const n = new Set(checkedRows); if (e.target.checked) n.add(key); else n.delete(key); setCheckedRows(n); }}
-                                    className="rounded border-gray-300" />
+                                    className="rounded border-[#23252A]" />
                                 )}
                               </td>
-                              <td className="py-1.5 px-3 text-gray-700">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-green-600">확정</span>}</td>
-                              <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-red-500 font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-gray-500'}`}>{dow}</td>
-                              <td className="py-1.5 px-3 text-blue-700">{plannedIn}</td>
-                              <td className="py-1.5 px-3 text-blue-700">{plannedOut}</td>
-                              <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualIn}</td>
-                              <td className={`py-1.5 px-3 ${isAnomaly ? 'text-red-700 font-bold' : 'text-green-700'}`}>{actualOut}</td>
+                              <td className="py-1.5 px-3 text-[#D0D6E0]">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-[#27A644]">확정</span>}</td>
+                              <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-[#EB5757] font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-[#8A8F98]'}`}>{dow}</td>
+                              <td className="py-1.5 px-3 text-[#828FFF]">{plannedIn}</td>
+                              <td className="py-1.5 px-3 text-[#828FFF]">{plannedOut}</td>
+                              <td className={`py-1.5 px-3 ${isAnomaly ? 'text-[#EB5757] font-bold' : 'text-[#27A644]'}`}>{actualIn}</td>
+                              <td className={`py-1.5 px-3 ${isAnomaly ? 'text-[#EB5757] font-bold' : 'text-[#27A644]'}`}>{actualOut}</td>
                               <td className="py-1.5 px-3">
                                 {mealApplicable ? (
                                   <label className="inline-flex items-center gap-1 cursor-pointer">
                                     <input type="checkbox" checked={mealChecked}
                                       onChange={e => setDinnerBreak({...dinnerBreak, [key]: e.target.checked})}
-                                      className="rounded border-gray-300" disabled={isDayConfirmed} />
-                                    <span className={`text-[10px] ${mealChecked ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
+                                      className="rounded border-[#23252A]" disabled={isDayConfirmed} />
+                                    <span className={`text-[10px] ${mealChecked ? 'text-[#FC7840] font-medium' : 'text-[#8A8F98]'}`}>
                                       {mealChecked ? '30분 휴게' : '미식사'}
                                     </span>
                                   </label>
                                 ) : (
-                                  <span className="text-[10px] text-gray-400">미해당</span>
+                                  <span className="text-[10px] text-[#62666D]">미해당</span>
                                 )}
                               </td>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <div className="flex items-center gap-1">
-                                    <span className="text-[10px] text-green-600 font-medium">확정됨</span>
+                                    <span className="text-[10px] text-[#27A644] font-medium">확정됨</span>
                                     <button onClick={async (e) => {
                                       e.stopPropagation();
                                       const cKey = `${emp.name}|${date}`;
@@ -554,13 +554,13 @@ export default function AttendanceSummaryDispatchPage() {
                                         const stillFull = emp.actuals.every((a: any) => a.date === date ? false : newSet.has(`${emp.name}|${a.date}`));
                                         if (!stillFull) { const newEmpSet = new Set(confirmedEmpSet); newEmpSet.delete(emp.name); setConfirmedEmpSet(newEmpSet); }
                                       } catch (err: any) { alert(err.message); }
-                                    }} className="px-1 py-0.5 text-[9px] text-red-600 bg-red-50 hover:bg-red-100 rounded font-medium">
+                                    }} className="px-1 py-0.5 text-[9px] text-[#EB5757] bg-[#EB5757]/10 hover:bg-[#EB5757]/15 rounded font-medium">
                                       취소
                                     </button>
                                   </div>
                                 ) : (
                                   <select value={source} onChange={e => setSelectedSource({...selectedSource, [key]: e.target.value as any})}
-                                    className="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-white">
+                                    className="px-1 py-0.5 border border-[#23252A] rounded text-[10px] bg-[#0F1011]">
                                     <option value="planned">계획</option>
                                     <option value="actual">실제</option>
                                   </select>
@@ -578,7 +578,7 @@ export default function AttendanceSummaryDispatchPage() {
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 py-16 text-center text-sm text-gray-400">해당 월에 출근 기록이 있는 직원이 없습니다.</div>
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] py-16 text-center text-sm text-[#62666D]">해당 월에 출근 기록이 있는 직원이 없습니다.</div>
       )}
     </div>
   );

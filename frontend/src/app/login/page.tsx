@@ -116,38 +116,38 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-[#0F1011] rounded-2xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-[#4EA7FC]/15 rounded-full flex items-center justify-center mx-auto mb-4">
               {step === "email" ? (
-                <Mail size={32} className="text-blue-600" />
+                <Mail size={32} className="text-[#7070FF]" />
               ) : (
-                <KeyRound size={32} className="text-blue-600" />
+                <KeyRound size={32} className="text-[#7070FF]" />
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">근태 관리 시스템</h1>
-            <p className="text-gray-500 mt-2">
+            <h1 className="text-2xl font-bold text-[#F7F8F8]">근태 관리 시스템</h1>
+            <p className="text-[#8A8F98] mt-2">
               {step === "email" ? "이메일로 로그인하세요" : "인증 코드를 입력하세요"}
             </p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-              <AlertCircle size={20} className="text-red-500 shrink-0" />
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="mb-6 p-4 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg flex items-center gap-3">
+              <AlertCircle size={20} className="text-[#EB5757] shrink-0" />
+              <p className="text-sm text-[#EB5757]">{error}</p>
             </div>
           )}
 
           {step === "email" ? (
             <form onSubmit={handleSendCode} className="space-y-5">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-[#D0D6E0] mb-1">
                   이메일
                 </label>
                 <div className="relative">
-                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]" />
                   <input
                     id="email"
                     type="email"
@@ -155,31 +155,31 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="이메일을 입력하세요"
                     required
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-gray-900"
+                    className="w-full pl-10 pr-4 py-3 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none transition-colors text-[#F7F8F8]"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-3 bg-[#5E6AD2] text-white font-medium rounded-lg hover:bg-[#828FFF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? "발송 중..." : "인증 코드 발송"}
               </button>
             </form>
           ) : (
             <form onSubmit={handleVerifyCode} className="space-y-5">
-              <div className="p-3 bg-blue-50 rounded-lg mb-2">
-                <p className="text-sm text-blue-700">
+              <div className="p-3 bg-[#4EA7FC]/10 rounded-lg mb-2">
+                <p className="text-sm text-[#828FFF]">
                   <span className="font-medium">{email}</span>로 인증 코드를 발송했습니다.
                 </p>
               </div>
               <div>
-                <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="code" className="block text-sm font-medium text-[#D0D6E0] mb-1">
                   인증 코드 (6자리)
                 </label>
                 <div className="relative">
-                  <KeyRound size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <KeyRound size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]" />
                   <input
                     id="code"
                     type="text"
@@ -188,14 +188,14 @@ export default function LoginPage() {
                     placeholder="000000"
                     required
                     maxLength={6}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-gray-900 text-center text-xl tracking-[0.5em] font-mono"
+                    className="w-full pl-10 pr-4 py-3 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none transition-colors text-[#F7F8F8] text-center text-xl tracking-[0.5em] font-mono"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={loading || code.length !== 6}
-                className="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-3 bg-[#5E6AD2] text-white font-medium rounded-lg hover:bg-[#828FFF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? "확인 중..." : "확인"}
               </button>
@@ -203,7 +203,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => { setStep("email"); setCode(""); setError(""); }}
-                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                  className="text-sm text-[#8A8F98] hover:text-[#D0D6E0] flex items-center gap-1"
                 >
                   <ArrowLeft size={14} />
                   이메일 변경
@@ -212,7 +212,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleResend}
                   disabled={countdown > 0 || loading}
-                  className="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  className="text-sm text-[#7070FF] hover:text-[#828FFF] disabled:text-[#62666D] disabled:cursor-not-allowed"
                 >
                   {countdown > 0 ? `재발송 (${countdown}초)` : "코드 재발송"}
                 </button>

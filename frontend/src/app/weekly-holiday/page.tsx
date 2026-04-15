@@ -114,23 +114,23 @@ export default function WeeklyHolidayPage() {
   const warningColors = {
     danger: {
       border: "border-l-red-500",
-      bg: "bg-red-50",
-      badge: "bg-red-100 text-red-700",
-      text: "text-red-600",
+      bg: "bg-[#EB5757]/10",
+      badge: "bg-[#EB5757]/15 text-[#EB5757]",
+      text: "text-[#EB5757]",
       label: "위험",
     },
     caution: {
       border: "border-l-yellow-500",
-      bg: "bg-yellow-50",
-      badge: "bg-yellow-100 text-yellow-700",
-      text: "text-yellow-600",
+      bg: "bg-[#F0BF00]/10",
+      badge: "bg-[#F0BF00]/15 text-[#F0BF00]",
+      text: "text-[#F0BF00]",
       label: "주의",
     },
     safe: {
       border: "border-l-green-500",
-      bg: "bg-green-50",
-      badge: "bg-green-100 text-green-700",
-      text: "text-green-600",
+      bg: "bg-[#27A644]/10",
+      badge: "bg-[#27A644]/15 text-[#27A644]",
+      text: "text-[#27A644]",
       label: "안전",
     },
   };
@@ -139,31 +139,31 @@ export default function WeeklyHolidayPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-[#F7F8F8]">
           주휴수당 관리 현황판
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-[#8A8F98] mt-1">
           주 15시간 이상 + 5일 개근 시 주휴수당이 발생합니다
         </p>
       </div>
 
       {/* Week Navigation */}
-      <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-center justify-between bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
         <button
           onClick={() => setWeekOffset((p) => p - 1)}
-          className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[#8A8F98] hover:bg-[#141516]/5 rounded-lg transition-colors"
         >
           <ChevronLeft size={16} />
           이전 주
         </button>
         <div className="text-center">
-          <p className="text-lg font-semibold text-gray-900">
+          <p className="text-lg font-semibold text-[#F7F8F8]">
             {getWeekLabel(monday, sunday)}
           </p>
           {weekOffset !== 0 && (
             <button
               onClick={() => setWeekOffset(0)}
-              className="text-sm text-blue-600 hover:underline mt-1"
+              className="text-sm text-[#7070FF] hover:underline mt-1"
             >
               이번 주로 이동
             </button>
@@ -171,7 +171,7 @@ export default function WeeklyHolidayPage() {
         </div>
         <button
           onClick={() => setWeekOffset((p) => p + 1)}
-          className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-[#8A8F98] hover:bg-[#141516]/5 rounded-lg transition-colors"
         >
           다음 주
           <ChevronRight size={16} />
@@ -182,12 +182,12 @@ export default function WeeklyHolidayPage() {
       {loading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="animate-spin text-blue-500" size={32} />
-          <span className="ml-3 text-gray-500">불러오는 중...</span>
+          <span className="ml-3 text-[#8A8F98]">불러오는 중...</span>
         </div>
       )}
 
       {error && !loading && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700">
+        <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-4 text-[#EB5757]">
           {error}
         </div>
       )}
@@ -196,38 +196,38 @@ export default function WeeklyHolidayPage() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-sm text-gray-500">전체 근무자</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+              <p className="text-sm text-[#8A8F98]">전체 근무자</p>
+              <p className="text-3xl font-bold text-[#F7F8F8] mt-1">
                 {data.summary.total_workers}
               </p>
             </div>
-            <div className="bg-red-50 rounded-xl border border-red-200 p-5">
+            <div className="bg-[#EB5757]/10 rounded-xl border border-[#EB5757]/30 p-5">
               <div className="flex items-center gap-2">
-                <XCircle size={18} className="text-red-500" />
-                <p className="text-sm text-red-600 font-medium">
+                <XCircle size={18} className="text-[#EB5757]" />
+                <p className="text-sm text-[#EB5757] font-medium">
                   주휴수당 발생
                 </p>
               </div>
-              <p className="text-3xl font-bold text-red-700 mt-1">
+              <p className="text-3xl font-bold text-[#EB5757] mt-1">
                 {data.summary.danger_count}
               </p>
             </div>
-            <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-5">
+            <div className="bg-[#F0BF00]/10 rounded-xl border border-[#F0BF00]/30 p-5">
               <div className="flex items-center gap-2">
                 <AlertTriangle size={18} className="text-yellow-500" />
-                <p className="text-sm text-yellow-600 font-medium">주의</p>
+                <p className="text-sm text-[#F0BF00] font-medium">주의</p>
               </div>
-              <p className="text-3xl font-bold text-yellow-700 mt-1">
+              <p className="text-3xl font-bold text-[#F0BF00] mt-1">
                 {data.summary.caution_count}
               </p>
             </div>
-            <div className="bg-green-50 rounded-xl border border-green-200 p-5">
+            <div className="bg-[#27A644]/10 rounded-xl border border-[#27A644]/30 p-5">
               <div className="flex items-center gap-2">
                 <CheckCircle size={18} className="text-green-500" />
-                <p className="text-sm text-green-600 font-medium">안전</p>
+                <p className="text-sm text-[#27A644] font-medium">안전</p>
               </div>
-              <p className="text-3xl font-bold text-green-700 mt-1">
+              <p className="text-3xl font-bold text-[#27A644] mt-1">
                 {data.summary.safe_count}
               </p>
             </div>
@@ -235,7 +235,7 @@ export default function WeeklyHolidayPage() {
 
           {/* Worker Cards */}
           {data.workers.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-500">
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-10 text-center text-[#8A8F98]">
               이번 주 근무 기록이 없습니다.
             </div>
           ) : (
@@ -254,23 +254,23 @@ export default function WeeklyHolidayPage() {
                 return (
                   <div
                     key={worker.phone}
-                    className={`bg-white rounded-xl border border-gray-200 border-l-4 ${colors.border} p-5`}
+                    className={`bg-[#0F1011] rounded-xl border border-[#23252A] border-l-4 ${colors.border} p-5`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                       {/* Left: Info */}
                       <div className="flex-1 space-y-3">
                         {/* Name + badges */}
                         <div className="flex items-center gap-3 flex-wrap">
-                          <span className="text-lg font-semibold text-gray-900">
+                          <span className="text-lg font-semibold text-[#F7F8F8]">
                             {worker.name}
                           </span>
                           {worker.department && (
-                            <span className="text-xs font-medium px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                            <span className="text-xs font-medium px-2 py-0.5 bg-[#4EA7FC]/15 text-[#828FFF] rounded-full">
                               {worker.department}
                             </span>
                           )}
                           {worker.workplace && (
-                            <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                            <span className="text-xs font-medium px-2 py-0.5 bg-[#141516] text-[#8A8F98] rounded-full">
                               {worker.workplace}
                             </span>
                           )}
@@ -283,7 +283,7 @@ export default function WeeklyHolidayPage() {
 
                         {/* Day dots */}
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-400 w-12">
+                          <span className="text-xs text-[#62666D] w-12">
                             출근일:
                           </span>
                           <div className="flex gap-1.5">
@@ -295,14 +295,14 @@ export default function WeeklyHolidayPage() {
                                   key={idx}
                                   className="flex flex-col items-center gap-0.5"
                                 >
-                                  <span className="text-[10px] text-gray-400">
+                                  <span className="text-[10px] text-[#62666D]">
                                     {dayName}
                                   </span>
                                   <div
                                     className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
                                       worked
-                                        ? "bg-blue-500 text-white"
-                                        : "bg-gray-100 text-gray-300"
+                                        ? "bg-[#4EA7FC] text-white"
+                                        : "bg-[#141516] text-[#62666D]"
                                     }`}
                                   >
                                     {worked ? "O" : "-"}
@@ -311,31 +311,31 @@ export default function WeeklyHolidayPage() {
                               );
                             })}
                           </div>
-                          <span className="text-sm font-medium text-gray-700 ml-2">
+                          <span className="text-sm font-medium text-[#D0D6E0] ml-2">
                             {worker.work_days}일
                           </span>
                         </div>
 
                         {/* Hours bar */}
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400 w-12">
+                          <span className="text-xs text-[#62666D] w-12">
                             시간:
                           </span>
                           <div className="flex-1 max-w-xs">
                             <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="text-gray-500">
+                              <span className="text-[#8A8F98]">
                                 {worker.total_hours}시간
                               </span>
-                              <span className="text-gray-400">15시간</span>
+                              <span className="text-[#62666D]">15시간</span>
                             </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                            <div className="w-full bg-[#141516] rounded-full h-2.5 overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${
                                   overThreshold
-                                    ? "bg-red-500"
+                                    ? "bg-[#EB5757]"
                                     : hoursPercent >= 80
-                                    ? "bg-yellow-500"
-                                    : "bg-green-500"
+                                    ? "bg-[#F0BF00]"
+                                    : "bg-[#27A644]"
                                 }`}
                                 style={{ width: `${hoursPercent}%` }}
                               />

@@ -700,7 +700,7 @@ export { pool };
 
 // ===== Frontend URL Helpers =====
 // 도메인 변경 시 이 한 곳만 수정하면 모든 SMS 링크에 반영됨
-const FRONTEND_BASE = process.env.FRONTEND_URL || 'https://aisystem.nuldam.com/attendance';
+const FRONTEND_BASE = process.env.FRONTEND_URL || 'https://aisystem.nuldam.com';
 
 export function getFrontendUrl(path: string = ''): string {
   const base = FRONTEND_BASE.replace(/\/+$/, ''); // trailing slash 제거

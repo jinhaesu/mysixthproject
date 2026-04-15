@@ -1,9 +1,4 @@
 {
   "cleanUrls": true,
-  "trailingSlash": true,
-  "rewrites": [
-    { "source": "/attendance/_next/:path*", "destination": "/_next/:path*" },
-    { "source": "/attendance/:path*", "destination": "/:path*" },
-    { "source": "/attendance", "destination": "/" }
-  ]
+  "trailingSlash": true
 }

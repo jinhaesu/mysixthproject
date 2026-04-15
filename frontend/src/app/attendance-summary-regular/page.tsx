@@ -206,8 +206,7 @@ export default function AttendanceSummaryRegularPage() {
       const days = daysStr.split(',').map(Number).filter((n: number) => !isNaN(n));
       if (days.includes(dow)) return { in: s.planned_clock_in, out: s.planned_clock_out };
     }
-    // 3차: fallback
-    if (shifts && shifts.length > 0) return { in: shifts[0].planned_clock_in, out: shifts[0].planned_clock_out };
+    // 매칭되는 시프트 없으면 null — 배치 안 된 날짜에 가상 행 생성 방지
     return null;
   };
 

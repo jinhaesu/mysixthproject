@@ -6,6 +6,7 @@
  */
 
 import crypto from 'crypto';
+import { getSurveyUrl } from '../db';
 
 interface SendResult {
   success: boolean;
@@ -14,10 +15,9 @@ interface SendResult {
 }
 
 const SMS_PROVIDER = process.env.SMS_PROVIDER || 'mock';
-const SURVEY_BASE_URL = process.env.SURVEY_BASE_URL || 'http://localhost:3000/s';
 
 function buildSurveyUrl(token: string): string {
-  return `${SURVEY_BASE_URL}?token=${token}`;
+  return getSurveyUrl(token);
 }
 
 function buildMessage(surveyUrl: string, date: string, workplaceName: string, department?: string): string {

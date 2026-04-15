@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend, normalizePhone } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend, normalizePhone, getRegularUrl, getFrontendUrl } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms } from '../services/smsService';
 
@@ -144,8 +144,7 @@ router.post('/employees/:id/send-link', async (req: AuthRequest, res: Response) 
       return;
     }
 
-    const baseUrl = process.env.SURVEY_BASE_URL?.replace('/s', '/r') || 'http://localhost:3000/r';
-    const url = `${baseUrl}?token=${employee.token}`;
+    const url = getRegularUrl(employee.token);
     const message = `[조인앤조인 출퇴근]\n${employee.name}님, 출퇴근 기록 링크입니다.\n매일 이 링크로 출퇴근을 기록해주세요.\n${url}`;
 
     const result = await sendGeneralSms(employee.phone, message);
@@ -173,8 +172,7 @@ router.post('/employees/send-link-batch', async (req: AuthRequest, res: Response
       const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ? AND is_active = 1', id) as any;
       if (!employee) continue;
 
-      const baseUrl = process.env.SURVEY_BASE_URL?.replace('/s', '/r') || 'http://localhost:3000/r';
-      const url = `${baseUrl}?token=${employee.token}`;
+      const url = getRegularUrl(employee.token);
       const message = `[조인앤조인 출퇴근]\n${employee.name}님, 출퇴근 기록 링크입니다.\n매일 이 링크로 출퇴근을 기록해주세요.\n${url}`;
 
       const result = await sendGeneralSms(employee.phone, message);
@@ -516,8 +514,7 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
       WHERE re.is_active = 1
     `, today) as any;
 
-    const frontendUrl = process.env.FRONTEND_URL || process.env.SURVEY_BASE_URL?.replace('/s', '') || 'https://mysixthproject.vercel.app';
-    const detailLink = `${frontendUrl}/report-regular?date=${today}`;
+    const detailLink = getFrontendUrl(`/report-regular?date=${today}`);
     const message = `[조인앤조인 정규직 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근중: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
     const phones = JSON.parse(schedule.phones);
@@ -976,8 +973,7 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
       annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00'
     );
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://mysixthproject.vercel.app';
-    const contractLink = `${frontendUrl}/regular-contract?token=${token}`;
+    const contractLink = getFrontendUrl(`/regular-contract?token=${token}`);
     const message = `[조인앤조인 근로계약서]\n${employee.name}님, 근로계약서를 작성해주세요.\n아래 링크를 눌러 서명해주세요.\n${contractLink}`;
     await sendGeneralSms(employee.phone, message);
 

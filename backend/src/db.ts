@@ -698,6 +698,24 @@ export async function initializeDB(): Promise<void> {
 
 export { pool };
 
+// ===== Frontend URL Helpers =====
+// 도메인 변경 시 이 한 곳만 수정하면 모든 SMS 링크에 반영됨
+const FRONTEND_BASE = process.env.FRONTEND_URL || 'https://aisystem.nuldam.com/attendance';
+
+export function getFrontendUrl(path: string = ''): string {
+  const base = FRONTEND_BASE.replace(/\/+$/, ''); // trailing slash 제거
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${p}`;
+}
+
+export function getSurveyUrl(token: string): string {
+  return getFrontendUrl(`/s?token=${token}`);
+}
+
+export function getRegularUrl(token: string): string {
+  return getFrontendUrl(`/r?token=${token}`);
+}
+
 // ===== Phone Number Normalization =====
 // 010-1234-5678 → 01012345678 (대시, 공백 제거)
 export function normalizePhone(phone: string): string {

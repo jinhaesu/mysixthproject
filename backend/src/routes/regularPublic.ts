@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, getBusinessDate, normalizePhone } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, getBusinessDate, normalizePhone, getFrontendUrl } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 
@@ -120,8 +120,7 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
     );
 
     // Send confirmation SMS with contract view link
-    const frontendUrl = process.env.FRONTEND_URL || 'https://mysixthproject.vercel.app';
-    const viewLink = `${frontendUrl}/regular-contract?token=${token}`;
+    const viewLink = getFrontendUrl(`/regular-contract?token=${token}`);
     const message = `[조인앤조인 근로계약서]\n${contract.worker_name}님의 근로계약서가 체결되었습니다.\n계약기간: ${contract.contract_start} ~ ${contract.contract_end}\n\n계약서 확인: ${viewLink}`;
     await sendGeneralSms(contract.phone, message);
     await dbRun('UPDATE regular_labor_contracts SET sms_sent = 1 WHERE token = ?', token);

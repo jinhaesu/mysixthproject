@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import ChartCard from "@/components/charts/ChartCard";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { SEMANTIC_COLORS } from "@/lib/chartColors";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { ClipboardList, Loader2, ChevronDown, ChevronUp, Check, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { getAttendanceSummaryRegular, confirmAttendance, getConfirmedList, deleteConfirmedRecord, getRegularVacations, deleteRegularAttendanceMonth } from "@/lib/api";
@@ -427,6 +430,11 @@ export default function AttendanceSummaryRegularPage() {
   );
   const lastDay = new Date(year, month, 0).getDate();
 
+  const chartData = visibleEmployees.slice(0, 15).map((emp: any) => {
+    const s = getEmpSummary(emp, viewMode);
+    return { name: emp.name.slice(0, 3), 기본: s.regular, 연장: s.overtime, 주말: s.weekend };
+  });
+
   return (
     <div className="min-w-0">
       <div className="mb-6">
@@ -516,6 +524,24 @@ export default function AttendanceSummaryRegularPage() {
               <Check className="w-4 h-4" /> 개별 {checkedRows.size}건 확정
             </button>
           )}
+        </div>
+      )}
+
+      {/* Employee Hours Stacked Bar Chart */}
+      {!loading && visibleEmployees.length > 0 && (
+        <div className="mb-4">
+          <ChartCard title="직원별 근무시간 분석" subtitle="상위 15명 (기본/연장/주말)" height={280}>
+            <BarChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} unit="h" />
+              <Tooltip formatter={(value: number | undefined, name: string | undefined) => [`${value ?? 0}h`, name ?? '']} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="기본" stackId="a" fill={SEMANTIC_COLORS.regular} />
+              <Bar dataKey="연장" stackId="a" fill={SEMANTIC_COLORS.overtime} />
+              <Bar dataKey="주말" stackId="a" fill={SEMANTIC_COLORS.holiday} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ChartCard>
         </div>
       )}
 

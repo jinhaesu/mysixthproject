@@ -5,6 +5,9 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Loader2, Download } from "lucide-react";
 import { getPayrollCalc } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
+import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import ChartCard from "@/components/charts/ChartCard";
+import { getColor } from "@/lib/chartColors";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -109,6 +112,32 @@ export default function PayrollCalcPage() {
           <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><p className="text-lg font-bold text-green-700">{fmt.format(sum('net_pay'))}</p><p className="text-xs text-green-600">총 실지급액</p></div>
         </div>
       )}
+
+      {results.length > 0 && (() => {
+        const deductionData = [
+          { name: '국민연금', value: sum('national_pension') },
+          { name: '건강보험', value: sum('health_insurance') },
+          { name: '장기요양', value: sum('long_term_care') },
+          { name: '고용보험', value: sum('employment_insurance') },
+          { name: '소득세', value: sum('income_tax') },
+          { name: '주민세', value: sum('local_tax') },
+        ].filter(d => d.value > 0);
+        return (
+          <div className="mb-4">
+            <ChartCard title="공제 항목 구성" subtitle="국민연금, 건강보험, 장기요양, 고용보험, 소득세, 주민세" height={260}>
+              <PieChart>
+                <Pie data={deductionData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="75%" label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
+                  {deductionData.map((_entry, index) => (
+                    <Cell key={index} fill={getColor(index)} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number | string | Array<number | string> | undefined) => [`${fmt.format(Number(value ?? 0))}원`, '']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ChartCard>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" /></div>

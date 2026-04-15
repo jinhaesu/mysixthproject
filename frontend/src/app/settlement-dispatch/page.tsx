@@ -5,6 +5,11 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Loader2, Download } from "lucide-react";
 import { getConfirmedList, getWorkers } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
+import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import ChartCard from "@/components/charts/ChartCard";
+import { getColor } from "@/lib/chartColors";
+
+const krFmt = new Intl.NumberFormat('ko-KR');
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -245,6 +250,32 @@ export default function SettlementDispatchPage() {
           <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><p className="text-lg font-bold text-green-700">{fmt.format(totals.total)}</p><p className="text-xs text-green-600">최종액 (VAT포함)</p></div>
         </div>
       )}
+
+      {totals.grossPay > 0 && (() => {
+        const pieData = [
+          { name: '기본급', value: totals.basePay || 0 },
+          { name: '연장수당', value: totals.overtimePay || 0 },
+          { name: '야간수당', value: totals.nightPay || 0 },
+          { name: '주휴수당', value: totals.whPay || 0 },
+          { name: '보험료', value: totals.ins || 0 },
+          { name: '수수료', value: totals.fee || 0 },
+        ].filter(d => d.value > 0);
+        return (
+          <div className="mb-4">
+            <ChartCard title="급여 구성 비율" subtitle="기본급, 수당, 보험료, 수수료 분포" height={260}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="70%" label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
+                  {pieData.map((_entry, index) => (
+                    <Cell key={index} fill={getColor(index)} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number | string | Array<number | string> | undefined) => [`${krFmt.format(Number(value ?? 0))}원`, '']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ChartCard>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" /></div>

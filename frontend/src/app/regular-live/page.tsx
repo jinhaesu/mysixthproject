@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import HourlyChart from "@/components/HourlyChart";
+import ChartCard from "@/components/charts/ChartCard";
+import { PieChart, Pie, Cell, Tooltip } from "recharts";
+import { CHART_COLORS, getColor } from "@/lib/chartColors";
 import {
   getRegularDashboard,
   getRegularReportSchedules,
@@ -257,6 +260,37 @@ export default function RegularLivePage() {
               <p className="text-xs text-red-600 mt-1">미출근</p>
             </div>
           </div>
+
+          {/* Department Completion Donut Chart */}
+          {data && data.departments && data.departments.length > 0 && (() => {
+            const donutData = (data.departments || []).map((d: DepartmentSummary) => ({
+              name: d.department,
+              value: d.clocked_in + d.completed,
+            }));
+            return (
+              <div className="mb-6">
+                <ChartCard title="부서별 출근 현황" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={donutData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="50%"
+                      outerRadius="75%"
+                      dataKey="value"
+                      label={({ percent }) => percent != null ? `${(percent * 100).toFixed(0)}%` : ''}
+                      labelLine={false}
+                    >
+                      {donutData.map((_: any, i: number) => (
+                        <Cell key={i} fill={getColor(i)} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number | undefined, name: string | undefined) => [`${value ?? 0}명`, name ?? '']} />
+                  </PieChart>
+                </ChartCard>
+              </div>
+            );
+          })()}
 
           {/* Vacation Section */}
           {(data as any).vacations && (data as any).vacations.length > 0 && (

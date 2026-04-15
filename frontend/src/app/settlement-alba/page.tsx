@@ -5,6 +5,9 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Loader2, Download } from "lucide-react";
 import { getConfirmedList, getWorkers } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import ChartCard from "@/components/charts/ChartCard";
+import { SEMANTIC_COLORS } from "@/lib/chartColors";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -235,6 +238,29 @@ export default function SettlementAlbaPage() {
           <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-center"><p className="text-lg font-bold text-green-700">{fmt.format(totals.netPay)}</p><p className="text-xs text-green-600">실지급 합계</p></div>
         </div>
       )}
+
+      {rows.length > 0 && (() => {
+        const chartData = [...rows]
+          .sort((a: any, b: any) => (b.regular_hours + b.overtime_hours + b.night_hours) - (a.regular_hours + a.overtime_hours + a.night_hours))
+          .slice(0, 10)
+          .map((r: any) => ({ name: r.name, 기본: r.regular_hours, 연장: r.overtime_hours, 야간: r.night_hours || 0 }));
+        return (
+          <div className="mb-4">
+            <ChartCard title="근무시간 상위 인원 (기본/연장/야간)" subtitle="최대 10명, 총 근무시간 내림차순" height={320}>
+              <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 48 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} unit="h" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={48} />
+                <Tooltip formatter={(value: number | string | Array<number | string> | undefined, name: string | undefined) => [`${value ?? 0}h`, name ?? '']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="기본" stackId="a" fill={SEMANTIC_COLORS.regular} />
+                <Bar dataKey="연장" stackId="a" fill={SEMANTIC_COLORS.overtime} />
+                <Bar dataKey="야간" stackId="a" fill={SEMANTIC_COLORS.night} radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ChartCard>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-orange-600 mx-auto" /></div>

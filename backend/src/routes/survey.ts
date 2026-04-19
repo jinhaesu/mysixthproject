@@ -1403,6 +1403,52 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
         emp.actuals.push(a);
       }
     }
+
+    // Get planned-only survey_requests (past dates with planned times but no actual clock-in)
+    // This allows confirming attendance for past dates based on planned times
+    const today = new Date().toISOString().slice(0, 10);
+    const plannedOnly = await dbAll(`
+      SELECT sr.phone, sr.date, sr.planned_clock_in, sr.planned_clock_out
+      FROM survey_requests sr
+      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.date >= ? AND sr.date <= ? AND sr.date <= ?
+        AND sr.planned_clock_in IS NOT NULL AND sr.planned_clock_in != ''
+        AND (resp.clock_in_time IS NULL OR resp.id IS NULL)
+      ORDER BY sr.date
+    `, startDate, endDate, today) as any[];
+
+    // Add planned-only rows to actuals (skip duplicates)
+    for (const p of plannedOnly) {
+      let emp = phoneMap.get(p.phone);
+      // If phone not in phoneMap yet (worker never responded to any survey), look up from workers table
+      if (!emp) {
+        const wk = workerCategories.find((w: any) => w.phone === p.phone);
+        if (wk) {
+          let type = catMap.get(p.phone) || '';
+          if (type === 'dispatch' || type.includes('파견')) type = '파견';
+          else if (type === 'alba' || type.includes('알바') || type.includes('사업소득')) type = '알바';
+          else type = '';
+          emp = { phone: p.phone, name: wk.name_ko || p.phone, department: '', type, actuals: [], shifts: [] };
+          if (p.planned_clock_in) {
+            emp.shifts.push({ planned_clock_in: p.planned_clock_in, planned_clock_out: p.planned_clock_out || '', days_of_week: '1,2,3,4,5', day_of_week: 1 });
+          }
+          phoneMap.set(p.phone, emp);
+        }
+      }
+      if (!emp) continue;
+      // Skip if already has an actual for this date
+      if (emp.actuals.some((a: any) => a.date === p.date)) continue;
+      emp.actuals.push({
+        phone: p.phone,
+        date: p.date,
+        clock_in_time: null,
+        clock_out_time: null,
+        planned_clock_in: p.planned_clock_in,
+        planned_clock_out: p.planned_clock_out,
+        isPlannedOnly: true,
+      });
+    }
+
     for (const [phone, emp] of phoneMap) {
       emp.actual_days = emp.actuals.length;
       emp.id = phone;

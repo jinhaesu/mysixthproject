@@ -194,8 +194,10 @@ export default function AttendanceSummaryDispatchPage() {
     for (const actual of emp.actuals) {
       const date = actual.date;
       const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
-      const clockIn = mode === 'planned' && planned ? planned.in : formatTime(actual.clock_in_time);
-      const clockOut = mode === 'planned' && planned ? planned.out : formatTime(actual.clock_out_time);
+      // planned-only 행은 항상 계획 기준으로 계산
+      const useMode = actual.isPlannedOnly ? 'planned' : mode;
+      const clockIn = useMode === 'planned' && planned ? planned.in : formatTime(actual.clock_in_time);
+      const clockOut = useMode === 'planned' && planned ? planned.out : formatTime(actual.clock_out_time);
       if (clockIn === '-' && clockOut === '-') continue;
       days++;
       const breakH = getBreakHours(emp.id, date, clockIn, clockOut);
@@ -228,11 +230,14 @@ export default function AttendanceSummaryDispatchPage() {
         const [empId, date] = key.split('|');
         const emp = data?.employees?.find((e: any) => String(e.id) === empId);
         if (!emp) continue;
-        const source = selectedSource[key] || 'planned';
         const actual = emp.actuals.find((a: any) => a.date === date);
+        const source = selectedSource[key] || (actual?.isPlannedOnly ? 'planned' : 'planned');
         const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
-        const clockIn = source === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
-        const clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
+        let clockIn = source === 'actual' ? formatTime(actual?.clock_in_time) : (planned?.in || '');
+        let clockOut = source === 'actual' ? formatTime(actual?.clock_out_time) : (planned?.out || '');
+        // planned-only 행에서 실제가 없으면 계획으로 fallback
+        if ((clockIn === '-' || !clockIn) && planned?.in) clockIn = planned.in;
+        if ((clockOut === '-' || !clockOut) && planned?.out) clockOut = planned.out;
         const breakH = getBreakHours(parseInt(empId), date, clockIn, clockOut);
         const h = calcHoursFromTimes(clockIn, clockOut, breakH);
         records.push({ employee_type: emp.type || '파견', employee_name: emp.name, employee_phone: emp.phone, department: emp.department || '', date, confirmed_clock_in: clockIn, confirmed_clock_out: clockOut, source, regular_hours: h.regular, overtime_hours: h.overtime, night_hours: h.night, break_hours: breakH, year_month: `${year}-${String(month).padStart(2, '0')}` });
@@ -257,8 +262,11 @@ export default function AttendanceSummaryDispatchPage() {
         for (const actual of emp.actuals) {
           if (actual.date < startDate || actual.date > endDate) continue;
           const planned = getPlannedForDay(emp.shifts, actual.date, emp.actuals);
-          const clockIn = batchSource === 'actual' ? formatTime(actual.clock_in_time) : (planned?.in || formatTime(actual.clock_in_time));
-          const clockOut = batchSource === 'actual' ? formatTime(actual.clock_out_time) : (planned?.out || formatTime(actual.clock_out_time));
+          let clockIn = batchSource === 'actual' ? formatTime(actual.clock_in_time) : (planned?.in || formatTime(actual.clock_in_time));
+          let clockOut = batchSource === 'actual' ? formatTime(actual.clock_out_time) : (planned?.out || formatTime(actual.clock_out_time));
+          // planned-only 행에서 실제가 없으면 계획으로 fallback
+          if ((clockIn === '-' || !clockIn) && planned?.in) clockIn = planned.in;
+          if ((clockOut === '-' || !clockOut) && planned?.out) clockOut = planned.out;
           if (clockIn === '-' && clockOut === '-') continue;
           const breakH = getBreakHours(emp.id, actual.date, clockIn, clockOut);
           const h = calcHoursFromTimes(clockIn, clockOut, breakH);
@@ -303,7 +311,7 @@ export default function AttendanceSummaryDispatchPage() {
           <ClipboardList className="w-6 h-6 text-[#7070FF]" />
           사업소득(알바)/파견 근태 정보 종합 요약
         </h1>
-        <p className="text-sm text-[#8A8F98] mt-1">실제 출퇴근 기록이 있는 직원만 표시됩니다.</p>
+        <p className="text-sm text-[#8A8F98] mt-1">실제 출퇴근 기록 또는 계획 출퇴근이 있는 직원이 표시됩니다.</p>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end mb-4">
@@ -499,14 +507,15 @@ export default function AttendanceSummaryDispatchPage() {
                           const isAnomaly = (diffIn >= 3 || diffOut >= 3) && plannedIn !== '-';
                           const dowNum = new Date(date + 'T00:00:00+09:00').getDay();
                           const dow = ['일','월','화','수','목','금','토'][dowNum];
-                          const source = selectedSource[key] || 'planned';
+                          const isPlannedOnly = actual.isPlannedOnly;
+                          const source = selectedSource[key] || (isPlannedOnly ? 'planned' : 'planned');
                           const isDayConfirmed = confirmedSet.has(`${emp.name}|${date}`);
                           const useClockIn = source === 'actual' ? actualIn : (plannedIn !== '-' ? plannedIn : actualIn);
                           const useClockOut = source === 'actual' ? actualOut : (plannedOut !== '-' ? plannedOut : actualOut);
                           const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);
                           const mealChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
                           return (
-                            <tr key={date} className={isDayConfirmed ? 'bg-[#27A644]/10' : isAnomaly ? 'bg-[#EB5757]/10' : 'bg-[#0F1011]'}>
+                            <tr key={date} className={isDayConfirmed ? 'bg-[#27A644]/10' : isPlannedOnly ? 'bg-[#4EA7FC]/5' : isAnomaly ? 'bg-[#EB5757]/10' : 'bg-[#0F1011]'}>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -516,7 +525,7 @@ export default function AttendanceSummaryDispatchPage() {
                                     className="rounded border-[#23252A]" />
                                 )}
                               </td>
-                              <td className="py-1.5 px-3 text-[#D0D6E0]">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-[#27A644]">확정</span>}</td>
+                              <td className="py-1.5 px-3 text-[#D0D6E0]">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-[#27A644]">확정</span>}{isPlannedOnly && !isDayConfirmed && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[#4EA7FC]/15 text-[#828FFF]">계획만</span>}</td>
                               <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-[#EB5757] font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-[#8A8F98]'}`}>{dow}</td>
                               <td className="py-1.5 px-3 text-[#828FFF]">{plannedIn}</td>
                               <td className="py-1.5 px-3 text-[#828FFF]">{plannedOut}</td>

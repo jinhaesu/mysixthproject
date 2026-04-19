@@ -618,7 +618,36 @@ router.put('/vacations/:id/reject', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { admin_memo } = req.body;
+    const request = await dbGet('SELECT * FROM regular_vacation_requests WHERE id = ?', id) as any;
+    if (!request) { res.status(404).json({ error: '휴가 신청을 찾을 수 없습니다.' }); return; }
+
+    const wasApproved = request.status === 'approved';
     await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'rejected', admin_memo || '', id);
+
+    // 이미 승인되었던 연차를 거절/취소하는 경우: confirmed_attendance 삭제 + used_days 차감
+    if (wasApproved) {
+      const emp = await dbGet('SELECT name FROM regular_employees WHERE id = ?', request.employee_id) as any;
+      if (emp) {
+        const start = new Date(request.start_date + 'T00:00:00+09:00');
+        const end = new Date(request.end_date + 'T00:00:00+09:00');
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          try {
+            await dbRun(
+              `DELETE FROM confirmed_attendance WHERE employee_type = '정규직' AND employee_name = ? AND date = ? AND source = 'vacation'`,
+              emp.name, dateStr
+            );
+          } catch {}
+        }
+      }
+      // used_days 차감
+      const year = parseInt(request.start_date.slice(0, 4));
+      const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
+      if (balance) {
+        await dbRun('UPDATE regular_vacation_balances SET used_days = GREATEST(used_days - ?, 0), updated_at = NOW() WHERE id = ?', request.days, balance.id);
+      }
+    }
+
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

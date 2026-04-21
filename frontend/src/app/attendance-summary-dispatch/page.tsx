@@ -189,8 +189,45 @@ export default function AttendanceSummaryDispatchPage() {
     return hasMeal ? 1.5 : 1;
   };
 
+  // 주간 근무일수 기반 휴일근무 판정 (정산 로직과 동일: days > 5이면 주말=휴일근무)
+  const getWeeklyDayCounts = (actuals: any[], mode: 'actual' | 'planned', shifts: any[]) => {
+    const weekMap = new Map<string, Set<string>>();
+    for (const actual of actuals) {
+      const planned = getPlannedForDay(shifts, actual.date, actuals);
+      const useMode = actual.isPlannedOnly ? 'planned' : mode;
+      const clockIn = useMode === 'planned' && planned ? planned.in : formatTime(actual.clock_in_time);
+      const clockOut = useMode === 'planned' && planned ? planned.out : formatTime(actual.clock_out_time);
+      if (clockIn === '-' && clockOut === '-') continue;
+      const d = new Date(actual.date + 'T00:00:00+09:00');
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - d.getDay());
+      const weekKey = weekStart.toISOString().slice(0, 10);
+      if (!weekMap.has(weekKey)) weekMap.set(weekKey, new Set());
+      weekMap.get(weekKey)!.add(actual.date);
+    }
+    return weekMap;
+  };
+
+  // 해당 날짜가 휴일근무에 해당하는지 (주 5일 초과 시 주말=휴일, 아니면 공휴일만 휴일)
+  const isHolidayWorkDate = (date: string, weekMap: Map<string, Set<string>>) => {
+    if (!isHolidayOrWeekend(date)) return false;
+    const d = new Date(date + 'T00:00:00+09:00');
+    const weekStart = new Date(d);
+    weekStart.setDate(d.getDate() - d.getDay());
+    const weekKey = weekStart.toISOString().slice(0, 10);
+    const weekDays = weekMap.get(weekKey);
+    const dayCount = weekDays ? weekDays.size : 0;
+    // 주 5일 초과(6일+): 주말/공휴일 모두 휴일근무
+    if (dayCount > 5) return true;
+    // 주 5일 이하: 공휴일만 휴일근무 (토일은 일반근무)
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) return false; // 토/일은 휴일 아님
+    return (HOLIDAYS[d.getFullYear()] || []).includes(date); // 공휴일만
+  };
+
   const getEmpSummary = (emp: any, mode: 'actual' | 'planned') => {
     let regular = 0, overtime = 0, weekend = 0, days = 0;
+    const weekMap = getWeeklyDayCounts(emp.actuals, mode, emp.shifts);
     for (const actual of emp.actuals) {
       const date = actual.date;
       const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
@@ -203,7 +240,7 @@ export default function AttendanceSummaryDispatchPage() {
       const breakH = getBreakHours(emp.id, date, clockIn, clockOut);
       const h = calcHoursFromTimes(clockIn, clockOut, breakH);
       const totalH = h.regular + h.overtime;
-      if (isHolidayOrWeekend(date)) {
+      if (isHolidayWorkDate(date, weekMap)) {
         overtime += totalH;
         weekend += totalH;
       } else {
@@ -430,7 +467,7 @@ export default function AttendanceSummaryDispatchPage() {
                       <span className="text-[#8A8F98]">{summary.days}일</span>
                       <span className="text-[#828FFF] font-medium">기본 {summary.regular}h</span>
                       <span className="text-[#F0BF00] font-medium">연장 {summary.overtime}h</span>
-                      <span className="text-[#EB5757] font-medium">주말 {summary.weekend}h</span>
+                      <span className="text-[#EB5757] font-medium">휴일근무 {summary.weekend}h</span>
                       {expanded ? <ChevronUp className="w-4 h-4 text-[#62666D]" /> : <ChevronDown className="w-4 h-4 text-[#62666D]" />}
                     </div>
                   </button>
@@ -494,7 +531,9 @@ export default function AttendanceSummaryDispatchPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#23252A]">
-                        {emp.actuals.map((actual: any) => {
+                        {(() => {
+                          const weekMap = getWeeklyDayCounts(emp.actuals, viewMode, emp.shifts);
+                          return emp.actuals.map((actual: any) => {
                           const date = actual.date;
                           const planned = getPlannedForDay(emp.shifts, date, emp.actuals);
                           const key = `${emp.id}|${date}`;
@@ -514,8 +553,9 @@ export default function AttendanceSummaryDispatchPage() {
                           const useClockOut = source === 'actual' ? actualOut : (plannedOut !== '-' ? plannedOut : actualOut);
                           const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);
                           const mealChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
+                          const isHolidayW = isHolidayWorkDate(date, weekMap);
                           return (
-                            <tr key={date} className={isDayConfirmed ? 'bg-[#27A644]/10' : isPlannedOnly ? 'bg-[#4EA7FC]/5' : isAnomaly ? 'bg-[#EB5757]/10' : 'bg-[#0F1011]'}>
+                            <tr key={date} className={isDayConfirmed ? 'bg-[#27A644]/10' : isHolidayW ? 'bg-[#EB5757]/10' : isPlannedOnly ? 'bg-[#4EA7FC]/5' : isAnomaly ? 'bg-[#EB5757]/10' : 'bg-[#0F1011]'}>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -525,7 +565,7 @@ export default function AttendanceSummaryDispatchPage() {
                                     className="rounded border-[#23252A]" />
                                 )}
                               </td>
-                              <td className="py-1.5 px-3 text-[#D0D6E0]">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-[#27A644]">확정</span>}{isPlannedOnly && !isDayConfirmed && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[#4EA7FC]/15 text-[#828FFF]">계획만</span>}</td>
+                              <td className="py-1.5 px-3 text-[#D0D6E0]">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-[#27A644]">확정</span>}{isHolidayW && !isDayConfirmed && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[#EB5757]/15 text-[#EB5757]">휴일근무</span>}{isPlannedOnly && !isDayConfirmed && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[#4EA7FC]/15 text-[#828FFF]">계획만</span>}</td>
                               <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-[#EB5757] font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-[#8A8F98]'}`}>{dow}</td>
                               <td className="py-1.5 px-3 text-[#828FFF]">{plannedIn}</td>
                               <td className="py-1.5 px-3 text-[#828FFF]">{plannedOut}</td>
@@ -577,7 +617,8 @@ export default function AttendanceSummaryDispatchPage() {
                               </td>
                             </tr>
                           );
-                        })}
+                        });
+                        })()}
                       </tbody>
                     </table>
                   </div>

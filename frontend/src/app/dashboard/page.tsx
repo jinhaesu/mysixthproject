@@ -744,7 +744,7 @@ function DashboardContent() {
                             );
                           });
                           fragment.push(
-                            <tr key={`sub-${gi}`} className="bg-[#4EA7FC]/10 border-b border-[#5E6AD2]/30 font-semibold text-blue-900">
+                            <tr key={`sub-${gi}`} className="bg-[#4EA7FC]/10 border-b border-[#5E6AD2]/30 font-semibold text-[#4EA7FC]">
                               <td className="px-3 py-2" colSpan={4}>{g.key} 소계</td>
                               <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.attendance_count}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours + floor30g(g.subtotal.overtime_hours) + g.subtotal.night_hours)}</td>
@@ -928,7 +928,7 @@ function DashboardContent() {
                           const catDiff = catCurSal - catPrevSal;
 
                           const subtotalRow = (
-                            <tr key={`sub-${cat}`} className="bg-[#4EA7FC]/10 border-b border-[#5E6AD2]/30 font-semibold text-blue-900">
+                            <tr key={`sub-${cat}`} className="bg-[#4EA7FC]/10 border-b border-[#5E6AD2]/30 font-semibold text-[#4EA7FC]">
                               <td className="px-3 py-2" colSpan={2}>{cat} 소계</td>
                               <td className="text-right px-3 py-2 tabular-nums border-l border-blue-100">{fmt(catCurReg)}</td>
                               <td className="text-right px-3 py-2 tabular-nums">{fmt(catCurOt)}</td>

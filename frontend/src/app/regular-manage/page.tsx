@@ -2369,7 +2369,7 @@ function ShiftsTab() {
                 <div className="space-y-1">
                   {calPopupAssignments.map((a: any) => (
                     <div key={a.employee_id} className="flex items-center justify-between bg-[#27A644]/10 rounded-lg px-3 py-2">
-                      <span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-[#27A644]">{a.department} {a.team}</span></span>
+                      <span className="text-sm font-medium text-[#27A644]">{a.name} <span className="text-xs text-[#27A644]">{a.department} {a.team}</span></span>
                       <button onClick={() => handleCalPopupRemove(a.employee_id)} className="text-xs text-[#EB5757] hover:text-[#EB5757]">해제</button>
                     </div>
                   ))}
@@ -2586,7 +2586,7 @@ function ShiftsTab() {
             <p className="text-sm text-[#8A8F98] mb-4">{selectedShift.name} · {parseDays(selectedShift.days_of_week || String(selectedShift.day_of_week)).map((d: number) => DAY_NAMES[d]).join('/')}요일 · {selectedShift.planned_clock_in}~{selectedShift.planned_clock_out}</p>
             {assignments.length > 0 && (
               <div className="mb-4"><h4 className="text-xs font-semibold text-[#8A8F98] mb-2">배정된 직원 ({assignments.length}명)</h4><div className="space-y-1">{assignments.map((a: any) => (
-                <div key={a.employee_id} className="flex items-center justify-between bg-[#27A644]/10 rounded-lg px-3 py-2"><span className="text-sm font-medium text-green-900">{a.name} <span className="text-xs text-[#27A644]">{a.department} {a.team}</span></span><button onClick={() => handleRemove(a.employee_id)} className="text-xs text-[#EB5757] hover:text-[#EB5757]">해제</button></div>
+                <div key={a.employee_id} className="flex items-center justify-between bg-[#27A644]/10 rounded-lg px-3 py-2"><span className="text-sm font-medium text-[#27A644]">{a.name} <span className="text-xs text-[#27A644]">{a.department} {a.team}</span></span><button onClick={() => handleRemove(a.employee_id)} className="text-xs text-[#EB5757] hover:text-[#EB5757]">해제</button></div>
               ))}</div></div>
             )}
             <div>

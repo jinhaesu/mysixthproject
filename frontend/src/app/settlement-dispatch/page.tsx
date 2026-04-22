@@ -356,7 +356,7 @@ export default function SettlementDispatchPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-[#4EA7FC]/10 border-t-2 border-[#5E6AD2]/30 font-bold text-[10px]">
-                  <td className="py-2 px-1.5 text-blue-900" colSpan={2}>합계 ({rows.length}명)</td>
+                  <td className="py-2 px-1.5 text-[#4EA7FC]" colSpan={2}>합계 ({rows.length}명)</td>
                   <td className="py-2 px-1.5 text-right">{totals.work_days}</td>
                   <td className="py-2 px-1.5 text-right">{(totals.regular_hours || 0).toFixed(1)}</td>
                   <td className="py-2 px-1.5 text-right">{(totals.overtime_hours || 0).toFixed(1)}</td>
@@ -376,7 +376,7 @@ export default function SettlementDispatchPage() {
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.ins)}</td>
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.fee)}</td>
                   <td className="py-2 px-1.5 text-right">{fmt.format(totals.vat)}</td>
-                  <td className="py-2 px-1.5 text-right text-blue-900">{fmt.format(totals.total)}</td>
+                  <td className="py-2 px-1.5 text-right text-[#4EA7FC]">{fmt.format(totals.total)}</td>
                 </tr>
               </tfoot>
             </table>

@@ -96,7 +96,7 @@ export default function ManagePage() {
 
       <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-xl p-4 mb-6 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-blue-900">근무자 DB 구분(파견/알바) 일괄 채우기</h3>
+          <h3 className="text-sm font-semibold text-[#4EA7FC]">근무자 DB 구분(파견/알바) 일괄 채우기</h3>
           <p className="text-xs text-[#828FFF] mt-1">구분이 비어있는 근무자에 대해 출퇴근 기록에서 파견/알바 유형을 찾아 자동 채웁니다.</p>
         </div>
         <button onClick={async () => {

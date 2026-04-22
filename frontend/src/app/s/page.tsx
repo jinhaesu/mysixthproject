@@ -205,7 +205,7 @@ function SurveyContent() {
     const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#000';
+    ctx.strokeStyle = '#F7F8F8';
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -558,7 +558,7 @@ function SurveyContent() {
                 className="py-6 bg-[#FC7840]/10 border-2 border-[#FC7840]/30 rounded-xl text-center hover:bg-[#FC7840]/15 hover:border-orange-400 transition-all"
               >
                 <p className="text-2xl mb-1">📋</p>
-                <p className="font-bold text-orange-800">알바</p>
+                <p className="font-bold text-[#FC7840]">알바</p>
                 <p className="text-xs text-[#FC7840] mt-1">단기 근로계약</p>
               </button>
             </div>
@@ -657,7 +657,7 @@ function SurveyContent() {
           <div className="flex items-center justify-between bg-[#08090A] rounded-xl px-4 py-3 border border-[#23252A]">
             <div className="flex items-center gap-2">
               <span className="text-sm text-[#8A8F98]">근무 유형:</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-bold ${workerType === 'dispatch' ? 'bg-[#4EA7FC]/15 text-[#828FFF]' : 'bg-[#FC7840]/15 text-orange-800'}`}>
+              <span className={`px-3 py-1 rounded-full text-sm font-bold ${workerType === 'dispatch' ? 'bg-[#4EA7FC]/15 text-[#828FFF]' : 'bg-[#FC7840]/15 text-[#FC7840]'}`}>
                 {workerType === 'dispatch' ? '파견' : '알바'}
               </span>
             </div>

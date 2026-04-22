@@ -173,7 +173,7 @@ export default function OrgChartPage() {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className={`font-medium ${isDept ? "text-blue-900" : "text-[#F7F8F8]"}`}>{node.name}</span>
+              <span className={`font-medium ${isDept ? "text-[#4EA7FC]" : "text-[#F7F8F8]"}`}>{node.name}</span>
               {node.position && <span className="text-xs text-[#8A8F98] bg-[#141516] px-1.5 py-0.5 rounded">{node.position}</span>}
               {node.employment_type && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${

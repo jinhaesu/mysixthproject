@@ -209,7 +209,7 @@ export default function SettlementAlbaPage() {
           <Calculator className="w-6 h-6 text-[#FC7840]" />
           알바(사업소득) 정산관리
         </h1>
-        <div className="mt-2 bg-[#FC7840]/10 border border-[#FC7840]/30 rounded-lg px-3 py-2 text-xs text-orange-800">
+        <div className="mt-2 bg-[#FC7840]/10 border border-[#FC7840]/30 rounded-lg px-3 py-2 text-xs text-[#FC7840]">
           <b>수당 계산:</b> 시급×1.5배 | <b>30분 내림</b> | 주5일 이하 휴일→수당없음 | 주5일 초과+휴일→휴일수당 | 공휴일→무조건 휴일수당 | 야간(22~06)→연장 | 소득세3.3%+지방세0.33%
         </div>
       </div>

@@ -417,7 +417,7 @@ export default function PayrollPage() {
                   {grandTotal && (
                     <tfoot>
                       <tr className="bg-[#4EA7FC]/10 border-t-2 border-[#5E6AD2]/30 font-bold">
-                        <td className="px-4 py-3 text-blue-900" colSpan={7}>
+                        <td className="px-4 py-3 text-[#4EA7FC]" colSpan={7}>
                           합계 ({grandTotal.workers}명)
                         </td>
                         <td className="px-4 py-3 text-right text-[#F7F8F8]">{formatNum(grandTotal.base_pay)}</td>

@@ -54,7 +54,7 @@ function SignaturePad({
     const { x, y } = getPos(e, canvas);
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#111';
+    ctx.strokeStyle = '#F7F8F8';
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -379,13 +379,13 @@ function RegularContractContent() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[#4EA7FC]/10 rounded-lg p-3 border border-blue-100">
-                  <p className="font-bold text-blue-900 text-xs mb-1">(사업주)</p>
+                  <p className="font-bold text-[#4EA7FC] text-xs mb-1">(사업주)</p>
                   <p className="text-xs">사업체명: (주)조인앤조인</p>
                   <p className="text-xs">주소: 전북특별자치도 전주시 덕진구 기린대로 458</p>
                   <p className="text-xs">대표자: 진해수 (인)</p>
                 </div>
                 <div className="bg-[#27A644]/10 rounded-lg p-3 border border-green-100">
-                  <p className="font-bold text-green-900 text-xs mb-1">(근로자)</p>
+                  <p className="font-bold text-[#27A644] text-xs mb-1">(근로자)</p>
                   <p className="text-xs">성명: <b>{contract.worker_name}</b></p>
                   {contract.birth_date && <p className="text-xs">생년월일: {contract.birth_date}</p>}
                   {contract.address && <p className="text-xs">주소: {contract.address}</p>}
@@ -452,7 +452,7 @@ function RegularContractContent() {
             })()}
           </p>
 
-          <div className="bg-[#4EA7FC]/10 rounded-lg p-3 text-xs text-blue-900 border border-blue-100">
+          <div className="bg-[#4EA7FC]/10 rounded-lg p-3 text-xs text-[#4EA7FC] border border-blue-100">
             <p className="font-bold">(사업주) (주)조인앤조인</p>
             <p>주소: 전북특별자치도 전주시 덕진구 기린대로 458</p>
             <p>대표자: 진해수 (인)</p>

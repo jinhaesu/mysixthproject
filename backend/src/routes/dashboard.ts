@@ -83,7 +83,8 @@ router.get('/home-stats', async (req: AuthRequest, res: Response) => {
     // Build date range for the given year_month (first day ~ last day)
     const [ymYear, ymMonth] = year_month.split('-').map(Number);
     const firstDay = `${year_month}-01`;
-    const lastDay  = new Date(ymYear, ymMonth, 0).toISOString().slice(0, 10); // last day of month
+    const lastDayNum = new Date(ymYear, ymMonth, 0).getDate();
+    const lastDay = `${year_month}-${String(lastDayNum).padStart(2, '0')}`;
 
     const vacationRows = await dbAll(
       `SELECT rvr.type, rvr.days
@@ -307,7 +308,7 @@ router.get('/home-stats', async (req: AuthRequest, res: Response) => {
     });
   } catch (error: any) {
     console.error('GET /api/dashboard/home-stats error:', error);
-    res.status(500).json({ error: '대시보드 데이터 조회 중 오류가 발생했습니다.' });
+    res.status(500).json({ error: `대시보드 데이터 조회 중 오류: ${error.message || error}` });
   }
 });
 

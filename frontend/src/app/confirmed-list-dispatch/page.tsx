@@ -130,6 +130,9 @@ export default function ConfirmedListDispatchPage() {
             <option value="물류">물류</option>
             <option value="생산2층">생산2층</option>
             <option value="생산3층">생산3층</option>
+            <option value="카페(해방촌)">카페(해방촌)</option>
+            <option value="카페(행궁동)">카페(행궁동)</option>
+            <option value="카페(경복궁)">카페(경복궁)</option>
           </select>
         </div>
         <div>

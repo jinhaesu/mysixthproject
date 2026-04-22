@@ -469,6 +469,9 @@ export default function AttendanceSummaryRegularPage() {
             <option value="생산3층">생산3층</option>
             <option value="생산 야간">생산 야간</option>
             <option value="물류 야간">물류 야간</option>
+            <option value="카페(해방촌)">카페(해방촌)</option>
+            <option value="카페(행궁동)">카페(행궁동)</option>
+            <option value="카페(경복궁)">카페(경복궁)</option>
           </select>
         </div>
         <div>

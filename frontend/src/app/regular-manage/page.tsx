@@ -53,7 +53,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 
-const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간"];
+const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간", "카페(해방촌)", "카페(행궁동)", "카페(경복궁)"];
 const TEAMS = ["1조", "2조", "3조"];
 const ROLES = ["일반", "조장", "반장"];
 const LEADER_ROLES = ["조장", "반장"];
@@ -840,6 +840,9 @@ export default function RegularManagePage() {
                     <option value="물류1층">물류1층</option>
                     <option value="생산 야간">생산 야간</option>
                     <option value="물류 야간">물류 야간</option>
+                    <option value="카페(해방촌)">카페(해방촌)</option>
+                    <option value="카페(행궁동)">카페(행궁동)</option>
+                    <option value="카페(경복궁)">카페(경복궁)</option>
                   </select>
                 </div>
               </div>

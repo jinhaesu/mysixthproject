@@ -15,6 +15,7 @@ import payrollRoutes from './routes/payroll';
 import workersRoutes from './routes/workers';
 import regularRoutes from './routes/regular';
 import regularPublicRoutes from './routes/regularPublic';
+import dashboardRoutes from './routes/dashboard';
 import { requireAuth } from './middleware/auth';
 import { startReminderService } from './services/reminderService';
 
@@ -47,6 +48,7 @@ app.use('/api/payroll', requireAuth, payrollRoutes);
 app.use('/api/workers', requireAuth, workersRoutes);
 app.use('/api/regular', requireAuth, regularRoutes);
 app.use('/api/regular-public', regularPublicRoutes);
+app.use('/api/dashboard', requireAuth, dashboardRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

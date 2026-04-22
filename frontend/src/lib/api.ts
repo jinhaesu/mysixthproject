@@ -601,3 +601,8 @@ export async function getPayrollCalc(yearMonth: string) {
 export async function getSettlement(yearMonth: string, type: string) {
   return fetchAPI<any>(`/api/survey/settlement?year_month=${yearMonth}&type=${type}`);
 }
+
+// ===== Dashboard Home Stats =====
+export async function getDashboardHomeStats(yearMonth: string) {
+  return fetchAPI<any>(`/api/dashboard/home-stats?year_month=${yearMonth}`);
+}

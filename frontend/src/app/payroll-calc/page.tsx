@@ -47,8 +47,10 @@ export default function PayrollCalcPage() {
     const otPay = Math.round(otHours * overtimeRate * 1.5);
     const holPay = Math.round(holHours * overtimeRate * 1.5);
     const nightPay = Math.round(nightHours * overtimeRate * 1.5); // 야간시간은 기본에서 분리됨, 1.5배
-    const gross = (r.base_pay || 0) + (r.meal_allowance || 0) + (r.bonus || 0) + (r.position_allowance || 0) + (r.other_allowance || 0) + otPay + holPay + nightPay;
-    const taxBase = (r.base_pay || 0) + (r.meal_allowance || 0);
+    const basePay = r.base_pay || 0;
+    const mealAllow = r.meal_allowance || 0;
+    const gross = basePay + mealAllow + (r.bonus || 0) + (r.position_allowance || 0) + (r.other_allowance || 0) + otPay + holPay + nightPay;
+    const taxBase = basePay + mealAllow;
     const np = Math.round(taxBase * 0.045);
     const hi = Math.round(taxBase * 0.03545);
     const ltc = Math.round(hi * 0.1281);
@@ -63,8 +65,8 @@ export default function PayrollCalcPage() {
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','은행','계좌번호','주민번호','기본급','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금','건강보험','장기요양','고용보험','소득세','주민세','공제계','실지급액'];
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.bank_name, r.bank_account, r.id_number, r.base_pay, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, (r.holiday_hours || 0).toFixed(1), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
+    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금','건강보험','장기요양','고용보험','소득세','주민세','공제계','실지급액'];
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name, r.bank_account, r.id_number, r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, (r.holiday_hours || 0).toFixed(1), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
     const csv = [header, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -146,9 +148,11 @@ export default function PayrollCalcPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-[10px]">
               <thead>
-                <tr className="bg-[#08090A] text-left">
-                  <th className="py-2 px-2">성명</th>
+                <tr className="bg-[#08090A] text-left whitespace-nowrap">
+                  <th className="py-2 px-2 sticky left-0 bg-[#08090A] z-10">성명</th>
                   <th className="py-2 px-2">부서</th>
+                  <th className="py-2 px-2">입사일</th>
+                  <th className="py-2 px-2">퇴사일</th>
                   <th className="py-2 px-2">은행</th>
                   <th className="py-2 px-2">계좌번호</th>
                   <th className="py-2 px-2">주민번호</th>
@@ -175,13 +179,18 @@ export default function PayrollCalcPage() {
               </thead>
               <tbody className="divide-y divide-[#23252A]">
                 {results.map((r: any, i: number) => (
-                  <tr key={i} className="hover:bg-[#141516]/5">
-                    <td className="py-1.5 px-2 font-medium text-[#F7F8F8] whitespace-nowrap">{r.name}</td>
+                  <tr key={i} className="hover:bg-[#141516] whitespace-nowrap">
+                    <td className="py-1.5 px-2 font-medium text-[#F7F8F8] sticky left-0 bg-[#0F1011] z-10">{r.name}</td>
                     <td className="py-1.5 px-2 text-[#8A8F98]">{r.department} {r.team}</td>
+                    <td className="py-1.5 px-2 text-[#8A8F98] text-[9px]">{r.hire_date ? r.hire_date.slice(5) : '-'}</td>
+                    <td className="py-1.5 px-2 text-[9px]">{r.resign_date ? <span className="text-[#EB5757]">{r.resign_date.slice(5)}</span> : <span className="text-[#62666D]">-</span>}</td>
                     <td className="py-1.5 px-2 text-[#8A8F98] text-[9px]">{r.bank_name || '-'}</td>
                     <td className="py-1.5 px-2 text-[#8A8F98] font-mono text-[9px]">{r.bank_account || '-'}</td>
                     <td className="py-1.5 px-2 text-[#8A8F98] font-mono text-[9px]">{r.id_number || '-'}</td>
-                    <td className="py-1.5 px-2 text-right">{fmt.format(r.base_pay)}</td>
+                    <td className="py-1.5 px-2 text-right">
+                      {fmt.format(r.base_pay)}
+                      {r.prorate_ratio < 100 && <span className="ml-0.5 text-[8px] text-[#FC7840]">({r.prorate_ratio}%)</span>}
+                    </td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.meal_allowance)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.bonus)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.position_allowance || 0)}</td>
@@ -205,7 +214,7 @@ export default function PayrollCalcPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-[#5E6AD2]/10 border-t-2 border-[#5E6AD2]/30 font-bold text-[10px]">
-                  <td className="py-2 px-2 text-[#828FFF]" colSpan={10}>합계 ({results.length}명)</td>
+                  <td className="py-2 px-2 text-[#828FFF]" colSpan={12}>합계 ({results.length}명)</td>
                   <td className="py-2 px-2 text-right">{sum('work_days')}</td>
                   <td className="py-2 px-2 text-right">{sum('overtime_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('overtime_pay'))}</td>

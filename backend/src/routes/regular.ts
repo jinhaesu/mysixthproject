@@ -1555,6 +1555,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     // Get salary settings
     const salaries = await dbAll(`
       SELECT re.name, re.phone, re.department, re.team, re.hire_date,
+             COALESCE(re.resign_date, '') as resign_date,
              COALESCE(re.bank_name, '') as bank_name,
              COALESCE(re.bank_account, '') as bank_account,
              COALESCE(re.id_number, '') as id_number,
@@ -1566,10 +1567,11 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
              COALESCE(ss.overtime_hourly_rate, 0) as overtime_hourly_rate
       FROM regular_employees re
       LEFT JOIN regular_salary_settings ss ON re.id = ss.employee_id
-      WHERE re.is_active = 1
-    `) as any[];
+      WHERE re.is_active = 1 OR (re.resign_date != '' AND re.resign_date >= ?)
+    `, monthStart) as any[];
 
     const results = [];
+    const daysInMonth = lastDay;
     for (const sal of salaries) {
       const att = confirmedWithVacation.find(c => c.employee_name === sal.name);
       const overtimeHours = att?.total_overtime || 0;
@@ -1577,10 +1579,27 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;
       const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
-      const grossPay = parseFloat(sal.base_pay) + parseFloat(sal.meal_allowance) + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
 
-      // 4대보험 계산 (근로자 부담분)
-      const taxBase = parseFloat(sal.base_pay) + parseFloat(sal.meal_allowance);
+      // 입사일/퇴사일 기반 일할 계산
+      let workableDays = daysInMonth;
+      const hireDate = sal.hire_date || '';
+      const resignDate = sal.resign_date || '';
+      if (hireDate && hireDate > monthStart) {
+        const hireDayNum = parseInt(hireDate.slice(8, 10)) || 1;
+        workableDays = daysInMonth - hireDayNum + 1;
+      }
+      if (resignDate && resignDate >= monthStart && resignDate <= monthEnd) {
+        const resignDayNum = parseInt(resignDate.slice(8, 10)) || daysInMonth;
+        workableDays = Math.min(workableDays, resignDayNum);
+      }
+      const prorateRatio = Math.min(workableDays / daysInMonth, 1);
+
+      const basePay = Math.round(parseFloat(sal.base_pay) * prorateRatio);
+      const mealAllowance = Math.round(parseFloat(sal.meal_allowance) * prorateRatio);
+      const grossPay = basePay + mealAllowance + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
+
+      // 4대보험 계산 (근로자 부담분) - 일할 계산 기준
+      const taxBase = basePay + mealAllowance;
       const nationalPension = Math.round(taxBase * 0.045);      // 국민연금 4.5%
       const healthInsurance = Math.round(taxBase * 0.03545);     // 건강보험 3.545%
       const longTermCare = Math.round(healthInsurance * 0.1281); // 장기요양 12.81%
@@ -1594,9 +1613,12 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const netPay = grossPay - totalDeductions - incomeTax - localTax;
 
       results.push({
-        name: sal.name, phone: sal.phone, department: sal.department, team: sal.team, hire_date: sal.hire_date,
+        name: sal.name, phone: sal.phone, department: sal.department, team: sal.team,
+        hire_date: sal.hire_date || '', resign_date: resignDate,
         bank_name: sal.bank_name || '', bank_account: sal.bank_account || '', id_number: sal.id_number || '',
-        base_pay: parseFloat(sal.base_pay), meal_allowance: parseFloat(sal.meal_allowance),
+        base_pay_full: parseFloat(sal.base_pay), base_pay: basePay,
+        meal_allowance_full: parseFloat(sal.meal_allowance), meal_allowance: mealAllowance,
+        prorate_ratio: Math.round(prorateRatio * 100), workable_days: workableDays,
         bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),
         other_allowance: parseFloat(sal.other_allowance),
         overtime_hourly_rate: hourlyRate,

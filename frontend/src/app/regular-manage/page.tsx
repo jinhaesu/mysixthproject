@@ -1304,6 +1304,7 @@ function VacationTab() {
   const [calDept, setCalDept] = useState("");
   const [calVacations, setCalVacations] = useState<any[]>([]);
   const [calLoading, setCalLoading] = useState(false);
+  const [selectedCalDay, setSelectedCalDay] = useState<{ day: number; vacs: any[] } | null>(null);
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -1625,7 +1626,8 @@ function VacationTab() {
                       const isSun = colIdx === 6;
                       const vacsOnDay = day ? (vacsByDate.get(day) || []) : [];
                       return (
-                        <div key={idx} className={`bg-[#0F1011] min-h-[72px] p-1.5 ${!day ? 'bg-[#08090A]' : ''}`}>
+                        <div key={idx} className={`bg-[#0F1011] min-h-[72px] p-1.5 ${!day ? 'bg-[#08090A]' : vacsOnDay.length > 0 ? 'cursor-pointer hover:bg-[#141516]' : ''}`}
+                          onClick={() => { if (day && vacsOnDay.length > 0) setSelectedCalDay({ day, vacs: vacsOnDay }); }}>
                           {day && (
                             <>
                               <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
@@ -1647,7 +1649,7 @@ function VacationTab() {
                                   );
                                 })}
                                 {vacsOnDay.length > 4 && (
-                                  <div className="text-[10px] text-[#62666D] px-1">+{vacsOnDay.length - 4}명</div>
+                                  <div className="text-[10px] text-[#4EA7FC] px-1 font-medium">+{vacsOnDay.length - 4}명 더보기</div>
                                 )}
                               </div>
                             </>
@@ -1659,6 +1661,33 @@ function VacationTab() {
                 </div>
               )}
             </div>
+
+            {/* 날짜 클릭 모달 */}
+            {selectedCalDay && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSelectedCalDay(null)}>
+                <div className="bg-[#0F1011] rounded-xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] max-w-sm w-full p-5" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-semibold text-[#F7F8F8]">{calYear}년 {calMonth}월 {selectedCalDay.day}일 휴가자</h3>
+                    <button onClick={() => setSelectedCalDay(null)} className="text-[#62666D] hover:text-[#D0D6E0] text-lg">&times;</button>
+                  </div>
+                  <p className="text-xs text-[#8A8F98] mb-3">총 {selectedCalDay.vacs.length}명</p>
+                  <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                    {selectedCalDay.vacs.map((v: any, i: number) => {
+                      const typeColor = (v.type || '').includes('반차')
+                        ? 'bg-[#27A644]/15 text-[#27A644]'
+                        : 'bg-[#4EA7FC]/15 text-[#828FFF]';
+                      return (
+                        <div key={i} className="flex items-center gap-3 py-1.5 px-2 rounded-lg bg-[#08090A]">
+                          <span className="text-sm font-medium text-[#F7F8F8] flex-1">{v.employee_name}</span>
+                          <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${typeColor}`}>{v.type || '휴가'}</span>
+                          <span className="text-[10px] text-[#62666D]">{v.start_date}~{v.end_date}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}

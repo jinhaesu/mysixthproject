@@ -29,58 +29,31 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 프론트엔드에서 직접 휴가 데이터 계산
-  const loadVacationSummary = async (confirmed: any[]) => {
+  // 프론트엔드에서 직접 휴가 데이터 계산 (vacation_requests가 정확한 단일 소스)
+  const loadVacationSummary = async () => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-    const vacNames = new Set<string>();
     let vacationCount = 0, halfDayCount = 0, totalVacDays = 0;
+    const todayVacNames: string[] = [];
 
-    // 1. confirmed_attendance에서 source='vacation' 레코드 (오늘)
-    for (const emp of confirmed) {
-      for (const r of (emp.records || [])) {
-        if (r.date === todayStr && r.source === 'vacation') {
-          if (!vacNames.has(emp.name)) {
-            vacNames.add(emp.name);
-            if ((r.memo || '').includes('반차')) halfDayCount++;
-            else vacationCount++;
-          }
-        }
-        // 이번 달 전체 휴가일 수
-        if (r.source === 'vacation') totalVacDays++;
-      }
-    }
-
-    // 2. regular_vacation_requests에서 승인된 휴가 (오늘)
     try {
       const vacations = await getRegularVacations({ status: 'approved' });
       for (const v of (vacations || [])) {
+        // 오늘 휴가자
         if (v.start_date <= todayStr && v.end_date >= todayStr) {
-          if (!vacNames.has(v.employee_name)) {
-            vacNames.add(v.employee_name);
-            if ((v.type || '').includes('반차')) halfDayCount++;
-            else vacationCount++;
-          }
+          todayVacNames.push(v.employee_name);
+          if ((v.type || '').includes('반차')) halfDayCount++;
+          else vacationCount++;
         }
-        // 이번 달 휴가일수 집계
+        // 이번 달 총 휴가일수
         if (v.start_date?.startsWith(yearMonth) || v.end_date?.startsWith(yearMonth)) {
           totalVacDays += parseFloat(v.days) || 0;
         }
       }
     } catch {}
 
-    // 오늘 출근자 (confirmed에서 오늘 날짜 레코드가 있고 휴가가 아닌 사람)
-    const workingNames = new Set<string>();
-    for (const emp of confirmed) {
-      for (const r of (emp.records || [])) {
-        if (r.date === todayStr && r.source !== 'vacation') workingNames.add(emp.name);
-      }
-    }
-    // 휴가자 제외
-    for (const name of vacNames) workingNames.delete(name);
-
     return {
-      vacation_summary: { working: workingNames.size, vacation: vacationCount, half_day: halfDayCount },
+      vacation_summary: { vacation: vacationCount, half_day: halfDayCount, names: todayVacNames },
       vacation_days: totalVacDays,
     };
   };
@@ -94,7 +67,7 @@ export default function HomePage() {
       ]);
 
       // 휴가 데이터는 항상 프론트엔드에서 직접 계산
-      const vacData = await loadVacationSummary(confirmed || []);
+      const vacData = await loadVacationSummary();
 
       if (d?.kpi) {
         // 대시보드 API 성공 시 그 데이터 사용 + 휴가 보강
@@ -174,7 +147,7 @@ export default function HomePage() {
   });
   const heatmapDates = (by_dept_daily || []).map((r: any) => String(r.date)).filter(Boolean).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).sort();
   const heatmapMax = Math.max(...(by_dept_daily || []).map((r: any) => parseFloat(r.hours) || 0), 1);
-  const vacTotal = (vacation_summary?.working || 0) + (vacation_summary?.vacation || 0) + (vacation_summary?.half_day || 0);
+  const vacTotal = (vacation_summary?.vacation || 0) + (vacation_summary?.half_day || 0);
 
   // Pie label renderer that avoids overlap
   const renderPieLabel = ({ name, value, percent }: any) => `${name} ${value} (${(percent * 100).toFixed(0)}%)`;
@@ -236,18 +209,28 @@ export default function HomePage() {
             <h3 className="text-sm font-semibold text-[#F7F8F8] mb-1">오늘 휴가 현황</h3>
             <p className="text-[10px] text-[#8A8F98] mb-3">{kpi.vacation_days > 0 ? `이번 달 총 ${kpi.vacation_days}일 사용` : ''}</p>
             {vacTotal > 0 ? (
-              <div className="space-y-2">
-                {[
-                  { name: '출근', value: vacation_summary?.working || 0, color: '#10b981' },
-                  { name: '연차', value: vacation_summary?.vacation || 0, color: '#a78bfa' },
-                  { name: '반차', value: vacation_summary?.half_day || 0, color: '#f59e0b' },
-                ].filter(d => d.value > 0).map(d => (
-                  <div key={d.name} className="flex items-center gap-3">
-                    <span className="w-3 h-3 rounded-full" style={{ background: d.color }} />
-                    <span className="text-xs text-[#D0D6E0] flex-1">{d.name}</span>
-                    <span className="text-sm text-[#F7F8F8] font-bold">{d.value}명</span>
+              <div className="space-y-1.5">
+                {(vacation_summary?.vacation || 0) > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-violet-400" />
+                    <span className="text-xs text-[#D0D6E0]">연차 <b className="text-[#F7F8F8]">{vacation_summary.vacation}명</b></span>
                   </div>
-                ))}
+                )}
+                {(vacation_summary?.half_day || 0) > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    <span className="text-xs text-[#D0D6E0]">반차 <b className="text-[#F7F8F8]">{vacation_summary.half_day}명</b></span>
+                  </div>
+                )}
+                {(vacation_summary?.names || []).length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-[#23252A]">
+                    <div className="flex flex-wrap gap-1">
+                      {(vacation_summary.names as string[]).map((name: string, i: number) => (
+                        <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-violet-500/15 text-violet-300">{name}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-3">

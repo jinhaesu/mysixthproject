@@ -409,7 +409,7 @@ function RegularContractContent() {
                   {contract.signature_data && (
                     <div className="mt-2">
                       <p className="text-xs text-[#8A8F98] mb-1">서명:</p>
-                      <div className="bg-[#0F1011] rounded border p-1 inline-block">
+                      <div className="bg-white rounded border p-1 inline-block">
                         <img src={contract.signature_data} alt="서명" className="max-h-16" />
                       </div>
                     </div>
@@ -425,7 +425,7 @@ function RegularContractContent() {
                 <p className="text-xs">성명: {contract.worker_name}</p>
                 {contract.consent_signature_data && (
                   <div className="mt-2">
-                    <div className="bg-[#0F1011] rounded border p-1 inline-block">
+                    <div className="bg-white rounded border p-1 inline-block">
                       <img src={contract.consent_signature_data} alt="동의서명" className="max-h-16" />
                     </div>
                   </div>

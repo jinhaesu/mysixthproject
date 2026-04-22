@@ -562,6 +562,7 @@ function SendTab() {
                   <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">전화번호</th>
                   <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">근무일</th>
                   <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">근무지</th>
+                  <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">배정파트</th>
                   <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">이름</th>
                   <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">출근</th>
                   <th className="py-2.5 px-4 font-medium text-[#8A8F98] whitespace-nowrap">퇴근</th>
@@ -571,7 +572,7 @@ function SendTab() {
               </thead>
               <tbody className="divide-y divide-[#23252A]">
                 {recentSends.map((r: any) => (
-                  <tr key={r.id} className="hover:bg-[#141516]/5/50">
+                  <tr key={r.id} className="hover:bg-[#141516]">
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       <span className="flex items-center gap-1.5 text-[#D0D6E0]">
                         <Phone className="w-3.5 h-3.5 text-[#62666D] shrink-0" />
@@ -580,6 +581,7 @@ function SendTab() {
                     </td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">{r.date}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98]">{r.workplace_name || "-"}</td>
+                    <td className="py-2.5 px-4 whitespace-nowrap text-[#8A8F98]">{r.department || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap font-medium text-[#F7F8F8]">{r.worker_name_ko || "-"}</td>
                     <td className="py-2.5 px-4 whitespace-nowrap text-[#D0D6E0]">
                       {r.clock_in_time ? new Date(r.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-"}
@@ -940,7 +942,7 @@ function ResponsesTab() {
               </thead>
               <tbody className="divide-y divide-[#23252A]">
                 {responses.map((r: any, i: number) => (
-                  <tr key={i} className="hover:bg-[#141516]/5/50">
+                  <tr key={i} className="hover:bg-[#141516]">
                     <td className="py-2.5 px-3">
                       <input type="checkbox"
                         checked={selectedIds.includes(r.id)}
@@ -1342,7 +1344,7 @@ function WorkplacesTab() {
               </thead>
               <tbody className="divide-y divide-[#23252A]">
                 {workplaces.map((w) => (
-                  <tr key={w.id} className="hover:bg-[#141516]/5/50">
+                  <tr key={w.id} className="hover:bg-[#141516]">
                     <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 bg-[#4EA7FC]/10 rounded-lg flex items-center justify-center shrink-0">
@@ -1701,7 +1703,7 @@ function SafetyTab() {
         ) : (
           <div className="divide-y divide-[#23252A]">
             {notices.map((n) => (
-              <div key={n.id} className="px-5 py-4 hover:bg-[#141516]/5/50">
+              <div key={n.id} className="px-5 py-4 hover:bg-[#141516]">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-[#F7F8F8]">{n.title}</h3>
                   <div className="flex gap-1">

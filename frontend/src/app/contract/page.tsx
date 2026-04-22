@@ -135,7 +135,7 @@ function ContractContent() {
             {contract.signature_data && (
               <div className="mt-3">
                 <p className="text-xs text-[#8A8F98] mb-1">서명:</p>
-                <div className="bg-[#0F1011] rounded border border-orange-300 p-2 inline-block">
+                <div className="bg-white rounded border border-orange-300 p-2 inline-block">
                   <img src={contract.signature_data} alt="서명" className="max-h-20" />
                 </div>
               </div>

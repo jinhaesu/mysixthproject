@@ -33,13 +33,18 @@ export default function HomePage() {
   const [yearMonth, setYearMonth] = usePersistedState("home_ym", `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const d = await getDashboardHomeStats(yearMonth);
       setData(d);
-    } catch { setData(null); }
+    } catch (e: any) {
+      setData(null);
+      setError(e?.message || 'API 호출 실패');
+    }
     finally { setLoading(false); }
   }, [yearMonth]);
 
@@ -55,9 +60,13 @@ export default function HomePage() {
   if (!data || !data.kpi) return (
     <div className="py-32 text-center">
       <AlertTriangle className="w-10 h-10 text-[#F0BF00] mx-auto" />
-      <p className="text-sm text-[#8A8F98] mt-3">해당 월의 확정 데이터가 없습니다.</p>
-      <div className="mt-4 flex justify-center">
+      <p className="text-sm text-[#8A8F98] mt-3">
+        {error ? `오류: ${error}` : '해당 월의 확정 데이터가 없습니다.'}
+      </p>
+      {error && <p className="text-xs text-[#62666D] mt-1">백엔드 배포가 완료되지 않았을 수 있습니다. 잠시 후 새로고침해주세요.</p>}
+      <div className="mt-4 flex justify-center gap-2">
         <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]" />
+        <button onClick={load} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">재시도</button>
       </div>
     </div>
   );

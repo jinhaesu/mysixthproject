@@ -293,7 +293,7 @@ export default function ConfirmedListDispatchPage() {
                   const isExpanded = expandedEmp === rowKey;
                   return (
                     <React.Fragment key={rowKey}>
-                      <tr className={`hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] ${isExpanded ? 'bg-[#5E6AD2]/10/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : rowKey)}>
+                      <tr className={`hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] ${isExpanded ? 'bg-[#5E6AD2]/10' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : rowKey)}>
                         <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">
                           {emp.name}
                           <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${emp.type === '파견' ? 'bg-[#4EA7FC]/10 text-[#828FFF]' : emp.type === '알바' ? 'bg-[#FC7840]/10 text-[#FC7840]' : 'bg-[#141516] text-[#8A8F98]'}`}>{emp.type || '?'}</span>
@@ -310,9 +310,9 @@ export default function ConfirmedListDispatchPage() {
                       {isExpanded && (
                         <tr>
                           <td colSpan={8} className="p-0">
-                            <div className="bg-[#5E6AD2]/10/30 border-b border-[#5E6AD2]/30">
+                            <div className="bg-[#5E6AD2]/10 border-b border-[#5E6AD2]/30">
                               <div className="px-4 py-2 bg-[#5E6AD2]/10 border-b border-[#5E6AD2]/30 flex items-center justify-between">
-                                <span className="text-xs font-semibold text-indigo-800">{emp.name} 일별 상세</span>
+                                <span className="text-xs font-semibold text-[#828FFF]">{emp.name} 일별 상세</span>
                                 <span className="text-[10px] text-[#7070FF]">타입 뱃지 클릭 → 드롭다운에서 변경 가능</span>
                               </div>
                               <table className="w-full text-xs">

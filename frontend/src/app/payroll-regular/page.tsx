@@ -312,14 +312,14 @@ export default function PayrollRegularPage() {
               {grandTotal && (
                 <tfoot>
                   <tr className="bg-[#5E6AD2]/10 border-t-2 border-[#5E6AD2]/30 font-bold">
-                    <td className="px-4 py-3 text-indigo-900" colSpan={7}>
+                    <td className="px-4 py-3 text-[#828FFF]" colSpan={7}>
                       합계 ({grandTotal.workers}명)
                     </td>
                     <td className="px-4 py-3 text-right text-[#F7F8F8]">{fmt.format(grandTotal.base_pay)}</td>
                     <td className="px-4 py-3 text-right text-[#FC7840]">{fmt.format(grandTotal.overtime_pay)}</td>
                     <td className="px-4 py-3 text-right text-[#828FFF]">{fmt.format(grandTotal.night_pay)}</td>
                     <td className="px-4 py-3 text-right text-[#27A644]">{fmt.format(grandTotal.weekly_holiday_pay || 0)}</td>
-                    <td className="px-4 py-3 text-right text-indigo-800 whitespace-nowrap">{fmt.format(grandTotal.total_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#828FFF] whitespace-nowrap">{fmt.format(grandTotal.total_pay)}</td>
                   </tr>
                 </tfoot>
               )}

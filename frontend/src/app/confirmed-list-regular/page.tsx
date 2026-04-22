@@ -206,8 +206,8 @@ export default function ConfirmedListRegularPage() {
               <p className="text-2xl font-bold text-[#828FFF]">{totals.night.toFixed(1)}</p>
               <p className="text-xs text-[#8A8F98] mt-1">야간시간(h)</p>
             </div>
-            <div className="bg-[#0F1011] rounded-xl border border-violet-200 p-4 text-center">
-              <p className="text-2xl font-bold text-violet-700">{vacCount % 1 === 0 ? vacCount : vacCount.toFixed(1)}</p>
+            <div className="bg-[#0F1011] rounded-xl border border-violet-500/30 p-4 text-center">
+              <p className="text-2xl font-bold text-violet-300">{vacCount % 1 === 0 ? vacCount : vacCount.toFixed(1)}</p>
               <p className="text-xs text-[#8A8F98] mt-1">휴가 사용(일)</p>
             </div>
           </div>
@@ -232,7 +232,7 @@ export default function ConfirmedListRegularPage() {
                   const isExpanded = expandedEmp === emp.name;
                   return (
                     <React.Fragment key={emp.name}>
-                      <tr className={`hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] ${isExpanded ? 'bg-[#5E6AD2]/10/50' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : emp.name)}>
+                      <tr className={`hover:bg-[#141516]/5 cursor-pointer border-b border-[#23252A] ${isExpanded ? 'bg-[#5E6AD2]/10' : ''}`} onClick={() => setExpandedEmp(isExpanded ? null : emp.name)}>
                         <td className="py-2.5 px-4 font-medium text-[#F7F8F8]">{emp.name}{emp.department && <span className="ml-1 text-[10px] text-[#8A8F98]">{emp.department}</span>}</td>
                         <td className="py-2.5 px-4 text-[#8A8F98]">{emp.phone}</td>
                         <td className="py-2.5 px-4 text-right">{emp.days}</td>
@@ -265,9 +265,9 @@ export default function ConfirmedListRegularPage() {
                         <tr>
                           <td colSpan={8} className="p-0">
                             {/* colSpan=8 matches the outer summary table's 8 columns, not the inner detail's 10 */}
-                            <div className="bg-[#5E6AD2]/10/30 border-b border-[#5E6AD2]/30">
+                            <div className="bg-[#5E6AD2]/10 border-b border-[#5E6AD2]/30">
                               <div className="px-4 py-2 bg-[#5E6AD2]/10 border-b border-[#5E6AD2]/30">
-                                <span className="text-xs font-semibold text-indigo-800">{emp.name} 일별 상세</span>
+                                <span className="text-xs font-semibold text-[#828FFF]">{emp.name} 일별 상세</span>
                               </div>
                               <table className="w-full text-xs">
                                 <thead>
@@ -301,17 +301,17 @@ export default function ConfirmedListRegularPage() {
                                   })().map((r: any) => {
                                     if (r.isVacOnly) {
                                       return (
-                                        <tr key={r.id} className="bg-violet-50/50">
+                                        <tr key={r.id} className="bg-violet-500/10">
                                           <td className="py-1.5 px-3">
                                             {r.date}
-                                            <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-100 text-violet-700">
+                                            <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-500/20 text-violet-300">
                                               {r.vacType}{r.vacType === '오전반차' ? ' 09~14시' : r.vacType === '오후반차' ? ' 14~18시' : ''}
                                             </span>
                                           </td>
-                                          <td className="py-1.5 px-3 text-violet-600">휴가</td>
-                                          <td className="py-1.5 px-3 text-violet-600">휴가</td>
-                                          <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-50 text-violet-700">휴가</span></td>
-                                          <td className="py-1.5 px-3 text-right text-violet-700">{r.vacType?.includes('반차') ? '4.0' : '8.0'}</td>
+                                          <td className="py-1.5 px-3 text-violet-400">휴가</td>
+                                          <td className="py-1.5 px-3 text-violet-400">휴가</td>
+                                          <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-500/10 text-violet-300">휴가</span></td>
+                                          <td className="py-1.5 px-3 text-right text-violet-300">{r.vacType?.includes('반차') ? '4.0' : '8.0'}</td>
                                           <td className="py-1.5 px-3 text-right">0.0</td>
                                           <td className="py-1.5 px-3 text-right">0.0</td>
                                           <td className="py-1.5 px-3 text-right">0.0</td>
@@ -331,12 +331,12 @@ export default function ConfirmedListRegularPage() {
                                       return '공휴일';
                                     })();
                                     return (
-                                    <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-50/50' : isHoliday ? 'bg-[#EB5757]/10/40 hover:bg-[#EB5757]/10' : vType?.includes('반차') ? 'bg-[#F0BF00]/10/50 hover:bg-[#F0BF00]/10' : vType ? 'bg-violet-50/50 hover:bg-violet-50' : 'hover:bg-[#141516]/60'}>
+                                    <tr key={r.id} className={r.source === 'vacation' ? 'bg-violet-500/10' : isHoliday ? 'bg-[#EB5757]/10 hover:bg-[#EB5757]/10' : vType?.includes('반차') ? 'bg-[#F0BF00]/10 hover:bg-[#F0BF00]/10' : vType ? 'bg-violet-500/10 hover:bg-violet-500/10' : 'hover:bg-[#141516]/60'}>
                                       <td className="py-1.5 px-3">
                                         {r.date}
                                         {holidayLabel && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[#EB5757]/15 text-[#EB5757]">{holidayLabel}</span>}
-                                        {r.source === 'vacation' && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-100 text-violet-700">{r.memo || '연차'}</span>}
-                                        {r.source !== 'vacation' && vType && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vType.includes('반차') ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-violet-100 text-violet-700'}`}>{vType}</span>}
+                                        {r.source === 'vacation' && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-violet-500/20 text-violet-300">{r.memo || '연차'}</span>}
+                                        {r.source !== 'vacation' && vType && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vType.includes('반차') ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-violet-500/20 text-violet-300'}`}>{vType}</span>}
                                       </td>
                                       <td className="py-1.5 px-3">{editingId === r.id ? <input type="time" value={editForm.confirmed_clock_in} onChange={e => {
                                         const ci = e.target.value; const calc = calcFromTimes(ci, editForm.confirmed_clock_out, r.date);

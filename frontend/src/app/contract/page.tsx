@@ -128,7 +128,7 @@ function ContractContent() {
           {/* Worker */}
           <div className="bg-[#FC7840]/10 rounded-lg p-4 border border-[#FC7840]/30">
             <p className="font-bold text-[#F7F8F8]">(근로자)</p>
-            <p>성명: <b className="text-orange-800">{contract.worker_name}</b></p>
+            <p>성명: <b className="text-[#FC7840]">{contract.worker_name}</b></p>
             {contract.address && <p>주소: {contract.address}</p>}
             <p>연락처: {contract.phone}</p>
             {/* Signature */}

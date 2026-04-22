@@ -94,7 +94,7 @@ function statusColor(status: string) {
 }
 
 function roleBadge(role: string) {
-  if (role === "반장") return "bg-[#5E6AD2]/15 text-purple-800 border border-purple-300";
+  if (role === "반장") return "bg-[#5E6AD2]/15 text-purple-300 border border-purple-500";
   if (role === "조장") return "bg-[#4EA7FC]/15 text-[#828FFF] border border-blue-300";
   return "";
 }
@@ -295,13 +295,13 @@ export default function RegularLivePage() {
           {/* Vacation Section */}
           {(data as any).vacations && (data as any).vacations.length > 0 && (
             <div className="bg-[#5E6AD2]/10 rounded-xl border border-[#5E6AD2]/30 p-4 mb-6">
-              <h3 className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-purple-300 mb-2 flex items-center gap-2">
                 🏖️ 휴가중 ({(data as any).vacations.length}명)
               </h3>
               <div className="flex flex-wrap gap-2">
                 {(data as any).vacations.map((v: any) => (
                   <div key={v.id} className="bg-[#0F1011] rounded-lg px-3 py-2 border border-[#5E6AD2]/30 text-sm">
-                    <span className="font-medium text-purple-900">{v.employee_name}</span>
+                    <span className="font-medium text-purple-300">{v.employee_name}</span>
                     <span className="text-[#7070FF] ml-2 text-xs">{v.department} {v.team}</span>
                     <span className="text-purple-400 ml-2 text-xs">{v.start_date}~{v.end_date}</span>
                   </div>
@@ -381,7 +381,7 @@ export default function RegularLivePage() {
                                 </thead>
                                 <tbody className="divide-y divide-[#23252A]">
                                   {teamGroup.employees.map((emp) => (
-                                    <tr key={emp.id} className="hover:bg-[#141516]/5/50">
+                                    <tr key={emp.id} className="hover:bg-[#141516]/5">
                                       <td className="py-2.5 px-5 whitespace-nowrap font-medium text-[#F7F8F8]">
                                         {emp.name}
                                       </td>

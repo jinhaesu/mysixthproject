@@ -448,8 +448,8 @@ export default function AttendanceSummaryDispatchPage() {
             const expanded = expandedEmp === emp.id;
             const isFullyConfirmed = confirmedEmpSet.has(emp.name);
             return (
-              <div key={emp.id} className={`rounded-xl border overflow-hidden ${isFullyConfirmed ? 'border-green-300 bg-[#27A644]/10/30' : 'border-[#23252A] bg-[#0F1011]'}`}>
-                <div className={`flex items-center px-4 py-3 hover:bg-[#141516]/5 ${checkedEmps.has(emp.id) ? 'bg-[#5E6AD2]/10/50' : ''}`}>
+              <div key={emp.id} className={`rounded-xl border overflow-hidden ${isFullyConfirmed ? 'border-green-300 bg-[#27A644]/10' : 'border-[#23252A] bg-[#0F1011]'}`}>
+                <div className={`flex items-center px-4 py-3 hover:bg-[#141516]/5 ${checkedEmps.has(emp.id) ? 'bg-[#5E6AD2]/10' : ''}`}>
                   <div className="mr-3" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checkedEmps.has(emp.id)}
                       onChange={e => { const n = new Set(checkedEmps); if (e.target.checked) n.add(emp.id); else n.delete(emp.id); setCheckedEmps(n); }}
@@ -515,7 +515,7 @@ export default function AttendanceSummaryDispatchPage() {
                 </div>
 
                 {expanded && (
-                  <div className="border-t border-[#5E6AD2]/30 bg-[#5E6AD2]/10/20 overflow-x-auto">
+                  <div className="border-t border-[#5E6AD2]/30 bg-[#5E6AD2]/10 overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-[#08090A] text-left">

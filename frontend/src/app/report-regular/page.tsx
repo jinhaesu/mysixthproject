@@ -237,11 +237,11 @@ function ReportRegularContent() {
         {/* Vacation List */}
         {data.vacations && data.vacations.length > 0 && (
           <div className="bg-[#5E6AD2]/10 rounded-xl border border-[#5E6AD2]/30 p-3">
-            <p className="text-xs font-semibold text-purple-800 mb-2">🏖️ 휴가중 ({data.vacations.length}명)</p>
+            <p className="text-xs font-semibold text-purple-300 mb-2">🏖️ 휴가중 ({data.vacations.length}명)</p>
             {data.vacations.map((v: any) => (
               <div key={v.id} className="flex items-center justify-between bg-[#0F1011] rounded-lg px-3 py-2 mb-1 border border-purple-100">
                 <div>
-                  <span className="font-medium text-sm text-purple-900">{v.employee_name}</span>
+                  <span className="font-medium text-sm text-purple-300">{v.employee_name}</span>
                   {v.phone && <a href={`tel:${v.phone}`} className="text-xs text-[#7070FF] ml-2">{v.phone}</a>}
                 </div>
                 <span className="text-xs text-purple-500">{v.start_date}~{v.end_date}</span>

@@ -686,7 +686,7 @@ export default function RegularManagePage() {
           {showResigned && (
             <div className="bg-[#0F1011] rounded-xl border border-[#FC7840]/30 overflow-hidden">
               <div className="px-4 py-3 bg-[#FC7840]/10 border-b border-[#FC7840]/30">
-                <h3 className="text-sm font-semibold text-orange-800">퇴사자 목록 ({resignedEmployees.filter(e => !empSearch || e.name?.includes(empSearch) || e.phone?.includes(empSearch)).length}명)</h3>
+                <h3 className="text-sm font-semibold text-[#FC7840]">퇴사자 목록 ({resignedEmployees.filter(e => !empSearch || e.name?.includes(empSearch) || e.phone?.includes(empSearch)).length}명)</h3>
               </div>
               {resignedEmployees.length === 0 ? (
                 <div className="py-8 text-center text-sm text-[#62666D]">퇴사자가 없습니다.</div>
@@ -694,7 +694,7 @@ export default function RegularManagePage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-[#FC7840]/10/50 text-left">
+                      <tr className="bg-[#FC7840]/10 text-left">
                         <th className="px-4 py-2 font-medium text-[#8A8F98]">이름</th>
                         <th className="px-4 py-2 font-medium text-[#8A8F98]">연락처</th>
                         <th className="px-4 py-2 font-medium text-[#8A8F98]">부서</th>
@@ -900,7 +900,7 @@ export default function RegularManagePage() {
                       onClick={() => setPreviewNotice(notice)}
                       className={`bg-[#0F1011] rounded-xl border p-4 cursor-pointer transition-colors ${
                         previewNotice?.id === notice.id
-                          ? "border-blue-400 bg-[#4EA7FC]/10/30"
+                          ? "border-blue-400 bg-[#4EA7FC]/10"
                           : "border-[#23252A] hover:border-[#23252A]"
                       }`}
                     >
@@ -1359,8 +1359,8 @@ function VacationTab() {
     <div className="space-y-4">
       {/* 연차 규칙 안내 */}
       <div className="bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 rounded-xl p-4">
-        <h4 className="text-sm font-semibold text-indigo-900 mb-2">연차휴가 기준 (근로기준법 제60조)</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-indigo-800">
+        <h4 className="text-sm font-semibold text-[#828FFF] mb-2">연차휴가 기준 (근로기준법 제60조)</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-[#828FFF]">
           <div className="bg-[#0F1011] rounded-lg p-2.5 border border-indigo-100">
             <p className="font-semibold text-[#828FFF]">1년 미만</p>
             <p>1개월 개근 시 <b>1일</b> 발생 (최대 11일)</p>
@@ -1635,7 +1635,7 @@ function VacationTab() {
                                     ? 'bg-[#27A644]/15 text-[#27A644]'
                                     : (v.type || '') === '연차' || (v.type || '').includes('연차')
                                     ? 'bg-[#4EA7FC]/15 text-[#828FFF]'
-                                    : 'bg-[#5E6AD2]/15 text-purple-800';
+                                    : 'bg-[#5E6AD2]/15 text-purple-300';
                                   return (
                                     <div key={vi} className={`text-[10px] px-1 py-0.5 rounded truncate font-medium ${typeColor}`}
                                       title={`${v.employee_name} (${v.type || '휴가'})`}>
@@ -1744,7 +1744,7 @@ function VacationTab() {
                   </thead>
                   <tbody className="divide-y divide-[#23252A]">
                     {balances.filter((b: any) => !balanceSearch || b.employee_name?.includes(balanceSearch) || b.phone?.includes(balanceSearch)).map((b: any) => (
-                      <tr key={b.employee_id} className={`hover:bg-[#141516]/5 ${selectedEmpIds.has(b.employee_id) ? 'bg-[#4EA7FC]/10/50' : ''}`}>
+                      <tr key={b.employee_id} className={`hover:bg-[#141516]/5 ${selectedEmpIds.has(b.employee_id) ? 'bg-[#4EA7FC]/10' : ''}`}>
                         <td className="py-2.5 px-3">
                           <input type="checkbox"
                             checked={selectedEmpIds.has(b.employee_id)}
@@ -2165,7 +2165,7 @@ function ShiftsTab() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
                     {unassigned.map((e: any) => (
                       <div key={e.id} className="flex items-center gap-2 bg-[#FC7840]/10 rounded-lg px-2.5 py-2 border border-orange-100">
-                        <div className="w-6 h-6 rounded-full bg-orange-200 flex items-center justify-center text-[10px] font-bold text-orange-800">
+                        <div className="w-6 h-6 rounded-full bg-[#FC7840]/20 flex items-center justify-center text-[10px] font-bold text-[#FC7840]">
                           {(e.name || '?')[0]}
                         </div>
                         <div className="min-w-0">
@@ -2184,16 +2184,16 @@ function ShiftsTab() {
                 {/* Vacation list for the date */}
                 {vacOnDate.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-[#23252A]">
-                    <h5 className="text-xs font-semibold text-violet-700 mb-2">휴가자 ({vacOnDate.length}명)</h5>
+                    <h5 className="text-xs font-semibold text-violet-300 mb-2">휴가자 ({vacOnDate.length}명)</h5>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
                       {vacOnDate.map((v: any) => (
-                        <div key={v.id} className="flex items-center gap-2 bg-violet-50 rounded-lg px-2.5 py-2 border border-violet-100">
-                          <div className="w-6 h-6 rounded-full bg-violet-200 flex items-center justify-center text-[10px] font-bold text-violet-800">
+                        <div key={v.id} className="flex items-center gap-2 bg-violet-500/10 rounded-lg px-2.5 py-2 border border-violet-500/20">
+                          <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center text-[10px] font-bold text-violet-300">
                             {(v.employee_name || '?')[0]}
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-[#F7F8F8] truncate">{v.employee_name}</p>
-                            <p className="text-[10px] text-violet-600 truncate">
+                            <p className="text-[10px] text-violet-400 truncate">
                               {v.type === '오전반차' ? '오전반차 09~14시' : v.type === '오후반차' ? '오후반차 14~18시' : '연차'}
                             </p>
                           </div>
@@ -2243,7 +2243,7 @@ function ShiftsTab() {
         }
 
         const DOW_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
-        const SHIFT_COLORS = ['bg-[#4EA7FC]/15 text-[#828FFF]', 'bg-emerald-100 text-emerald-800', 'bg-[#F0BF00]/15 text-amber-800', 'bg-[#5E6AD2]/15 text-purple-800', 'bg-rose-100 text-rose-800'];
+        const SHIFT_COLORS = ['bg-[#4EA7FC]/15 text-[#828FFF]', 'bg-emerald-900/30 text-emerald-300', 'bg-[#F0BF00]/15 text-[#F0BF00]', 'bg-[#5E6AD2]/15 text-purple-300', 'bg-rose-900/30 text-rose-300'];
 
         return (
           <div className="space-y-3">

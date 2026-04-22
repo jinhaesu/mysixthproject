@@ -81,7 +81,7 @@ export default function PayrollCalcPage() {
           정규직 급여 계산
         </h1>
         <p className="text-sm text-[#8A8F98] mt-1">확정 근태 + 기본급 설정 기반 급여 자동 계산</p>
-        <div className="mt-2 bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 rounded-lg px-3 py-2 text-xs text-indigo-800">
+        <div className="mt-2 bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 rounded-lg px-3 py-2 text-xs text-[#828FFF]">
           <b>수당 계산:</b> 연장/휴일/야간 각 <b>시급 × 1.5배</b> | <b>30분 단위 내림</b> (0.1~0.4h → 0, 0.5h = 30분) | 토/일/공휴일 근무 = <b>휴일(h) 별도 집계</b> (연장 제외) | 22:00~06:00 = 야간(h) 별도 | 연장 2h 초과 시 저녁식사 30분 휴게 자동 추가
         </div>
       </div>
@@ -205,7 +205,7 @@ export default function PayrollCalcPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-[#5E6AD2]/10 border-t-2 border-[#5E6AD2]/30 font-bold text-[10px]">
-                  <td className="py-2 px-2 text-indigo-900" colSpan={10}>합계 ({results.length}명)</td>
+                  <td className="py-2 px-2 text-[#828FFF]" colSpan={10}>합계 ({results.length}명)</td>
                   <td className="py-2 px-2 text-right">{sum('work_days')}</td>
                   <td className="py-2 px-2 text-right">{sum('overtime_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('overtime_pay'))}</td>

@@ -551,8 +551,8 @@ export default function AttendanceSummaryRegularPage() {
             const expanded = expandedEmp === emp.id;
             const isFullyConfirmed = confirmedEmpSet.has(emp.name);
             return (
-              <div key={emp.id} className={`rounded-xl border overflow-hidden ${isFullyConfirmed ? 'border-green-300 bg-[#27A644]/10/30' : 'border-[#23252A] bg-[#0F1011]'}`}>
-                <div className={`flex items-center px-4 py-3 hover:bg-[#141516]/5 ${checkedEmps.has(emp.id) ? 'bg-[#5E6AD2]/10/50' : ''}`}>
+              <div key={emp.id} className={`rounded-xl border overflow-hidden ${isFullyConfirmed ? 'border-green-300 bg-[#27A644]/10' : 'border-[#23252A] bg-[#0F1011]'}`}>
+                <div className={`flex items-center px-4 py-3 hover:bg-[#141516]/5 ${checkedEmps.has(emp.id) ? 'bg-[#5E6AD2]/10' : ''}`}>
                   <div className="mr-3" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={checkedEmps.has(emp.id)}
                       onChange={e => { const n = new Set(checkedEmps); if (e.target.checked) n.add(emp.id); else n.delete(emp.id); setCheckedEmps(n); }}
@@ -571,7 +571,7 @@ export default function AttendanceSummaryRegularPage() {
                         const halfDays = vacDays.filter(([,v]) => v.type?.includes('반차')).length;
                         if (fullDays + halfDays === 0) return null;
                         return (<>
-                          {fullDays > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">연차 {fullDays}일</span>}
+                          {fullDays > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-500/20 text-violet-300">연차 {fullDays}일</span>}
                           {halfDays > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#F0BF00]/15 text-[#F0BF00]">반차 {halfDays}건</span>}
                         </>);
                       })()}
@@ -654,7 +654,7 @@ export default function AttendanceSummaryRegularPage() {
                 </div>
 
                 {expanded && (
-                  <div className="border-t border-[#5E6AD2]/30 bg-[#5E6AD2]/10/20 overflow-x-auto">
+                  <div className="border-t border-[#5E6AD2]/30 bg-[#5E6AD2]/10 overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-[#08090A] text-left">
@@ -698,11 +698,11 @@ export default function AttendanceSummaryRegularPage() {
                           if (actual.isVacOnly && vacInfo) {
                             const isHalf = vacInfo.type?.includes('반차');
                             return (
-                              <tr key={date} className={isHalf ? 'bg-[#F0BF00]/10' : 'bg-violet-50'}>
+                              <tr key={date} className={isHalf ? 'bg-[#F0BF00]/10' : 'bg-violet-500/10'}>
                                 <td className="py-1.5 px-3"></td>
                                 <td className="py-1.5 px-3 text-[#D0D6E0]">
                                   {date.slice(5)}
-                                  <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${isHalf ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-violet-100 text-violet-700'}`}>
+                                  <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${isHalf ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-violet-500/20 text-violet-300'}`}>
                                     {vacInfo.type}
                                     {vacInfo.type === '오전반차' && ' 09~14시'}
                                     {vacInfo.type === '오후반차' && ' 14~18시'}
@@ -710,7 +710,7 @@ export default function AttendanceSummaryRegularPage() {
                                 </td>
                                 <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-[#EB5757] font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-[#8A8F98]'}`}>{dow}</td>
                                 <td className="py-1.5 px-3 text-[#62666D]" colSpan={6}>
-                                  <span className={`font-medium text-[10px] ${isHalf ? 'text-[#F0BF00]' : 'text-violet-600'}`}>
+                                  <span className={`font-medium text-[10px] ${isHalf ? 'text-[#F0BF00]' : 'text-violet-400'}`}>
                                     유급{isHalf ? '반차' : '휴가'} ({isHalf ? '4h' : '8h'} 인정)
                                   </span>
                                 </td>
@@ -732,7 +732,7 @@ export default function AttendanceSummaryRegularPage() {
                           const mealApplicable = isMealBreakApplicable(useClockIn, useClockOut);
                           const mealChecked = dinnerBreak[key] !== undefined ? dinnerBreak[key] : true;
                           return (
-                            <tr key={date} className={vacInfo?.type?.includes('반차') ? 'bg-[#F0BF00]/10/50' : vacInfo ? 'bg-violet-50' : isDayConfirmed ? 'bg-[#27A644]/10' : isAnomaly ? 'bg-[#EB5757]/10' : 'bg-[#0F1011]'}>
+                            <tr key={date} className={vacInfo?.type?.includes('반차') ? 'bg-[#F0BF00]/10' : vacInfo ? 'bg-violet-500/10' : isDayConfirmed ? 'bg-[#27A644]/10' : isAnomaly ? 'bg-[#EB5757]/10' : 'bg-[#0F1011]'}>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
                                   <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -745,7 +745,7 @@ export default function AttendanceSummaryRegularPage() {
                               <td className="py-1.5 px-3 text-[#D0D6E0]">
                                 {date.slice(5)}
                                 {isDayConfirmed && <span className="ml-1 text-[9px] text-[#27A644]">확정</span>}
-                                {vacInfo && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vacInfo.type === '반차' || vacInfo.type?.includes('반차') ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-violet-100 text-violet-700'}`}>{vacInfo.type}</span>}
+                                {vacInfo && <span className={`ml-1 px-1 py-0.5 rounded text-[9px] font-medium ${vacInfo.type === '반차' || vacInfo.type?.includes('반차') ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-violet-500/20 text-violet-300'}`}>{vacInfo.type}</span>}
                               </td>
                               <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-[#EB5757] font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-[#8A8F98]'}`}>{dow}</td>
                               <td className="py-1.5 px-3 text-[#828FFF]">{plannedIn}</td>

@@ -685,7 +685,7 @@ function DashboardContent() {
                     <div className="space-y-2">
                       <div className="flex items-start gap-2.5 bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg px-4 py-3">
                         <AlertTriangle size={16} className="text-[#F0BF00] shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-800">총 근무시간 대비 연장+야간 근무 시간은 <strong>30%를 넘기지 않는 것</strong>이 좋습니다.</p>
+                        <p className="text-sm text-[#FC7840]">총 근무시간 대비 연장+야간 근무 시간은 <strong>30%를 넘기지 않는 것</strong>이 좋습니다.</p>
                       </div>
                       <div className="flex items-start gap-2.5 bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-lg px-4 py-3">
                         <Info size={16} className="text-[#7070FF] shrink-0 mt-0.5" />
@@ -959,14 +959,14 @@ function DashboardContent() {
 
                             whRows.push(
                               <tr key={`wh-${cat}`} className="bg-[#FC7840]/10 border-b border-[#FC7840]/30">
-                                <td className="px-3 py-2 font-medium text-orange-800" colSpan={2}>
+                                <td className="px-3 py-2 font-medium text-[#FC7840]" colSpan={2}>
                                   ↳ {cat === "알바(사업소득)" ? "알바" : cat} 주휴수당
                                   <span className="ml-1 text-xs font-normal text-orange-500">(주5일↑ × 8h × 기본단가)</span>
                                 </td>
                                 <td className="text-right px-3 py-2 tabular-nums text-[#FC7840] border-l border-orange-100">{fmt(curWHHours)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums text-orange-400">-</td>
                                 <td className="text-right px-3 py-2 tabular-nums text-[#FC7840]">{fmt(curWHHours)}</td>
-                                <td className="text-right px-3 py-2 tabular-nums font-semibold text-orange-800">{fmtWon(curWHSal)}원</td>
+                                <td className="text-right px-3 py-2 tabular-nums font-semibold text-[#FC7840]">{fmtWon(curWHSal)}원</td>
                                 <td className="text-right px-3 py-2 tabular-nums text-orange-500 border-l border-orange-100">{fmt(prevWHHours)}</td>
                                 <td className="text-right px-3 py-2 tabular-nums text-orange-400">-</td>
                                 <td className="text-right px-3 py-2 tabular-nums text-orange-500">{fmt(prevWHHours)}</td>

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import ChartCard from "@/components/charts/ChartCard";
 import { SEMANTIC_COLORS, CHART_COLORS } from "@/lib/chartColors";
-import { getDashboardHomeStats } from "@/lib/api";
+import { getDashboardHomeStats, getConfirmedList } from "@/lib/api";
 
 const DEPT_COLORS: Record<string, string> = {
   '물류': '#3b82f6',
@@ -42,6 +42,50 @@ export default function HomePage() {
       const d = await getDashboardHomeStats(yearMonth);
       setData(d);
     } catch (e: any) {
+      // Fallback: build basic data from confirmed list
+      try {
+        const confirmed = await getConfirmedList(yearMonth, '');
+        if (confirmed && confirmed.length > 0) {
+          const byDeptMap: Record<string, { workers: number; regular_hours: number; overtime_hours: number; night_hours: number; holiday_hours: number }> = {};
+          const byTypeMap: Record<string, { workers: number; hours: number }> = {};
+          let totalWorkers = 0, totalDays = 0, totalHours = 0, totalOt = 0;
+          for (const emp of confirmed) {
+            totalWorkers++;
+            totalDays += emp.days || 0;
+            const rh = parseFloat(emp.regular_hours) || 0;
+            const oh = parseFloat(emp.overtime_hours) || 0;
+            const nh = parseFloat(emp.night_hours) || 0;
+            totalHours += rh + oh + nh;
+            totalOt += oh;
+            const dept = emp.department || '(미지정)';
+            if (!byDeptMap[dept]) byDeptMap[dept] = { workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, holiday_hours: 0 };
+            byDeptMap[dept].workers++;
+            byDeptMap[dept].regular_hours += rh;
+            byDeptMap[dept].overtime_hours += oh;
+            byDeptMap[dept].night_hours += nh;
+            const t = emp.type || '(미지정)';
+            if (!byTypeMap[t]) byTypeMap[t] = { workers: 0, hours: 0 };
+            byTypeMap[t].workers++;
+            byTypeMap[t].hours += rh + oh + nh;
+          }
+          setData({
+            year_month: yearMonth,
+            kpi: {
+              total_workers: totalWorkers,
+              total_work_days: totalDays,
+              total_hours: Math.round(totalHours * 10) / 10,
+              avg_hours_per_worker: totalWorkers > 0 ? Math.round(totalHours / totalWorkers * 10) / 10 : 0,
+              overtime_ratio: totalHours > 0 ? Math.round(totalOt / totalHours * 1000) / 10 : 0,
+              vacation_days: 0,
+            },
+            by_department: Object.entries(byDeptMap).map(([dept, v]) => ({ department: dept, ...v })),
+            by_type: Object.entries(byTypeMap).map(([type, v]) => ({ type, ...v })),
+            daily: [], by_dept_daily: [], vacation_summary: { working: 0, vacation: 0, half_day: 0 }, dow_avg: [],
+          });
+          setError('');
+          return;
+        }
+      } catch {}
       setData(null);
       setError(e?.message || 'API 호출 실패');
     }

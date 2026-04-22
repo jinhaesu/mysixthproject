@@ -34,7 +34,7 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: '요청 처리 중 오류가 발생했습니다.' }));
+    const error = await res.json().catch(() => ({ error: `HTTP ${res.status} 오류` }));
     throw new Error(error.error || `HTTP ${res.status}`);
   }
 

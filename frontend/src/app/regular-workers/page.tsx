@@ -10,6 +10,7 @@ import {
   sendRegularLink,
   sendRegularContract,
   getRegularContracts,
+  getSurveyWorkplaces,
 } from "@/lib/api";
 import {
   Contact,
@@ -120,7 +121,13 @@ export default function RegularWorkersPage() {
     other_allowance: '',
     pay_day: '10',
     work_hours: '09:00~18:00',
+    work_place: '',
   });
+  const [workplaces, setWorkplaces] = useState<any[]>([]);
+
+  useEffect(() => {
+    getSurveyWorkplaces().then(setWorkplaces).catch(() => {});
+  }, []);
 
   const loadContracts = useCallback(async () => {
     try {
@@ -595,6 +602,16 @@ export default function RegularWorkersPage() {
               <label className="block text-xs font-medium text-[#8A8F98] mb-1">근로 개시일</label>
               <input type="date" value={contractForm.work_start_date} onChange={e => setContractForm({...contractForm, work_start_date: e.target.value})}
                 className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#8A8F98] mb-1">근무장소</label>
+              <select value={contractForm.work_place} onChange={e => setContractForm({...contractForm, work_place: e.target.value})}
+                className="w-full px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]">
+                <option value="">본사 (전북특별자치도 전주시 덕진구 기린대로 458)</option>
+                {workplaces.map((wp: any) => (
+                  <option key={wp.id} value={wp.address || wp.name}>{wp.name}{wp.address ? ` (${wp.address})` : ''}</option>
+                ))}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

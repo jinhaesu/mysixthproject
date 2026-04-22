@@ -632,6 +632,7 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS id_number TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS consent_signed INTEGER DEFAULT 0"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS consent_signature_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_place TEXT DEFAULT ''"); } catch {}
 
   // Admin password settings
   try {

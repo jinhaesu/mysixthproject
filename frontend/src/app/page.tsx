@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import ChartCard from "@/components/charts/ChartCard";
 import { SEMANTIC_COLORS } from "@/lib/chartColors";
-import { getDashboardHomeStats, getConfirmedList } from "@/lib/api";
+import { getDashboardHomeStats, getConfirmedList, getRegularVacations } from "@/lib/api";
 
 const DEPT_COLORS: Record<string, string> = {
   '물류': '#3b82f6', '생산2층': '#f97316', '생산3층': '#10b981',
@@ -29,54 +29,120 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // 프론트엔드에서 직접 휴가 데이터 계산
+  const loadVacationSummary = async (confirmed: any[]) => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const vacNames = new Set<string>();
+    let vacationCount = 0, halfDayCount = 0, totalVacDays = 0;
+
+    // 1. confirmed_attendance에서 source='vacation' 레코드 (오늘)
+    for (const emp of confirmed) {
+      for (const r of (emp.records || [])) {
+        if (r.date === todayStr && r.source === 'vacation') {
+          if (!vacNames.has(emp.name)) {
+            vacNames.add(emp.name);
+            if ((r.memo || '').includes('반차')) halfDayCount++;
+            else vacationCount++;
+          }
+        }
+        // 이번 달 전체 휴가일 수
+        if (r.source === 'vacation') totalVacDays++;
+      }
+    }
+
+    // 2. regular_vacation_requests에서 승인된 휴가 (오늘)
+    try {
+      const vacations = await getRegularVacations({ status: 'approved' });
+      for (const v of (vacations || [])) {
+        if (v.start_date <= todayStr && v.end_date >= todayStr) {
+          if (!vacNames.has(v.employee_name)) {
+            vacNames.add(v.employee_name);
+            if ((v.type || '').includes('반차')) halfDayCount++;
+            else vacationCount++;
+          }
+        }
+        // 이번 달 휴가일수 집계
+        if (v.start_date?.startsWith(yearMonth) || v.end_date?.startsWith(yearMonth)) {
+          totalVacDays += parseFloat(v.days) || 0;
+        }
+      }
+    } catch {}
+
+    // 오늘 출근자 (confirmed에서 오늘 날짜 레코드가 있고 휴가가 아닌 사람)
+    const workingNames = new Set<string>();
+    for (const emp of confirmed) {
+      for (const r of (emp.records || [])) {
+        if (r.date === todayStr && r.source !== 'vacation') workingNames.add(emp.name);
+      }
+    }
+    // 휴가자 제외
+    for (const name of vacNames) workingNames.delete(name);
+
+    return {
+      vacation_summary: { working: workingNames.size, vacation: vacationCount, half_day: halfDayCount },
+      vacation_days: totalVacDays,
+    };
+  };
+
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const d = await getDashboardHomeStats(yearMonth);
-      setData(d);
-    } catch (e: any) {
-      try {
-        const confirmed = await getConfirmedList(yearMonth, '');
-        if (confirmed?.length > 0) {
-          const byDeptMap: Record<string, any> = {}, byTypeMap: Record<string, any> = {};
-          const dailyMap: Record<string, any> = {};
-          let tw = 0, td = 0, th = 0, to = 0;
-          for (const emp of confirmed) {
-            tw++; td += emp.days || 0;
-            const rh = parseFloat(emp.regular_hours) || 0, oh = parseFloat(emp.overtime_hours) || 0, nh = parseFloat(emp.night_hours) || 0;
-            th += rh + oh + nh; to += oh;
-            const dept = emp.department || '(미지정)';
-            if (!byDeptMap[dept]) byDeptMap[dept] = { workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, holiday_hours: 0 };
-            byDeptMap[dept].workers++; byDeptMap[dept].regular_hours += rh; byDeptMap[dept].overtime_hours += oh; byDeptMap[dept].night_hours += nh;
-            const t = emp.type || '(미지정)';
-            if (!byTypeMap[t]) byTypeMap[t] = { workers: 0, hours: 0 };
-            byTypeMap[t].workers++; byTypeMap[t].hours += rh + oh + nh;
-            for (const r of (emp.records || [])) {
-              if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0 };
-              dailyMap[r.date].workers++;
-              dailyMap[r.date].regular_hours += parseFloat(r.regular_hours) || 0;
-              dailyMap[r.date].overtime_hours += parseFloat(r.overtime_hours) || 0;
-              dailyMap[r.date].night_hours += parseFloat(r.night_hours) || 0;
-            }
+      const [d, confirmed] = await Promise.all([
+        getDashboardHomeStats(yearMonth).catch(() => null),
+        getConfirmedList(yearMonth, '').catch(() => []),
+      ]);
+
+      // 휴가 데이터는 항상 프론트엔드에서 직접 계산
+      const vacData = await loadVacationSummary(confirmed || []);
+
+      if (d?.kpi) {
+        // 대시보드 API 성공 시 그 데이터 사용 + 휴가 보강
+        d.vacation_summary = vacData.vacation_summary;
+        if (vacData.vacation_days > 0) d.kpi.vacation_days = vacData.vacation_days;
+        setData(d);
+      } else if (confirmed?.length > 0) {
+        // Fallback: confirmed list로 데이터 구성
+        const byDeptMap: Record<string, any> = {}, byTypeMap: Record<string, any> = {};
+        const dailyMap: Record<string, any> = {};
+        let tw = 0, td = 0, th = 0, to = 0;
+        for (const emp of confirmed) {
+          tw++; td += emp.days || 0;
+          const rh = parseFloat(emp.regular_hours) || 0, oh = parseFloat(emp.overtime_hours) || 0, nh = parseFloat(emp.night_hours) || 0;
+          th += rh + oh + nh; to += oh;
+          const dept = emp.department || '(미지정)';
+          if (!byDeptMap[dept]) byDeptMap[dept] = { workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, holiday_hours: 0 };
+          byDeptMap[dept].workers++; byDeptMap[dept].regular_hours += rh; byDeptMap[dept].overtime_hours += oh; byDeptMap[dept].night_hours += nh;
+          const t = emp.type || '(미지정)';
+          if (!byTypeMap[t]) byTypeMap[t] = { workers: 0, hours: 0 };
+          byTypeMap[t].workers++; byTypeMap[t].hours += rh + oh + nh;
+          for (const r of (emp.records || [])) {
+            if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0 };
+            dailyMap[r.date].workers++;
+            dailyMap[r.date].regular_hours += parseFloat(r.regular_hours) || 0;
+            dailyMap[r.date].overtime_hours += parseFloat(r.overtime_hours) || 0;
+            dailyMap[r.date].night_hours += parseFloat(r.night_hours) || 0;
           }
-          const dailyArr = Object.values(dailyMap).sort((a: any, b: any) => a.date.localeCompare(b.date));
-          const deptDailyArr: any[] = [];
-          for (const emp of confirmed) {
-            for (const r of (emp.records || [])) {
-              deptDailyArr.push({ date: r.date, department: emp.department || '(미지정)', workers: 1, hours: (parseFloat(r.regular_hours)||0)+(parseFloat(r.overtime_hours)||0)+(parseFloat(r.night_hours)||0) });
-            }
-          }
-          setData({
-            year_month: yearMonth,
-            kpi: { total_workers: tw, total_work_days: td, total_hours: fmt(th), avg_hours_per_worker: tw > 0 ? fmt(th/tw) : 0, overtime_ratio: th > 0 ? fmt(to/th*100) : 0, vacation_days: 0 },
-            by_department: Object.entries(byDeptMap).map(([d, v]: any) => ({ department: d, ...v })),
-            by_type: Object.entries(byTypeMap).map(([t, v]: any) => ({ type: t, ...v })),
-            daily: dailyArr, by_dept_daily: deptDailyArr,
-            vacation_summary: { working: 0, vacation: 0, half_day: 0 }, dow_avg: [],
-          });
-          setError(''); return;
         }
-      } catch {}
+        const dailyArr = Object.values(dailyMap).sort((a: any, b: any) => a.date.localeCompare(b.date));
+        const deptDailyArr: any[] = [];
+        for (const emp of confirmed) {
+          for (const r of (emp.records || [])) {
+            deptDailyArr.push({ date: r.date, department: emp.department || '(미지정)', workers: 1, hours: (parseFloat(r.regular_hours)||0)+(parseFloat(r.overtime_hours)||0)+(parseFloat(r.night_hours)||0) });
+          }
+        }
+        setData({
+          year_month: yearMonth,
+          kpi: { total_workers: tw, total_work_days: td, total_hours: fmt(th), avg_hours_per_worker: tw > 0 ? fmt(th/tw) : 0, overtime_ratio: th > 0 ? fmt(to/th*100) : 0, vacation_days: vacData.vacation_days },
+          by_department: Object.entries(byDeptMap).map(([d, v]: any) => ({ department: d, ...v })),
+          by_type: Object.entries(byTypeMap).map(([t, v]: any) => ({ type: t, ...v })),
+          daily: dailyArr, by_dept_daily: deptDailyArr,
+          vacation_summary: vacData.vacation_summary, dow_avg: [],
+        });
+      } else {
+        setData(null); setError('확정 데이터가 없습니다.');
+      }
+    } catch (e: any) {
       setData(null); setError(e?.message || 'API 호출 실패');
     } finally { setLoading(false); }
   }, [yearMonth]);

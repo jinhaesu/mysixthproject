@@ -3,8 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Area, AreaChart,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Area, AreaChart,
 } from "recharts";
 import {
   Users, Clock, TrendingUp, CalendarDays, Loader2, AlertTriangle, Palmtree,
@@ -183,35 +182,55 @@ export default function HomePage() {
           </ChartCard>
         </div>
 
-        {/* Type + Vacation Pies */}
+        {/* Type + Vacation */}
         <div className="flex flex-col gap-4">
-          <ChartCard title="유형별 근로자 분포" height={130}>
-            <PieChart>
-              <Pie data={by_type} dataKey="workers" nameKey="type" cx="50%" cy="50%" outerRadius={50} innerRadius={25} paddingAngle={3} label={({ type, workers }: any) => `${type} ${workers}`} style={{ fontSize: 10 }}>
-                {(by_type || []).map((e: any, i: number) => <Cell key={i} fill={typeColors[e.type] || CHART_COLORS[i]} />)}
-              </Pie>
-              <Tooltip contentStyle={{ background: '#0F1011', border: '1px solid #23252A', borderRadius: 8, fontSize: 12 }} />
-            </PieChart>
-          </ChartCard>
-          <ChartCard title="휴가 현황" subtitle={vacTotal > 0 ? `전체 ${vacTotal}명 기준` : '데이터 없음'} height={130}>
-            <PieChart>
-              <Pie data={[
-                { name: '출근', value: vacation_summary?.working || 0 },
-                { name: '연차', value: vacation_summary?.vacation || 0 },
-                { name: '반차', value: vacation_summary?.half_day || 0 },
-              ].filter(d => d.value > 0)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={50} innerRadius={25} paddingAngle={3} label={({ name, value }: any) => `${name} ${value}`} style={{ fontSize: 10 }}>
-                <Cell fill="#10b981" />
-                <Cell fill="#a78bfa" />
-                <Cell fill="#f59e0b" />
-              </Pie>
-              <Tooltip contentStyle={{ background: '#0F1011', border: '1px solid #23252A', borderRadius: 8, fontSize: 12 }} />
-            </PieChart>
-          </ChartCard>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
+            <h3 className="text-sm font-semibold text-[#F7F8F8] mb-3">유형별 근로자 분포</h3>
+            <div className="space-y-2">
+              {(by_type || []).map((t: any) => {
+                const total = (by_type || []).reduce((s: number, x: any) => s + (x.workers || 0), 0);
+                const pct = total > 0 ? Math.round(t.workers / total * 100) : 0;
+                return (
+                  <div key={t.type} className="flex items-center gap-3">
+                    <span className="text-xs text-[#D0D6E0] w-14">{t.type}</span>
+                    <div className="flex-1 h-5 bg-[#23252A] rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: typeColors[t.type] || '#64748b' }} />
+                    </div>
+                    <span className="text-xs text-[#F7F8F8] font-medium w-16 text-right">{t.workers}명 ({pct}%)</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
+            <h3 className="text-sm font-semibold text-[#F7F8F8] mb-1">휴가 현황</h3>
+            <p className="text-[10px] text-[#8A8F98] mb-3">{kpi.vacation_days > 0 ? `이번 달 총 ${kpi.vacation_days}일 사용` : '승인된 휴가 없음'}</p>
+            {vacTotal > 0 ? (
+              <div className="space-y-2">
+                {[
+                  { name: '출근', value: vacation_summary?.working || 0, color: '#10b981' },
+                  { name: '연차', value: vacation_summary?.vacation || 0, color: '#a78bfa' },
+                  { name: '반차', value: vacation_summary?.half_day || 0, color: '#f59e0b' },
+                ].filter(d => d.value > 0).map(d => (
+                  <div key={d.name} className="flex items-center gap-3">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                    <span className="text-xs text-[#D0D6E0] w-8">{d.name}</span>
+                    <span className="text-xs text-[#F7F8F8] font-medium">{d.value}명</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Palmtree className="w-4 h-4 text-[#8A8F98]" />
+                <span className="text-xs text-[#8A8F98]">오늘 휴가자 정보 없음</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Row 2: Daily Workers + Daily Hours */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      {daily.length > 0 && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <ChartCard title="일별 출근자 수 추이" subtitle="날짜별 출근 인원" height={240}>
           <AreaChart data={daily} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
             <defs>
@@ -250,10 +269,10 @@ export default function HomePage() {
             <Area type="monotone" dataKey="night_hours" name="야간" stroke={SEMANTIC_COLORS.night} fill={SEMANTIC_COLORS.night} fillOpacity={0.15} strokeWidth={1.5} stackId="1" />
           </AreaChart>
         </ChartCard>
-      </div>
+      </div>}
 
       {/* Row 3: Day-of-week + Dept daily stacked bar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+      {(dow_avg || []).length > 0 && <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <ChartCard title="요일별 평균" subtitle="평균 근무시수 / 출근자" height={240}>
           <BarChart data={dow_avg} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
@@ -281,10 +300,10 @@ export default function HomePage() {
             </BarChart>
           </ChartCard>
         </div>
-      </div>
+      </div>}
 
       {/* Row 4: Heatmap */}
-      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 mb-4">
+      {heatmapDates.length > 0 && <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 mb-4">
         <h3 className="text-sm font-semibold text-[#F7F8F8] mb-1">부서별/일별 근무시수 히트맵</h3>
         <p className="text-[10px] text-[#8A8F98] mb-3">색이 진할수록 근무시수가 많습니다</p>
         <div className="overflow-x-auto">
@@ -324,7 +343,7 @@ export default function HomePage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
 
       {/* Row 5: Department detail table */}
       <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import ChartCard from "@/components/charts/ChartCard";
 import { SEMANTIC_COLORS } from "@/lib/chartColors";
-import { getDashboardHomeStats, getConfirmedList, getRegularVacations } from "@/lib/api";
+import { getDashboardHomeStats, getConfirmedList, getRegularVacations, getAttendanceSummaryRegular, getAttendanceSummaryDispatch } from "@/lib/api";
 
 const DEPT_COLORS: Record<string, string> = {
   '물류': '#3b82f6', '생산2층': '#f97316', '생산3층': '#10b981',
@@ -28,6 +28,8 @@ export default function HomePage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [dataSource, setDataSource] = usePersistedState<'confirmed' | 'all'>("home_ds", 'confirmed');
+  const [timeBase, setTimeBase] = usePersistedState<'actual' | 'planned'>("home_tb", 'actual');
 
   // 프론트엔드에서 직접 휴가 데이터 계산 (vacation_requests가 정확한 단일 소스)
   const loadVacationSummary = async () => {
@@ -58,67 +60,130 @@ export default function HomePage() {
     };
   };
 
+  // 출퇴근 시간 포맷
+  const fmtTime = (t: string | null) => {
+    if (!t) return '-';
+    try { const d = new Date(t); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch { return t; }
+  };
+
+  // summary API 데이터로 대시보드 데이터 구성
+  const buildFromSummary = (regEmps: any[], dispEmps: any[], tb: 'actual' | 'planned') => {
+    const byDeptMap: Record<string, any> = {}, byTypeMap: Record<string, any> = {};
+    const dailyMap: Record<string, any> = {};
+    const deptDailyArr: any[] = [];
+    let tw = 0, td = 0, th = 0, to = 0;
+
+    const processEmp = (emp: any, empType: string) => {
+      if (!emp.actuals || emp.actuals.length === 0) return;
+      tw++;
+      for (const a of emp.actuals) {
+        const clockIn = tb === 'planned' && a.planned_clock_in ? a.planned_clock_in : fmtTime(a.clock_in_time);
+        const clockOut = tb === 'planned' && a.planned_clock_out ? a.planned_clock_out : fmtTime(a.clock_out_time);
+        if (clockIn === '-' && clockOut === '-') continue;
+        // 간이 시간 계산
+        const [h1, m1] = (clockIn || '').split(':').map(Number);
+        const [h2, m2] = (clockOut || '').split(':').map(Number);
+        let hours = 0;
+        if (!isNaN(h1) && !isNaN(h2)) {
+          let startM = h1 * 60 + (m1 || 0), endM = h2 * 60 + (m2 || 0);
+          if (endM <= startM) endM += 1440;
+          hours = Math.max((endM - startM) / 60 - 1, 0);
+        }
+        td++;
+        const reg = Math.min(hours, 8), ot = Math.max(hours - 8, 0);
+        th += hours; to += ot;
+        const dept = emp.department || '(미지정)';
+        if (!byDeptMap[dept]) byDeptMap[dept] = { workers: new Set(), regular_hours: 0, overtime_hours: 0, night_hours: 0, holiday_hours: 0 };
+        byDeptMap[dept].workers.add(emp.name); byDeptMap[dept].regular_hours += reg; byDeptMap[dept].overtime_hours += ot;
+        if (!byTypeMap[empType]) byTypeMap[empType] = { workers: new Set(), hours: 0 };
+        byTypeMap[empType].workers.add(emp.name); byTypeMap[empType].hours += hours;
+        if (!dailyMap[a.date]) dailyMap[a.date] = { date: a.date, workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0 };
+        dailyMap[a.date].workers++; dailyMap[a.date].regular_hours += reg; dailyMap[a.date].overtime_hours += ot;
+        deptDailyArr.push({ date: a.date, department: dept, workers: 1, hours });
+      }
+    };
+    for (const e of regEmps) processEmp(e, '정규직');
+    for (const e of dispEmps) processEmp(e, e.type || '파견');
+    return {
+      kpi: { total_workers: tw, total_work_days: td, total_hours: fmt(th), avg_hours_per_worker: tw > 0 ? fmt(th / tw) : 0, overtime_ratio: th > 0 ? fmt(to / th * 100) : 0, vacation_days: 0 },
+      by_department: Object.entries(byDeptMap).map(([d, v]: any) => ({ department: d, workers: v.workers.size, regular_hours: fmt(v.regular_hours), overtime_hours: fmt(v.overtime_hours), night_hours: fmt(v.night_hours), holiday_hours: fmt(v.holiday_hours) })),
+      by_type: Object.entries(byTypeMap).map(([t, v]: any) => ({ type: t, workers: v.workers.size, hours: fmt(v.hours) })),
+      daily: Object.values(dailyMap).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+      by_dept_daily: deptDailyArr, dow_avg: [],
+    };
+  };
+
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const [d, confirmed] = await Promise.all([
-        getDashboardHomeStats(yearMonth).catch(() => null),
-        getConfirmedList(yearMonth, '').catch(() => []),
-      ]);
-
-      // 휴가 데이터는 항상 프론트엔드에서 직접 계산
+      const [ym_year, ym_month] = yearMonth.split('-').map(Number);
       const vacData = await loadVacationSummary();
 
-      if (d?.kpi) {
-        // 대시보드 API 성공 시 그 데이터 사용 + 휴가 보강
-        d.vacation_summary = vacData.vacation_summary;
-        if (vacData.vacation_days > 0) d.kpi.vacation_days = vacData.vacation_days;
-        setData(d);
-      } else if (confirmed?.length > 0) {
-        // Fallback: confirmed list로 데이터 구성
-        const byDeptMap: Record<string, any> = {}, byTypeMap: Record<string, any> = {};
-        const dailyMap: Record<string, any> = {};
-        let tw = 0, td = 0, th = 0, to = 0;
-        for (const emp of confirmed) {
-          tw++; td += emp.days || 0;
-          const rh = parseFloat(emp.regular_hours) || 0, oh = parseFloat(emp.overtime_hours) || 0, nh = parseFloat(emp.night_hours) || 0;
-          th += rh + oh + nh; to += oh;
-          const dept = emp.department || '(미지정)';
-          if (!byDeptMap[dept]) byDeptMap[dept] = { workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, holiday_hours: 0 };
-          byDeptMap[dept].workers++; byDeptMap[dept].regular_hours += rh; byDeptMap[dept].overtime_hours += oh; byDeptMap[dept].night_hours += nh;
-          const t = emp.type || '(미지정)';
-          if (!byTypeMap[t]) byTypeMap[t] = { workers: 0, hours: 0 };
-          byTypeMap[t].workers++; byTypeMap[t].hours += rh + oh + nh;
-          for (const r of (emp.records || [])) {
-            if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0 };
-            dailyMap[r.date].workers++;
-            dailyMap[r.date].regular_hours += parseFloat(r.regular_hours) || 0;
-            dailyMap[r.date].overtime_hours += parseFloat(r.overtime_hours) || 0;
-            dailyMap[r.date].night_hours += parseFloat(r.night_hours) || 0;
-          }
-        }
-        const dailyArr = Object.values(dailyMap).sort((a: any, b: any) => a.date.localeCompare(b.date));
-        const deptDailyArr: any[] = [];
-        for (const emp of confirmed) {
-          for (const r of (emp.records || [])) {
-            deptDailyArr.push({ date: r.date, department: emp.department || '(미지정)', workers: 1, hours: (parseFloat(r.regular_hours)||0)+(parseFloat(r.overtime_hours)||0)+(parseFloat(r.night_hours)||0) });
-          }
-        }
-        setData({
-          year_month: yearMonth,
-          kpi: { total_workers: tw, total_work_days: td, total_hours: fmt(th), avg_hours_per_worker: tw > 0 ? fmt(th/tw) : 0, overtime_ratio: th > 0 ? fmt(to/th*100) : 0, vacation_days: vacData.vacation_days },
-          by_department: Object.entries(byDeptMap).map(([d, v]: any) => ({ department: d, ...v })),
-          by_type: Object.entries(byTypeMap).map(([t, v]: any) => ({ type: t, ...v })),
-          daily: dailyArr, by_dept_daily: deptDailyArr,
-          vacation_summary: vacData.vacation_summary, dow_avg: [],
-        });
+      if (dataSource === 'all') {
+        // 전체 데이터: attendance-summary API (미확정 포함)
+        const [regData, dispData] = await Promise.all([
+          getAttendanceSummaryRegular(ym_year, ym_month).catch(() => ({ employees: [] })),
+          getAttendanceSummaryDispatch(ym_year, ym_month).catch(() => ({ employees: [] })),
+        ]);
+        const result = buildFromSummary(regData.employees || [], dispData.employees || [], timeBase);
+        result.kpi.vacation_days = vacData.vacation_days;
+        setData({ year_month: yearMonth, ...result, vacation_summary: vacData.vacation_summary });
       } else {
-        setData(null); setError('확정 데이터가 없습니다.');
+        // 확정 데이터
+        const [d, confirmed] = await Promise.all([
+          getDashboardHomeStats(yearMonth).catch(() => null),
+          getConfirmedList(yearMonth, '').catch(() => []),
+        ]);
+
+        if (d?.kpi) {
+          d.vacation_summary = vacData.vacation_summary;
+          if (vacData.vacation_days > 0) d.kpi.vacation_days = vacData.vacation_days;
+          setData(d);
+        } else if (confirmed?.length > 0) {
+          const byDeptMap: Record<string, any> = {}, byTypeMap: Record<string, any> = {};
+          const dailyMap: Record<string, any> = {};
+          let tw = 0, td = 0, th = 0, to = 0;
+          for (const emp of confirmed) {
+            tw++; td += emp.days || 0;
+            const rh = parseFloat(emp.regular_hours) || 0, oh = parseFloat(emp.overtime_hours) || 0, nh = parseFloat(emp.night_hours) || 0;
+            th += rh + oh + nh; to += oh;
+            const dept = emp.department || '(미지정)';
+            if (!byDeptMap[dept]) byDeptMap[dept] = { workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, holiday_hours: 0 };
+            byDeptMap[dept].workers++; byDeptMap[dept].regular_hours += rh; byDeptMap[dept].overtime_hours += oh; byDeptMap[dept].night_hours += nh;
+            const t = emp.type || '(미지정)';
+            if (!byTypeMap[t]) byTypeMap[t] = { workers: 0, hours: 0 };
+            byTypeMap[t].workers++; byTypeMap[t].hours += rh + oh + nh;
+            for (const r of (emp.records || [])) {
+              if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, workers: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0 };
+              dailyMap[r.date].workers++;
+              dailyMap[r.date].regular_hours += parseFloat(r.regular_hours) || 0;
+              dailyMap[r.date].overtime_hours += parseFloat(r.overtime_hours) || 0;
+              dailyMap[r.date].night_hours += parseFloat(r.night_hours) || 0;
+            }
+          }
+          const dailyArr = Object.values(dailyMap).sort((a: any, b: any) => a.date.localeCompare(b.date));
+          const deptDailyArr: any[] = [];
+          for (const emp of confirmed) {
+            for (const r of (emp.records || [])) {
+              deptDailyArr.push({ date: r.date, department: emp.department || '(미지정)', workers: 1, hours: (parseFloat(r.regular_hours)||0)+(parseFloat(r.overtime_hours)||0)+(parseFloat(r.night_hours)||0) });
+            }
+          }
+          setData({
+            year_month: yearMonth,
+            kpi: { total_workers: tw, total_work_days: td, total_hours: fmt(th), avg_hours_per_worker: tw > 0 ? fmt(th/tw) : 0, overtime_ratio: th > 0 ? fmt(to/th*100) : 0, vacation_days: vacData.vacation_days },
+            by_department: Object.entries(byDeptMap).map(([d, v]: any) => ({ department: d, ...v })),
+            by_type: Object.entries(byTypeMap).map(([t, v]: any) => ({ type: t, ...v })),
+            daily: dailyArr, by_dept_daily: deptDailyArr,
+            vacation_summary: vacData.vacation_summary, dow_avg: [],
+          });
+        } else {
+          setData(null); setError('확정 데이터가 없습니다.');
+        }
       }
     } catch (e: any) {
       setData(null); setError(e?.message || 'API 호출 실패');
     } finally { setLoading(false); }
-  }, [yearMonth]);
+  }, [yearMonth, dataSource, timeBase]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -158,9 +223,17 @@ export default function HomePage() {
       <div className="flex flex-wrap items-end gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#F7F8F8]">근태 관리 대시보드</h1>
-          <p className="text-sm text-[#8A8F98] mt-1">확정된 근태 데이터 기반 종합 현황</p>
+          <p className="text-sm text-[#8A8F98] mt-1">{dataSource === 'confirmed' ? '확정' : '전체'} 데이터 / {timeBase === 'actual' ? '실제' : '계획'} 출근 기준</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <select value={dataSource} onChange={e => setDataSource(e.target.value as any)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]">
+            <option value="confirmed">확정 데이터</option>
+            <option value="all">전체 데이터</option>
+          </select>
+          <select value={timeBase} onChange={e => setTimeBase(e.target.value as any)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]">
+            <option value="actual">실제 출근</option>
+            <option value="planned">계획 출근</option>
+          </select>
           <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]" />
           <button onClick={load} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">새로고침</button>
         </div>

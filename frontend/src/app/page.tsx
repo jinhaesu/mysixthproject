@@ -66,6 +66,20 @@ export default function HomePage() {
     try { const d = new Date(t); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch { return t; }
   };
 
+  // 정규직: shifts 배열에서 해당 날짜의 계획 시간 찾기
+  const getPlannedTime = (shifts: any[], date: string) => {
+    if (!shifts || shifts.length === 0) return null;
+    const d = new Date(date + 'T00:00:00+09:00');
+    const dow = d.getDay();
+    for (const s of shifts) {
+      const daysStr = s.days_of_week || (s.day_of_week != null ? String(s.day_of_week) : '');
+      if (!daysStr) continue;
+      const days = daysStr.split(',').map(Number).filter((n: number) => !isNaN(n));
+      if (days.includes(dow)) return { in: s.planned_clock_in, out: s.planned_clock_out };
+    }
+    return shifts[0] ? { in: shifts[0].planned_clock_in, out: shifts[0].planned_clock_out } : null;
+  };
+
   // summary API 데이터로 대시보드 데이터 구성
   const buildFromSummary = (regEmps: any[], dispEmps: any[], tb: 'actual' | 'planned') => {
     const byDeptMap: Record<string, any> = {}, byTypeMap: Record<string, any> = {};
@@ -73,22 +87,35 @@ export default function HomePage() {
     const deptDailyArr: any[] = [];
     let tw = 0, td = 0, th = 0, to = 0;
 
+    const calcHours = (ci: string, co: string) => {
+      const [h1, m1] = (ci || '').split(':').map(Number);
+      const [h2, m2] = (co || '').split(':').map(Number);
+      if (isNaN(h1) || isNaN(h2)) return 0;
+      let startM = h1 * 60 + (m1 || 0), endM = h2 * 60 + (m2 || 0);
+      if (endM <= startM) endM += 1440;
+      return Math.max((endM - startM) / 60 - 1, 0);
+    };
+
     const processEmp = (emp: any, empType: string) => {
       if (!emp.actuals || emp.actuals.length === 0) return;
       tw++;
       for (const a of emp.actuals) {
-        const clockIn = tb === 'planned' && a.planned_clock_in ? a.planned_clock_in : fmtTime(a.clock_in_time);
-        const clockOut = tb === 'planned' && a.planned_clock_out ? a.planned_clock_out : fmtTime(a.clock_out_time);
-        if (clockIn === '-' && clockOut === '-') continue;
-        // 간이 시간 계산
-        const [h1, m1] = (clockIn || '').split(':').map(Number);
-        const [h2, m2] = (clockOut || '').split(':').map(Number);
-        let hours = 0;
-        if (!isNaN(h1) && !isNaN(h2)) {
-          let startM = h1 * 60 + (m1 || 0), endM = h2 * 60 + (m2 || 0);
-          if (endM <= startM) endM += 1440;
-          hours = Math.max((endM - startM) / 60 - 1, 0);
+        let clockIn: string, clockOut: string;
+        if (tb === 'planned') {
+          // 계획 시간: actual 레코드에 planned가 있으면 사용, 없으면 shifts에서 찾기
+          const planned = a.planned_clock_in ? { in: a.planned_clock_in, out: a.planned_clock_out }
+            : getPlannedTime(emp.shifts, a.date);
+          clockIn = planned?.in || fmtTime(a.clock_in_time);
+          clockOut = planned?.out || fmtTime(a.clock_out_time);
+        } else {
+          clockIn = fmtTime(a.clock_in_time);
+          clockOut = fmtTime(a.clock_out_time);
+          // 실제 출퇴근이 없으면 스킵 (isPlannedOnly인 경우)
+          if (a.isPlannedOnly && clockIn === '-') continue;
         }
+        if (clockIn === '-' && clockOut === '-') continue;
+        const hours = calcHours(clockIn, clockOut);
+        if (hours <= 0) continue;
         td++;
         const reg = Math.min(hours, 8), ot = Math.max(hours - 8, 0);
         th += hours; to += ot;
@@ -230,7 +257,8 @@ export default function HomePage() {
             <option value="confirmed">확정 데이터</option>
             <option value="all">전체 데이터</option>
           </select>
-          <select value={timeBase} onChange={e => setTimeBase(e.target.value as any)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]">
+          <select value={timeBase} onChange={e => { setTimeBase(e.target.value as any); if (dataSource === 'confirmed') setDataSource('all'); }}
+            className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]">
             <option value="actual">실제 출근</option>
             <option value="planned">계획 출근</option>
           </select>

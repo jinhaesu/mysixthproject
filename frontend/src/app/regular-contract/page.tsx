@@ -54,7 +54,7 @@ function SignaturePad({
     const { x, y } = getPos(e, canvas);
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#F7F8F8';
+    ctx.strokeStyle = '#222';
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -66,8 +66,22 @@ function SignaturePad({
 
   const clear = () => {
     const canvas = canvasRef.current;
-    if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
+
+  // Initialize canvas with white background
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
 
   return (
     <div>
@@ -75,12 +89,12 @@ function SignaturePad({
         <label className="block text-xs font-medium text-[#8A8F98]">{label} <span className="text-[#EB5757]">*</span></label>
         <button type="button" onClick={clear} className="text-xs text-[#62666D] hover:text-[#D0D6E0] underline">지우기</button>
       </div>
-      <div className="border-2 border-[#23252A] rounded-lg bg-[#0F1011] relative" style={{ touchAction: 'none' }}>
+      <div className="border-2 border-[#23252A] rounded-lg overflow-hidden relative" style={{ touchAction: 'none' }}>
         <canvas
           ref={canvasRef}
           width={480}
           height={120}
-          className="w-full cursor-crosshair block"
+          className="w-full cursor-crosshair block bg-white"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
@@ -99,6 +113,8 @@ function isCanvasBlank(canvas: HTMLCanvasElement): boolean {
   const blank = document.createElement('canvas');
   blank.width = canvas.width;
   blank.height = canvas.height;
+  const ctx = blank.getContext('2d');
+  if (ctx) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, blank.width, blank.height); }
   return canvas.toDataURL() === blank.toDataURL();
 }
 

@@ -220,11 +220,14 @@ router.get('/home-stats', async (req: AuthRequest, res: Response) => {
       hours:      Math.round(Number(r.hours ?? 0) * 10) / 10,
     }));
 
-    // ── 7. vacation_summary (today's date in the month) ───────────────────
-    // Count employees working vs on vacation today (or last available date in month)
-    const today = new Date().toISOString().slice(0, 10);
-    const summaryDate = today >= firstDay && today <= lastDay ? today : lastDay;
+    // ── 7. vacation_summary ─────────────────────────────────────────────
+    // Count vacation from confirmed_attendance (source='vacation') for the whole month
+    // + regular_vacation_requests approved within the month
+    const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const todayKST = nowKST.toISOString().slice(0, 10);
+    const summaryDate = todayKST >= firstDay && todayKST <= lastDay ? todayKST : lastDay;
 
+    // Today's working count
     const workingOnDate = await dbAll(
       `SELECT DISTINCT employee_name
        FROM confirmed_attendance
@@ -233,8 +236,17 @@ router.get('/home-stats', async (req: AuthRequest, res: Response) => {
       summaryDate
     );
 
-    // Approved vacations that cover summaryDate
-    const vacOnDate = await dbAll(
+    // Vacation from confirmed_attendance (source='vacation') for today
+    const vacFromConfirmed = await dbAll(
+      `SELECT DISTINCT employee_name, memo
+       FROM confirmed_attendance
+       WHERE year_month = ? AND date = ? AND source = 'vacation'`,
+      year_month,
+      summaryDate
+    );
+
+    // Vacation from regular_vacation_requests for today
+    const vacFromRequests = await dbAll(
       `SELECT rvr.type, re.name AS employee_name
        FROM regular_vacation_requests rvr
        JOIN regular_employees re ON re.id = rvr.employee_id
@@ -245,18 +257,29 @@ router.get('/home-stats', async (req: AuthRequest, res: Response) => {
       summaryDate
     );
 
+    // Merge both sources (deduplicate by name)
+    const vacNames = new Set<string>();
     let vacationCount = 0;
     let halfDayCount  = 0;
-    for (const v of vacOnDate) {
-      if ((v.type || '').includes('반차')) {
-        halfDayCount++;
-      } else {
-        vacationCount++;
-      }
+
+    for (const v of vacFromConfirmed) {
+      if (vacNames.has(v.employee_name)) continue;
+      vacNames.add(v.employee_name);
+      if ((v.memo || '').includes('반차')) halfDayCount++;
+      else vacationCount++;
+    }
+    for (const v of vacFromRequests) {
+      if (vacNames.has(v.employee_name)) continue;
+      vacNames.add(v.employee_name);
+      if ((v.type || '').includes('반차')) halfDayCount++;
+      else vacationCount++;
     }
 
+    // Working = people who have confirmed attendance today and are NOT on full vacation
+    const workingCount = workingOnDate.filter((w: any) => !vacNames.has(w.employee_name) || halfDayCount > 0).length;
+
     const vacationSummary = {
-      working:  workingOnDate.length,
+      working:  workingCount,
       vacation: vacationCount,
       half_day: halfDayCount,
     };

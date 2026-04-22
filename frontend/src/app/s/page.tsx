@@ -205,7 +205,7 @@ function SurveyContent() {
     const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#F7F8F8';
+    ctx.strokeStyle = '#222';
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -215,7 +215,9 @@ function SurveyContent() {
   const clearSignature = () => {
     if (!signatureRef) return;
     const ctx = signatureRef.getContext('2d');
-    if (ctx) ctx.clearRect(0, 0, signatureRef.width, signatureRef.height);
+    if (!ctx) return;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, signatureRef.width, signatureRef.height);
   };
 
   const handleContractSubmit = async () => {
@@ -228,6 +230,8 @@ function SurveyContent() {
     const blankCanvas = document.createElement('canvas');
     blankCanvas.width = signatureRef.width;
     blankCanvas.height = signatureRef.height;
+    const blankCtx = blankCanvas.getContext('2d');
+    if (blankCtx) { blankCtx.fillStyle = '#FFFFFF'; blankCtx.fillRect(0, 0, blankCanvas.width, blankCanvas.height); }
     if (signatureData === blankCanvas.toDataURL()) {
       alert('서명을 해주세요.');
       return;
@@ -622,12 +626,15 @@ function SurveyContent() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#D0D6E0] mb-1">서명 <span className="text-[#EB5757]">*</span></label>
-                <div className="border-2 border-[#23252A] rounded-lg bg-[#0F1011] relative" style={{ touchAction: 'none' }}>
+                <div className="border-2 border-[#23252A] rounded-lg overflow-hidden relative" style={{ touchAction: 'none' }}>
                   <canvas
-                    ref={(el) => setSignatureRef(el)}
+                    ref={(el) => {
+                      setSignatureRef(el);
+                      if (el) { const ctx = el.getContext('2d'); if (ctx) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, el.width, el.height); } }
+                    }}
                     width={320}
                     height={150}
-                    className="w-full cursor-crosshair"
+                    className="w-full cursor-crosshair bg-white"
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}

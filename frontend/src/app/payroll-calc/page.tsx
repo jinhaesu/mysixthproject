@@ -161,7 +161,8 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right">상여</th>
                   <th className="py-2 px-2 text-right">직책수당</th>
                   <th className="py-2 px-2 text-right">기타수당</th>
-                  <th className="py-2 px-2 text-right">일</th>
+                  <th className="py-2 px-2 text-right">출근/소정</th>
+                  <th className="py-2 px-2 text-right">결근</th>
                   <th className="py-2 px-2 text-right">연장h</th>
                   <th className="py-2 px-2 text-right">연장수당</th>
                   <th className="py-2 px-2 text-right">휴일h</th>
@@ -195,7 +196,8 @@ export default function PayrollCalcPage() {
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.bonus)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.position_allowance || 0)}</td>
                     <td className="py-1.5 px-2 text-right">{fmt.format(r.other_allowance || 0)}</td>
-                    <td className="py-1.5 px-2 text-right">{r.work_days}</td>
+                    <td className="py-1.5 px-2 text-right">{r.actual_work_days ?? r.work_days}<span className="text-[#62666D]">/{r.scheduled_work_days ?? '-'}</span></td>
+                    <td className="py-1.5 px-2 text-right">{(r.absent_days || 0) > 0 ? <span className="text-[#EB5757] font-medium">{r.absent_days}</span> : <span className="text-[#62666D]">0</span>}</td>
                     <td className="py-1.5 px-2 text-right text-[#F0BF00]">{(r.overtime_hours || 0).toFixed(1)}</td>
                     <td className="py-1.5 px-2 text-right text-[#F0BF00]">{fmt.format(r.overtime_pay)}</td>
                     <td className="py-1.5 px-2 text-right text-[#EB5757]">{(r.holiday_hours || 0).toFixed(1)}</td>
@@ -214,8 +216,8 @@ export default function PayrollCalcPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-[#5E6AD2]/10 border-t-2 border-[#5E6AD2]/30 font-bold text-[10px]">
-                  <td className="py-2 px-2 text-[#828FFF]" colSpan={12}>합계 ({results.length}명)</td>
-                  <td className="py-2 px-2 text-right">{sum('work_days')}</td>
+                  <td className="py-2 px-2 text-[#828FFF]" colSpan={13}>합계 ({results.length}명)</td>
+                  <td className="py-2 px-2 text-right">{sum('absent_days')}</td>
                   <td className="py-2 px-2 text-right">{sum('overtime_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right">{fmt.format(sum('overtime_pay'))}</td>
                   <td className="py-2 px-2 text-right">{sum('holiday_hours').toFixed(1)}</td>

@@ -1580,19 +1580,25 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
 
-      // 입사일/퇴사일 기반 일할 계산
-      let workableDays = daysInMonth;
+      // 소정근로일 계산 (해당 월 평일 수, 입사일/퇴사일 고려)
       const hireDate = sal.hire_date || '';
       const resignDate = sal.resign_date || '';
-      if (hireDate && hireDate > monthStart) {
-        const hireDayNum = parseInt(hireDate.slice(8, 10)) || 1;
-        workableDays = daysInMonth - hireDayNum + 1;
+      let scheduledWorkDays = 0; // 소정근로일
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${yearMonth}-${String(day).padStart(2, '0')}`;
+        if (isHolidayOrWeekend(dateStr)) continue;
+        if (hireDate && dateStr < hireDate) continue;
+        if (resignDate && resignDate >= monthStart && resignDate <= monthEnd && dateStr > resignDate) continue;
+        scheduledWorkDays++;
       }
-      if (resignDate && resignDate >= monthStart && resignDate <= monthEnd) {
-        const resignDayNum = parseInt(resignDate.slice(8, 10)) || daysInMonth;
-        workableDays = Math.min(workableDays, resignDayNum);
-      }
-      const prorateRatio = Math.min(workableDays / daysInMonth, 1);
+
+      // 실제 근무일 = 평일 확정 출근일 + 휴가일 (주말/휴일 근무는 제외 - 별도 수당)
+      const weekdayWorkDays = att ? att.work_days - (att.holiday_days || 0) : 0;
+      const actualWorkDays = weekdayWorkDays; // 이미 휴가도 work_days에 포함됨
+
+      // 기본급 일할 계산: 실제 근무일 / 소정근로일
+      const prorateRatio = scheduledWorkDays > 0 ? Math.min(actualWorkDays / scheduledWorkDays, 1) : 0;
+      const absentDays = Math.max(scheduledWorkDays - actualWorkDays, 0);
 
       const basePay = Math.round(parseFloat(sal.base_pay) * prorateRatio);
       const mealAllowance = Math.round(parseFloat(sal.meal_allowance) * prorateRatio);
@@ -1618,7 +1624,8 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         bank_name: sal.bank_name || '', bank_account: sal.bank_account || '', id_number: sal.id_number || '',
         base_pay_full: parseFloat(sal.base_pay), base_pay: basePay,
         meal_allowance_full: parseFloat(sal.meal_allowance), meal_allowance: mealAllowance,
-        prorate_ratio: Math.round(prorateRatio * 100), workable_days: workableDays,
+        prorate_ratio: Math.round(prorateRatio * 100),
+        scheduled_work_days: scheduledWorkDays, actual_work_days: actualWorkDays, absent_days: absentDays,
         bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),
         other_allowance: parseFloat(sal.other_allowance),
         overtime_hourly_rate: hourlyRate,

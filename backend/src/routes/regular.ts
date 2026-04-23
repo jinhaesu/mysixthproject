@@ -1580,28 +1580,48 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
 
-      // 소정근로일 계산 (해당 월 평일 수, 입사일/퇴사일 고려)
+      // 소정근로일 계산
       const hireDate = sal.hire_date || '';
       const resignDate = sal.resign_date || '';
-      let scheduledWorkDays = 0; // 소정근로일
+      const todayStr = getKSTDate();
+      const cutoffDate = todayStr < monthEnd ? todayStr : monthEnd;
+
+      // 전체 월 소정근로일 (입사일/퇴사일 고려)
+      let totalScheduledDays = 0;
       for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${yearMonth}-${String(day).padStart(2, '0')}`;
         if (isHolidayOrWeekend(dateStr)) continue;
         if (hireDate && dateStr < hireDate) continue;
         if (resignDate && resignDate >= monthStart && resignDate <= monthEnd && dateStr > resignDate) continue;
-        scheduledWorkDays++;
+        totalScheduledDays++;
+      }
+
+      // 오늘까지 경과한 소정근로일 (결근 계산용)
+      let elapsedScheduledDays = 0;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${yearMonth}-${String(day).padStart(2, '0')}`;
+        if (dateStr > cutoffDate) break;
+        if (isHolidayOrWeekend(dateStr)) continue;
+        if (hireDate && dateStr < hireDate) continue;
+        if (resignDate && resignDate >= monthStart && resignDate <= monthEnd && dateStr > resignDate) continue;
+        elapsedScheduledDays++;
       }
 
       // 실제 근무일 = 평일 확정 출근일 + 휴가일 (주말/휴일 근무는 제외 - 별도 수당)
       const weekdayWorkDays = att ? att.work_days - (att.holiday_days || 0) : 0;
-      const actualWorkDays = weekdayWorkDays; // 이미 휴가도 work_days에 포함됨
+      const actualWorkDays = weekdayWorkDays;
 
-      // 기본급 일할 계산: 실제 근무일 / 소정근로일
-      const prorateRatio = scheduledWorkDays > 0 ? Math.min(actualWorkDays / scheduledWorkDays, 1) : 0;
-      const absentDays = Math.max(scheduledWorkDays - actualWorkDays, 0);
+      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일
+      const absentDays = Math.max(elapsedScheduledDays - actualWorkDays, 0);
 
-      const basePay = Math.round(parseFloat(sal.base_pay) * prorateRatio);
-      const mealAllowance = Math.round(parseFloat(sal.meal_allowance) * prorateRatio);
+      // 기본급: 월급 전액에서 결근분만 차감
+      // 1일당 단가 = 월급 / 전체 소정근로일, 차감액 = 단가 × 결근일
+      const dailyRate = totalScheduledDays > 0 ? parseFloat(sal.base_pay) / totalScheduledDays : 0;
+      const mealDailyRate = totalScheduledDays > 0 ? parseFloat(sal.meal_allowance) / totalScheduledDays : 0;
+      const prorateRatio = totalScheduledDays > 0 ? Math.round((1 - absentDays / totalScheduledDays) * 100) : 100;
+
+      const basePay = Math.round(parseFloat(sal.base_pay) - dailyRate * absentDays);
+      const mealAllowance = Math.round(parseFloat(sal.meal_allowance) - mealDailyRate * absentDays);
       const grossPay = basePay + mealAllowance + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
 
       // 4대보험 계산 (근로자 부담분) - 일할 계산 기준
@@ -1624,8 +1644,9 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         bank_name: sal.bank_name || '', bank_account: sal.bank_account || '', id_number: sal.id_number || '',
         base_pay_full: parseFloat(sal.base_pay), base_pay: basePay,
         meal_allowance_full: parseFloat(sal.meal_allowance), meal_allowance: mealAllowance,
-        prorate_ratio: Math.round(prorateRatio * 100),
-        scheduled_work_days: scheduledWorkDays, actual_work_days: actualWorkDays, absent_days: absentDays,
+        prorate_ratio: prorateRatio,
+        scheduled_work_days: totalScheduledDays, elapsed_scheduled_days: elapsedScheduledDays,
+        actual_work_days: actualWorkDays, absent_days: absentDays,
         bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),
         other_allowance: parseFloat(sal.other_allowance),
         overtime_hourly_rate: hourlyRate,

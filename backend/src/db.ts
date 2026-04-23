@@ -694,6 +694,18 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Payroll closing (급여 마감)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payroll_closing (
+        id SERIAL PRIMARY KEY,
+        year_month TEXT NOT NULL UNIQUE,
+        closed_at TIMESTAMPTZ DEFAULT NOW(),
+        closed_by TEXT DEFAULT ''
+      )
+    `);
+  } catch {}
+
   console.log('Database initialized successfully');
 }
 

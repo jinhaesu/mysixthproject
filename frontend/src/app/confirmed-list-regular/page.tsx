@@ -2,8 +2,8 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Table2, Loader2, Edit3, Trash2 } from "lucide-react";
-import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord, getRegularVacations } from "@/lib/api";
+import { Table2, Loader2, Edit3, Trash2, Lock, Unlock } from "lucide-react";
+import { getConfirmedList, updateConfirmedRecord, deleteConfirmedRecord, getRegularVacations, getPayrollClosing, closePayroll, cancelPayrollClosing } from "@/lib/api";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -73,6 +73,18 @@ export default function ConfirmedListRegularPage() {
   const [nameSearch, setNameSearch] = usePersistedState("clr_nameSearch", "");
   const [deptFilter, setDeptFilter] = usePersistedState("clr_deptFilter", "");
   const [vacationMap, setVacationMap] = useState<Record<string, string>>({});
+  const [isClosed, setIsClosed] = useState(false);
+  const [closedAt, setClosedAt] = useState<string | null>(null);
+
+  const loadClosing = useCallback(async () => {
+    try {
+      const c = await getPayrollClosing(yearMonth);
+      setIsClosed(c.is_closed);
+      setClosedAt(c.closed_at);
+    } catch { setIsClosed(false); setClosedAt(null); }
+  }, [yearMonth]);
+
+  useEffect(() => { loadClosing(); }, [loadClosing]);
 
   const load = useCallback(async () => {
     const cacheKey = `clr-${yearMonth}`;
@@ -145,6 +157,28 @@ export default function ConfirmedListRegularPage() {
             className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
         </div>
         <button onClick={() => { delete _cache[`clr-${yearMonth}`]; load(); }} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">조회</button>
+        <div className="ml-auto flex items-center gap-2">
+          {isClosed ? (
+            <>
+              <span className="flex items-center gap-1.5 px-3 py-2 bg-[#27A644]/15 text-[#27A644] rounded-lg text-sm font-medium">
+                <Lock className="w-4 h-4" /> 마감 완료 {closedAt && <span className="text-xs text-[#8A8F98] ml-1">({new Date(closedAt).toLocaleDateString('ko-KR')})</span>}
+              </span>
+              <button onClick={async () => {
+                if (!confirm(`${yearMonth} 급여 마감을 취소하시겠습니까?\n마감 취소 시 급여계산에서 기본급이 전액으로 복원됩니다.`)) return;
+                try { await cancelPayrollClosing(yearMonth); setIsClosed(false); setClosedAt(null); } catch (e: any) { alert(e.message); }
+              }} className="px-3 py-2 bg-[#EB5757]/15 text-[#EB5757] rounded-lg text-sm font-medium hover:bg-[#EB5757]/25 flex items-center gap-1">
+                <Unlock className="w-4 h-4" /> 마감 취소
+              </button>
+            </>
+          ) : (
+            <button onClick={async () => {
+              if (!confirm(`${yearMonth} 근태를 최종 마감하시겠습니까?\n마감 후 급여계산에서 결근 차감이 반영됩니다.`)) return;
+              try { await closePayroll(yearMonth); setIsClosed(true); setClosedAt(new Date().toISOString()); } catch (e: any) { alert(e.message); }
+            }} className="px-4 py-2 bg-[#EB5757] text-white rounded-lg text-sm font-medium hover:bg-[#EB5757]/80 flex items-center gap-1">
+              <Lock className="w-4 h-4" /> 최종 마감
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (

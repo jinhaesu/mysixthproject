@@ -98,12 +98,24 @@ export default function PayrollCalcPage() {
           <input type="number" value={overtimeRate} onChange={e => setOvertimeRate(parseInt(e.target.value) || 0)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
         </div>
         <div className="text-xs text-[#8A8F98] py-2">× 1.5배 = {fmt.format(Math.round(overtimeRate * 1.5))}원/h</div>
+        {/* 마감 상태 */}
+        {data && (
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${data.is_closed ? 'bg-[#27A644]/15 text-[#27A644]' : 'bg-[#F0BF00]/15 text-[#F0BF00]'}`}>
+            {data.is_closed ? '마감 완료' : '미마감'}
+            {data.is_closed && data.closed_at && <span className="text-xs text-[#8A8F98]">({new Date(data.closed_at).toLocaleDateString('ko-KR')})</span>}
+          </div>
+        )}
         {results.length > 0 && (
           <button onClick={handleExcel} className="px-4 py-2 bg-[#27A644] text-white rounded-lg text-sm font-medium flex items-center gap-1 ml-auto">
             <Download className="w-4 h-4" /> 엑셀 다운로드
           </button>
         )}
       </div>
+      {data && !data.is_closed && (
+        <div className="bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg px-3 py-2 mb-4 text-xs text-[#F0BF00]">
+          미마감 상태입니다. 기본급은 전액으로 표시됩니다. <b>확정 리스트에서 최종 마감</b> 후 결근 차감이 반영됩니다.
+        </div>
+      )}
 
       {results.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">

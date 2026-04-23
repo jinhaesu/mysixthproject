@@ -1570,6 +1570,10 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       WHERE re.is_active = 1 OR (re.resign_date != '' AND re.resign_date >= ?)
     `, monthStart) as any[];
 
+    // 마감 여부 먼저 확인 (마감 전이면 기본급 전액, 마감 후면 결근 차감)
+    const closingCheck = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
+    const payrollClosed = !!closingCheck;
+
     const results = [];
     const daysInMonth = lastDay;
     for (const sal of salaries) {
@@ -1614,14 +1618,20 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일
       const absentDays = Math.max(elapsedScheduledDays - actualWorkDays, 0);
 
-      // 기본급: 월급 전액에서 결근분만 차감
-      // 1일당 단가 = 월급 / 전체 소정근로일, 차감액 = 단가 × 결근일
-      const dailyRate = totalScheduledDays > 0 ? parseFloat(sal.base_pay) / totalScheduledDays : 0;
-      const mealDailyRate = totalScheduledDays > 0 ? parseFloat(sal.meal_allowance) / totalScheduledDays : 0;
-      const prorateRatio = totalScheduledDays > 0 ? Math.round((1 - absentDays / totalScheduledDays) * 100) : 100;
-
-      const basePay = Math.round(parseFloat(sal.base_pay) - dailyRate * absentDays);
-      const mealAllowance = Math.round(parseFloat(sal.meal_allowance) - mealDailyRate * absentDays);
+      // 기본급: 마감 후에만 결근 차감, 마감 전에는 전액
+      let basePay: number, mealAllowance: number, prorateRatio: number;
+      if (payrollClosed) {
+        const dailyRate = totalScheduledDays > 0 ? parseFloat(sal.base_pay) / totalScheduledDays : 0;
+        const mealDailyRate = totalScheduledDays > 0 ? parseFloat(sal.meal_allowance) / totalScheduledDays : 0;
+        prorateRatio = totalScheduledDays > 0 ? Math.round((1 - absentDays / totalScheduledDays) * 100) : 100;
+        basePay = Math.round(parseFloat(sal.base_pay) - dailyRate * absentDays);
+        mealAllowance = Math.round(parseFloat(sal.meal_allowance) - mealDailyRate * absentDays);
+      } else {
+        // 마감 전: 기본급 전액
+        basePay = parseFloat(sal.base_pay);
+        mealAllowance = parseFloat(sal.meal_allowance);
+        prorateRatio = 100;
+      }
       const grossPay = basePay + mealAllowance + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
 
       // 4대보험 계산 (근로자 부담분) - 일할 계산 기준
@@ -1668,10 +1678,42 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       });
     }
 
-    res.json({ year_month: yearMonth, results });
+    // 마감 여부 확인
+    const closing = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
+    const isClosed = !!closing;
+
+    res.json({ year_month: yearMonth, is_closed: isClosed, closed_at: closing?.closed_at || null, results });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// ===== Payroll Closing (급여 마감) =====
+
+// GET /api/regular/payroll-closing/:yearMonth
+router.get('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    const closing = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', req.params.yearMonth) as any;
+    res.json({ is_closed: !!closing, closed_at: closing?.closed_at || null, closed_by: closing?.closed_by || '' });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// POST /api/regular/payroll-closing/:yearMonth - 마감
+router.post('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    const { yearMonth } = req.params;
+    await dbRun('INSERT INTO payroll_closing (year_month, closed_by) VALUES (?, ?) ON CONFLICT (year_month) DO UPDATE SET closed_at = NOW(), closed_by = ?',
+      yearMonth, req.body.closed_by || '', req.body.closed_by || '');
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// DELETE /api/regular/payroll-closing/:yearMonth - 마감 취소
+router.delete('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM payroll_closing WHERE year_month = ?', req.params.yearMonth);
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
 export default router;

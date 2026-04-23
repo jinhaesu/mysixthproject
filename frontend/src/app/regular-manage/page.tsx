@@ -27,6 +27,7 @@ import {
   setVacationBalance,
   initVacationBalances,
   autoCalcVacationBalances,
+  getVacationLogs,
   getRegularShifts,
   createRegularShift,
   deleteRegularShift,
@@ -1283,7 +1284,9 @@ function AttendanceTab() {
 }
 
 function VacationTab() {
-  const [subTab, setSubTab] = useState<'requests' | 'balances' | 'calendar'>('requests');
+  const [subTab, setSubTab] = useState<'requests' | 'balances' | 'calendar' | 'settings'>('requests');
+  const [vacLogs, setVacLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
   const [balances, setBalances] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1295,7 +1298,6 @@ function VacationTab() {
   const [editUsedDays, setEditUsedDays] = useState("");
   const [selectedEmpIds, setSelectedEmpIds] = useState<Set<number>>(new Set());
   const [batchDays, setBatchDays] = useState("15");
-  const [vacLogs, setVacLogs] = useState<any[]>([]);
   const [logsOpen, setLogsOpen] = useState(false);
   const [balanceSearch, setBalanceSearch] = useState("");
   // Calendar sub-tab state
@@ -1397,6 +1399,10 @@ function VacationTab() {
         <button onClick={() => setSubTab('calendar')}
           className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 ${subTab === 'calendar' ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>
           <Calendar size={14} /> 휴가 캘린더
+        </button>
+        <button onClick={() => { setSubTab('settings'); if (vacLogs.length === 0) { setLogsLoading(true); getVacationLogs().then(setVacLogs).catch(() => {}).finally(() => setLogsLoading(false)); } }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${subTab === 'settings' ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7'}`}>
+          휴가 세팅
         </button>
       </div>
 
@@ -1806,7 +1812,7 @@ function VacationTab() {
                             <span className="text-[#F0BF00]">{parseFloat(b.used_days)}</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-4 font-medium text-[#27A644]">{(parseFloat(b.total_days) - parseFloat(b.used_days)).toFixed(1)}</td>
+                        {(() => { const rem = parseFloat(b.total_days) - parseFloat(b.used_days); return <td className={`py-2.5 px-4 font-medium ${rem < 0 ? 'text-[#EB5757]' : 'text-[#27A644]'}`}>{rem.toFixed(1)}</td>; })()}
                         <td className="py-2.5 px-4">
                           {editingBalance === b.employee_id ? (
                             <div className="flex gap-1">
@@ -1828,6 +1834,86 @@ function VacationTab() {
             )}
           </div>
         </>
+      )}
+
+      {subTab === 'settings' && (
+        <div className="space-y-4">
+          {/* 현재 설정 */}
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+            <h3 className="text-sm font-semibold text-[#F7F8F8] mb-3">현재 휴가 설정</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-3 py-2 border-b border-[#23252A]">
+                <span className="text-[#8A8F98] w-40">자동 계산 기준</span>
+                <span className="text-[#F7F8F8] font-medium">근로기준법 (입사일 기준)</span>
+              </div>
+              <div className="flex items-center gap-3 py-2 border-b border-[#23252A]">
+                <span className="text-[#8A8F98] w-40">갱신 주기</span>
+                <span className="text-[#F7F8F8] font-medium">매일 자동 갱신 (서버 크론)</span>
+              </div>
+              <div className="flex items-center gap-3 py-2 border-b border-[#23252A]">
+                <span className="text-[#8A8F98] w-40">1년 미만 (월차)</span>
+                <span className="text-[#F7F8F8]">1개월 개근 시 <b>1일</b> (최대 11일)</span>
+              </div>
+              <div className="flex items-center gap-3 py-2 border-b border-[#23252A]">
+                <span className="text-[#8A8F98] w-40">1년 이상</span>
+                <span className="text-[#F7F8F8]">1년 80% 출근 시 <b>15일</b></span>
+              </div>
+              <div className="flex items-center gap-3 py-2 border-b border-[#23252A]">
+                <span className="text-[#8A8F98] w-40">3년 이상 가산</span>
+                <span className="text-[#F7F8F8]">2년마다 <b>+1일</b> (최대 25일)</span>
+              </div>
+              <div className="flex items-center gap-3 py-2 border-b border-[#23252A]">
+                <span className="text-[#8A8F98] w-40">마이너스 사용 허용</span>
+                <span className="text-[#27A644] font-medium">허용 (잔여 0일에서도 신청 가능, -N일로 표시)</span>
+              </div>
+              <div className="flex items-center gap-3 py-2">
+                <span className="text-[#8A8F98] w-40">적용 연도</span>
+                <span className="text-[#F7F8F8] font-medium">{new Date().getFullYear()}년</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 변경 이력 */}
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#23252A] flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#F7F8F8]">휴가 변경 이력</h3>
+              <button onClick={() => { setLogsLoading(true); getVacationLogs().then(setVacLogs).catch(() => {}).finally(() => setLogsLoading(false)); }}
+                className="px-3 py-1 text-xs bg-[#5E6AD2] text-white rounded-lg">새로고침</button>
+            </div>
+            {logsLoading ? (
+              <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin text-[#7070FF] mx-auto" /></div>
+            ) : vacLogs.length === 0 ? (
+              <div className="py-12 text-center text-sm text-[#62666D]">변경 이력이 없습니다.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-[#08090A] text-left">
+                      <th className="py-2 px-3 font-medium text-[#8A8F98]">일시</th>
+                      <th className="py-2 px-3 font-medium text-[#8A8F98]">이름</th>
+                      <th className="py-2 px-3 font-medium text-[#8A8F98]">작업</th>
+                      <th className="py-2 px-3 font-medium text-[#8A8F98] text-right">변경 전</th>
+                      <th className="py-2 px-3 font-medium text-[#8A8F98] text-right">변경 후</th>
+                      <th className="py-2 px-3 font-medium text-[#8A8F98]">사유</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#23252A]">
+                    {vacLogs.map((log: any, i: number) => (
+                      <tr key={i} className="hover:bg-[#141516]">
+                        <td className="py-1.5 px-3 text-[#8A8F98] whitespace-nowrap">{log.created_at ? new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                        <td className="py-1.5 px-3 text-[#F7F8F8] font-medium whitespace-nowrap">{log.employee_name}</td>
+                        <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#5E6AD2]/15 text-[#828FFF]">{log.action}</span></td>
+                        <td className="py-1.5 px-3 text-right text-[#8A8F98]">{parseFloat(log.prev_days || 0)}일</td>
+                        <td className="py-1.5 px-3 text-right text-[#F7F8F8] font-medium">{parseFloat(log.new_days || 0)}일</td>
+                        <td className="py-1.5 px-3 text-[#8A8F98]">{log.reason || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

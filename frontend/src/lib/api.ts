@@ -529,6 +529,9 @@ export async function initVacationBalances(data: { year: number; total_days: num
 export async function autoCalcVacationBalances(year: number) {
   return fetchAPI<any>('/api/regular/vacation-balances/auto-calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year }) });
 }
+export async function getVacationLogs() {
+  return fetchAPI<any[]>('/api/regular/vacation-logs');
+}
 
 // ===== Regular Shifts =====
 export async function getRegularShifts() {

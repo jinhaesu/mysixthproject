@@ -218,6 +218,14 @@ export async function resendSurvey(id: number) {
   return fetchAPI<any>(`/api/survey/resend/${id}`, { method: 'POST' });
 }
 
+export async function addManualAttendance(data: { password: string; phone: string; date: string; clock_in_time?: string; clock_out_time?: string }) {
+  return fetchAPI<any>('/api/survey/manual-attendance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
 // Survey responses
 export async function getSurveyResponses(params: Record<string, string> = {}) {
   const query = new URLSearchParams(params).toString();

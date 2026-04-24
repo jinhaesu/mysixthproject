@@ -8,6 +8,7 @@ import {
   updateWorker,
   deleteWorker,
   importWorkers,
+  addManualAttendance,
 } from "@/lib/api";
 import {
   Contact,
@@ -138,6 +139,45 @@ export default function WorkersPage() {
   const [historyMonth, setHistoryMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; });
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // 수동 출퇴근 추가 폼 상태
+  const [showAddAttendance, setShowAddAttendance] = useState(false);
+  const [addForm, setAddForm] = useState({ date: "", clock_in_time: "", clock_out_time: "", password: "" });
+  const [addSaving, setAddSaving] = useState(false);
+
+  const resetAddForm = () => {
+    const today = new Date();
+    const d = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    setAddForm({ date: d, clock_in_time: "", clock_out_time: "", password: "" });
+  };
+
+  const handleAddAttendance = async () => {
+    if (!editingWorker) return;
+    if (!addForm.date) return alert("날짜를 입력해주세요.");
+    if (!addForm.clock_in_time) return alert("출근 시간을 입력해주세요. (퇴근 시간은 선택)");
+    if (!addForm.password) return alert("비밀번호를 입력해주세요.");
+    setAddSaving(true);
+    try {
+      await addManualAttendance({
+        password: addForm.password,
+        phone: editingWorker.phone,
+        date: addForm.date,
+        clock_in_time: addForm.clock_in_time || undefined,
+        clock_out_time: addForm.clock_out_time || undefined,
+      });
+      alert("출퇴근 이력이 추가되었습니다.");
+      setShowAddAttendance(false);
+      resetAddForm();
+      // 추가된 날짜가 속한 월로 이동 후 reload
+      const ym = addForm.date.slice(0, 7);
+      setHistoryMonth(ym);
+      loadAttendanceHistory(editingWorker.phone, ym);
+    } catch (err: any) {
+      alert(err.message || "추가 중 오류가 발생했습니다.");
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
   const loadAttendanceHistory = async (phone: string, ym: string) => {
     setHistoryLoading(true);
     try {
@@ -169,6 +209,7 @@ export default function WorkersPage() {
       memo: worker.memo,
     });
     setShowModal(true);
+    setShowAddAttendance(false);
     loadAttendanceHistory(worker.phone, historyMonth);
   }
 
@@ -642,11 +683,65 @@ export default function WorkersPage() {
               <div className="px-6 py-4 border-t border-[#23252A]">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-semibold text-[#F7F8F8]">출퇴근 이력</h4>
-                  <input type="month" value={historyMonth} onChange={e => {
-                    setHistoryMonth(e.target.value);
-                    if (editingWorker) loadAttendanceHistory(editingWorker.phone, e.target.value);
-                  }} className="px-2 py-1 border border-[#23252A] rounded-lg text-xs" />
+                  <div className="flex items-center gap-2">
+                    <input type="month" value={historyMonth} onChange={e => {
+                      setHistoryMonth(e.target.value);
+                      if (editingWorker) loadAttendanceHistory(editingWorker.phone, e.target.value);
+                    }} className="px-2 py-1 border border-[#23252A] rounded-lg text-xs" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!showAddAttendance) resetAddForm();
+                        setShowAddAttendance(v => !v);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-[#5E6AD2] text-white hover:bg-[#828FFF] text-xs font-medium flex items-center gap-1"
+                    >
+                      <Plus size={12} /> 추가하기
+                    </button>
+                  </div>
                 </div>
+
+                {showAddAttendance && (
+                  <div className="mb-3 p-3 rounded-lg border border-[#5E6AD2]/40 bg-[#5E6AD2]/10 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-medium text-[#8A8F98] mb-1">날짜</label>
+                        <input type="date" value={addForm.date}
+                          onChange={e => setAddForm({ ...addForm, date: e.target.value })}
+                          className="w-full px-2 py-1 border border-[#23252A] rounded text-xs bg-[#0F1011]" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-[#8A8F98] mb-1">비밀번호</label>
+                        <input type="password" value={addForm.password}
+                          onChange={e => setAddForm({ ...addForm, password: e.target.value })}
+                          placeholder="비밀번호"
+                          className="w-full px-2 py-1 border border-[#23252A] rounded text-xs bg-[#0F1011]" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-[#8A8F98] mb-1">출근 시간</label>
+                        <input type="time" value={addForm.clock_in_time}
+                          onChange={e => setAddForm({ ...addForm, clock_in_time: e.target.value })}
+                          className="w-full px-2 py-1 border border-[#23252A] rounded text-xs bg-[#0F1011]" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-[#8A8F98] mb-1">퇴근 시간</label>
+                        <input type="time" value={addForm.clock_out_time}
+                          onChange={e => setAddForm({ ...addForm, clock_out_time: e.target.value })}
+                          className="w-full px-2 py-1 border border-[#23252A] rounded text-xs bg-[#0F1011]" />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button type="button" onClick={() => { setShowAddAttendance(false); resetAddForm(); }}
+                        className="px-3 py-1 rounded border border-[#23252A] text-[#D0D6E0] hover:bg-[#141516]/5 text-xs">
+                        취소
+                      </button>
+                      <button type="button" onClick={handleAddAttendance} disabled={addSaving}
+                        className="px-3 py-1 rounded bg-[#27A644] text-white hover:bg-[#27A644]/90 text-xs font-medium disabled:opacity-50 flex items-center gap-1">
+                        {addSaving && <Loader2 size={12} className="animate-spin" />} 저장
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {historyLoading ? (
                   <div className="py-4 text-center text-xs text-[#62666D]">로딩중...</div>
                 ) : attendanceHistory.length === 0 ? (

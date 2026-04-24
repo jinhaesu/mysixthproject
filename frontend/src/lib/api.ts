@@ -221,13 +221,19 @@ export async function resendSurvey(id: number) {
 export async function addManualAttendance(data: { password: string; phone: string; date: string; clock_in_time?: string; clock_out_time?: string }) {
   // 방어적 URL 해석: 오래된 캐시/환경변수 누락으로 API_URL 이 비어있어도 Railway 로 직접 호출
   const base = API_URL || 'https://mysixthproject-production.up.railway.app';
-  const res = await fetch(`${base}/api/survey/manual-attendance`, {
+  const url = `${base}/api/survey/manual-attendance`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
+  const text = await res.text();
+  let body: any = {};
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { error: `비JSON 응답: ${text.slice(0, 120)}` }; }
+  if (!res.ok) {
+    const suffix = body?.error ? ` — ${body.error}` : (text ? ` — ${text.slice(0, 80)}` : '');
+    throw new Error(`HTTP ${res.status} (${url})${suffix}`);
+  }
   return body;
 }
 

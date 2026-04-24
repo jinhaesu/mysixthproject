@@ -52,7 +52,12 @@ app.use('/api/dashboard', requireAuth, dashboardRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '2.0.0' });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0',
+    features: { manualAttendance: true }, // 배포 검증용 마커 (manual-attendance 라우트 포함)
+  });
 });
 
 // MCP SSE endpoint (remote MCP server for Claude Desktop/Mobile)

@@ -6,13 +6,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
 } from "recharts";
-import { Calendar, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info, RefreshCw } from "lucide-react";
+import { Calendar, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info } from "lucide-react";
 import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList, getSalarySettings } from "@/lib/api";
-import {
-  PageHeader, Card, CardHeader, Badge, Button, Tabs, SkeletonCard, EmptyState, CenterSpinner, Section,
-} from "@/components/ui";
-import ChartCard, { TOOLTIP_STYLE } from "@/components/charts/ChartCard";
-import { SEMANTIC_COLORS, AXIS_STYLE, GRID_STROKE } from "@/lib/chartColors";
 
 const REGULAR_CATS = ['정규직'];
 const DISPATCH_CATS = ['파견', '알바', '사업소득', '직원'];
@@ -559,82 +554,71 @@ function DashboardContent() {
 
   // ===================== RENDER =====================
   return (
-    <div className="fade-in">
+    <div>
       {/* Header */}
-      <PageHeader
-        eyebrow="분석"
-        title={`${isRegular ? '정규직' : '사업소득(알바)/파견'} 대시보드`}
-        description="근태 데이터를 다양한 관점에서 분석합니다."
-        meta={
-          <span className="text-[var(--fs-caption)] text-[var(--text-3)]">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-[#F7F8F8]">{isRegular ? '정규직' : '사업소득(알바)/파견'} 대시보드</h2>
+          <p className="text-[#8A8F98] mt-1">근태 데이터를 다양한 관점에서 분석합니다.</p>
+          <div className="mt-2 bg-[#08090A] border border-[#23252A] rounded-lg px-3 py-1.5 text-[10px] text-[#8A8F98]">
             연장/휴일 시간: <b>30분 단위 내림</b> (0.1~0.4h → 0h, 0.5h = 30분) | 토/일/공휴일 → 전량 연장 | 수당 = 시급 × 1.5배
-          </span>
-        }
-        actions={
-          <div className="flex items-center gap-2 bg-[var(--bg-1)] border border-[var(--border-2)] rounded-[var(--r-md)] px-3 py-2">
-            <button onClick={prevMonth} className="p-1 hover:bg-[var(--bg-3)] rounded transition-colors">
-              <ChevronLeft size={20} className="text-[var(--text-2)]" />
-            </button>
-            <span className="text-lg font-semibold text-[var(--text-1)] min-w-[120px] text-center tabular">{year}년 {month}월</span>
-            <button onClick={nextMonth} className="p-1 hover:bg-[var(--bg-3)] rounded transition-colors">
-              <ChevronRight size={20} className="text-[var(--text-2)]" />
-            </button>
-            <Button
-              variant="primary"
-              size="xs"
-              onClick={refreshData}
-              disabled={loading}
-              leadingIcon={<RefreshCw size={12} className={loading ? "animate-spin" : ""} />}
-              className="ml-2"
-            >
-              조회
-            </Button>
           </div>
-        }
-      />
-
-      {/* Tabs */}
-      <div className="mb-6">
-        <Tabs
-          variant="pill"
-          tabs={TABS.map(tab => ({
-            id: tab.id,
-            label: tab.label,
-            icon: <tab.icon size={15} />,
-          }))}
-          value={activeTab}
-          onChange={(id) => setActiveTab(id as TabId)}
-        />
+        </div>
+        <div className="flex items-center gap-3 bg-[#0F1011] rounded-xl border border-[#23252A] px-4 py-2">
+          <button onClick={prevMonth} className="p-1 hover:bg-[#141516]/5 rounded"><ChevronLeft size={20} /></button>
+          <span className="text-lg font-semibold text-[#F7F8F8] min-w-[120px] text-center">{year}년 {month}월</span>
+          <button onClick={nextMonth} className="p-1 hover:bg-[#141516]/5 rounded"><ChevronRight size={20} /></button>
+          <button onClick={refreshData} disabled={loading} className="ml-2 px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-[#28282C]" title="새로고침">조회</button>
+        </div>
       </div>
 
-      {loading && <CenterSpinner />}
-      {error && (
-        <Card tone="ghost" className="mb-4 border-[var(--danger-border)] bg-[var(--danger-bg)]">
-          <p className="text-[var(--danger-fg)] text-[var(--fs-body)]">{error}</p>
-        </Card>
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-[#141516] rounded-xl p-1">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex-1 justify-center ${
+                activeTab === tab.id ? "bg-[#0F1011] text-[#828FFF] shadow-[0px_1px_3px_rgba(0,0,0,0.2)]" : "text-[#8A8F98] hover:text-[#D0D6E0]"
+              }`}
+            >
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin" />
+        </div>
       )}
+      {error && <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-4 text-[#EB5757] text-sm mb-4">{error}</div>}
 
       {!loading && !error && (
         <>
           {anomalyCount > 0 && (
-            <Card tone="ghost" className="mb-6 border-[var(--danger-border)] bg-[var(--danger-bg)]">
+            <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-5 mb-6">
               <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-5 h-5 text-[var(--danger-fg)]" />
-                <h2 className="text-[var(--fs-base)] font-semibold text-[var(--danger-fg)]">근태 이상 감지 ({anomalyCount}건)</h2>
+                <AlertTriangle className="w-5 h-5 text-[#EB5757]" />
+                <h2 className="text-base font-semibold text-[#EB5757]">근태 이상 감지 ({anomalyCount}건)</h2>
               </div>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {anomalies.slice(0, 20).map((a: any, i: number) => (
-                  <div key={i} className={`flex items-start gap-2 text-[var(--fs-body)] ${
-                    a.severity === 'high' ? 'text-[var(--danger-fg)]' : 'text-[var(--warning-fg)]'
+                  <div key={i} className={`flex items-start gap-2 text-sm ${
+                    a.severity === 'high' ? 'text-[#EB5757]' : 'text-[#F0BF00]'
                   }`}>
                     <span className={`shrink-0 mt-0.5 w-2 h-2 rounded-full ${
-                      a.severity === 'high' ? 'bg-[var(--danger-fg)]' : 'bg-[var(--warning-fg)]'
+                      a.severity === 'high' ? 'bg-[#EB5757]' : 'bg-[#F0BF00]/100'
                     }`} />
                     <span>{a.message}</span>
                   </div>
                 ))}
               </div>
-            </Card>
+            </div>
           )}
 
           {/* ============ TAB 1: 월별 근태 요약 ============ */}
@@ -642,24 +626,19 @@ function DashboardContent() {
             <div className="space-y-4">
               {/* Overtime ratio cards by employment type */}
               {groups.length > 0 && (() => {
-                const displayCats: { label: string; keys: string[]; tone: string }[] = [
-                  { label: "정규직", keys: ["정규직"], tone: "brand" },
-                  { label: "파견", keys: ["파견"], tone: "warning" },
-                  { label: "알바(사업소득)", keys: ["알바(사업소득)", "알바"], tone: "success" },
-                  { label: "파견+알바", keys: ["파견", "알바(사업소득)", "알바"], tone: "brand" },
+                const targetCats = ["정규직", "파견", "알바(사업소득)", "알바"];
+                const displayCats: { label: string; keys: string[]; color: string; bg: string; border: string }[] = [
+                  { label: "정규직", keys: ["정규직"], color: "text-[#828FFF]", bg: "bg-[#4EA7FC]/10", border: "border-[#5E6AD2]/30" },
+                  { label: "파견", keys: ["파견"], color: "text-[#FC7840]", bg: "bg-[#FC7840]/10", border: "border-[#FC7840]/30" },
+                  { label: "알바(사업소득)", keys: ["알바(사업소득)", "알바"], color: "text-[#27A644]", bg: "bg-[#27A644]/10", border: "border-[#27A644]/30" },
+                  { label: "파견+알바", keys: ["파견", "알바(사업소득)", "알바"], color: "text-[#828FFF]", bg: "bg-[#5E6AD2]/10", border: "border-[#5E6AD2]/30" },
                 ];
-                const toneMap: Record<string, { bg: string; border: string; color: string }> = {
-                  brand:   { bg: "bg-[var(--brand-500)]/10", border: "border-[var(--brand-500)]/30", color: "text-[var(--brand-400)]" },
-                  warning: { bg: "bg-[var(--warning-bg)]",   border: "border-[var(--warning-border)]", color: "text-[var(--warning-fg)]" },
-                  success: { bg: "bg-[var(--success-bg)]",   border: "border-[var(--success-border)]", color: "text-[var(--success-fg)]" },
-                };
                 const found = displayCats.filter(dc => dc.keys.some(k => categoryStats.current.has(k)));
 
                 return (
                   <>
                     <div className={`grid grid-cols-1 ${found.length >= 4 ? "md:grid-cols-4" : found.length >= 3 ? "md:grid-cols-3" : found.length === 2 ? "md:grid-cols-2" : ""} gap-4`}>
                       {found.map(dc => {
-                        const tc = toneMap[dc.tone] || toneMap.brand;
                         const cur = dc.keys.reduce((a, k) => {
                           const t = categoryStats.current.get(k);
                           return t ? { total: a.total + t.total_hours, dayOt: a.dayOt + t.daytime_ot, nightTotal: a.nightTotal + t.night_total } : a;
@@ -677,76 +656,70 @@ function DashboardContent() {
                         const over30 = curRatio > 30;
 
                         return (
-                          <Card key={dc.label} tone="ghost" className={`${tc.bg} ${tc.border}`}>
+                          <div key={dc.label} className={`${dc.bg} rounded-xl border ${dc.border} p-4`}>
                             <div className="flex items-center justify-between mb-2">
-                              <span className={`text-[var(--fs-body)] font-semibold ${tc.color}`}>{dc.label} 연장&야간 비율</span>
-                              {over30 && <AlertTriangle size={16} className="text-[var(--danger-fg)]" />}
+                              <span className={`text-sm font-semibold ${dc.color}`}>{dc.label} 연장&야간 비율</span>
+                              {over30 && <AlertTriangle size={16} className="text-[#EB5757]" />}
                             </div>
                             <div className="flex items-baseline gap-2">
-                              <span className={`text-2xl font-bold tabular ${over30 ? "text-[var(--danger-fg)]" : tc.color}`}>
+                              <span className={`text-2xl font-bold ${over30 ? "text-[#EB5757]" : dc.color}`}>
                                 {curRatio.toFixed(1)}%
                               </span>
-                              <span className="text-[var(--fs-caption)] text-[var(--text-3)]">(연장+야간 {fmt(curOtNight)}h / 총 {fmt(cur.total)}h)</span>
+                              <span className="text-xs text-[#8A8F98]">(연장+야간 {fmt(curOtNight)}h / 총 {fmt(cur.total)}h)</span>
                             </div>
-                            <div className="mt-1 text-[var(--fs-caption)]">
+                            <div className="mt-1 text-xs">
                               {prev.total > 0 ? (
-                                <span className={ratioDiff > 0 ? "text-[var(--danger-fg)]" : ratioDiff < 0 ? "text-[var(--brand-400)]" : "text-[var(--text-4)]"}>
+                                <span className={ratioDiff > 0 ? "text-[#EB5757]" : ratioDiff < 0 ? "text-blue-500" : "text-[#62666D]"}>
                                   전월 {prevRatio.toFixed(1)}% {ratioDiff !== 0 && `(${ratioDiff > 0 ? "+" : ""}${ratioDiff.toFixed(1)}%p)`}
                                 </span>
                               ) : (
-                                <span className="text-[var(--text-4)]">전월 데이터 없음</span>
+                                <span className="text-[#62666D]">전월 데이터 없음</span>
                               )}
                             </div>
-                          </Card>
+                          </div>
                         );
                       })}
                     </div>
 
                     {/* Advisory notices */}
                     <div className="space-y-2">
-                      <Card tone="ghost" className="border-[var(--warning-border)] bg-[var(--warning-bg)] flex items-start gap-2.5">
-                        <AlertTriangle size={16} className="text-[var(--warning-fg)] shrink-0 mt-0.5" />
-                        <p className="text-[var(--fs-body)] text-[var(--warning-fg)]">총 근무시간 대비 연장+야간 근무 시간은 <strong>30%를 넘기지 않는 것</strong>이 좋습니다.</p>
-                      </Card>
-                      <Card tone="ghost" className="border-[var(--info-border)] bg-[var(--info-bg)] flex items-start gap-2.5">
-                        <Info size={16} className="text-[var(--info-fg)] shrink-0 mt-0.5" />
-                        <p className="text-[var(--fs-body)] text-[var(--info-fg)]">파견직과 알바(사업소득)는 <strong>생산성이 보장된 상황을 계산하면서</strong> 채용하셔야 합니다.</p>
-                      </Card>
+                      <div className="flex items-start gap-2.5 bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg px-4 py-3">
+                        <AlertTriangle size={16} className="text-[#F0BF00] shrink-0 mt-0.5" />
+                        <p className="text-sm text-[#FC7840]">총 근무시간 대비 연장+야간 근무 시간은 <strong>30%를 넘기지 않는 것</strong>이 좋습니다.</p>
+                      </div>
+                      <div className="flex items-start gap-2.5 bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-lg px-4 py-3">
+                        <Info size={16} className="text-[#7070FF] shrink-0 mt-0.5" />
+                        <p className="text-sm text-[#828FFF]">파견직과 알바(사업소득)는 <strong>생산성이 보장된 상황을 계산하면서</strong> 채용하셔야 합니다.</p>
+                      </div>
                     </div>
                   </>
                 );
               })()}
 
               {/* Table */}
-              <Card padding="none" className="overflow-hidden hover-lift">
-                <div className="px-5 py-3 bg-[var(--bg-0)]/60 border-b border-[var(--border-1)]">
-                  <CardHeader title={`${year}년 ${month}월 근태 요약`} />
+              <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+                <div className="px-5 py-3 bg-[#08090A] border-b border-[#23252A]">
+                  <h3 className="font-semibold text-[#F7F8F8]">{year}년 {month}월 근태 요약</h3>
                 </div>
                 {groups.length === 0 ? (
-                  <div className="p-8 text-center text-[var(--text-3)]">
-                    <p className="text-lg font-semibold text-[var(--text-2)]">{year}년 {month}월</p>
+                  <div className="p-8 text-center text-[#8A8F98]">
+                    <p className="text-lg font-semibold">{year}년 {month}월</p>
                     <p className="mt-2">확정된 근태 데이터가 없습니다.</p>
-                    <p className="text-[var(--fs-caption)] text-[var(--text-4)] mt-1">근태 정보 종합 요약에서 데이터를 확정해주세요.</p>
+                    <p className="text-xs text-[#62666D] mt-1">근태 정보 종합 요약에서 데이터를 확정해주세요.</p>
                     <div className="grid grid-cols-4 gap-3 mt-4 max-w-md mx-auto">
-                      {['인원','총 근로','연장','야간'].map(label => (
-                        <div key={label} className="bg-[var(--bg-0)] rounded-[var(--r-md)] p-3 text-center">
-                          <p className="text-xl font-bold text-[var(--text-4)]">0{label.includes('근로') || label.includes('연장') || label.includes('야간') ? 'h' : ''}</p>
-                          <p className="text-[10px] text-[var(--text-4)]">{label}</p>
-                        </div>
-                      ))}
+                      <div className="bg-[#08090A] rounded-lg p-3 text-center"><p className="text-xl font-bold text-[#62666D]">0</p><p className="text-[10px] text-[#62666D]">인원</p></div>
+                      <div className="bg-[#08090A] rounded-lg p-3 text-center"><p className="text-xl font-bold text-[#62666D]">0h</p><p className="text-[10px] text-[#62666D]">총 근로</p></div>
+                      <div className="bg-[#08090A] rounded-lg p-3 text-center"><p className="text-xl font-bold text-[#62666D]">0h</p><p className="text-[10px] text-[#62666D]">연장</p></div>
+                      <div className="bg-[#08090A] rounded-lg p-3 text-center"><p className="text-xl font-bold text-[#62666D]">0h</p><p className="text-[10px] text-[#62666D]">야간</p></div>
                     </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[var(--fs-body)]">
+                    <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-[var(--brand-500)]/10 border-b border-[var(--border-1)]">
-                          {["부서","근무층","고용형태","시간대"].map(h => (
-                            <th key={h} className="text-left px-3 py-2.5 font-medium text-[var(--brand-400)] uppercase tracking-wider text-[10px]">{h}</th>
-                          ))}
-                          {["출근횟수","총근로시간","기본시간","연장시간","야간시간","연차일수","1인평균근로","1인평균연장"].map(h => (
-                            <th key={h} className="text-right px-3 py-2.5 font-medium text-[var(--brand-400)] uppercase tracking-wider text-[10px]">{h}</th>
-                          ))}
+                        <tr className="bg-blue-900 text-white">
+                          {["부서","근무층","고용형태","시간대"].map(h => <th key={h} className="text-left px-3 py-3 font-medium">{h}</th>)}
+                          {["출근횟수","총근로시간","기본시간","연장시간","야간시간","연차일수","1인평균근로","1인평균연장"].map(h => <th key={h} className="text-right px-3 py-3 font-medium">{h}</th>)}
                         </tr>
                       </thead>
                       <tbody>
@@ -754,37 +727,33 @@ function DashboardContent() {
                           const fragment: React.ReactNode[] = [];
                           g.rows.forEach((r, ri) => {
                             fragment.push(
-                              <tr key={`r-${gi}-${ri}`} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/40 transition-colors">
-                                {ri === 0 && <td className="px-3 py-2 font-medium text-[var(--text-1)]" rowSpan={g.rows.length}>{r.department || "-"}</td>}
-                                {ri === 0 && <td className="px-3 py-2 text-[var(--text-2)]" rowSpan={g.rows.length}>{r.workplace || "-"}</td>}
-                                <td className="px-3 py-2 text-[var(--text-2)]">{r.category || "-"}</td>
-                                <td className="px-3 py-2 text-[var(--text-2)]">{r.shift}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-2)]">{r.attendance_count}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-1)] font-medium">{fmt(r.regular_hours + floor30g(r.overtime_hours) + (r.night_hours || 0))}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(r.regular_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular">
-                                  <span className={floor30g(r.overtime_hours) > 0 ? "text-[var(--warning-fg)] font-medium" : "text-[var(--text-4)]"}>
-                                    {fmt(floor30g(r.overtime_hours))}
-                                  </span>
-                                </td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(r.night_hours || 0)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{r.annual_leave_days}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-2)]">{r.unique_workers > 0 ? fmt((r.regular_hours + floor30g(r.overtime_hours) + (r.night_hours || 0)) / r.unique_workers) : "-"}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-2)]">{r.unique_workers > 0 ? fmt(floor30g(r.overtime_hours) / r.unique_workers) : "-"}</td>
+                              <tr key={`r-${gi}-${ri}`} className="border-b border-[#23252A] hover:bg-[#141516]/5">
+                                {ri === 0 && <td className="px-3 py-2 font-medium text-[#F7F8F8]" rowSpan={g.rows.length}>{r.department || "-"}</td>}
+                                {ri === 0 && <td className="px-3 py-2 text-[#D0D6E0]" rowSpan={g.rows.length}>{r.workplace || "-"}</td>}
+                                <td className="px-3 py-2 text-[#D0D6E0]">{r.category || "-"}</td>
+                                <td className="px-3 py-2 text-[#D0D6E0]">{r.shift}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.attendance_count}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours + floor30g(r.overtime_hours) + (r.night_hours || 0))}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.regular_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30g(r.overtime_hours))}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(r.night_hours || 0)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.annual_leave_days}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt((r.regular_hours + floor30g(r.overtime_hours) + (r.night_hours || 0)) / r.unique_workers) : "-"}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{r.unique_workers > 0 ? fmt(floor30g(r.overtime_hours) / r.unique_workers) : "-"}</td>
                               </tr>
                             );
                           });
                           fragment.push(
-                            <tr key={`sub-${gi}`} className="bg-[var(--brand-500)]/5 border-b border-[var(--border-2)] font-semibold text-[var(--brand-400)]">
+                            <tr key={`sub-${gi}`} className="bg-[#4EA7FC]/10 border-b border-[#5E6AD2]/30 font-semibold text-[#4EA7FC]">
                               <td className="px-3 py-2" colSpan={4}>{g.key} 소계</td>
-                              <td className="text-right px-3 py-2 tabular">{g.subtotal.attendance_count}</td>
-                              <td className="text-right px-3 py-2 tabular">{fmt(g.subtotal.regular_hours + floor30g(g.subtotal.overtime_hours) + g.subtotal.night_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular">{fmt(g.subtotal.regular_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular">{fmt(floor30g(g.subtotal.overtime_hours))}</td>
-                              <td className="text-right px-3 py-2 tabular">{fmt(g.subtotal.night_hours)}</td>
-                              <td className="text-right px-3 py-2 tabular">{g.subtotal.annual_leave_days}</td>
-                              <td className="text-right px-3 py-2 tabular">{g.subtotal.unique_workers > 0 ? fmt((g.subtotal.regular_hours + floor30g(g.subtotal.overtime_hours) + g.subtotal.night_hours) / g.subtotal.unique_workers) : "-"}</td>
-                              <td className="text-right px-3 py-2 tabular">{g.subtotal.unique_workers > 0 ? fmt(floor30g(g.subtotal.overtime_hours) / g.subtotal.unique_workers) : "-"}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.attendance_count}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours + floor30g(g.subtotal.overtime_hours) + g.subtotal.night_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.regular_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(floor30g(g.subtotal.overtime_hours))}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(g.subtotal.night_hours)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.annual_leave_days}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt((g.subtotal.regular_hours + floor30g(g.subtotal.overtime_hours) + g.subtotal.night_hours) / g.subtotal.unique_workers) : "-"}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{g.subtotal.unique_workers > 0 ? fmt(floor30g(g.subtotal.overtime_hours) / g.subtotal.unique_workers) : "-"}</td>
                             </tr>
                           );
                           return fragment;
@@ -797,7 +766,7 @@ function DashboardContent() {
                             const rate = pct(cur, prev);
                             if (rate === 0 && cur === 0 && prev === 0) return null;
                             return (
-                              <div className={`text-[10px] leading-tight mt-0.5 tabular ${rate > 0 ? "text-[var(--danger-fg)]" : rate < 0 ? "text-[var(--success-fg)]" : "text-[var(--brand-400)]"}`}>
+                              <div className={`text-[10px] leading-tight mt-0.5 ${rate > 0 ? "text-red-300" : rate < 0 ? "text-green-300" : "text-blue-200"}`}>
                                 {rate > 0 ? "+" : ""}{rate}%
                               </div>
                             );
@@ -808,34 +777,34 @@ function DashboardContent() {
                           const avgOtPrev = pt.unique_workers > 0 ? floor30g(pt.overtime_hours) / pt.unique_workers : 0;
 
                           return (
-                            <tr className="bg-[var(--brand-500)]/10 border-t border-[var(--border-2)] font-bold text-[var(--brand-400)]">
+                            <tr className="bg-blue-900 text-white font-bold">
                               <td className="px-3 py-3" colSpan={4}>전체 합계</td>
-                              <td className="text-right px-3 py-2 tabular">
+                              <td className="text-right px-3 py-2 tabular-nums">
                                 {gt.attendance_count}
                                 {momBadge(gt.attendance_count, pt.attendance_count)}
                               </td>
-                              <td className="text-right px-3 py-2 tabular">
+                              <td className="text-right px-3 py-2 tabular-nums">
                                 {fmt(gt.regular_hours + floor30g(gt.overtime_hours) + gt.night_hours)}
                                 {momBadge(gt.total_hours, pt.total_hours)}
                               </td>
-                              <td className="text-right px-3 py-2 tabular">
+                              <td className="text-right px-3 py-2 tabular-nums">
                                 {fmt(gt.regular_hours)}
                                 {momBadge(gt.regular_hours, pt.regular_hours)}
                               </td>
-                              <td className="text-right px-3 py-2 tabular">
+                              <td className="text-right px-3 py-2 tabular-nums">
                                 {fmt(floor30g(gt.overtime_hours))}
                                 {momBadge(floor30g(gt.overtime_hours), floor30g(pt.overtime_hours))}
                               </td>
-                              <td className="text-right px-3 py-2 tabular">
+                              <td className="text-right px-3 py-2 tabular-nums">
                                 {fmt(gt.night_hours)}
                                 {momBadge(gt.night_hours, pt.night_hours)}
                               </td>
-                              <td className="text-right px-3 py-2 tabular">{gt.annual_leave_days}</td>
-                              <td className="text-right px-3 py-2 tabular">
+                              <td className="text-right px-3 py-2 tabular-nums">{gt.annual_leave_days}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">
                                 {gt.unique_workers > 0 ? fmt(avgHoursCur) : "-"}
                                 {gt.unique_workers > 0 && momBadge(avgHoursCur, avgHoursPrev)}
                               </td>
-                              <td className="text-right px-3 py-2 tabular">
+                              <td className="text-right px-3 py-2 tabular-nums">
                                 {gt.unique_workers > 0 ? fmt(avgOtCur) : "-"}
                                 {gt.unique_workers > 0 && momBadge(avgOtCur, avgOtPrev)}
                               </td>
@@ -846,72 +815,72 @@ function DashboardContent() {
                     </table>
                   </div>
                 )}
-              </Card>
+              </div>
             </div>
           )}
 
           {/* ============ TAB 2: 급여 추정 ============ */}
           {activeTab === "salary" && (
             <div className="space-y-6">
-              <Card>
-                <CardHeader title="고용형태별 단가 설정" />
-                <div className="overflow-x-auto mt-4">
-                  <table className="w-full text-[var(--fs-body)]">
+              <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+                <h3 className="font-semibold text-[#F7F8F8] mb-4">고용형태별 단가 설정</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-[var(--bg-0)]/60 border-b border-[var(--border-1)]">
-                        <th className="px-4 py-2.5 text-left font-medium text-[var(--text-3)] uppercase tracking-wider text-[10px]">고용형태</th>
-                        <th className="px-4 py-2.5 text-right font-medium text-[var(--text-3)] uppercase tracking-wider text-[10px]">정규시간 단가 (원/시간)</th>
-                        <th className="px-4 py-2.5 text-right font-medium text-[var(--text-3)] uppercase tracking-wider text-[10px]">연장근로 (1.5배)</th>
-                        <th className="px-4 py-2.5 text-right font-medium text-[var(--text-3)] uppercase tracking-wider text-[10px]">야간정규 (1.5배)</th>
-                        <th className="px-4 py-2.5 text-right font-medium text-[var(--text-3)] uppercase tracking-wider text-[10px]">야간연장 (2.0배)</th>
+                      <tr className="bg-[#08090A] border-b border-[#23252A]">
+                        <th className="px-4 py-2.5 text-left font-medium text-[#D0D6E0]">고용형태</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-[#D0D6E0]">정규시간 단가 (원/시간)</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-[#D0D6E0]">연장근로 (1.5배)</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-[#D0D6E0]">야간정규 (1.5배)</th>
+                        <th className="px-4 py-2.5 text-right font-medium text-[#D0D6E0]">야간연장 (2.0배)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(["정규직", "파견", "알바"] as const).filter(cat => isRegular ? cat === "정규직" : cat !== "정규직").map(cat => (
-                        <tr key={cat} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/40 transition-colors">
-                          <td className="px-4 py-2.5 font-medium text-[var(--text-1)]">{cat === "알바" ? "알바(사업소득)" : cat}</td>
+                        <tr key={cat} className="border-b border-[#23252A]">
+                          <td className="px-4 py-2.5 font-medium text-[#F7F8F8]">{cat === "알바" ? "알바(사업소득)" : cat}</td>
                           <td className="px-4 py-2.5 text-right">
                             <input
                               type="number"
                               value={rates[cat]}
                               onChange={(e) => setRates(prev => ({ ...prev, [cat]: Number(e.target.value) }))}
-                              className="w-28 bg-[var(--bg-2)] text-[var(--text-1)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-3 py-1.5 text-[var(--fs-body)] text-right focus:outline-none focus:border-[var(--brand-500)]"
+                              className="w-28 border border-[#23252A] rounded-lg px-3 py-1.5 text-sm text-right text-[#F7F8F8]"
                             />
                           </td>
-                          <td className="px-4 py-2.5 text-right tabular text-[var(--text-3)]">{fmtWon(rates[cat] * 1.5)}원</td>
-                          <td className="px-4 py-2.5 text-right tabular text-[var(--text-3)]">{fmtWon(rates[cat] * 1.5)}원</td>
-                          <td className="px-4 py-2.5 text-right tabular text-[var(--text-3)]">{fmtWon(rates[cat] * 2.0)}원</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-[#8A8F98]">{fmtWon(rates[cat] * 1.5)}원</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-[#8A8F98]">{fmtWon(rates[cat] * 1.5)}원</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-[#8A8F98]">{fmtWon(rates[cat] * 2.0)}원</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </Card>
+              </div>
 
               {/* Detailed breakdown by category + shift */}
-              <Card padding="none" className="overflow-hidden hover-lift">
-                <div className="px-5 py-3 bg-[var(--bg-0)]/60 border-b border-[var(--border-1)]">
-                  <CardHeader title="고용형태별 근로시간 & 추정급여 비교" />
+              <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+                <div className="px-5 py-3 bg-[#08090A] border-b border-[#23252A]">
+                  <h3 className="font-semibold text-[#F7F8F8]">고용형태별 근로시간 & 추정급여 비교</h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[var(--fs-body)]">
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-[var(--brand-500)]/10 border-b border-[var(--border-1)]">
-                        <th className="px-3 py-3 text-left font-medium text-[var(--brand-400)] uppercase tracking-wider text-[10px]" rowSpan={2}>고용형태</th>
-                        <th className="px-3 py-3 text-left font-medium text-[var(--brand-400)] uppercase tracking-wider text-[10px]" rowSpan={2}>시간대</th>
-                        <th className="px-3 py-3 text-center font-medium text-[var(--brand-400)] uppercase tracking-wider text-[10px] border-l border-[var(--border-2)]" colSpan={4}>당월 ({month}월)</th>
-                        <th className="px-3 py-3 text-center font-medium text-[var(--text-3)] uppercase tracking-wider text-[10px] border-l border-[var(--border-2)]" colSpan={4}>전월 ({summaryData?.prevMonth || "-"}월)</th>
-                        <th className="px-3 py-3 text-center font-medium text-[var(--text-3)] uppercase tracking-wider text-[10px] border-l border-[var(--border-2)]" rowSpan={2}>급여 증감</th>
+                      <tr className="bg-blue-900 text-white">
+                        <th className="px-3 py-3 text-left font-medium" rowSpan={2}>고용형태</th>
+                        <th className="px-3 py-3 text-left font-medium" rowSpan={2}>시간대</th>
+                        <th className="px-3 py-3 text-center font-medium border-l border-blue-700" colSpan={4}>당월 ({month}월)</th>
+                        <th className="px-3 py-3 text-center font-medium border-l border-blue-700" colSpan={4}>전월 ({summaryData?.prevMonth || "-"}월)</th>
+                        <th className="px-3 py-3 text-center font-medium border-l border-blue-700" rowSpan={2}>급여 증감</th>
                       </tr>
-                      <tr className="bg-[var(--brand-500)]/5 border-b border-[var(--border-1)]">
-                        <th className="px-3 py-2 text-right font-medium text-[var(--brand-400)] text-[10px] border-l border-[var(--border-2)]">정규시간</th>
-                        <th className="px-3 py-2 text-right font-medium text-[var(--brand-400)] text-[10px]">연장시간</th>
-                        <th className="px-3 py-2 text-right font-medium text-[var(--brand-400)] text-[10px]">총시간</th>
-                        <th className="px-3 py-2 text-right font-medium text-[var(--brand-400)] text-[10px]">추정급여</th>
-                        <th className="px-3 py-2 text-right font-medium text-[var(--text-3)] text-[10px] border-l border-[var(--border-2)]">정규시간</th>
-                        <th className="px-3 py-2 text-right font-medium text-[var(--text-3)] text-[10px]">연장시간</th>
-                        <th className="px-3 py-2 text-right font-medium text-[var(--text-3)] text-[10px]">총시간</th>
-                        <th className="px-3 py-2 text-right font-medium text-[var(--text-3)] text-[10px]">추정급여</th>
+                      <tr className="bg-blue-800 text-blue-100">
+                        <th className="px-3 py-2 text-right font-medium border-l border-blue-600">정규시간</th>
+                        <th className="px-3 py-2 text-right font-medium">연장시간</th>
+                        <th className="px-3 py-2 text-right font-medium">총시간</th>
+                        <th className="px-3 py-2 text-right font-medium">추정급여</th>
+                        <th className="px-3 py-2 text-right font-medium border-l border-blue-600">정규시간</th>
+                        <th className="px-3 py-2 text-right font-medium">연장시간</th>
+                        <th className="px-3 py-2 text-right font-medium">총시간</th>
+                        <th className="px-3 py-2 text-right font-medium">추정급여</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -937,18 +906,18 @@ function DashboardContent() {
                             const diff = cur.salary - prev.salary;
 
                             return (
-                              <tr key={`${cat}-${shift}`} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/40 transition-colors">
-                                {si === 0 && <td className="px-3 py-2 font-medium text-[var(--text-1)]" rowSpan={2}>{cat}</td>}
-                                <td className="px-3 py-2 text-[var(--text-2)]">{shift}</td>
-                                <td className="text-right px-3 py-2 tabular border-l border-[var(--border-2)] text-[var(--text-2)]">{fmt(cur.regular_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--warning-fg)]">{fmt(cur.overtime_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-1)] font-medium">{fmt(cur.regular_hours + cur.overtime_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular font-medium text-[var(--success-fg)]">{fmtWon(cur.salary)}원</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)] border-l border-[var(--border-2)]">{fmt(prev.regular_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(prev.overtime_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(prev.regular_hours + prev.overtime_hours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmtWon(prev.salary)}원</td>
-                                <td className={`text-right px-3 py-2 tabular font-medium border-l border-[var(--border-2)] ${diff > 0 ? "text-[var(--danger-fg)]" : diff < 0 ? "text-[var(--brand-400)]" : "text-[var(--text-4)]"}`}>
+                              <tr key={`${cat}-${shift}`} className="border-b border-[#23252A] hover:bg-[#141516]/5">
+                                {si === 0 && <td className="px-3 py-2 font-medium text-[#F7F8F8]" rowSpan={2}>{cat}</td>}
+                                <td className="px-3 py-2 text-[#D0D6E0]">{shift}</td>
+                                <td className="text-right px-3 py-2 tabular-nums border-l border-[#23252A]">{fmt(cur.regular_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(cur.overtime_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(cur.regular_hours + cur.overtime_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums font-medium">{fmtWon(cur.salary)}원</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-[#8A8F98] border-l border-[#23252A]">{fmt(prev.regular_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-[#8A8F98]">{fmt(prev.overtime_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-[#8A8F98]">{fmt(prev.regular_hours + prev.overtime_hours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-[#8A8F98]">{fmtWon(prev.salary)}원</td>
+                                <td className={`text-right px-3 py-2 tabular-nums font-medium border-l border-[#23252A] ${diff > 0 ? "text-[#EB5757]" : diff < 0 ? "text-[#7070FF]" : ""}`}>
                                   {diff !== 0 ? `${diff > 0 ? "+" : ""}${fmtWon(diff)}원` : "-"}
                                 </td>
                               </tr>
@@ -959,17 +928,17 @@ function DashboardContent() {
                           const catDiff = catCurSal - catPrevSal;
 
                           const subtotalRow = (
-                            <tr key={`sub-${cat}`} className="bg-[var(--brand-500)]/5 border-b border-[var(--border-2)] font-semibold text-[var(--brand-400)]">
+                            <tr key={`sub-${cat}`} className="bg-[#4EA7FC]/10 border-b border-[#5E6AD2]/30 font-semibold text-[#4EA7FC]">
                               <td className="px-3 py-2" colSpan={2}>{cat} 소계</td>
-                              <td className="text-right px-3 py-2 tabular border-l border-[var(--border-2)]">{fmt(catCurReg)}</td>
-                              <td className="text-right px-3 py-2 tabular">{fmt(catCurOt)}</td>
-                              <td className="text-right px-3 py-2 tabular">{fmt(catCurReg + catCurOt)}</td>
-                              <td className="text-right px-3 py-2 tabular">{fmtWon(catCurSal)}원</td>
-                              <td className="text-right px-3 py-2 tabular text-[var(--text-3)] border-l border-[var(--border-2)]">{fmt(catPrevReg)}</td>
-                              <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(catPrevOt)}</td>
-                              <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(catPrevReg + catPrevOt)}</td>
-                              <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmtWon(catPrevSal)}원</td>
-                              <td className={`text-right px-3 py-2 tabular border-l border-[var(--border-2)] ${catDiff > 0 ? "text-[var(--danger-fg)]" : catDiff < 0 ? "text-[var(--brand-400)]" : "text-[var(--text-4)]"}`}>
+                              <td className="text-right px-3 py-2 tabular-nums border-l border-blue-100">{fmt(catCurReg)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(catCurOt)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmt(catCurReg + catCurOt)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums">{fmtWon(catCurSal)}원</td>
+                              <td className="text-right px-3 py-2 tabular-nums text-[#828FFF] border-l border-blue-100">{fmt(catPrevReg)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums text-[#828FFF]">{fmt(catPrevOt)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums text-[#828FFF]">{fmt(catPrevReg + catPrevOt)}</td>
+                              <td className="text-right px-3 py-2 tabular-nums text-[#828FFF]">{fmtWon(catPrevSal)}원</td>
+                              <td className={`text-right px-3 py-2 tabular-nums border-l border-blue-100 ${catDiff > 0 ? "text-[#EB5757]" : catDiff < 0 ? "text-[#7070FF]" : ""}`}>
                                 {catDiff !== 0 ? `${catDiff > 0 ? "+" : ""}${fmtWon(catDiff)}원` : "-"}
                               </td>
                             </tr>
@@ -989,20 +958,20 @@ function DashboardContent() {
                             grandCurWH += curWHHours; grandPrevWH += prevWHHours;
 
                             whRows.push(
-                              <tr key={`wh-${cat}`} className="bg-[var(--warning-bg)] border-b border-[var(--warning-border)]">
-                                <td className="px-3 py-2 font-medium text-[var(--warning-fg)]" colSpan={2}>
+                              <tr key={`wh-${cat}`} className="bg-[#FC7840]/10 border-b border-[#FC7840]/30">
+                                <td className="px-3 py-2 font-medium text-[#FC7840]" colSpan={2}>
                                   ↳ {cat === "알바(사업소득)" ? "알바" : cat} 주휴수당
-                                  <span className="ml-1 text-[10px] font-normal text-[var(--warning-fg)]/70">(주5일↑ × 8h × 기본단가)</span>
+                                  <span className="ml-1 text-xs font-normal text-orange-500">(주5일↑ × 8h × 기본단가)</span>
                                 </td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--warning-fg)] border-l border-[var(--border-2)]">{fmt(curWHHours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--warning-fg)]/70">-</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--warning-fg)]">{fmt(curWHHours)}</td>
-                                <td className="text-right px-3 py-2 tabular font-semibold text-[var(--warning-fg)]">{fmtWon(curWHSal)}원</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)] border-l border-[var(--border-2)]">{fmt(prevWHHours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-4)]">-</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(prevWHHours)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmtWon(prevWHSal)}원</td>
-                                <td className={`text-right px-3 py-2 tabular font-medium border-l border-[var(--border-2)] ${whDiff > 0 ? "text-[var(--danger-fg)]" : whDiff < 0 ? "text-[var(--brand-400)]" : "text-[var(--text-4)]"}`}>
+                                <td className="text-right px-3 py-2 tabular-nums text-[#FC7840] border-l border-orange-100">{fmt(curWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-400">-</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-[#FC7840]">{fmt(curWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums font-semibold text-[#FC7840]">{fmtWon(curWHSal)}원</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-500 border-l border-orange-100">{fmt(prevWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-400">-</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-500">{fmt(prevWHHours)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums text-orange-500">{fmtWon(prevWHSal)}원</td>
+                                <td className={`text-right px-3 py-2 tabular-nums font-medium border-l border-orange-100 ${whDiff > 0 ? "text-[#EB5757]" : whDiff < 0 ? "text-[#7070FF]" : ""}`}>
                                   {whDiff !== 0 ? `${whDiff > 0 ? "+" : ""}${fmtWon(whDiff)}원` : "-"}
                                 </td>
                               </tr>
@@ -1015,17 +984,17 @@ function DashboardContent() {
                             const curAllReg = grandTotal.regular_hours, curAllOt = grandTotal.overtime_hours;
                             const prevAllReg = prevTotal.regular_hours, prevAllOt = prevTotal.overtime_hours;
                             return [...shiftRows, subtotalRow, ...whRows, (
-                              <tr key="grand" className="bg-[var(--brand-500)]/10 border-t border-[var(--border-2)] font-bold text-[var(--brand-400)]">
+                              <tr key="grand" className="bg-blue-900 text-white font-bold">
                                 <td className="px-3 py-3" colSpan={2}>전체 합계 (주휴수당 포함)</td>
-                                <td className="text-right px-3 py-2 tabular border-l border-[var(--border-2)]">{fmt(curAllReg + grandCurWH)}</td>
-                                <td className="text-right px-3 py-2 tabular">{fmt(curAllOt)}</td>
-                                <td className="text-right px-3 py-2 tabular">{fmt(curAllReg + curAllOt + grandCurWH)}</td>
-                                <td className="text-right px-3 py-2 tabular">{fmtWon(grandCurSal)}원</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)] border-l border-[var(--border-2)]">{fmt(prevAllReg + grandPrevWH)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(prevAllOt)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmt(prevAllReg + prevAllOt + grandPrevWH)}</td>
-                                <td className="text-right px-3 py-2 tabular text-[var(--text-3)]">{fmtWon(grandPrevSal)}원</td>
-                                <td className={`text-right px-3 py-2 tabular border-l border-[var(--border-2)] ${gDiff > 0 ? "text-[var(--danger-fg)]" : gDiff < 0 ? "text-[var(--success-fg)]" : "text-[var(--text-4)]"}`}>
+                                <td className="text-right px-3 py-2 tabular-nums border-l border-blue-700">{fmt(curAllReg + grandCurWH)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(curAllOt)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(curAllReg + curAllOt + grandCurWH)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmtWon(grandCurSal)}원</td>
+                                <td className="text-right px-3 py-2 tabular-nums border-l border-blue-700">{fmt(prevAllReg + grandPrevWH)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(prevAllOt)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmt(prevAllReg + prevAllOt + grandPrevWH)}</td>
+                                <td className="text-right px-3 py-2 tabular-nums">{fmtWon(grandPrevSal)}원</td>
+                                <td className={`text-right px-3 py-2 tabular-nums border-l border-blue-700 ${gDiff > 0 ? "text-red-300" : gDiff < 0 ? "text-green-300" : ""}`}>
                                   {gDiff !== 0 ? `${gDiff > 0 ? "+" : ""}${fmtWon(gDiff)}원` : "-"}
                                 </td>
                               </tr>
@@ -1037,49 +1006,59 @@ function DashboardContent() {
                     </tbody>
                   </table>
                 </div>
-              </Card>
+              </div>
 
               {/* Salary summary cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card tone="ghost" className="border-[var(--brand-500)]/30 bg-[var(--brand-500)]/10 flex items-center justify-between">
-                  <span className="text-[var(--fs-body)] font-medium text-[var(--text-2)]">당월 추정급여</span>
-                  <span className="text-xl font-bold text-[var(--brand-400)] tabular">{fmtWon(curSalary)}원</span>
-                </Card>
-                <Card className="flex items-center justify-between">
-                  <span className="text-[var(--fs-body)] font-medium text-[var(--text-2)]">전월 추정급여</span>
-                  <span className="text-xl font-bold text-[var(--text-3)] tabular">{fmtWon(prevSalary)}원</span>
-                </Card>
-                <Card tone="ghost" className={`flex items-center justify-between ${curSalary - prevSalary > 0 ? "border-[var(--danger-border)] bg-[var(--danger-bg)]" : "border-[var(--success-border)] bg-[var(--success-bg)]"}`}>
-                  <span className="text-[var(--fs-body)] font-medium text-[var(--text-2)]">급여 증감{prevSalary > 0 ? ` (${curSalary - prevSalary > 0 ? "+" : ""}${pct(curSalary, prevSalary)}%)` : ""}</span>
-                  <span className={`text-xl font-bold tabular ${curSalary - prevSalary > 0 ? "text-[var(--danger-fg)]" : "text-[var(--success-fg)]"}`}>
+                <div className="flex justify-between items-center p-4 bg-[#4EA7FC]/10 rounded-xl border border-[#5E6AD2]/30">
+                  <span className="text-sm font-medium text-[#D0D6E0]">당월 추정급여</span>
+                  <span className="text-xl font-bold text-[#828FFF]">{fmtWon(curSalary)}원</span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-[#08090A] rounded-xl border border-[#23252A]">
+                  <span className="text-sm font-medium text-[#D0D6E0]">전월 추정급여</span>
+                  <span className="text-xl font-bold text-[#8A8F98]">{fmtWon(prevSalary)}원</span>
+                </div>
+                <div className={`flex justify-between items-center p-4 rounded-xl border ${curSalary - prevSalary > 0 ? "bg-[#EB5757]/10 border-[#EB5757]/30" : "bg-[#27A644]/10 border-[#27A644]/30"}`}>
+                  <span className="text-sm font-medium text-[#D0D6E0]">급여 증감{prevSalary > 0 ? ` (${curSalary - prevSalary > 0 ? "+" : ""}${pct(curSalary, prevSalary)}%)` : ""}</span>
+                  <span className={`text-xl font-bold ${curSalary - prevSalary > 0 ? "text-[#EB5757]" : "text-[#27A644]"}`}>
                     {curSalary - prevSalary > 0 ? "+" : ""}{fmtWon(curSalary - prevSalary)}원
                   </span>
-                </Card>
+                </div>
               </div>
 
               {/* 3-month trend chart */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChartCard title="최근 3개월 근로시간 추이" height={280}>
-                  <BarChart data={threeMonthTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
-                    <XAxis dataKey="month" tick={AXIS_STYLE} />
-                    <YAxis tick={AXIS_STYLE} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, name) => [`${Number(v).toFixed(1)}시간`, name]} />
-                    <Legend />
-                    <Bar dataKey="정규시간" fill={SEMANTIC_COLORS.regular} radius={[2, 2, 0, 0]} />
-                    <Bar dataKey="연장시간" fill={SEMANTIC_COLORS.overtime} radius={[2, 2, 0, 0]} />
-                  </BarChart>
-                </ChartCard>
+                <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+                  <h3 className="font-semibold text-[#F7F8F8] mb-4">최근 3개월 근로시간 추이</h3>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={threeMonthTrend}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(v, name) => [`${Number(v).toFixed(1)}시간`, name]} />
+                        <Legend />
+                        <Bar dataKey="정규시간" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                        <Bar dataKey="연장시간" fill="#f97316" radius={[2, 2, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
 
-                <ChartCard title="최근 3개월 추정 급여 추이" height={280}>
-                  <BarChart data={threeMonthTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
-                    <XAxis dataKey="month" tick={AXIS_STYLE} />
-                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} tick={AXIS_STYLE} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${fmtWon(Number(v))}원`, "추정 급여"]} />
-                    <Bar dataKey="추정급여" fill={SEMANTIC_COLORS.gross} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartCard>
+                <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+                  <h3 className="font-semibold text-[#F7F8F8] mb-4">최근 3개월 추정 급여 추이</h3>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={threeMonthTrend}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(v) => [`${fmtWon(Number(v))}원`, "추정 급여"]} />
+                        <Bar dataKey="추정급여" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1087,48 +1066,39 @@ function DashboardContent() {
           {/* ============ TAB 3: 인건비 분석 ============ */}
           {activeTab === "labor" && (
             <div className="space-y-6">
-              <Card>
-                <CardHeader title="설정" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+                <h3 className="font-semibold text-[#F7F8F8] mb-4">설정</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">매출액 (원)</label>
-                    <input
-                      type="number"
-                      value={revenue}
-                      onChange={(e) => setRevenue(Number(e.target.value))}
-                      className="w-full bg-[var(--bg-2)] text-[var(--text-1)] border border-[var(--border-2)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-body)] focus:outline-none focus:border-[var(--brand-500)]"
-                      placeholder="매출액을 입력하세요"
-                    />
+                    <label className="block text-sm font-medium text-[#D0D6E0] mb-1">매출액 (원)</label>
+                    <input type="number" value={revenue} onChange={(e) => setRevenue(Number(e.target.value))} className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm text-[#F7F8F8]" placeholder="매출액을 입력하세요" />
                   </div>
                   <div>
-                    <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">목표 인건비 비율 (%)</label>
-                    <input
-                      type="number"
-                      value={targetRatio}
-                      onChange={(e) => setTargetRatio(Number(e.target.value))}
-                      className="w-full bg-[var(--bg-2)] text-[var(--text-1)] border border-[var(--border-2)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-body)] focus:outline-none focus:border-[var(--brand-500)]"
-                    />
+                    <label className="block text-sm font-medium text-[#D0D6E0] mb-1">목표 인건비 비율 (%)</label>
+                    <input type="number" value={targetRatio} onChange={(e) => setTargetRatio(Number(e.target.value))} className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm text-[#F7F8F8]" />
                   </div>
                   <div>
-                    <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">총 추정 인건비</label>
-                    <div className="w-full bg-[var(--bg-0)] text-[var(--text-1)] border border-[var(--border-2)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-body)] font-semibold tabular">{fmtWon(curSalary)}원</div>
+                    <label className="block text-sm font-medium text-[#D0D6E0] mb-1">총 추정 인건비</label>
+                    <div className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm bg-[#08090A] font-semibold text-[#F7F8F8]">{fmtWon(curSalary)}원</div>
                   </div>
                 </div>
-              </Card>
+              </div>
 
-              <Card padding="none" className="overflow-hidden hover-lift">
-                <div className="px-5 py-3 bg-[var(--bg-0)]/60 border-b border-[var(--border-1)]">
-                  <CardHeader title="매출액 대비 인건비 비율 분석" />
+              <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+                <div className="px-5 py-3 bg-[#08090A] border-b border-[#23252A]">
+                  <h3 className="font-semibold text-[#F7F8F8]">매출액 대비 인건비 비율 분석</h3>
                 </div>
                 {deptSalary.length === 0 ? (
-                  <div className="p-12 text-center text-[var(--text-4)]">데이터가 없습니다.</div>
+                  <div className="p-12 text-center text-[#62666D]">데이터가 없습니다.</div>
                 ) : (
-                  <table className="w-full text-[var(--fs-body)]">
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-[var(--brand-500)]/10 border-b border-[var(--border-1)]">
-                        {["부서","추정 인건비","매출 대비 비율","목표 비율","달성 상태"].map((h, i) => (
-                          <th key={h} className={`px-4 py-2.5 font-medium text-[var(--brand-400)] uppercase tracking-wider text-[10px] ${i === 0 ? 'text-left' : i === 4 ? 'text-center' : 'text-right'}`}>{h}</th>
-                        ))}
+                      <tr className="bg-blue-900 text-white">
+                        <th className="px-4 py-3 text-left font-medium">부서</th>
+                        <th className="px-4 py-3 text-right font-medium">추정 인건비</th>
+                        <th className="px-4 py-3 text-right font-medium">매출 대비 비율</th>
+                        <th className="px-4 py-3 text-right font-medium">목표 비율</th>
+                        <th className="px-4 py-3 text-center font-medium">달성 상태</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1136,43 +1106,43 @@ function DashboardContent() {
                         const ratio = revenue > 0 ? (d.cost / revenue) * 100 : 0;
                         const achieved = ratio <= targetRatio;
                         return (
-                          <tr key={d.dept} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/40 transition-colors">
-                            <td className="px-4 py-3 font-medium text-[var(--text-1)]">{d.dept}</td>
-                            <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{fmtWon(d.cost)}원</td>
-                            <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{revenue > 0 ? ratio.toFixed(1) : "-"}%</td>
-                            <td className="px-4 py-3 text-right tabular text-[var(--text-3)]">{targetRatio}%</td>
+                          <tr key={d.dept} className="border-b border-[#23252A] hover:bg-[#141516]/5">
+                            <td className="px-4 py-3 font-medium text-[#F7F8F8]">{d.dept}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{fmtWon(d.cost)}원</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{revenue > 0 ? ratio.toFixed(1) : "-"}%</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{targetRatio}%</td>
                             <td className="px-4 py-3 text-center">
                               {revenue > 0 ? (
-                                <Badge tone={achieved ? "success" : "danger"} size="sm">
+                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${achieved ? "bg-[#27A644]/15 text-[#27A644]" : "bg-[#EB5757]/15 text-[#EB5757]"}`}>
                                   {achieved ? "달성" : "초과"}
-                                </Badge>
+                                </span>
                               ) : "-"}
                             </td>
                           </tr>
                         );
                       })}
-                      <tr className="bg-[var(--brand-500)]/10 border-t border-[var(--border-2)] font-bold text-[var(--brand-400)]">
+                      <tr className="bg-blue-900 text-white font-bold">
                         <td className="px-4 py-3">합계</td>
-                        <td className="px-4 py-3 text-right tabular">{fmtWon(curSalary)}원</td>
-                        <td className="px-4 py-3 text-right tabular">{revenue > 0 ? ((curSalary / revenue) * 100).toFixed(1) : "-"}%</td>
-                        <td className="px-4 py-3 text-right tabular">{targetRatio}%</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{fmtWon(curSalary)}원</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{revenue > 0 ? ((curSalary / revenue) * 100).toFixed(1) : "-"}%</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{targetRatio}%</td>
                         <td className="px-4 py-3 text-center">
                           {revenue > 0 ? (
-                            <Badge tone={(curSalary / revenue) * 100 <= targetRatio ? "success" : "danger"} size="sm">
+                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${(curSalary / revenue) * 100 <= targetRatio ? "bg-green-200 text-[#27A644]" : "bg-red-200 text-[#EB5757]"}`}>
                               {(curSalary / revenue) * 100 <= targetRatio ? "달성" : "초과"}
-                            </Badge>
+                            </span>
                           ) : "-"}
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 )}
-              </Card>
+              </div>
 
               {revenue > 0 && deptSalary.length > 0 && (
-                <Card tone="ghost" className="border-[var(--warning-border)] bg-[var(--warning-bg)]">
-                  <h4 className="font-semibold text-[var(--warning-fg)] mb-2">핵심 요약</h4>
-                  <p className="text-[var(--fs-body)] text-[var(--warning-fg)]">
+                <div className="bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-xl p-5">
+                  <h4 className="font-semibold text-[#F0BF00] mb-2">핵심 요약</h4>
+                  <p className="text-sm text-[#F0BF00]">
                     {month}월 총 추정 인건비는 <strong>{fmtWon(curSalary)}원</strong>이며,
                     매출액 <strong>{fmtWon(revenue)}원</strong> 대비 인건비 비율은{" "}
                     <strong>{((curSalary / revenue) * 100).toFixed(1)}%</strong>입니다.
@@ -1181,33 +1151,43 @@ function DashboardContent() {
                       : ` 목표 비율 ${targetRatio}%를 ${(((curSalary / revenue) * 100) - targetRatio).toFixed(1)}%p 초과하였습니다.`
                     }
                   </p>
-                </Card>
+                </div>
               )}
 
               {deptSalary.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <ChartCard title="부서별 추정 인건비" height={280}>
-                    <BarChart data={deptSalary}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
-                      <XAxis dataKey="dept" tick={AXIS_STYLE} />
-                      <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} tick={AXIS_STYLE} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${fmtWon(Number(v))}원`, "추정 인건비"]} />
-                      <Bar dataKey="cost" fill={SEMANTIC_COLORS.regular} radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ChartCard>
+                  <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+                    <h3 className="font-semibold text-[#F7F8F8] mb-4">부서별 추정 인건비</h3>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={deptSalary}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="dept" tick={{ fontSize: 12 }} />
+                          <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                          <Tooltip formatter={(v) => [`${fmtWon(Number(v))}원`, "추정 인건비"]} />
+                          <Bar dataKey="cost" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
 
                   {revenue > 0 && (
-                    <ChartCard title="부서별 매출 대비 인건비 비율" height={280}>
-                      <BarChart data={deptSalary.map(d => ({ ...d, ratio: Number(((d.cost / revenue) * 100).toFixed(1)), target: targetRatio }))}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
-                        <XAxis dataKey="dept" tick={AXIS_STYLE} />
-                        <YAxis unit="%" tick={AXIS_STYLE} />
-                        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, name) => [`${Number(v).toFixed(1)}%`, name === "ratio" ? "실제 비율" : "목표 비율"]} />
-                        <Legend />
-                        <Bar dataKey="ratio" name="실제 비율" fill={SEMANTIC_COLORS.regular} radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="target" name="목표 비율" fill={GRID_STROKE} radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ChartCard>
+                    <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5">
+                      <h3 className="font-semibold text-[#F7F8F8] mb-4">부서별 매출 대비 인건비 비율</h3>
+                      <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={deptSalary.map(d => ({ ...d, ratio: Number(((d.cost / revenue) * 100).toFixed(1)), target: targetRatio }))}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="dept" tick={{ fontSize: 12 }} />
+                            <YAxis unit="%" />
+                            <Tooltip formatter={(v, name) => [`${Number(v).toFixed(1)}%`, name === "ratio" ? "실제 비율" : "목표 비율"]} />
+                            <Legend />
+                            <Bar dataKey="ratio" name="실제 비율" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="target" name="목표 비율" fill="#d1d5db" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -1221,7 +1201,7 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<SkeletonCard className="h-32" />}>
+    <Suspense fallback={<div className="py-20 text-center text-[#62666D]">로딩 중...</div>}>
       <DashboardContent />
     </Suspense>
   );

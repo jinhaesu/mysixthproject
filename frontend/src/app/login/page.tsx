@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, AlertCircle, KeyRound, ArrowLeft } from "lucide-react";
-import { Button, Input, Field, Card } from "@/components/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -31,14 +30,21 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       const res = await fetch(`${API_URL}/api/auth/send-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "인증 코드 발송에 실패했습니다."); return; }
+
+      if (!res.ok) {
+        setError(data.error || "인증 코드 발송에 실패했습니다.");
+        return;
+      }
+
       setChallengeToken(data.challengeToken);
       setStep("code");
       startCountdown();
@@ -54,14 +60,21 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       const res = await fetch(`${API_URL}/api/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ challengeToken, code }),
       });
+
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "인증에 실패했습니다."); return; }
+
+      if (!res.ok) {
+        setError(data.error || "인증에 실패했습니다.");
+        return;
+      }
+
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       router.push("/");
@@ -77,14 +90,21 @@ export default function LoginPage() {
     if (countdown > 0) return;
     setError("");
     setLoading(true);
+
     try {
       const res = await fetch(`${API_URL}/api/auth/send-code`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "재발송에 실패했습니다."); return; }
+
+      if (!res.ok) {
+        setError(data.error || "재발송에 실패했습니다.");
+        return;
+      }
+
       setChallengeToken(data.challengeToken);
       startCountdown();
     } catch (err: any) {
@@ -96,89 +116,94 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)] px-4 fade-in">
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
       <div className="w-full max-w-md">
-        <Card padding="lg" tone="default" className="shadow-[var(--elev-3)] surface-bevel">
-          {/* Brand mark + title */}
+        <div className="bg-[#0F1011] rounded-2xl shadow-[0px_7px_32px_rgba(0,0,0,0.35)] p-8">
           <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-[var(--r-xl)] gradient-brand flex items-center justify-center mx-auto mb-5 shadow-[var(--elev-2)]"
-                 style={{ background: 'linear-gradient(135deg, var(--brand-500) 0%, var(--brand-400) 100%)' }}>
-              <span className="text-white text-[var(--fs-h3)] font-bold select-none">J</span>
+            <div className="w-16 h-16 bg-[#4EA7FC]/15 rounded-full flex items-center justify-center mx-auto mb-4">
+              {step === "email" ? (
+                <Mail size={32} className="text-[#7070FF]" />
+              ) : (
+                <KeyRound size={32} className="text-[#7070FF]" />
+              )}
             </div>
-            <h1 className="text-h2 text-gradient-brand">근태 관리 시스템</h1>
-            <p className="text-[var(--text-3)] mt-2 text-[var(--fs-body)]">
+            <h1 className="text-2xl font-bold text-[#F7F8F8]">근태 관리 시스템</h1>
+            <p className="text-[#8A8F98] mt-2">
               {step === "email" ? "이메일로 로그인하세요" : "인증 코드를 입력하세요"}
             </p>
           </div>
 
-          {/* Error */}
           {error && (
-            <div className="mb-6 p-3.5 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] flex items-center gap-3">
-              <AlertCircle size={18} className="text-[var(--danger-fg)] shrink-0" />
-              <p className="text-[var(--fs-body)] text-[var(--danger-fg)]">{error}</p>
+            <div className="mb-6 p-4 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg flex items-center gap-3">
+              <AlertCircle size={20} className="text-[#EB5757] shrink-0" />
+              <p className="text-sm text-[#EB5757]">{error}</p>
             </div>
           )}
 
           {step === "email" ? (
             <form onSubmit={handleSendCode} className="space-y-5">
-              <Field label="이메일" required>
-                <Input
-                  id="email"
-                  type="email"
-                  inputSize="lg"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="이메일을 입력하세요"
-                  required
-                  iconLeft={<Mail size={16} />}
-                />
-              </Field>
-              <Button
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-[#D0D6E0] mb-1">
+                  이메일
+                </label>
+                <div className="relative">
+                  <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]" />
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="이메일을 입력하세요"
+                    required
+                    className="w-full pl-10 pr-4 py-3 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none transition-colors text-[#F7F8F8]"
+                  />
+                </div>
+              </div>
+              <button
                 type="submit"
-                variant="primary"
-                size="lg"
-                loading={loading}
-                className="w-full"
+                disabled={loading}
+                className="w-full py-3 bg-[#5E6AD2] text-white font-medium rounded-lg hover:bg-[#828FFF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? "발송 중..." : "인증 코드 발송"}
-              </Button>
+              </button>
             </form>
           ) : (
             <form onSubmit={handleVerifyCode} className="space-y-5">
-              <div className="p-3 bg-[var(--info-bg)] rounded-[var(--r-md)] border border-[var(--info-border)]">
-                <p className="text-[var(--fs-body)] text-[var(--info-fg)]">
+              <div className="p-3 bg-[#4EA7FC]/10 rounded-lg mb-2">
+                <p className="text-sm text-[#828FFF]">
                   <span className="font-medium">{email}</span>로 인증 코드를 발송했습니다.
                 </p>
               </div>
-              <Field label="인증 코드 (6자리)" required>
-                <Input
-                  id="code"
-                  type="text"
-                  inputSize="lg"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="000000"
-                  required
-                  maxLength={6}
-                  iconLeft={<KeyRound size={16} />}
-                  className="text-center text-xl tracking-[0.5em] font-mono tabular"
-                />
-              </Field>
-              <Button
+              <div>
+                <label htmlFor="code" className="block text-sm font-medium text-[#D0D6E0] mb-1">
+                  인증 코드 (6자리)
+                </label>
+                <div className="relative">
+                  <KeyRound size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]" />
+                  <input
+                    id="code"
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000"
+                    required
+                    maxLength={6}
+                    className="w-full pl-10 pr-4 py-3 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none transition-colors text-[#F7F8F8] text-center text-xl tracking-[0.5em] font-mono"
+                  />
+                </div>
+              </div>
+              <button
                 type="submit"
-                variant="primary"
-                size="lg"
-                loading={loading}
                 disabled={loading || code.length !== 6}
-                className="w-full"
+                className="w-full py-3 bg-[#5E6AD2] text-white font-medium rounded-lg hover:bg-[#828FFF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? "확인 중..." : "확인"}
-              </Button>
-              <div className="flex items-center justify-between pt-1">
+              </button>
+              <div className="flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => { setStep("email"); setCode(""); setError(""); }}
-                  className="text-[var(--fs-body)] text-[var(--text-3)] hover:text-[var(--text-2)] flex items-center gap-1 transition-colors"
+                  className="text-sm text-[#8A8F98] hover:text-[#D0D6E0] flex items-center gap-1"
                 >
                   <ArrowLeft size={14} />
                   이메일 변경
@@ -187,14 +212,14 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleResend}
                   disabled={countdown > 0 || loading}
-                  className="text-eyebrow tabular text-[var(--brand-400)] hover:text-[var(--brand-200)] disabled:text-[var(--text-4)] disabled:cursor-not-allowed transition-colors"
+                  className="text-sm text-[#7070FF] hover:text-[#828FFF] disabled:text-[#62666D] disabled:cursor-not-allowed"
                 >
                   {countdown > 0 ? `재발송 (${countdown}초)` : "코드 재발송"}
                 </button>
               </div>
             </form>
           )}
-        </Card>
+        </div>
       </div>
     </div>
   );

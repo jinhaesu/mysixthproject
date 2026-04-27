@@ -7,24 +7,20 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Area, AreaChart,
 } from "recharts";
 import {
-  Users, Clock, TrendingUp, CalendarDays, AlertTriangle, Palmtree, RefreshCw, Sparkles,
+  Users, Clock, TrendingUp, CalendarDays, Loader2, AlertTriangle, Palmtree,
 } from "lucide-react";
 import ChartCard from "@/components/charts/ChartCard";
-import { CHART_AXIS_PROPS, CHART_GRID_PROPS, ChartTooltip, ChartGradients } from "@/components/charts/theme";
-import { SEMANTIC_COLORS, CHART_COLORS } from "@/lib/chartColors";
+import { SEMANTIC_COLORS } from "@/lib/chartColors";
 import { getDashboardHomeStats, getConfirmedList, getRegularVacations, getAttendanceSummaryRegular, getAttendanceSummaryDispatch } from "@/lib/api";
-import {
-  PageHeader, Stat, Badge, Button, EmptyState, SkeletonCard, SegmentedControl, Input,
-  Card, CardHeader, Table, THead, TBody, TR, TH, TD,
-} from "@/components/ui";
 
 const DEPT_COLORS: Record<string, string> = {
-  '물류': CHART_COLORS[0], '생산2층': CHART_COLORS[6], '생산3층': CHART_COLORS[1],
-  '생산 야간': CHART_COLORS[4], '물류 야간': CHART_COLORS[5], '기타': CHART_COLORS[7],
+  '물류': '#3b82f6', '생산2층': '#f97316', '생산3층': '#10b981',
+  '생산 야간': '#8b5cf6', '물류 야간': '#06b6d4', '기타': '#64748b',
 };
-function getDeptColor(dept: string) { return DEPT_COLORS[dept] || CHART_COLORS[7]; }
+function getDeptColor(dept: string) { return DEPT_COLORS[dept] || '#64748b'; }
 const fmt = (n: number) => Math.round(n * 10) / 10;
-const TYPE_COLORS: Record<string, string> = { '정규직': CHART_COLORS[0], '파견': CHART_COLORS[6], '알바': CHART_COLORS[1] };
+const TYPE_COLORS: Record<string, string> = { '정규직': '#3b82f6', '파견': '#f97316', '알바': '#10b981' };
+const TT = { background: '#0F1011', border: '1px solid #23252A', borderRadius: 8, fontSize: 12 };
 
 export default function HomePage() {
   const now = new Date();
@@ -35,6 +31,7 @@ export default function HomePage() {
   const [dataSource, setDataSource] = usePersistedState<'confirmed' | 'all'>("home_ds", 'confirmed');
   const [timeBase, setTimeBase] = usePersistedState<'actual' | 'planned'>("home_tb", 'actual');
 
+  // 프론트엔드에서 직접 휴가 데이터 계산 (vacation_requests가 정확한 단일 소스)
   const loadVacationSummary = async () => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
@@ -44,12 +41,13 @@ export default function HomePage() {
     try {
       const vacations = await getRegularVacations({ status: 'approved' });
       for (const v of (vacations || [])) {
+        // 오늘 휴가자
         if (v.start_date <= todayStr && v.end_date >= todayStr) {
           todayVacNames.push(v.employee_name);
-          const vt = (v.type || '') as string;
-          if (vt.startsWith('오전') || vt.startsWith('오후')) halfDayCount++;
+          if ((v.type || '').includes('반차')) halfDayCount++;
           else vacationCount++;
         }
+        // 이번 달 총 휴가일수
         if (v.start_date?.startsWith(yearMonth) || v.end_date?.startsWith(yearMonth)) {
           totalVacDays += parseFloat(v.days) || 0;
         }
@@ -62,11 +60,13 @@ export default function HomePage() {
     };
   };
 
+  // 출퇴근 시간 포맷
   const fmtTime = (t: string | null) => {
     if (!t) return '-';
     try { const d = new Date(t); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; } catch { return t; }
   };
 
+  // 정규직: shifts 배열에서 해당 날짜의 계획 시간 찾기
   const getPlannedTime = (shifts: any[], date: string) => {
     if (!shifts || shifts.length === 0) return null;
     const d = new Date(date + 'T00:00:00+09:00');
@@ -80,6 +80,7 @@ export default function HomePage() {
     return shifts[0] ? { in: shifts[0].planned_clock_in, out: shifts[0].planned_clock_out } : null;
   };
 
+  // summary API 데이터로 대시보드 데이터 구성
   const buildFromSummary = (regEmps: any[], dispEmps: any[], tb: 'actual' | 'planned') => {
     const byDeptMap: Record<string, any> = {}, byTypeMap: Record<string, any> = {};
     const dailyMap: Record<string, any> = {};
@@ -101,6 +102,7 @@ export default function HomePage() {
       for (const a of emp.actuals) {
         let clockIn: string, clockOut: string;
         if (tb === 'planned') {
+          // 계획 시간: actual 레코드에 planned가 있으면 사용, 없으면 shifts에서 찾기
           const planned = a.planned_clock_in ? { in: a.planned_clock_in, out: a.planned_clock_out }
             : getPlannedTime(emp.shifts, a.date);
           clockIn = planned?.in || fmtTime(a.clock_in_time);
@@ -108,6 +110,7 @@ export default function HomePage() {
         } else {
           clockIn = fmtTime(a.clock_in_time);
           clockOut = fmtTime(a.clock_out_time);
+          // 실제 출퇴근이 없으면 스킵 (isPlannedOnly인 경우)
           if (a.isPlannedOnly && clockIn === '-') continue;
         }
         if (clockIn === '-' && clockOut === '-') continue;
@@ -144,6 +147,7 @@ export default function HomePage() {
       const vacData = await loadVacationSummary();
 
       if (dataSource === 'all') {
+        // 전체 데이터: attendance-summary API (미확정 포함)
         const [regData, dispData] = await Promise.all([
           getAttendanceSummaryRegular(ym_year, ym_month).catch(() => ({ employees: [] })),
           getAttendanceSummaryDispatch(ym_year, ym_month).catch(() => ({ employees: [] })),
@@ -152,6 +156,7 @@ export default function HomePage() {
         result.kpi.vacation_days = vacData.vacation_days;
         setData({ year_month: yearMonth, ...result, vacation_summary: vacData.vacation_summary });
       } else {
+        // 확정 데이터
         const [d, confirmed] = await Promise.all([
           getDashboardHomeStats(yearMonth).catch(() => null),
           getConfirmedList(yearMonth, '').catch(() => []),
@@ -209,38 +214,16 @@ export default function HomePage() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return (
-    <div className="min-w-0">
-      <PageHeader
-        eyebrow={<><Sparkles size={12} />Overview</>}
-        title="근태 관리 대시보드"
-        description="조직 전반의 근태·근무시수·휴가 현황을 한눈에 확인합니다."
-      />
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <SkeletonCard className="lg:col-span-2 h-[320px]" />
-        <SkeletonCard className="h-[320px]" />
-      </div>
-    </div>
-  );
+  if (loading) return <div className="py-32 text-center"><Loader2 className="w-10 h-10 animate-spin text-[#7070FF] mx-auto" /><p className="text-sm text-[#8A8F98] mt-3">대시보드 로딩 중...</p></div>;
 
   if (!data?.kpi) return (
-    <div className="min-w-0">
-      <PageHeader
-        eyebrow={<><Sparkles size={12} />Overview</>}
-        title="근태 관리 대시보드"
-        actions={
-          <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
-        }
-      />
-      <EmptyState
-        icon={<AlertTriangle className="w-7 h-7" />}
-        title={error ? "데이터 조회 중 오류" : "확정 데이터가 없습니다"}
-        description={error ? error : "선택한 월에 대한 확정 근태 데이터가 아직 없습니다. 월을 변경하거나 새로고침해 보세요."}
-        action={<Button variant="primary" leadingIcon={<RefreshCw size={14} />} onClick={load}>다시 시도</Button>}
-      />
+    <div className="py-32 text-center">
+      <AlertTriangle className="w-10 h-10 text-[#F0BF00] mx-auto" />
+      <p className="text-sm text-[#8A8F98] mt-3">{error ? `오류: ${error}` : '확정 데이터가 없습니다.'}</p>
+      <div className="mt-4 flex justify-center gap-2">
+        <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]" />
+        <button onClick={load} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">재시도</button>
+      </div>
     </div>
   );
 
@@ -258,77 +241,52 @@ export default function HomePage() {
   const heatmapMax = Math.max(...(by_dept_daily || []).map((r: any) => parseFloat(r.hours) || 0), 1);
   const vacTotal = (vacation_summary?.vacation || 0) + (vacation_summary?.half_day || 0);
 
+  // Pie label renderer that avoids overlap
   const renderPieLabel = ({ name, value, percent }: any) => `${name} ${value} (${(percent * 100).toFixed(0)}%)`;
-
-  const workersTrend = (daily || []).slice(-14).map((d: any) => Number(d.workers) || 0);
-  const hoursTrend = (daily || []).slice(-14).map((d: any) => (parseFloat(d.regular_hours)||0) + (parseFloat(d.overtime_hours)||0) + (parseFloat(d.night_hours)||0));
 
   return (
     <div className="min-w-0">
-      <PageHeader
-        eyebrow={<><Sparkles size={12} />Overview · {yearMonth}</>}
-        title="근태 관리 대시보드"
-        description={`${dataSource === 'confirmed' ? '확정 데이터' : '전체 데이터'} · ${timeBase === 'actual' ? '실제 출근' : '계획 출근'} 기준 집계`}
-        actions={
-          <>
-            <SegmentedControl
-              value={dataSource}
-              onChange={(v) => setDataSource(v)}
-              options={[
-                { value: 'confirmed', label: '확정' },
-                { value: 'all',       label: '전체' },
-              ]}
-            />
-            <SegmentedControl
-              value={timeBase}
-              onChange={(v) => { setTimeBase(v); if (dataSource === 'confirmed') setDataSource('all'); }}
-              options={[
-                { value: 'actual',  label: '실제' },
-                { value: 'planned', label: '계획' },
-              ]}
-            />
-            <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
-            <Button variant="primary" size="sm" leadingIcon={<RefreshCw size={14} />} onClick={load}>새로고침</Button>
-          </>
-        }
-        meta={
-          <>
-            <Badge tone="success" dot pulse>실시간 집계</Badge>
-            {(vacation_summary?.names?.length || 0) > 0 && (
-              <span>오늘 휴가자 <b className="text-[var(--text-2)] tabular">{vacation_summary.names.length}</b>명</span>
-            )}
-            <span>총 근로자 <b className="text-[var(--text-2)] tabular">{kpi.total_workers}</b>명</span>
-          </>
-        }
-      />
-
-      {/* KPI Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <Stat tone="info"    icon={<Users className="w-4 h-4" />}        label="총 근로자"   value={kpi.total_workers} unit="명" />
-        <Stat tone="success" icon={<CalendarDays className="w-4 h-4" />} label="총 근무일"   value={kpi.total_work_days} unit="일" />
-        <Stat tone="warning" icon={<Clock className="w-4 h-4" />}        label="총 근무시수" value={fmt(kpi.total_hours)} unit="h" trend={hoursTrend} />
-        <Stat tone="brand"   icon={<TrendingUp className="w-4 h-4" />}    label="1인 평균"    value={fmt(kpi.avg_hours_per_worker)} unit="h" trend={workersTrend} />
-        <Stat
-          tone={kpi.overtime_ratio > 25 ? 'danger' : 'warning'}
-          icon={<AlertTriangle className="w-4 h-4" />}
-          label="연장 비율"
-          value={fmt(kpi.overtime_ratio)}
-          unit="%"
-          hint={kpi.overtime_ratio > 25 ? '권장 상한 25% 초과' : '정상 범위'}
-        />
-        <Stat tone="brand" icon={<Palmtree className="w-4 h-4" />} label="휴가 사용" value={kpi.vacation_days} unit="일" hint="이번 달 사용일수" />
+      {/* Header */}
+      <div className="flex flex-wrap items-end gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-[#F7F8F8]">근태 관리 대시보드</h1>
+          <p className="text-sm text-[#8A8F98] mt-1">{dataSource === 'confirmed' ? '확정' : '전체'} 데이터 / {timeBase === 'actual' ? '실제' : '계획'} 출근 기준</p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <select value={dataSource} onChange={e => setDataSource(e.target.value as any)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]">
+            <option value="confirmed">확정 데이터</option>
+            <option value="all">전체 데이터</option>
+          </select>
+          <select value={timeBase} onChange={e => { setTimeBase(e.target.value as any); if (dataSource === 'confirmed') setDataSource('all'); }}
+            className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]">
+            <option value="actual">실제 출근</option>
+            <option value="planned">계획 출근</option>
+          </select>
+          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011] text-[#F7F8F8]" />
+          <button onClick={load} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium">새로고침</button>
+        </div>
       </div>
 
-      {/* Row 1: Department Bar + Type Pie + Vacation Card */}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <KpiCard icon={<Users className="w-5 h-5" />} label="총 근로자" value={kpi.total_workers} unit="명" color="#3b82f6" />
+        <KpiCard icon={<CalendarDays className="w-5 h-5" />} label="총 근무일" value={kpi.total_work_days} unit="일" color="#10b981" />
+        <KpiCard icon={<Clock className="w-5 h-5" />} label="총 근무시수" value={fmt(kpi.total_hours)} unit="h" color="#f59e0b" />
+        <KpiCard icon={<TrendingUp className="w-5 h-5" />} label="1인 평균" value={fmt(kpi.avg_hours_per_worker)} unit="h" color="#8b5cf6" />
+        <KpiCard icon={<AlertTriangle className="w-5 h-5" />} label="연장 비율" value={fmt(kpi.overtime_ratio)} unit="%" color={kpi.overtime_ratio > 25 ? '#ef4444' : '#f59e0b'} />
+        <KpiCard icon={<Palmtree className="w-5 h-5" />} label="휴가 사용" value={kpi.vacation_days} unit="일" color="#a78bfa" />
+      </div>
+
+      {/* Row 1: Department Bar + Type Pie + Vacation Pie */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <div className="lg:col-span-2">
           <ChartCard title="부서별 근무시간 현황" subtitle="기본 / 연장 / 야간 / 휴일" height={300}>
             <BarChart data={by_department} layout="vertical" margin={{ left: 60, right: 16, top: 4, bottom: 4 }}>
-              <CartesianGrid {...CHART_GRID_PROPS} />
-              <XAxis type="number" {...CHART_AXIS_PROPS} unit="h" />
-              <YAxis type="category" dataKey="department" {...CHART_AXIS_PROPS} tick={{ fill: 'var(--text-2)', fontSize: 11 }} width={56} />
-              <Tooltip content={<ChartTooltip unit="h" formatter={(v) => `${fmt(Number(v))}h`} />} />
-              <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-2)' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
+              <XAxis type="number" tick={{ fontSize: 11, fill: '#8A8F98' }} unit="h" />
+              <YAxis type="category" dataKey="department" tick={{ fontSize: 11, fill: '#D0D6E0' }} width={56} />
+              <Tooltip formatter={(v: any) => `${fmt(v ?? 0)}h`} contentStyle={TT} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="regular_hours" name="기본" stackId="a" fill={SEMANTIC_COLORS.regular} />
               <Bar dataKey="overtime_hours" name="연장" stackId="a" fill={SEMANTIC_COLORS.overtime} />
               <Bar dataKey="night_hours" name="야간" stackId="a" fill={SEMANTIC_COLORS.night} />
@@ -337,242 +295,197 @@ export default function HomePage() {
           </ChartCard>
         </div>
         <div className="flex flex-col gap-4">
+          {/* Type Pie */}
           <ChartCard title="유형별 근로자 분포" height={140}>
             <PieChart>
               <Pie data={by_type} dataKey="workers" nameKey="type" cx="50%" cy="50%" outerRadius={48} innerRadius={20} paddingAngle={3}
-                label={renderPieLabel} labelLine={{ stroke: 'var(--text-3)' }} style={{ fontSize: 9 }}>
+                label={renderPieLabel} labelLine={{ stroke: '#8A8F98' }} style={{ fontSize: 9 }}>
                 {(by_type || []).map((e: any, i: number) => <Cell key={i} fill={TYPE_COLORS[e.type] || '#64748b'} />)}
               </Pie>
-              <Tooltip content={<ChartTooltip />} />
+              <Tooltip contentStyle={TT} />
             </PieChart>
           </ChartCard>
-
-          <Card padding="md" className="hover-lift">
-            <CardHeader
-              title="오늘 휴가 현황"
-              subtitle={kpi.vacation_days > 0 ? `이번 달 총 ${kpi.vacation_days}일 사용` : undefined}
-              actions={<Badge tone={vacTotal > 0 ? 'brand' : 'neutral'} size="sm">{vacTotal}명</Badge>}
-            />
-            <div className="mt-3">
-              {vacTotal > 0 ? (
-                <div className="space-y-2">
-                  {(vacation_summary?.vacation || 0) > 0 && (
-                    <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-[var(--r-sm)] bg-[var(--bg-2)]">
-                      <span className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#A78BFA]" />
-                        <span className="text-[var(--fs-caption)] text-[var(--text-2)]">연차</span>
-                      </span>
-                      <span className="tabular text-[var(--fs-caption)] font-medium text-[var(--text-1)]">{vacation_summary.vacation}명</span>
+          {/* Vacation */}
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
+            <h3 className="text-sm font-semibold text-[#F7F8F8] mb-1">오늘 휴가 현황</h3>
+            <p className="text-[10px] text-[#8A8F98] mb-3">{kpi.vacation_days > 0 ? `이번 달 총 ${kpi.vacation_days}일 사용` : ''}</p>
+            {vacTotal > 0 ? (
+              <div className="space-y-1.5">
+                {(vacation_summary?.vacation || 0) > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-violet-400" />
+                    <span className="text-xs text-[#D0D6E0]">연차 <b className="text-[#F7F8F8]">{vacation_summary.vacation}명</b></span>
+                  </div>
+                )}
+                {(vacation_summary?.half_day || 0) > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    <span className="text-xs text-[#D0D6E0]">반차 <b className="text-[#F7F8F8]">{vacation_summary.half_day}명</b></span>
+                  </div>
+                )}
+                {(vacation_summary?.names || []).length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-[#23252A]">
+                    <div className="flex flex-wrap gap-1">
+                      {(vacation_summary.names as string[]).map((name: string, i: number) => (
+                        <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-violet-500/15 text-violet-300">{name}</span>
+                      ))}
                     </div>
-                  )}
-                  {(vacation_summary?.half_day || 0) > 0 && (
-                    <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-[var(--r-sm)] bg-[var(--bg-2)]">
-                      <span className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--warning-fg)]" />
-                        <span className="text-[var(--fs-caption)] text-[var(--text-2)]">반차</span>
-                      </span>
-                      <span className="tabular text-[var(--fs-caption)] font-medium text-[var(--text-1)]">{vacation_summary.half_day}명</span>
-                    </div>
-                  )}
-                  {(vacation_summary?.names || []).length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-[var(--border-1)]">
-                      <div className="flex flex-wrap gap-1">
-                        {(vacation_summary.names as string[]).map((name: string, i: number) => (
-                          <Badge key={i} tone="brand" size="xs">{name}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-4 text-center">
-                  <Palmtree className="w-6 h-6 text-[var(--text-4)] mb-1.5" />
-                  <span className="text-[var(--fs-caption)] text-[var(--text-4)]">오늘 휴가자 없음</span>
-                </div>
-              )}
-            </div>
-          </Card>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-3">
+                <Palmtree className="w-5 h-5 text-[#62666D] mx-auto mb-1" />
+                <span className="text-xs text-[#62666D]">오늘 휴가자 없음</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Row 2: Daily Workers + Daily Hours */}
-      {daily.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <ChartCard title="일별 출근자 수 추이" height={240}>
-            <AreaChart data={daily} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
-              <defs>
-                <ChartGradients keys={["brand"]} />
-              </defs>
-              <CartesianGrid {...CHART_GRID_PROPS} />
-              <XAxis dataKey="date" tickFormatter={(d: any) => String(d).slice(8)} {...CHART_AXIS_PROPS} />
-              <YAxis {...CHART_AXIS_PROPS} />
-              <Tooltip content={<ChartTooltip unit="명" />} labelFormatter={(d: any) => String(d)} />
-              <Area type="monotone" dataKey="workers" name="출근자" stroke="#828FFF" fill="url(#grad-brand)" strokeWidth={2} />
-            </AreaChart>
-          </ChartCard>
-          <ChartCard title="일별 근무시수 추이" subtitle="기본 / 연장 / 야간" height={240}>
-            <AreaChart data={daily} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
-              <defs>
-                <ChartGradients keys={["brand", "gold"]} />
-              </defs>
-              <CartesianGrid {...CHART_GRID_PROPS} />
-              <XAxis dataKey="date" tickFormatter={(d: any) => String(d).slice(8)} {...CHART_AXIS_PROPS} />
-              <YAxis {...CHART_AXIS_PROPS} unit="h" />
-              <Tooltip content={<ChartTooltip unit="h" formatter={(v) => `${fmt(Number(v))}h`} />} labelFormatter={(d: any) => String(d)} />
-              <Legend wrapperStyle={{ fontSize: 10, color: 'var(--text-2)' }} />
-              <Area type="monotone" dataKey="regular_hours" name="기본" stroke={SEMANTIC_COLORS.regular} fill="url(#grad-brand)" strokeWidth={1.5} stackId="1" />
-              <Area type="monotone" dataKey="overtime_hours" name="연장" stroke={SEMANTIC_COLORS.overtime} fill="url(#grad-gold)" strokeWidth={1.5} stackId="1" />
-              <Area type="monotone" dataKey="night_hours" name="야간" stroke={SEMANTIC_COLORS.night} fill={SEMANTIC_COLORS.night} fillOpacity={0.15} strokeWidth={1.5} stackId="1" />
-            </AreaChart>
-          </ChartCard>
-        </div>
-      )}
+      {daily.length > 0 && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <ChartCard title="일별 출근자 수 추이" height={240}>
+          <AreaChart data={daily} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
+            <defs>
+              <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
+            <XAxis dataKey="date" tickFormatter={(d: any) => String(d).slice(8)} tick={{ fontSize: 10, fill: '#8A8F98' }} />
+            <YAxis tick={{ fontSize: 10, fill: '#8A8F98' }} />
+            <Tooltip labelFormatter={(d: any) => String(d)} formatter={(v: any) => [`${v ?? 0}명`]} contentStyle={TT} />
+            <Area type="monotone" dataKey="workers" stroke="#3b82f6" fill="url(#wg)" strokeWidth={2} />
+          </AreaChart>
+        </ChartCard>
+        <ChartCard title="일별 근무시수 추이" subtitle="기본 / 연장 / 야간" height={240}>
+          <AreaChart data={daily} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
+            <defs>
+              <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={SEMANTIC_COLORS.regular} stopOpacity={0.4} /><stop offset="95%" stopColor={SEMANTIC_COLORS.regular} stopOpacity={0} /></linearGradient>
+              <linearGradient id="og" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={SEMANTIC_COLORS.overtime} stopOpacity={0.4} /><stop offset="95%" stopColor={SEMANTIC_COLORS.overtime} stopOpacity={0} /></linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
+            <XAxis dataKey="date" tickFormatter={(d: any) => String(d).slice(8)} tick={{ fontSize: 10, fill: '#8A8F98' }} />
+            <YAxis tick={{ fontSize: 10, fill: '#8A8F98' }} unit="h" />
+            <Tooltip labelFormatter={(d: any) => String(d)} formatter={(v: any, name: any) => [`${fmt(v ?? 0)}h`, name]} contentStyle={TT} />
+            <Legend wrapperStyle={{ fontSize: 10 }} />
+            <Area type="monotone" dataKey="regular_hours" name="기본" stroke={SEMANTIC_COLORS.regular} fill="url(#rg)" strokeWidth={1.5} stackId="1" />
+            <Area type="monotone" dataKey="overtime_hours" name="연장" stroke={SEMANTIC_COLORS.overtime} fill="url(#og)" strokeWidth={1.5} stackId="1" />
+            <Area type="monotone" dataKey="night_hours" name="야간" stroke={SEMANTIC_COLORS.night} fill={SEMANTIC_COLORS.night} fillOpacity={0.15} strokeWidth={1.5} stackId="1" />
+          </AreaChart>
+        </ChartCard>
+      </div>}
 
-      {/* Row 3: Day-of-week avg + Dept daily stacked bar */}
-      {daily.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          {(dow_avg || []).length > 0 && (
-            <ChartCard title="요일별 평균" subtitle="평균 근무시수 / 출근자" height={240}>
-              <BarChart data={dow_avg} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
-                <CartesianGrid {...CHART_GRID_PROPS} />
-                <XAxis dataKey="dow" {...CHART_AXIS_PROPS} />
-                <YAxis yAxisId="h" {...CHART_AXIS_PROPS} unit="h" />
-                <YAxis yAxisId="w" orientation="right" {...CHART_AXIS_PROPS} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 10, color: 'var(--text-2)' }} />
-                <Bar yAxisId="h" dataKey="avg_hours" name="평균 시수(h)" fill={SEMANTIC_COLORS.regular} radius={[3, 3, 0, 0]} />
-                <Bar yAxisId="w" dataKey="avg_workers" name="평균 인원" fill={SEMANTIC_COLORS.overtime} radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ChartCard>
-          )}
-          <div className={(dow_avg || []).length > 0 ? "lg:col-span-2" : "lg:col-span-3"}>
-            <ChartCard title="부서별 일별 근무시수" height={240}>
-              <BarChart data={daily} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
-                <CartesianGrid {...CHART_GRID_PROPS} />
-                <XAxis dataKey="date" tickFormatter={(d: any) => String(d).slice(8)} {...CHART_AXIS_PROPS} />
-                <YAxis {...CHART_AXIS_PROPS} unit="h" />
-                <Tooltip content={<ChartTooltip unit="h" formatter={(v) => `${fmt(Number(v))}h`} />} />
-                <Legend wrapperStyle={{ fontSize: 10, color: 'var(--text-2)' }} />
-                {deptNames.map((dept: string, i: number) => (
-                  <Bar key={dept} dataKey={`dept_${dept}`} name={dept} stackId="a" fill={getDeptColor(dept)} radius={i === deptNames.length - 1 ? [2, 2, 0, 0] : undefined} />
-                ))}
-              </BarChart>
-            </ChartCard>
-          </div>
+      {/* Row 3: Day-of-week + Dept daily stacked bar */}
+      {daily.length > 0 && <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {(dow_avg || []).length > 0 && <ChartCard title="요일별 평균" subtitle="평균 근무시수 / 출근자" height={240}>
+          <BarChart data={dow_avg} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
+            <XAxis dataKey="dow" tick={{ fontSize: 11, fill: '#D0D6E0' }} />
+            <YAxis yAxisId="h" tick={{ fontSize: 10, fill: '#8A8F98' }} unit="h" />
+            <YAxis yAxisId="w" orientation="right" tick={{ fontSize: 10, fill: '#8A8F98' }} />
+            <Tooltip contentStyle={TT} />
+            <Legend wrapperStyle={{ fontSize: 10 }} />
+            <Bar yAxisId="h" dataKey="avg_hours" name="평균 시수(h)" fill={SEMANTIC_COLORS.regular} radius={[3, 3, 0, 0]} />
+            <Bar yAxisId="w" dataKey="avg_workers" name="평균 인원" fill={SEMANTIC_COLORS.overtime} radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ChartCard>}
+        <div className={(dow_avg || []).length > 0 ? "lg:col-span-2" : "lg:col-span-3"}>
+          <ChartCard title="부서별 일별 근무시수" height={240}>
+            <BarChart data={daily} margin={{ left: -8, right: 8, top: 4, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
+              <XAxis dataKey="date" tickFormatter={(d: any) => String(d).slice(8)} tick={{ fontSize: 10, fill: '#8A8F98' }} />
+              <YAxis tick={{ fontSize: 10, fill: '#8A8F98' }} unit="h" />
+              <Tooltip contentStyle={TT} formatter={(v: any, name: any) => [`${fmt(v ?? 0)}h`, name]} />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              {deptNames.map((dept: string, i: number) => (
+                <Bar key={dept} dataKey={`dept_${dept}`} name={dept} stackId="a" fill={getDeptColor(dept)} radius={i === deptNames.length - 1 ? [2, 2, 0, 0] : undefined} />
+              ))}
+            </BarChart>
+          </ChartCard>
         </div>
-      )}
+      </div>}
 
       {/* Row 4: Heatmap */}
-      {heatmapDates.length > 0 && (
-        <Card padding="md" className="mb-4 hover-lift">
-          <div className="flex items-end justify-between mb-3">
-            <div>
-              <h3 className="text-[var(--fs-base)] font-semibold text-[var(--text-1)] tracking-[var(--tracking-tight)]">부서별/일별 근무시수 히트맵</h3>
-              <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-0.5">색이 진할수록 근무시수가 많습니다</p>
-            </div>
-            <div className="flex items-center gap-1.5 text-[var(--fs-micro)] text-[var(--text-3)]">
-              <span>적음</span>
-              {[0.15, 0.35, 0.55, 0.75, 1].map((a, i) => (
-                <span key={i} className="w-3 h-3 rounded-sm" style={{ background: `rgba(110,124,255,${a})` }} />
-              ))}
-              <span>많음</span>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="text-[10px] border-collapse">
-              <thead>
-                <tr>
-                  <th className="px-2 py-1 text-left text-eyebrow sticky left-0 bg-[var(--bg-1)] z-10">부서</th>
+      {heatmapDates.length > 0 && <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 mb-4">
+        <h3 className="text-sm font-semibold text-[#F7F8F8] mb-1">부서별/일별 근무시수 히트맵</h3>
+        <p className="text-[10px] text-[#8A8F98] mb-3">색이 진할수록 근무시수가 많습니다</p>
+        <div className="overflow-x-auto">
+          <table className="text-[10px] border-collapse">
+            <thead><tr>
+              <th className="px-2 py-1 text-left text-[#8A8F98] sticky left-0 bg-[#0F1011] z-10">부서</th>
+              {heatmapDates.map((d: string) => {
+                const dow = new Date(d + 'T00:00:00+09:00').getDay();
+                return <th key={d} className={`px-1 py-1 text-center min-w-[26px] ${dow === 0 ? 'text-[#EB5757]' : dow === 6 ? 'text-[#4EA7FC]' : 'text-[#8A8F98]'}`}>{d.slice(8)}</th>;
+              })}
+            </tr></thead>
+            <tbody>
+              {deptNames.map((dept: string) => (
+                <tr key={dept}>
+                  <td className="px-2 py-1 text-[#D0D6E0] font-medium whitespace-nowrap sticky left-0 bg-[#0F1011] z-10">{dept}</td>
                   {heatmapDates.map((d: string) => {
-                    const dow = new Date(d + 'T00:00:00+09:00').getDay();
+                    const hrs = (by_dept_daily || []).filter((r: any) => r.date === d && r.department === dept).reduce((s: number, r: any) => s + (parseFloat(r.hours) || 0), 0);
+                    const intensity = hrs > 0 ? Math.max(0.1, Math.min(hrs / heatmapMax, 1)) : 0;
                     return (
-                      <th key={d} className={`px-1 py-1 text-center min-w-[26px] tabular text-eyebrow ${dow === 0 ? 'text-[var(--danger-fg)]' : dow === 6 ? 'text-[var(--info-fg)]' : ''}`}>
-                        {d.slice(8)}
-                      </th>
+                      <td key={d} className="px-0.5 py-0.5 text-center" title={`${dept} ${d}: ${fmt(hrs)}h`}>
+                        <div className="w-[22px] h-[22px] rounded-sm flex items-center justify-center mx-auto" style={{ background: hrs > 0 ? `rgba(59,130,246,${intensity})` : 'transparent' }}>
+                          {hrs > 0 && <span className="text-[8px] text-white font-medium">{Math.round(hrs)}</span>}
+                        </div>
+                      </td>
                     );
                   })}
                 </tr>
-              </thead>
-              <tbody>
-                {deptNames.map((dept: string) => (
-                  <tr key={dept} className="hover:bg-[var(--bg-2)]/50">
-                    <td className="px-2 py-1 text-[var(--text-2)] font-medium whitespace-nowrap sticky left-0 bg-[var(--bg-1)] z-10">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: getDeptColor(dept) }} />
-                        {dept}
-                      </span>
-                    </td>
-                    {heatmapDates.map((d: string) => {
-                      const hrs = (by_dept_daily || []).filter((r: any) => r.date === d && r.department === dept).reduce((s: number, r: any) => s + (parseFloat(r.hours) || 0), 0);
-                      const intensity = hrs > 0 ? Math.max(0.12, Math.min(hrs / heatmapMax, 1)) : 0;
-                      return (
-                        <td key={d} className="px-0.5 py-0.5 text-center" title={`${dept} ${d}: ${fmt(hrs)}h`}>
-                          <div
-                            className="w-[22px] h-[22px] rounded-[5px] flex items-center justify-center mx-auto transition-transform hover:scale-110"
-                            style={{ background: hrs > 0 ? `rgba(110,124,255,${intensity})` : 'rgba(255,255,255,0.02)' }}
-                          >
-                            {hrs > 0 && <span className="text-[8px] text-white font-medium tabular">{Math.round(hrs)}</span>}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>}
 
       {/* Row 5: Department detail table */}
-      <Card padding="none" className="overflow-hidden hover-lift">
-        <div className="px-4 py-3 border-b border-[var(--border-1)] flex items-center justify-between">
-          <CardHeader
-            title="부서별 상세 현황"
-            subtitle="근무 유형별 시수와 연장 비율"
-            actions={<Badge tone="neutral" size="sm">{by_department?.length || 0}개 부서</Badge>}
-          />
-        </div>
-        <Table>
-          <THead>
-            <TR>
-              <TH>부서</TH>
-              <TH numeric>인원</TH>
-              <TH numeric>기본(h)</TH>
-              <TH numeric>연장(h)</TH>
-              <TH numeric>야간(h)</TH>
-              <TH numeric>휴일(h)</TH>
-              <TH numeric>합계(h)</TH>
-              <TH numeric>연장비율</TH>
-            </TR>
-          </THead>
-          <TBody>
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+        <div className="px-4 py-3 border-b border-[#23252A]"><h3 className="text-sm font-semibold text-[#F7F8F8]">부서별 상세 현황</h3></div>
+        <table className="w-full text-xs">
+          <thead><tr className="bg-[#08090A] text-left">
+            <th className="py-2 px-4 font-medium text-[#8A8F98]">부서</th>
+            <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">인원</th>
+            <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">기본(h)</th>
+            <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">연장(h)</th>
+            <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">야간(h)</th>
+            <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">휴일(h)</th>
+            <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">합계(h)</th>
+            <th className="py-2 px-4 font-medium text-[#8A8F98] text-right">연장비율</th>
+          </tr></thead>
+          <tbody>
             {(by_department || []).map((dept: any) => {
               const total = (parseFloat(dept.regular_hours)||0) + (parseFloat(dept.overtime_hours)||0) + (parseFloat(dept.night_hours)||0);
               const otRatio = total > 0 ? ((parseFloat(dept.overtime_hours)||0) + (parseFloat(dept.night_hours)||0)) / total * 100 : 0;
               return (
-                <TR key={dept.department}>
-                  <TD emphasis>
-                    <span className="inline-flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full" style={{ background: getDeptColor(dept.department) }} />
-                      {dept.department || '미지정'}
-                    </span>
-                  </TD>
-                  <TD numeric>{dept.workers}</TD>
-                  <TD numeric className="tabular" style={{ color: SEMANTIC_COLORS.regular }}>{fmt(dept.regular_hours)}</TD>
-                  <TD numeric className="tabular" style={{ color: SEMANTIC_COLORS.overtime }}>{fmt(dept.overtime_hours)}</TD>
-                  <TD numeric className="tabular" style={{ color: SEMANTIC_COLORS.night }}>{fmt(dept.night_hours)}</TD>
-                  <TD numeric className="tabular" style={{ color: SEMANTIC_COLORS.holiday }}>{fmt(dept.holiday_hours)}</TD>
-                  <TD numeric emphasis>{fmt(total)}</TD>
-                  <TD numeric>
-                    <Badge tone={otRatio > 25 ? 'danger' : 'success'} size="sm">{fmt(otRatio)}%</Badge>
-                  </TD>
-                </TR>
+                <tr key={dept.department} className="border-b border-[#23252A] hover:bg-[#141516]">
+                  <td className="py-2.5 px-4 font-medium text-[#F7F8F8]"><span className="inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ background: getDeptColor(dept.department) }} />{dept.department || '미지정'}</td>
+                  <td className="py-2.5 px-4 text-right text-[#D0D6E0]">{dept.workers}</td>
+                  <td className="py-2.5 px-4 text-right text-[#3b82f6]">{fmt(dept.regular_hours)}</td>
+                  <td className="py-2.5 px-4 text-right text-[#f59e0b]">{fmt(dept.overtime_hours)}</td>
+                  <td className="py-2.5 px-4 text-right text-[#8b5cf6]">{fmt(dept.night_hours)}</td>
+                  <td className="py-2.5 px-4 text-right text-[#f43f5e]">{fmt(dept.holiday_hours)}</td>
+                  <td className="py-2.5 px-4 text-right text-[#F7F8F8] font-medium">{fmt(total)}</td>
+                  <td className="py-2.5 px-4 text-right"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${otRatio > 25 ? 'bg-[#EB5757]/15 text-[#EB5757]' : 'bg-[#27A644]/15 text-[#27A644]'}`}>{fmt(otRatio)}%</span></td>
+                </tr>
               );
             })}
-          </TBody>
-        </Table>
-      </Card>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ icon, label, value, unit, color }: { icon: React.ReactNode; label: string; value: number | string; unit: string; color: string }) {
+  return (
+    <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="p-1.5 rounded-lg" style={{ background: `${color}15`, color }}>{icon}</div>
+        <span className="text-[11px] text-[#8A8F98]">{label}</span>
+      </div>
+      <p className="text-xl font-bold text-[#F7F8F8]">{value}<span className="text-xs text-[#8A8F98] ml-1">{unit}</span></p>
     </div>
   );
 }

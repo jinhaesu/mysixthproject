@@ -2,9 +2,9 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { PageHeader, Card, Badge, Button, SkeletonCard, EmptyState, Input, Select, Field, useToast } from "@/components/ui";
 import {
   CalendarCheck,
+  Loader2,
   Check,
   XCircle,
   ChevronLeft,
@@ -118,7 +118,6 @@ function toDateStr(d: Date): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ConfirmCalendarDispatchPage() {
-  const toast = useToast();
   const today = new Date();
   const [year, setYear] = usePersistedState("ccd_year", today.getFullYear());
   const [month, setMonth] = usePersistedState(
@@ -178,7 +177,7 @@ export default function ConfirmCalendarDispatchPage() {
         }
         setConfirmedData(confirmed.data);
       } catch (e: any) {
-        toast.error(e.message || "오류가 발생했습니다.");
+        alert(e.message);
       } finally {
         setLoading(false);
       }
@@ -329,7 +328,7 @@ export default function ConfirmCalendarDispatchPage() {
         delete _confirmedCache[`disp-confirmed-${yearMonth}`];
         await loadData(true);
       } catch (e: any) {
-        toast.error(e.message || "오류가 발생했습니다.");
+        alert(e.message);
       } finally {
         setActionLoading(null);
       }
@@ -347,7 +346,7 @@ export default function ConfirmCalendarDispatchPage() {
         delete _confirmedCache[`disp-confirmed-${yearMonth}`];
         await loadData(true);
       } catch (e: any) {
-        toast.error(e.message || "오류가 발생했습니다.");
+        alert(e.message);
       } finally {
         setActionLoading(null);
       }
@@ -383,7 +382,7 @@ export default function ConfirmCalendarDispatchPage() {
         delete _confirmedCache[`disp-confirmed-${yearMonth}`];
         await loadData(true);
       } catch (e: any) {
-        toast.error(e.message || "오류가 발생했습니다.");
+        alert(e.message);
       } finally {
         setActionLoading(null);
       }
@@ -442,57 +441,88 @@ export default function ConfirmCalendarDispatchPage() {
 
   return (
     <div className="min-w-0">
-      <PageHeader
-        eyebrow={<><CalendarCheck className="w-3.5 h-3.5 inline-block mr-1" />캘린더 관리</>}
-        title="미확정 캘린더 관리 (파견/알바)"
-        description="날짜를 클릭하여 미확정 근태를 확인하고 확정하세요."
-        actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 border border-[var(--border-1)] rounded-[var(--r-md)] px-2 py-1.5 bg-[var(--bg-1)]">
-              <button onClick={prevMonth} className="p-1 hover:bg-[var(--bg-2)] rounded-[var(--r-sm)]">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-sm font-semibold w-24 text-center tabular">{year}년 {month}월</span>
-              <button onClick={nextMonth} className="p-1 hover:bg-[var(--bg-2)] rounded-[var(--r-sm)]">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-            <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} inputSize="sm">
-              {DEPT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </Select>
-            <Button
-              variant="primary"
-              size="sm"
-              loading={loading}
-              onClick={() => {
-                delete _summaryCache[`disp-${year}-${month}`];
-                delete _confirmedCache[`disp-confirmed-${yearMonth}`];
-                loadData(true);
-              }}
+      {/* Header */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+            <CalendarCheck className="w-6 h-6 text-[#7070FF]" />
+            미확정 캘린더 관리 (파견/알바)
+          </h1>
+          <p className="text-sm text-[#8A8F98] mt-1">
+            날짜를 클릭하여 미확정 근태를 확인하고 확정하세요.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Month navigator */}
+          <div className="flex items-center gap-1 bg-[#0F1011] border border-[#23252A] rounded-lg px-2 py-1.5">
+            <button
+              onClick={prevMonth}
+              className="p-1 hover:bg-[#141516]/5 rounded"
             >
-              새로고침
-            </Button>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold w-24 text-center">
+              {year}년 {month}월
+            </span>
+            <button
+              onClick={nextMonth}
+              className="p-1 hover:bg-[#141516]/5 rounded"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-        }
-      />
+          {/* Dept filter */}
+          <select
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            className="px-3 py-2 border border-[#23252A] rounded-lg text-sm bg-[#0F1011]"
+          >
+            {DEPT_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          {/* Refresh */}
+          <button
+            onClick={() => {
+              delete _summaryCache[`disp-${year}-${month}`];
+              delete _confirmedCache[`disp-confirmed-${yearMonth}`];
+              loadData(true);
+            }}
+            disabled={loading}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "새로고침"
+            )}
+          </button>
+        </div>
+      </div>
 
-      {loading && <SkeletonCard />}
+      {loading && (
+        <div className="py-16 flex justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
+        </div>
+      )}
 
       {!loading && (
         <>
           {/* Calendar */}
-          <Card padding="none" className="overflow-hidden mb-6 fade-in">
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden mb-6">
             {/* Day-of-week header */}
-            <div className="grid grid-cols-7 border-b border-[var(--border-1)]">
+            <div className="grid grid-cols-7 border-b border-[#23252A]">
               {["월", "화", "수", "목", "금", "토", "일"].map((d, i) => (
                 <div
                   key={d}
                   className={`py-2 text-center text-xs font-semibold ${
                     i === 5
-                      ? "text-[var(--brand-400)]"
+                      ? "text-[#7070FF]"
                       : i === 6
-                      ? "text-[var(--danger-fg)]"
-                      : "text-[var(--text-3)]"
+                      ? "text-[#EB5757]"
+                      : "text-[#8A8F98]"
                   }`}
                 >
                   {d}
@@ -507,7 +537,7 @@ export default function ConfirmCalendarDispatchPage() {
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className="min-h-[80px] border-b border-r border-[var(--border-1)] bg-[var(--bg-canvas)]/50"
+                      className="min-h-[80px] border-b border-r border-[#23252A] bg-[#08090A]/50"
                     />
                   );
                 }
@@ -547,32 +577,32 @@ export default function ConfirmCalendarDispatchPage() {
                         selectedDate === dateStr ? null : dateStr
                       )
                     }
-                    className={`min-h-[80px] border-b border-r border-[var(--border-1)] p-1.5 text-left flex flex-col gap-1 transition-colors ${
+                    className={`min-h-[80px] border-b border-r border-[#23252A] p-1.5 text-left flex flex-col gap-1 transition-colors ${
                       isSelected
-                        ? "bg-[var(--brand-500)]/10 border-[var(--brand-500)]/30"
-                        : "hover:bg-[var(--bg-2)]/5"
+                        ? "bg-[#5E6AD2]/10 border-[#5E6AD2]/30"
+                        : "hover:bg-[#141516]/5"
                     }`}
                   >
                     <span
                       className={`text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full ${
                         isToday
-                          ? "bg-[var(--brand-500)] text-white"
+                          ? "bg-indigo-600 text-white"
                           : isSun
-                          ? "text-[var(--danger-fg)]"
+                          ? "text-[#EB5757]"
                           : isSat
-                          ? "text-[var(--brand-400)]"
-                          : "text-[var(--text-2)]"
+                          ? "text-[#7070FF]"
+                          : "text-[#D0D6E0]"
                       }`}
                     >
                       {day.getDate()}
                     </span>
                     {filteredUnconfirmed > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--danger-fg)]/15 text-[var(--danger-fg)] w-fit">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#EB5757]/15 text-[#EB5757] w-fit">
                         미확정 {filteredUnconfirmed}
                       </span>
                     )}
                     {filteredConfirmed > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--success-fg)]/15 text-[var(--success-fg)] w-fit">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#27A644]/15 text-[#27A644] w-fit">
                         확정 {filteredConfirmed}
                       </span>
                     )}
@@ -580,13 +610,13 @@ export default function ConfirmCalendarDispatchPage() {
                 );
               })}
             </div>
-          </Card>
+          </div>
 
           {/* Selected date detail panel */}
           {selectedDate && (
-            <Card padding="none" className="fade-in">
-              <div className="px-4 py-3 border-b border-[var(--border-1)] flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                <h2 className="text-base font-semibold text-[var(--text-1)]">
+            <div className="bg-[#0F1011] rounded-xl border border-[#23252A]">
+              <div className="px-4 py-3 border-b border-[#23252A] flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                <h2 className="text-base font-semibold text-[#F7F8F8]">
                   {selectedDate} 근태 목록
                 </h2>
                 <div className="flex gap-1">
@@ -596,8 +626,8 @@ export default function ConfirmCalendarDispatchPage() {
                       onClick={() => setTabFilter(t)}
                       className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                         tabFilter === t
-                          ? "bg-[var(--brand-500)] text-white"
-                          : "bg-[var(--bg-2)] text-[var(--text-3)] hover:bg-[var(--bg-2)]/7"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-[#141516] text-[#8A8F98] hover:bg-[#141516]/7"
                       }`}
                     >
                       {t}
@@ -607,9 +637,11 @@ export default function ConfirmCalendarDispatchPage() {
               </div>
 
               {selectedEntries.length === 0 ? (
-                <EmptyState icon={<CalendarCheck className="w-10 h-10" />} title="근태 기록 없음" description="해당 날짜에 근태 기록이 없습니다." />
+                <div className="py-12 text-center text-sm text-[#62666D]">
+                  해당 날짜에 근태 기록이 없습니다.
+                </div>
               ) : (
-                <div className="divide-y divide-[var(--border-1)]">
+                <div className="divide-y divide-[#23252A]">
                   {selectedEntries.map((entry) => {
                     const key = buildDayKey(entry.emp.name, entry.date);
                     const isActioning = actionLoading === key;
@@ -621,40 +653,55 @@ export default function ConfirmCalendarDispatchPage() {
                         {/* Name */}
                         <button
                           onClick={() => setPopupEmp(entry.emp)}
-                          className="text-sm font-semibold text-[var(--brand-400)] hover:underline min-w-[4rem]"
+                          className="text-sm font-semibold text-[#828FFF] hover:underline min-w-[4rem]"
                         >
                           {entry.emp.name}
                         </button>
                         {/* Dept */}
-                        <span className="text-xs text-[var(--text-3)]">
+                        <span className="text-xs text-[#8A8F98]">
                           {entry.emp.department}
                         </span>
                         {/* Type badge */}
-                        <Badge tone={entry.emp.type === "파견" ? "warning" : "success"} size="xs">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            entry.emp.type === "파견"
+                              ? "bg-[#4EA7FC]/10 text-[#828FFF]"
+                              : "bg-[#FC7840]/10 text-[#FC7840]"
+                          }`}
+                        >
                           {entry.emp.type || "파견"}
-                        </Badge>
+                        </span>
                         {/* Times */}
                         <div className="flex flex-col text-xs">
-                          <span className="text-[var(--text-2)]">실제: <b>{entry.actualClockIn || "--:--"} ~ {entry.actualClockOut || "--:--"}</b></span>
-                          {entry.plannedClockIn && <span className="text-[var(--brand-400)]">계획: {entry.plannedClockIn} ~ {entry.plannedClockOut}</span>}
+                          <span className="text-[#D0D6E0]">실제: <b>{entry.actualClockIn || "--:--"} ~ {entry.actualClockOut || "--:--"}</b></span>
+                          {entry.plannedClockIn && <span className="text-[#7070FF]">계획: {entry.plannedClockIn} ~ {entry.plannedClockOut}</span>}
                         </div>
                         {entry.isConfirmed && (
-                          <Badge tone={entry.source === "actual" ? "success" : "brand"} size="xs">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${entry.source === "actual" ? "bg-[#27A644]/10 text-[#27A644]" : "bg-[#4EA7FC]/10 text-[#828FFF]"}`}>
                             {entry.source === "actual" ? "실제확정" : "계획확정"}
-                          </Badge>
+                          </span>
                         )}
                         <div className="ml-auto flex items-center gap-2">
                           {entry.isConfirmed ? (
                             <>
-                              <Badge tone="success" size="xs">확정 ({entry.clockIn}~{entry.clockOut})</Badge>
-                              <Button variant="danger" size="xs" leadingIcon={<XCircle className="w-3 h-3" />} loading={isActioning} onClick={() => handleCancelConfirm(entry)}>취소</Button>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#27A644]/15 text-[#27A644]">확정 ({entry.clockIn}~{entry.clockOut})</span>
+                              <button onClick={() => handleCancelConfirm(entry)} disabled={isActioning}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#EB5757]/10 text-[#EB5757] hover:bg-[#EB5757]/15 disabled:opacity-50">
+                                {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />} 취소
+                              </button>
                             </>
                           ) : (
                             <>
-                              <Badge tone="danger" size="xs">미확정</Badge>
-                              <Button variant="secondary" size="xs" leadingIcon={<Check className="w-3 h-3" />} loading={isActioning} onClick={() => handleConfirm(entry, "actual")}>실제확정</Button>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#EB5757]/15 text-[#EB5757]">미확정</span>
+                              <button onClick={() => handleConfirm(entry, "actual")} disabled={isActioning}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-[#27A644] text-white hover:bg-green-700 disabled:opacity-50">
+                                {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} 실제확정
+                              </button>
                               {entry.plannedClockIn && (
-                                <Button variant="primary" size="xs" leadingIcon={<Check className="w-3 h-3" />} loading={isActioning} onClick={() => handleConfirm(entry, "planned")}>계획확정</Button>
+                                <button onClick={() => handleConfirm(entry, "planned")} disabled={isActioning}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-[#5E6AD2] text-white hover:bg-[#828FFF] disabled:opacity-50">
+                                  {isActioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} 계획확정
+                                </button>
                               )}
                             </>
                           )}
@@ -664,7 +711,7 @@ export default function ConfirmCalendarDispatchPage() {
                   })}
                 </div>
               )}
-            </Card>
+            </div>
           )}
         </>
       )}
@@ -677,23 +724,23 @@ export default function ConfirmCalendarDispatchPage() {
             if (e.target === e.currentTarget) setPopupEmp(null);
           }}
         >
-          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-3)] border border-[var(--border-1)] w-full max-w-2xl max-h-[85vh] flex flex-col">
+          <div className="bg-[#0F1011] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
             {/* Popup header */}
-            <div className="px-5 py-4 border-b border-[var(--border-1)] flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-[#23252A] flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-[var(--text-1)]">
+                <h3 className="text-base font-bold text-[#F7F8F8]">
                   {popupEmp.name}{" "}
-                  <span className="text-sm font-normal text-[var(--text-3)]">
+                  <span className="text-sm font-normal text-[#8A8F98]">
                     {popupEmp.department}
                   </span>
                 </h3>
-                <p className="text-xs text-[var(--text-3)] mt-0.5">
+                <p className="text-xs text-[#8A8F98] mt-0.5">
                   {year}년 {month}월 전체 근태
                 </p>
               </div>
               <button
                 onClick={() => setPopupEmp(null)}
-                className="text-[var(--text-4)] hover:text-[var(--text-2)] text-lg leading-none"
+                className="text-[#62666D] hover:text-[#D0D6E0] text-lg leading-none"
               >
                 ✕
               </button>
@@ -702,65 +749,114 @@ export default function ConfirmCalendarDispatchPage() {
             {/* Popup body */}
             <div className="overflow-y-auto flex-1">
               {popupEntries.length === 0 ? (
-                <EmptyState icon={<CalendarCheck className="w-10 h-10" />} title="근태 기록 없음" description="이번 달 근태 기록이 없습니다." />
+                <div className="py-12 text-center text-sm text-[#62666D]">
+                  이번 달 근태 기록이 없습니다.
+                </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[var(--bg-canvas)] text-left sticky top-0">
-                      <th className="py-2 px-4 text-[10px] uppercase tracking-wider text-[var(--text-3)]">날짜</th>
-                      <th className="py-2 px-4 text-[10px] uppercase tracking-wider text-[var(--text-3)]">출근</th>
-                      <th className="py-2 px-4 text-[10px] uppercase tracking-wider text-[var(--text-3)]">퇴근</th>
-                      <th className="py-2 px-4 text-[10px] uppercase tracking-wider text-[var(--text-3)]">기준</th>
-                      <th className="py-2 px-4 text-[10px] uppercase tracking-wider text-[var(--text-3)]">상태</th>
-                      <th className="py-2 px-4 text-[10px] uppercase tracking-wider text-[var(--text-3)]">관리</th>
+                    <tr className="bg-[#08090A] text-left sticky top-0">
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
+                        날짜
+                      </th>
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
+                        출근
+                      </th>
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
+                        퇴근
+                      </th>
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
+                        기준
+                      </th>
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
+                        상태
+                      </th>
+                      <th className="py-2 px-4 text-xs font-medium text-[#8A8F98]">
+                        관리
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--border-1)]">
+                  <tbody className="divide-y divide-[#23252A]">
                     {popupEntries.map((row) => {
                       const k = buildDayKey(popupEmp.name, row.date);
                       const isActioning = actionLoading === k;
                       return (
-                        <tr key={row.date} className="hover:bg-[var(--bg-2)]/5">
-                          <td className="py-2 px-4 text-[var(--text-2)]">
+                        <tr key={row.date} className="hover:bg-[#141516]/5">
+                          <td className="py-2 px-4 text-[#D0D6E0]">
                             {row.date}
                           </td>
-                          <td className="py-2 px-4 text-[var(--text-2)]">
+                          <td className="py-2 px-4 text-[#D0D6E0]">
                             {row.clockIn || "--:--"}
                           </td>
-                          <td className="py-2 px-4 text-[var(--text-2)]">
+                          <td className="py-2 px-4 text-[#D0D6E0]">
                             {row.clockOut || "--:--"}
                           </td>
                           <td className="py-2 px-4">
-                            <Badge tone={row.source === "actual" ? "success" : "brand"} size="xs">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                row.source === "actual"
+                                  ? "bg-[#27A644]/10 text-[#27A644]"
+                                  : "bg-[#4EA7FC]/10 text-[#828FFF]"
+                              }`}
+                            >
                               {row.source === "actual" ? "실제" : "계획"}
-                            </Badge>
+                            </span>
                           </td>
                           <td className="py-2 px-4">
-                            <Badge tone={row.isConfirmed ? "success" : "danger"} size="xs">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                row.isConfirmed
+                                  ? "bg-[#27A644]/15 text-[#27A644]"
+                                  : "bg-[#EB5757]/15 text-[#EB5757]"
+                              }`}
+                            >
                               {row.isConfirmed ? "확정" : "미확정"}
-                            </Badge>
+                            </span>
                           </td>
                           <td className="py-2 px-4">
                             {row.isConfirmed ? (
-                              <Button
-                                variant="danger"
-                                size="xs"
-                                leadingIcon={<XCircle className="w-3 h-3" />}
-                                loading={isActioning}
-                                onClick={() => handlePopupConfirm(popupEmp, row.date, row.clockIn, row.clockOut, row.source, row.confirmedId)}
+                              <button
+                                onClick={() =>
+                                  handlePopupConfirm(
+                                    popupEmp,
+                                    row.date,
+                                    row.clockIn,
+                                    row.clockOut,
+                                    row.source,
+                                    row.confirmedId
+                                  )
+                                }
+                                disabled={isActioning}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#EB5757]/10 text-[#EB5757] hover:bg-[#EB5757]/15 disabled:opacity-50"
                               >
+                                {isActioning ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <XCircle className="w-3 h-3" />
+                                )}
                                 취소
-                              </Button>
+                              </button>
                             ) : (
-                              <Button
-                                variant="primary"
-                                size="xs"
-                                leadingIcon={<Check className="w-3 h-3" />}
-                                loading={isActioning}
-                                onClick={() => handlePopupConfirm(popupEmp, row.date, row.clockIn, row.clockOut, row.source)}
+                              <button
+                                onClick={() =>
+                                  handlePopupConfirm(
+                                    popupEmp,
+                                    row.date,
+                                    row.clockIn,
+                                    row.clockOut,
+                                    row.source
+                                  )
+                                }
+                                disabled={isActioning}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
                               >
+                                {isActioning ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Check className="w-3 h-3" />
+                                )}
                                 확정
-                              </Button>
+                              </button>
                             )}
                           </td>
                         </tr>

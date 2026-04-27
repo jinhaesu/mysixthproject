@@ -3,15 +3,10 @@
 import { useEffect, useState } from "react";
 import { getUploads, deleteUpload } from "@/lib/api";
 import type { Upload, AnalysisResult } from "@/types/attendance";
-import { Trash2, FileSpreadsheet, AlertTriangle, ChevronDown, ChevronUp, Database, RefreshCw, Tags } from "lucide-react";
+import { Trash2, FileSpreadsheet, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import PasswordGate from "@/components/PasswordGate";
-import {
-  PageHeader, Card, CardHeader, Section, Button, Badge, CenterSpinner,
-  EmptyState, useToast,
-} from "@/components/ui";
 
 export default function ManagePage() {
-  const toast = useToast();
   const [authorized, setAuthorized] = useState(false);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +34,7 @@ export default function ManagePage() {
       const data = await getUploads();
       setUploads(data);
     } catch {
+      // handle error
     } finally {
       setLoading(false);
     }
@@ -51,7 +47,7 @@ export default function ManagePage() {
       await deleteUpload(id);
       setUploads((prev) => prev.filter((u) => u.id !== id));
     } catch {
-      toast.error("삭제 중 오류가 발생했습니다.");
+      alert("삭제 중 오류가 발생했습니다.");
     } finally {
       setDeleting(null);
     }
@@ -75,170 +71,133 @@ export default function ManagePage() {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
       const body = await res.json();
-      toast.success(`${body.updated}건 재계산 완료`);
-    } catch (e: any) { toast.error(e.message); }
+      alert(`${body.updated}건 재계산 완료`);
+    } catch (e: any) { alert(e.message); }
     finally { setRecalcing(false); }
   };
 
   if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
 
   return (
-    <>
-      <PageHeader
-        eyebrow="시스템"
-        title="데이터 관리"
-        description="업로드된 파일과 기록을 관리합니다."
-      />
+    <div>
+      <h2 className="text-2xl font-bold text-[#F7F8F8] mb-2">데이터 관리</h2>
+      <p className="text-[#8A8F98] mb-4">업로드된 파일과 기록을 관리합니다.</p>
 
-      <div className="space-y-3 mb-6">
-        <Card tone="ghost" className="border-[var(--warning-border)] bg-[var(--warning-bg)]">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <RefreshCw size={18} className="text-[var(--warning-fg)] shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[var(--fs-body)] font-semibold text-[var(--warning-fg)]">확정 데이터 근무시간 재계산</p>
-                <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-0.5 opacity-80">
-                  출근 30분 올림 / 퇴근 30분 내림 기준을 모든 기존 확정 데이터에 일괄 적용합니다.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRecalc}
-              loading={recalcing}
-            >
-              재계산 실행
-            </Button>
-          </div>
-        </Card>
-
-        <Card tone="ghost" className="border-[var(--info-border)] bg-[var(--info-bg)]">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Tags size={18} className="text-[var(--info-fg)] shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[var(--fs-body)] font-semibold text-[var(--info-fg)]">근무자 DB 구분(파견/알바) 일괄 채우기</p>
-                <p className="text-[var(--fs-caption)] text-[var(--info-fg)] mt-0.5 opacity-80">
-                  구분이 비어있는 근무자에 대해 출퇴근 기록에서 파견/알바 유형을 찾아 자동 채웁니다.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const token = localStorage.getItem('token');
-                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/workers/backfill-category`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({}),
-                  });
-                  const body = await res.json();
-                  let msg = `빈 구분 ${body.total_empty}명 중 ${body.updated}명 채움 완료`;
-                  if (body.not_found?.length > 0) msg += ` | 유형 데이터 없어 빈칸 유지: ${body.not_found.join(', ')}`;
-                  toast.success(msg);
-                } catch (e: any) { toast.error(e.message); }
-              }}
-            >
-              구분 채우기
-            </Button>
-          </div>
-        </Card>
+      <div className="bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-xl p-4 mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-amber-900">확정 데이터 근무시간 재계산</h3>
+          <p className="text-xs text-[#F0BF00] mt-1">출근 30분 올림 / 퇴근 30분 내림 기준을 모든 기존 확정 데이터에 일괄 적용합니다.</p>
+        </div>
+        <button onClick={handleRecalc} disabled={recalcing}
+          className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:bg-[#28282C] whitespace-nowrap">
+          {recalcing ? "처리중..." : "재계산 실행"}
+        </button>
       </div>
 
-      <Section title="업로드 기록">
-        {loading ? (
-          <CenterSpinner />
-        ) : uploads.length === 0 ? (
-          <EmptyState
-            icon={<Database size={40} />}
-            title="업로드된 데이터가 없습니다."
-          />
-        ) : (
-          <div className="space-y-3">
-            {uploads.map((upload) => {
-              const isExpanded = expandedId === upload.id;
-              const analysis = parseAnalysis(upload.ai_analysis);
+      <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-xl p-4 mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-[#4EA7FC]">근무자 DB 구분(파견/알바) 일괄 채우기</h3>
+          <p className="text-xs text-[#828FFF] mt-1">구분이 비어있는 근무자에 대해 출퇴근 기록에서 파견/알바 유형을 찾아 자동 채웁니다.</p>
+        </div>
+        <button onClick={async () => {
+          try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/workers/backfill-category`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({}),
+            });
+            const body = await res.json();
+            let msg = `빈 구분 ${body.total_empty}명 중 ${body.updated}명 채움 완료`;
+            if (body.not_found?.length > 0) msg += `\n유형 데이터 없어 빈칸 유지: ${body.not_found.join(', ')}`;
+            alert(msg);
+          } catch (e: any) { alert(e.message); }
+        }}
+          className="px-4 py-2 bg-[#5E6AD2] text-white rounded-lg text-sm font-medium hover:bg-[#828FFF] whitespace-nowrap">
+          구분 채우기
+        </button>
+      </div>
 
-              return (
-                <Card key={upload.id} padding="none" className="overflow-hidden">
-                  <div className="px-5 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <FileSpreadsheet size={20} className="text-[var(--success-fg)]" />
-                      <div>
-                        <p className="font-medium text-[var(--text-1)]">{upload.original_filename}</p>
-                        <p className="text-[var(--fs-caption)] text-[var(--text-3)]">
-                          <span className="tabular">{upload.record_count}</span>건 | {new Date(upload.uploaded_at).toLocaleString("ko-KR")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => setExpandedId(isExpanded ? null : upload.id)}
-                        leadingIcon={isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      >
-                        {isExpanded ? "접기" : "분석 보기"}
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="xs"
-                        onClick={() => handleDelete(upload.id)}
-                        loading={deleting === upload.id}
-                        leadingIcon={<Trash2 size={14} />}
-                      >
-                        삭제
-                      </Button>
+      {loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-8 h-8 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+      ) : uploads.length === 0 ? (
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center text-[#62666D]">
+          업로드된 데이터가 없습니다.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {uploads.map((upload) => {
+            const isExpanded = expandedId === upload.id;
+            const analysis = parseAnalysis(upload.ai_analysis);
+
+            return (
+              <div key={upload.id} className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+                <div className="px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileSpreadsheet size={20} className="text-[#27A644]" />
+                    <div>
+                      <p className="font-medium text-[#F7F8F8]">{upload.original_filename}</p>
+                      <p className="text-sm text-[#8A8F98]">
+                        {upload.record_count}건 | {new Date(upload.uploaded_at).toLocaleString("ko-KR")}
+                      </p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : upload.id)}
+                      className="p-2 rounded-lg hover:bg-[#141516]/5 text-[#8A8F98]"
+                    >
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(upload.id)}
+                      disabled={deleting === upload.id}
+                      className="p-2 rounded-lg hover:bg-[#EB5757]/10 text-[#EB5757] disabled:opacity-50"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
 
-                  {isExpanded && analysis && (
-                    <div className="px-5 pb-5 border-t border-[var(--border-1)] pt-4 space-y-3">
-                      <Card tone="ghost" className="border-[var(--info-border)] bg-[var(--info-bg)]">
-                        <p className="text-[var(--fs-caption)] text-[var(--brand-400)] whitespace-pre-wrap">{analysis.summary}</p>
-                      </Card>
-
-                      {analysis.duplicates.length > 0 && (
-                        <div>
-                          <p className="text-[var(--fs-body)] font-medium text-[var(--text-1)] mb-2 flex items-center gap-1.5">
-                            <AlertTriangle size={14} className="text-[var(--danger-fg)]" />
-                            중복{" "}
-                            <Badge tone="danger" size="xs">{analysis.duplicates.length}건</Badge>
-                          </p>
-                          <div className="space-y-1.5">
-                            {analysis.duplicates.map((d, i) => (
-                              <p key={i} className="text-[var(--fs-caption)] text-[var(--danger-fg)] pl-5">{d.details}</p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {analysis.warnings.length > 0 && (
-                        <div>
-                          <p className="text-[var(--fs-body)] font-medium text-[var(--text-1)] mb-2 flex items-center gap-1.5">
-                            주의사항{" "}
-                            <Badge tone="warning" size="xs">{analysis.warnings.length}건</Badge>
-                          </p>
-                          <div className="space-y-1">
-                            {analysis.warnings.slice(0, 10).map((w, i) => (
-                              <p key={i} className="text-[var(--fs-caption)] text-[var(--warning-fg)] pl-5">{w.message}</p>
-                            ))}
-                            {analysis.warnings.length > 10 && (
-                              <p className="text-[var(--fs-caption)] text-[var(--text-3)] pl-5">...외 {analysis.warnings.length - 10}건</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                {isExpanded && analysis && (
+                  <div className="px-5 pb-5 border-t border-[#23252A] pt-4 space-y-3">
+                    <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-lg p-3">
+                      <p className="text-sm text-[#828FFF] whitespace-pre-wrap">{analysis.summary}</p>
                     </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </Section>
-    </>
+
+                    {analysis.duplicates.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-[#F7F8F8] mb-1 flex items-center gap-1">
+                          <AlertTriangle size={14} className="text-[#EB5757]" />
+                          중복 {analysis.duplicates.length}건
+                        </p>
+                        {analysis.duplicates.map((d, i) => (
+                          <p key={i} className="text-sm text-[#EB5757] ml-5">{d.details}</p>
+                        ))}
+                      </div>
+                    )}
+
+                    {analysis.warnings.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-[#F7F8F8] mb-1">
+                          주의사항 {analysis.warnings.length}건
+                        </p>
+                        {analysis.warnings.slice(0, 10).map((w, i) => (
+                          <p key={i} className="text-sm text-[#F0BF00] ml-5">{w.message}</p>
+                        ))}
+                        {analysis.warnings.length > 10 && (
+                          <p className="text-sm text-[#62666D] ml-5">...외 {analysis.warnings.length - 10}건</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

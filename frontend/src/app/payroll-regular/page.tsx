@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Calculator, Download, AlertTriangle } from "lucide-react";
-import { calculatePayroll, exportPayrollExcel } from "@/lib/api";
+import { Calculator, Download, Loader2, AlertTriangle } from "lucide-react";
 import {
-  PageHeader, Card, CardHeader, Badge, Button, Field, Select, EmptyState, Stat, useToast,
-} from "@/components/ui";
+  calculatePayroll,
+  exportPayrollExcel,
+} from "@/lib/api";
 
 interface PayrollResult {
   name: string;
@@ -33,14 +33,15 @@ interface GrandTotal {
 }
 
 const CATEGORIES = ["정규직"];
+
 const fmt = new Intl.NumberFormat("ko-KR");
 
+/** Returns true when overtime hours exceed the legal daily limit (12h) or total regular hours suggest data error (>200h/month). */
 function isAnomalous(r: PayrollResult): boolean {
   return r.overtime_hours > 12 || r.regular_hours > 200;
 }
 
 export default function PayrollRegularPage() {
-  const toast = useToast();
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [results, setResults] = useState<PayrollResult[]>([]);
@@ -58,7 +59,16 @@ export default function PayrollRegularPage() {
         (r: PayrollResult) => CATEGORIES.includes(r.category)
       );
       setResults(filtered);
-      const total: GrandTotal = { workers: filtered.length, base_pay: 0, overtime_pay: 0, night_pay: 0, weekly_holiday_pay: 0, total_pay: 0 };
+
+      // Build grand total from filtered set
+      const total: GrandTotal = {
+        workers: filtered.length,
+        base_pay: 0,
+        overtime_pay: 0,
+        night_pay: 0,
+        weekly_holiday_pay: 0,
+        total_pay: 0,
+      };
       filtered.forEach((r) => {
         total.base_pay += r.base_pay;
         total.overtime_pay += r.overtime_pay;
@@ -87,7 +97,7 @@ export default function PayrollRegularPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      toast.error(err.message || "엑셀 다운로드에 실패했습니다.");
+      alert(err.message || "엑셀 다운로드에 실패했습니다.");
     } finally {
       setExporting(false);
     }
@@ -98,104 +108,138 @@ export default function PayrollRegularPage() {
   const maxPay = results.length > 0 ? Math.max(...results.map((r) => r.total_pay)) : 1;
 
   return (
-    <div className="space-y-6 fade-in">
-      <PageHeader
-        eyebrow="노무비"
-        title="현장 정규직 노무비 관리"
-        description="현장 정규직 근무자의 노무비를 관리합니다."
-      />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+            <Calculator size={28} className="text-[#7070FF]" />
+            현장 정규직 노무비 관리
+          </h1>
+          <p className="text-sm text-[#8A8F98] mt-1">
+            현장 정규직 근무자의 노무비를 관리합니다.
+          </p>
+        </div>
+      </div>
 
-      <Card>
+      {/* Controls */}
+      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] px-6 py-4">
         <div className="flex items-center gap-4 flex-wrap">
-          <Field label="연도">
-            <Select
-              inputSize="sm"
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-[#D0D6E0]">연도</label>
+            <select
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
-              className="w-24"
+              className="border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
             >
               {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
                 <option key={y} value={y}>{y}년</option>
               ))}
-            </Select>
-          </Field>
-          <Field label="월">
-            <Select
-              inputSize="sm"
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-[#D0D6E0]">월</label>
+            <select
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
-              className="w-20"
+              className="border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
             >
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                 <option key={m} value={m}>{m}월</option>
               ))}
-            </Select>
-          </Field>
-          <div className="self-end">
-            <Button variant="primary" leadingIcon={<Calculator size={14} />} loading={loading} onClick={handleCalculate}>
-              계산
-            </Button>
+            </select>
           </div>
+          <button
+            onClick={handleCalculate}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Calculator size={16} />}
+            {loading ? "계산 중..." : "계산"}
+          </button>
           {results.length > 0 && (
-            <div className="self-end">
-              <Button variant="secondary" leadingIcon={<Download size={14} />} loading={exporting} onClick={handleExport}>
-                엑셀 다운로드
-              </Button>
-            </div>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#27A644] text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {exporting ? "다운로드 중..." : "엑셀 다운로드"}
+            </button>
           )}
         </div>
-      </Card>
+      </div>
 
       {calcError && (
-        <div className="p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] text-[var(--fs-caption)] text-[var(--danger-fg)]">
+        <div className="p-3 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg text-sm text-[#EB5757]">
           {calcError}
         </div>
       )}
 
+      {/* Summary Cards */}
       {grandTotal && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <Stat label="총 인원" value={grandTotal.workers} unit="명" tone="neutral" />
-          <Stat label="기본급" value={fmt.format(grandTotal.base_pay)} unit="원" tone="brand" />
-          <Stat label="연장수당" value={fmt.format(grandTotal.overtime_pay)} unit="원" tone="warning" />
-          <Stat label="야간수당" value={fmt.format(grandTotal.night_pay)} unit="원" tone="info" />
-          <Stat label="총 노무비" value={fmt.format(grandTotal.total_pay)} unit="원" tone="success" />
+          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-4 text-center">
+            <p className="text-2xl font-bold text-[#F7F8F8]">{grandTotal.workers}</p>
+            <p className="text-xs text-[#8A8F98] mt-1">총 인원</p>
+          </div>
+          <div className="bg-[#5E6AD2]/10 rounded-xl border border-[#5E6AD2]/30 shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-4 text-center">
+            <p className="text-lg font-bold text-[#828FFF]">{fmt.format(grandTotal.base_pay)}</p>
+            <p className="text-xs text-[#7070FF] mt-1">기본급</p>
+          </div>
+          <div className="bg-[#F0BF00]/10 rounded-xl border border-[#F0BF00]/30 shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-4 text-center">
+            <p className="text-lg font-bold text-[#F0BF00]">{fmt.format(grandTotal.overtime_pay)}</p>
+            <p className="text-xs text-[#F0BF00] mt-1">연장수당</p>
+          </div>
+          <div className="bg-[#5E6AD2]/10 rounded-xl border border-[#5E6AD2]/30 shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-4 text-center">
+            <p className="text-lg font-bold text-[#828FFF]">{fmt.format(grandTotal.night_pay)}</p>
+            <p className="text-xs text-[#7070FF] mt-1">야간수당</p>
+          </div>
+          <div className="bg-[#27A644]/10 rounded-xl border border-[#27A644]/30 shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-4 text-center">
+            <p className="text-xl font-bold text-[#27A644]">{fmt.format(grandTotal.total_pay)}</p>
+            <p className="text-xs text-[#27A644] mt-1">총 노무비</p>
+          </div>
         </div>
       )}
 
+      {/* Bar Chart — plain CSS, no library */}
       {results.length > 0 && (
-        <Card className="hover-lift">
-          <CardHeader title="개인별 노무비 현황" className="mb-4" />
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
+          <h3 className="text-sm font-semibold text-[#D0D6E0] mb-4">개인별 노무비 현황</h3>
           <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
             {sortedResults.map((r, i) => (
-              <div key={`chart-${i}`} className="flex items-center gap-3 text-[var(--fs-caption)]">
-                <span className="w-16 text-[var(--text-2)] font-medium truncate shrink-0">{r.name}</span>
-                <div className="flex-1 bg-[var(--bg-3)] rounded-full h-5 relative overflow-hidden">
+              <div key={`chart-${i}`} className="flex items-center gap-3 text-xs">
+                <span className="w-16 text-[#D0D6E0] font-medium truncate shrink-0">{r.name}</span>
+                <div className="flex-1 bg-[#141516] rounded-full h-5 relative overflow-hidden">
                   <div
-                    className="bg-[var(--brand-500)] rounded-full h-5 flex items-center justify-end pr-2 transition-all"
+                    className="bg-[#5E6AD2]/100 rounded-full h-5 flex items-center justify-end pr-2 transition-all"
                     style={{ width: `${Math.max((r.total_pay / maxPay) * 100, 5)}%` }}
                   >
-                    <span className="text-[10px] text-white font-medium whitespace-nowrap tabular">
+                    <span className="text-[10px] text-white font-medium whitespace-nowrap">
                       {fmt.format(r.total_pay)}
                     </span>
                   </div>
                 </div>
-                <span className="w-12 text-right shrink-0 font-medium text-[var(--brand-400)]">{r.category}</span>
+                <span className="w-12 text-right shrink-0 font-medium text-[#7070FF]">
+                  {r.category}
+                </span>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       )}
 
+      {/* Anomaly Detection */}
       {anomalies.length > 0 && (
-        <Card tone="ghost" className="border-[var(--danger-border)] bg-[var(--danger-bg)]">
-          <h3 className="text-[var(--fs-body)] font-semibold text-[var(--danger-fg)] mb-3 flex items-center gap-2">
-            <AlertTriangle size={16} />
+        <div className="bg-[#EB5757]/10 rounded-xl border border-[#EB5757]/30 shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
+          <h3 className="text-sm font-semibold text-[#EB5757] mb-3 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-[#EB5757]" />
             이상 감지 ({anomalies.length}건)
           </h3>
           <div className="space-y-2">
             {anomalies.map((r, i) => (
-              <div key={`anomaly-${i}`} className="flex items-start gap-2 text-[var(--fs-caption)] text-[var(--danger-fg)]">
-                <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+              <div key={`anomaly-${i}`} className="flex items-start gap-2 text-xs text-[#EB5757]">
+                <AlertTriangle size={12} className="text-[#EB5757] mt-0.5 shrink-0" />
                 <p>
                   <span className="font-semibold">{r.name}</span>
                   {" — "}
@@ -206,73 +250,92 @@ export default function PayrollRegularPage() {
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       )}
 
+      {/* Results Table */}
       {results.length > 0 && (
-        <Card padding="none" className="overflow-hidden hover-lift">
-          <div className="px-5 py-3 border-b border-[var(--border-1)]">
-            <CardHeader
-              title={`${year}년 ${month}월 노무비 계산 결과`}
-              subtitle={`총 ${grandTotal?.workers ?? 0}명 | 총 노무비: ${fmt.format(grandTotal?.total_pay ?? 0)}원`}
-            />
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#23252A]">
+            <h2 className="text-lg font-semibold text-[#F7F8F8]">
+              {year}년 {month}월 노무비 계산 결과
+            </h2>
+            <p className="text-sm text-[#8A8F98] mt-1">
+              총 {grandTotal?.workers ?? 0}명 | 총 노무비: {fmt.format(grandTotal?.total_pay ?? 0)}원
+            </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-[var(--fs-body)]">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[var(--bg-canvas)] border-b border-[var(--border-1)]">
-                  {['이름','구분','근무일','정규시간','연장시간','야간시간','시급','기본급','연장수당','야간수당','주휴수당','총 노무비'].map(h => (
-                    <th key={h} className={`px-4 py-2.5 text-eyebrow whitespace-nowrap ${['근무일','정규시간','연장시간','야간시간','시급','기본급','연장수당','야간수당','주휴수당','총 노무비'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
-                  ))}
+                <tr className="bg-[#08090A] border-b border-[#23252A]">
+                  <th className="text-left px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">이름</th>
+                  <th className="text-left px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">구분</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">근무일</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">정규시간</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">연장시간</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">야간시간</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">시급</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">기본급</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">연장수당</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">야간수당</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">주휴수당</th>
+                  <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">총 노무비</th>
                 </tr>
               </thead>
               <tbody>
                 {results.map((r, i) => (
                   <tr
                     key={`row-${i}`}
-                    className={`border-b border-[var(--border-1)] transition-colors ${isAnomalous(r) ? "bg-[var(--danger-bg)]" : "hover:bg-[var(--bg-2)]/40"}`}
+                    className={`border-b border-[#23252A] hover:bg-[#141516]/5 ${isAnomalous(r) ? "bg-[#EB5757]/10 hover:bg-[#EB5757]/15" : ""}`}
                   >
-                    <td className="px-4 py-3 font-medium text-[var(--text-1)] whitespace-nowrap">{r.name}</td>
+                    <td className="px-4 py-3 font-medium text-[#F7F8F8] whitespace-nowrap">{r.name}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <Badge tone="brand" size="sm">{r.category}</Badge>
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-[#5E6AD2]/10 text-[#828FFF]">
+                        {r.category}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{r.work_days}</td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{r.regular_hours}</td>
-                    <td className={`px-4 py-3 text-right tabular font-medium ${r.overtime_hours > 12 ? "text-[var(--danger-fg)]" : "text-[var(--text-2)]"}`}>
+                    <td className="px-4 py-3 text-right text-[#D0D6E0]">{r.work_days}</td>
+                    <td className="px-4 py-3 text-right text-[#D0D6E0]">{r.regular_hours}</td>
+                    <td className={`px-4 py-3 text-right font-medium ${r.overtime_hours > 12 ? "text-[#EB5757]" : "text-[#D0D6E0]"}`}>
                       {r.overtime_hours}
                     </td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{r.night_hours}</td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{fmt.format(r.hourly_rate)}</td>
-                    <td className="px-4 py-3 text-right tabular font-medium text-[var(--text-1)]">{fmt.format(r.base_pay)}</td>
-                    <td className="px-4 py-3 text-right tabular font-medium text-[var(--warning-fg)]">{fmt.format(r.overtime_pay)}</td>
-                    <td className="px-4 py-3 text-right tabular font-medium text-[var(--brand-400)]">{fmt.format(r.night_pay)}</td>
-                    <td className="px-4 py-3 text-right tabular font-medium text-[var(--success-fg)]">{fmt.format(r.weekly_holiday_pay || 0)}</td>
-                    <td className="px-4 py-3 text-right tabular font-bold text-[var(--brand-400)] whitespace-nowrap">{fmt.format(r.total_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#D0D6E0]">{r.night_hours}</td>
+                    <td className="px-4 py-3 text-right text-[#D0D6E0]">{fmt.format(r.hourly_rate)}</td>
+                    <td className="px-4 py-3 text-right text-[#F7F8F8] font-medium">{fmt.format(r.base_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#FC7840] font-medium">{fmt.format(r.overtime_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#7070FF] font-medium">{fmt.format(r.night_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#27A644] font-medium">{fmt.format(r.weekly_holiday_pay || 0)}</td>
+                    <td className="px-4 py-3 text-right text-[#828FFF] font-bold whitespace-nowrap">{fmt.format(r.total_pay)}</td>
                   </tr>
                 ))}
               </tbody>
               {grandTotal && (
                 <tfoot>
-                  <tr className="bg-[var(--brand-500)]/10 border-t-2 border-[var(--brand-500)]/30 font-bold">
-                    <td className="px-4 py-3 text-[var(--brand-400)]" colSpan={7}>합계 ({grandTotal.workers}명)</td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--text-1)]">{fmt.format(grandTotal.base_pay)}</td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--warning-fg)]">{fmt.format(grandTotal.overtime_pay)}</td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--brand-400)]">{fmt.format(grandTotal.night_pay)}</td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--success-fg)]">{fmt.format(grandTotal.weekly_holiday_pay || 0)}</td>
-                    <td className="px-4 py-3 text-right tabular text-[var(--brand-400)] whitespace-nowrap">{fmt.format(grandTotal.total_pay)}</td>
+                  <tr className="bg-[#5E6AD2]/10 border-t-2 border-[#5E6AD2]/30 font-bold">
+                    <td className="px-4 py-3 text-[#828FFF]" colSpan={7}>
+                      합계 ({grandTotal.workers}명)
+                    </td>
+                    <td className="px-4 py-3 text-right text-[#F7F8F8]">{fmt.format(grandTotal.base_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#FC7840]">{fmt.format(grandTotal.overtime_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#828FFF]">{fmt.format(grandTotal.night_pay)}</td>
+                    <td className="px-4 py-3 text-right text-[#27A644]">{fmt.format(grandTotal.weekly_holiday_pay || 0)}</td>
+                    <td className="px-4 py-3 text-right text-[#828FFF] whitespace-nowrap">{fmt.format(grandTotal.total_pay)}</td>
                   </tr>
                 </tfoot>
               )}
             </table>
           </div>
-        </Card>
+        </div>
       )}
 
+      {/* Empty state */}
       {!loading && results.length === 0 && !calcError && (
-        <EmptyState
-          icon={<Calculator className="w-7 h-7" />}
-          title="연도와 월을 선택한 후 계산 버튼을 눌러주세요."
-        />
+        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-12 text-center">
+          <Calculator size={48} className="mx-auto mb-4 text-[#62666D]" />
+          <p className="text-[#8A8F98] text-sm">
+            연도와 월을 선택한 후 "계산" 버튼을 눌러주세요.
+          </p>
+        </div>
       )}
     </div>
   );

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { Badge, Input } from "@/components/ui";
 
 interface Worker {
   id: number;
@@ -58,16 +57,16 @@ function ReportContent() {
   }, [load]);
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
-      <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-400)]" />
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+      <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
     </div>
   );
 
   if (!data || !data.totals) return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
       <div className="text-center">
-        <p className="text-[var(--fs-lg)] font-semibold text-[var(--text-2)]">데이터 없음</p>
-        <p className="text-[var(--fs-body)] text-[var(--text-3)] mt-1">{dateParam} 발송된 설문이 없습니다.</p>
+        <p className="text-lg font-semibold text-[#D0D6E0]">데이터 없음</p>
+        <p className="text-sm text-[#8A8F98] mt-1">{dateParam} 발송된 설문이 없습니다.</p>
       </div>
     </div>
   );
@@ -96,39 +95,33 @@ function ReportContent() {
     try { return new Date(t).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }); } catch { return null; }
   };
 
-  const statusTone = (s: string): "success" | "warning" | "danger" => {
-    if (s === 'completed') return 'success';
-    if (s === 'clock_in') return 'warning';
-    return 'danger';
-  };
-  const statusLabel = (s: string) => {
-    if (s === 'completed') return '퇴근';
-    if (s === 'clock_in') return '출근';
-    return '미출근';
+  const statusStyle = (s: string) => {
+    if (s === 'completed') return { bg: 'bg-[#27A644]', text: 'text-white', label: '퇴근' };
+    if (s === 'clock_in') return { bg: 'bg-[#F0BF00]/100', text: 'text-white', label: '출근' };
+    return { bg: 'bg-[#EB5757]', text: 'text-white', label: '미출근' };
   };
 
   const rate = displayTotals.total > 0 ? Math.round(((displayTotals.clocked_in + displayTotals.completed) / displayTotals.total) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-canvas)] fade-in">
+    <div className="min-h-screen bg-[#08090A]">
       {/* Header */}
-      <div className="bg-[var(--brand-600)] border-b border-[var(--brand-700)] text-white px-4 pt-6 pb-8">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 pt-6 pb-8">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-[var(--fs-h4)] font-bold tracking-[var(--tracking-tight)]">알바(사업소득)/파견 출퇴근 현황 리포트</h1>
-              <p className="text-[var(--brand-200)] text-[var(--fs-caption)] mt-1 tabular">{lastUpdated} 업데이트 · 30초 자동 갱신</p>
+              <h1 className="text-xl font-bold">알바(사업소득)/파견 출퇴근 현황 리포트</h1>
+              <p className="text-blue-200 text-xs mt-1">{lastUpdated} 업데이트 · 30초 자동 갱신</p>
             </div>
-            <Input
+            <input
               type="date"
-              inputSize="sm"
               value={dateParam}
               onChange={(e) => setDateParam(e.target.value)}
-              className="bg-[var(--brand-500)]/40 border-[var(--brand-400)]/40 text-white w-36"
+              className="px-2 py-1 rounded-lg text-sm bg-[#4EA7FC]/30 border border-blue-400/40 text-white focus:outline-none"
             />
           </div>
 
-          {/* Circle rate */}
+          {/* Big circle rate */}
           <div className="flex items-center justify-center mt-5">
             <div className="relative w-28 h-28">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
@@ -139,8 +132,8 @@ function ReportContent() {
                   strokeDasharray={`${rate}, 100`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold tabular">{rate}%</span>
-                <span className="text-[var(--fs-micro)] text-[var(--brand-200)]">출근률</span>
+                <span className="text-2xl font-bold">{rate}%</span>
+                <span className="text-[10px] text-blue-200">출근률</span>
               </div>
             </div>
           </div>
@@ -151,20 +144,20 @@ function ReportContent() {
         {/* Summary Cards */}
         <div className="grid grid-cols-4 gap-2">
           {[
-            { key: "all" as const, count: displayTotals.total, label: "전체", activeBorder: "border-[var(--border-3)]" },
-            { key: "clock_in" as const, count: displayTotals.clocked_in, label: "출근중", activeBorder: "border-[var(--warning-border)]" },
-            { key: "completed" as const, count: displayTotals.completed, label: "퇴근", activeBorder: "border-[var(--success-border)]" },
-            { key: "sent" as const, count: displayTotals.not_clocked_in, label: "미출근", activeBorder: "border-[var(--danger-border)]" },
+            { key: "all" as const, count: displayTotals.total, label: "전체", border: "border-[#23252A]" },
+            { key: "clock_in" as const, count: displayTotals.clocked_in, label: "출근중", border: "border-amber-300" },
+            { key: "completed" as const, count: displayTotals.completed, label: "퇴근", border: "border-green-300" },
+            { key: "sent" as const, count: displayTotals.not_clocked_in, label: "미출근", border: "border-red-300" },
           ].map(card => (
             <button
               key={card.key}
               onClick={() => setFilter(card.key)}
-              className={`bg-[var(--bg-1)] rounded-[var(--r-lg)] border-2 p-3 text-center transition-all hover-lift ${
-                filter === card.key ? card.activeBorder + ' shadow-[var(--elev-2)] scale-[1.02]' : 'border-[var(--border-1)]'
+              className={`bg-[#0F1011] rounded-xl border-2 p-3 text-center transition-all ${
+                filter === card.key ? card.border + ' shadow-[0px_1px_3px_rgba(0,0,0,0.2)] scale-[1.02]' : 'border-[#23252A]'
               }`}
             >
-              <p className="text-xl font-bold text-[var(--text-1)] tabular">{card.count}</p>
-              <p className="text-[var(--fs-micro)] text-[var(--text-3)] mt-0.5">{card.label}</p>
+              <p className="text-xl font-bold text-[#F7F8F8]">{card.count}</p>
+              <p className="text-[10px] text-[#8A8F98] mt-0.5">{card.label}</p>
             </button>
           ))}
         </div>
@@ -174,10 +167,8 @@ function ReportContent() {
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
             <button
               onClick={() => setDeptFilter("all")}
-              className={`shrink-0 px-3 py-1.5 rounded-[var(--r-pill)] text-[var(--fs-caption)] font-medium transition-all ${
-                deptFilter === "all"
-                  ? "bg-[var(--brand-500)] text-white"
-                  : "bg-[var(--bg-1)] text-[var(--text-3)] border border-[var(--border-1)]"
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                deptFilter === "all" ? "bg-[#5E6AD2] text-white" : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A]"
               }`}
             >
               전체
@@ -186,10 +177,8 @@ function ReportContent() {
               <button
                 key={dept}
                 onClick={() => setDeptFilter(dept)}
-                className={`shrink-0 px-3 py-1.5 rounded-[var(--r-pill)] text-[var(--fs-caption)] font-medium transition-all ${
-                  deptFilter === dept
-                    ? "bg-[var(--brand-500)] text-white"
-                    : "bg-[var(--bg-1)] text-[var(--text-3)] border border-[var(--border-1)]"
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  deptFilter === dept ? "bg-purple-600 text-white" : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A]"
                 }`}
               >
                 {dept}
@@ -198,70 +187,71 @@ function ReportContent() {
           </div>
         )}
 
-        {/* Worker List */}
+        {/* Worker List - Mobile Card Style */}
         <div className="space-y-2">
-          <p className="text-[var(--fs-caption)] text-[var(--text-3)] px-1">
-            {filter === 'all' ? '전체' : filter === 'sent' ? '미출근' : filter === 'clock_in' ? '출근중' : '퇴근완료'} <span className="tabular">{filteredWorkers.length}</span>명
+          <p className="text-xs text-[#8A8F98] px-1">
+            {filter === 'all' ? '전체' : filter === 'sent' ? '미출근' : filter === 'clock_in' ? '출근중' : '퇴근완료'} {filteredWorkers.length}명
           </p>
 
           {filteredWorkers.length === 0 ? (
-            <div className="bg-[var(--bg-1)] rounded-[var(--r-lg)] border border-[var(--border-1)] p-8 text-center">
-              <p className="text-[var(--fs-body)] text-[var(--text-4)]">해당 상태의 근무자가 없습니다.</p>
+            <div className="bg-[#0F1011] rounded-xl p-8 text-center">
+              <p className="text-sm text-[#62666D]">해당 상태의 근무자가 없습니다.</p>
             </div>
           ) : (
-            filteredWorkers.map((w) => (
-              <div key={w.id} className="bg-[var(--bg-1)] rounded-[var(--r-lg)] border border-[var(--border-1)] p-3.5 shadow-[var(--elev-1)] hover-lift">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-[var(--r-pill)] flex items-center justify-center shrink-0
-                      ${w.status === 'completed' ? 'bg-[var(--success-bg)]' : w.status === 'clock_in' ? 'bg-[var(--warning-bg)]' : 'bg-[var(--danger-bg)]'}`}>
-                      <span className={`text-[var(--fs-caption)] font-bold
-                        ${w.status === 'completed' ? 'text-[var(--success-fg)]' : w.status === 'clock_in' ? 'text-[var(--warning-fg)]' : 'text-[var(--danger-fg)]'}`}>
-                        {statusLabel(w.status).charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-[var(--text-1)] text-[var(--fs-body)]">{w.worker_name_ko || w.phone}</p>
-                      {w.phone && (
-                        <a href={`tel:${w.phone}`} className="text-[11px] text-[var(--brand-400)] font-medium">{w.phone}</a>
-                      )}
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {w.department && (
-                          <span className="text-[var(--fs-micro)] px-1.5 py-0.5 bg-[var(--brand-500)]/10 text-[var(--brand-400)] rounded-[var(--r-sm)] font-medium">{w.department}</span>
+            filteredWorkers.map((w) => {
+              const st = statusStyle(w.status);
+              return (
+                <div key={w.id} className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3.5 shadow-[0px_1px_3px_rgba(0,0,0,0.2)]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-full ${st.bg} flex items-center justify-center`}>
+                        <span className={`text-xs font-bold ${st.text}`}>{st.label.charAt(0)}</span>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-[#F7F8F8] text-sm">{w.worker_name_ko || w.phone}</p>
+                        {w.phone && (
+                          <a href={`tel:${w.phone}`} className="text-[11px] text-[#7070FF] font-medium">{w.phone}</a>
                         )}
-                        {w.workplace_name && (
-                          <span className="text-[var(--fs-micro)] text-[var(--text-4)]">{w.workplace_name}</span>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {w.department && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-[#5E6AD2]/10 text-[#7070FF] rounded font-medium">{w.department}</span>
+                          )}
+                          {w.workplace_name && (
+                            <span className="text-[10px] text-[#62666D]">{w.workplace_name}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <span className={`px-2 py-1 rounded-lg text-xs font-bold ${st.bg} ${st.text}`}>
+                      {st.label}
+                    </span>
                   </div>
-                  <Badge tone={statusTone(w.status)} size="sm">{statusLabel(w.status)}</Badge>
-                </div>
 
-                {(w.clock_in_time || w.clock_out_time || w.planned_clock_in) && (
-                  <div className="mt-2.5 pt-2.5 border-t border-[var(--border-1)] flex gap-4 text-[var(--fs-caption)]">
-                    <div>
-                      <span className="text-[var(--text-4)]">출근</span>
-                      <p className="font-semibold text-[var(--text-1)] mt-0.5 tabular">
-                        {formatTime(w.clock_in_time) || "-"}
-                        {w.planned_clock_in && <span className="text-[var(--text-4)] font-normal ml-1 tabular">/ {formatPlannedTime(w.planned_clock_in)}</span>}
-                      </p>
+                  {(w.clock_in_time || w.clock_out_time || w.planned_clock_in) && (
+                    <div className="mt-2.5 pt-2.5 border-t border-[#23252A] flex gap-4 text-xs">
+                      <div>
+                        <span className="text-[#62666D]">출근</span>
+                        <p className="font-semibold text-[#F7F8F8] mt-0.5">
+                          {formatTime(w.clock_in_time) || "-"}
+                          {w.planned_clock_in && <span className="text-[#62666D] font-normal ml-1">/ {formatPlannedTime(w.planned_clock_in)}</span>}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[#62666D]">퇴근</span>
+                        <p className="font-semibold text-[#F7F8F8] mt-0.5">
+                          {formatTime(w.clock_out_time) || "-"}
+                          {w.planned_clock_out && <span className="text-[#62666D] font-normal ml-1">/ {formatPlannedTime(w.planned_clock_out)}</span>}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[var(--text-4)]">퇴근</span>
-                      <p className="font-semibold text-[var(--text-1)] mt-0.5 tabular">
-                        {formatTime(w.clock_out_time) || "-"}
-                        {w.planned_clock_out && <span className="text-[var(--text-4)] font-normal ml-1 tabular">/ {formatPlannedTime(w.planned_clock_out)}</span>}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
 
-        <p className="text-center text-[var(--fs-micro)] text-[var(--text-4)] mt-4 pb-4">조인앤조인 근태관리</p>
+        <p className="text-center text-[10px] text-[#62666D] mt-4 pb-4">조인앤조인 근태관리</p>
       </div>
     </div>
   );
@@ -270,8 +260,8 @@ function ReportContent() {
 export default function ReportPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-400)]" />
+      <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
       </div>
     }>
       <ReportContent />

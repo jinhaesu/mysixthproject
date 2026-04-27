@@ -2,18 +2,15 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Download, Users } from "lucide-react";
+import { Calculator, Loader2, Download } from "lucide-react";
 import { getConfirmedList, getWorkers } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import ChartCard from "@/components/charts/ChartCard";
 import { getColor } from "@/lib/chartColors";
-import {
-  PageHeader, Card, Stat, Button, Field, Input, EmptyState, CenterSpinner, useToast,
-  Table, THead, TBody, TR, TH, TD, Toolbar,
-} from "@/components/ui";
 
 const krFmt = new Intl.NumberFormat('ko-KR');
+
 const fmt = new Intl.NumberFormat('ko-KR');
 
 const HOLIDAYS: Record<number, string[]> = {
@@ -42,7 +39,6 @@ const normType = (t: string | null | undefined): string => {
 };
 
 export default function SettlementDispatchPage() {
-  const toast = useToast();
   const [authorized, setAuthorized] = useState(false);
   const [yearMonth, setYearMonth] = usePersistedState("sd_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any>(null);
@@ -55,6 +51,7 @@ export default function SettlementDispatchPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // confirmed-list + workers 직접 조회 → 로컬 정산 계산 (정규직 오분류 버그 우회)
       const [workersResp, confList] = await Promise.all([
         getWorkers({ limit: '10000' }).catch(() => ({ workers: [] })),
         getConfirmedList(yearMonth, ''),
@@ -151,7 +148,7 @@ export default function SettlementDispatchPage() {
       const meals: Record<number, number> = {};
       results.forEach((_, i) => { meals[i] = 0; });
       setMealDeductions(meals);
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { alert(e.message); }
     finally { setLoading(false); }
   }, [yearMonth]);
 
@@ -167,6 +164,7 @@ export default function SettlementDispatchPage() {
     return !!body.verified;
   };
 
+  // 30분 단위 내림: 0.1~0.4 → 0, 0.5~0.9 → 0.5
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
 
   const calcEmp = (r: any, idx: number) => {
@@ -176,7 +174,7 @@ export default function SettlementDispatchPage() {
     const basePay = Math.round(r.regular_hours * hourlyRate);
     const overtimePay = Math.round(otHours * hourlyRate * 1.5);
     const holidayPay = Math.round(holHours * hourlyRate * 1.5);
-    const nightPay = Math.round(nightHours * hourlyRate * 1.5);
+    const nightPay = Math.round(nightHours * hourlyRate * 1.5); // 야간시간은 기본에서 분리됨, 1.5배
     const whPay = Math.round(r.weekly_holiday_hours * hourlyRate);
     const grossPay = basePay + overtimePay + holidayPay + nightPay + whPay;
     const meal = mealDeductions[idx] || 0;
@@ -203,53 +201,53 @@ export default function SettlementDispatchPage() {
   if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
 
   return (
-    <div className="min-w-0 space-y-4 fade-in">
-      <PageHeader
-        eyebrow="정산"
-        title="파견 정산관리"
-        description="수당 계산: 시급 × 1.5배 | 30분 단위 내림 | 주5일 이하 휴일근무→수당 없음 | 공휴일→휴일수당 | 야간(22~06시)→연장수당"
-        actions={
-          rows.length > 0 ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              leadingIcon={<Download size={14} />}
-              onClick={() => {
-                const header = ['이름','근무일','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','국민연금','건강보험','산재보험','고용보험','장기요양','보험계','수수료','VAT','최종액'];
-                const csvRows = rows.map((r: any) => [r.name,r.work_days,r.regular_hours,r.overtime_hours,r.night_hours||0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.np,r.hi,r.ia,r.ei,r.ltc,r.ins,r.fee,r.vat,r.total]);
-                const csv = [header,...csvRows].map(r => r.join(',')).join('\n');
-                const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
-                const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`파견정산_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
-              }}
-            >
-              엑셀 다운로드
-            </Button>
-          ) : undefined
-        }
-      />
-
-      <Toolbar>
-        <Field label="연월">
-          <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
-        </Field>
-        <Field label="시간당 급여">
-          <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" />
-        </Field>
-        <Field label="파견수수료 (%)">
-          <Input type="number" inputSize="sm" step="0.1" value={feeRate} onChange={e => setFeeRate(parseFloat(e.target.value) || 0)} className="w-20" />
-        </Field>
-        <div className="flex gap-2 items-end pb-0.5">
-          <Button size="sm" variant="ghost" onClick={() => setCheckedEmps(new Set(results.map((_: any, i: number) => i)))}>전체 선택</Button>
-          <Button size="sm" variant="ghost" onClick={() => setCheckedEmps(new Set())}>전체 해제</Button>
+    <div className="min-w-0">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
+          <Calculator className="w-6 h-6 text-[#7070FF]" />
+          파견 정산관리
+        </h1>
+        <div className="mt-2 bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-lg px-3 py-2 text-xs text-[#828FFF]">
+          <b>수당 계산 기준:</b> 시급 × 1.5배 | <b>30분 단위 내림</b> (0.1~0.4h→0, 0.5h=30분) | 주5일 이하 휴일근무→휴일수당 없음 | 주5일 초과+휴일→휴일수당 | 공휴일→무조건 휴일수당 | 야간(22~06시)→연장수당
         </div>
-      </Toolbar>
+      </div>
+
+      <div className="bg-[#0F1011] rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연월</label>
+          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">시간당 급여</label>
+          <input type="number" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[#8A8F98] mb-1">파견수수료 (%)</label>
+          <input type="number" step="0.1" value={feeRate} onChange={e => setFeeRate(parseFloat(e.target.value) || 0)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-20" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setCheckedEmps(new Set(results.map((_: any, i: number) => i)))} className="px-3 py-2 bg-[#141516] text-[#D0D6E0] rounded-lg text-xs font-medium">전체 선택</button>
+          <button onClick={() => setCheckedEmps(new Set())} className="px-3 py-2 bg-[#141516] text-[#D0D6E0] rounded-lg text-xs font-medium">전체 해제</button>
+        </div>
+        {rows.length > 0 && (
+          <button onClick={() => {
+            const header = ['이름','근무일','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','국민연금','건강보험','산재보험','고용보험','장기요양','보험계','수수료','VAT','최종액'];
+            const csvRows = rows.map((r: any) => [r.name,r.work_days,r.regular_hours,r.overtime_hours,r.night_hours||0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.np,r.hi,r.ia,r.ei,r.ltc,r.ins,r.fee,r.vat,r.total]);
+            const csv = [header,...csvRows].map(r => r.join(',')).join('\n');
+            const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`파견정산_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
+          }} className="px-4 py-2 bg-[#27A644] text-white rounded-lg text-sm font-medium flex items-center gap-1 ml-auto">
+            <Download className="w-4 h-4" /> 엑셀 다운로드
+          </button>
+        )}
+      </div>
 
       {rows.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label="인원" value={rows.length} unit="명" tone="neutral" icon={<Users size={14} />} />
-          <Stat label="급여 합계" value={fmt.format(totals.grossPay)} unit="원" tone="brand" />
-          <Stat label="보험료 합계" value={fmt.format(totals.ins)} unit="원" tone="warning" />
-          <Stat label="최종액 (VAT포함)" value={fmt.format(totals.total)} unit="원" tone="success" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="bg-[#0F1011] rounded-xl border p-3 text-center"><p className="text-xl font-bold">{rows.length}</p><p className="text-xs text-[#8A8F98]">인원</p></div>
+          <div className="bg-[#4EA7FC]/10 rounded-xl border border-[#5E6AD2]/30 p-3 text-center"><p className="text-lg font-bold text-[#828FFF]">{fmt.format(totals.grossPay)}</p><p className="text-xs text-[#7070FF]">급여 합계</p></div>
+          <div className="bg-[#F0BF00]/10 rounded-xl border border-[#F0BF00]/30 p-3 text-center"><p className="text-lg font-bold text-[#F0BF00]">{fmt.format(totals.ins)}</p><p className="text-xs text-[#F0BF00]">보험료 합계</p></div>
+          <div className="bg-[#27A644]/10 rounded-xl border border-[#27A644]/30 p-3 text-center"><p className="text-lg font-bold text-[#27A644]">{fmt.format(totals.total)}</p><p className="text-xs text-[#27A644]">최종액 (VAT포함)</p></div>
         </div>
       )}
 
@@ -263,131 +261,129 @@ export default function SettlementDispatchPage() {
           { name: '수수료', value: totals.fee || 0 },
         ].filter(d => d.value > 0);
         return (
-          <ChartCard title="급여 구성 비율" subtitle="기본급, 수당, 보험료, 수수료 분포" height={260}>
-            <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="70%" label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
-                {pieData.map((_entry, index) => (
-                  <Cell key={index} fill={getColor(index)} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value: number | string | Array<number | string> | undefined) => [`${krFmt.format(Number(value ?? 0))}원`, '']} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-            </PieChart>
-          </ChartCard>
+          <div className="mb-4">
+            <ChartCard title="급여 구성 비율" subtitle="기본급, 수당, 보험료, 수수료 분포" height={260}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="70%" label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
+                  {pieData.map((_entry, index) => (
+                    <Cell key={index} fill={getColor(index)} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number | string | Array<number | string> | undefined) => [`${krFmt.format(Number(value ?? 0))}원`, '']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ChartCard>
+          </div>
         );
       })()}
 
       {loading ? (
-        <CenterSpinner />
+        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" /></div>
       ) : rows.length > 0 ? (
-        <Card padding="none" className="overflow-hidden">
+        <div className="bg-[#0F1011] rounded-xl border overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="text-[10px]">
-              <THead>
-                <TR>
-                  <TH className="w-8">수수료</TH>
-                  <TH>이름</TH>
-                  <TH numeric>일</TH>
-                  <TH numeric>기본h</TH>
-                  <TH numeric>연장h</TH>
-                  <TH numeric>야간h</TH>
-                  <TH numeric>주휴h</TH>
-                  <TH numeric>기본급</TH>
-                  <TH numeric>연장수당</TH>
-                  <TH numeric>야간수당</TH>
-                  <TH numeric>주휴수당</TH>
-                  <TH numeric>급여계</TH>
-                  <TH numeric className="w-20">식대공제</TH>
-                  <TH numeric title="4.75%">국민연금</TH>
-                  <TH numeric title="3.595%">건강보험</TH>
-                  <TH numeric title="1.436%">산재보험</TH>
-                  <TH numeric title="1.15%">고용보험</TH>
-                  <TH numeric title="건강x13.14%">장기요양</TH>
-                  <TH numeric>보험계</TH>
-                  <TH numeric>수수료</TH>
-                  <TH numeric>VAT</TH>
-                  <TH numeric>최종액</TH>
-                </TR>
-                <TR>
-                  <TH colSpan={12}></TH>
-                  <TH numeric className="text-[9px] text-[var(--text-4)]">직접입력</TH>
-                  <TH numeric className="text-[9px] text-[var(--text-4)]">4.75%</TH>
-                  <TH numeric className="text-[9px] text-[var(--text-4)]">3.595%</TH>
-                  <TH numeric className="text-[9px] text-[var(--text-4)]">1.436%</TH>
-                  <TH numeric className="text-[9px] text-[var(--text-4)]">1.15%</TH>
-                  <TH numeric className="text-[9px] text-[var(--text-4)]">건강x13.14%</TH>
-                  <TH colSpan={4}></TH>
-                </TR>
-              </THead>
-              <TBody>
+            <table className="w-full text-[10px]">
+              <thead>
+                <tr className="bg-[#08090A] text-left">
+                  <th className="py-2 px-1.5 w-8">수수료</th>
+                  <th className="py-2 px-1.5">이름</th>
+                  <th className="py-2 px-1.5 text-right">일</th>
+                  <th className="py-2 px-1.5 text-right">기본h</th>
+                  <th className="py-2 px-1.5 text-right">연장h</th>
+                  <th className="py-2 px-1.5 text-right">야간h</th>
+                  <th className="py-2 px-1.5 text-right">주휴h</th>
+                  <th className="py-2 px-1.5 text-right">기본급</th>
+                  <th className="py-2 px-1.5 text-right">연장수당</th>
+                  <th className="py-2 px-1.5 text-right">야간수당</th>
+                  <th className="py-2 px-1.5 text-right">주휴수당</th>
+                  <th className="py-2 px-1.5 text-right">급여계</th>
+                  <th className="py-2 px-1.5 text-right w-20">식대공제</th>
+                  <th className="py-2 px-1.5 text-right" title="4.75%">국민연금</th>
+                  <th className="py-2 px-1.5 text-right" title="3.595%">건강보험</th>
+                  <th className="py-2 px-1.5 text-right" title="1.436%">산재보험</th>
+                  <th className="py-2 px-1.5 text-right" title="1.15%">고용보험</th>
+                  <th className="py-2 px-1.5 text-right" title="건강x13.14%">장기요양</th>
+                  <th className="py-2 px-1.5 text-right">보험계</th>
+                  <th className="py-2 px-1.5 text-right">수수료</th>
+                  <th className="py-2 px-1.5 text-right">VAT</th>
+                  <th className="py-2 px-1.5 text-right font-bold">최종액</th>
+                </tr>
+                <tr className="bg-[#141516] text-[9px] text-[#8A8F98]">
+                  <th colSpan={12}></th>
+                  <th className="px-1.5 text-right">직접입력</th>
+                  <th className="px-1.5 text-right">4.75%</th>
+                  <th className="px-1.5 text-right">3.595%</th>
+                  <th className="px-1.5 text-right">1.436%</th>
+                  <th className="px-1.5 text-right">1.15%</th>
+                  <th className="px-1.5 text-right">건강x13.14%</th>
+                  <th colSpan={4}></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#23252A]">
                 {rows.map((r: any) => (
-                  <TR key={r.idx}>
-                    <TD className="text-center">
+                  <tr key={r.idx} className="hover:bg-[#141516]/5">
+                    <td className="py-1.5 px-1.5 text-center">
                       <input type="checkbox" checked={checkedEmps.has(r.idx)}
                         onChange={e => { const n = new Set(checkedEmps); if (e.target.checked) n.add(r.idx); else n.delete(r.idx); setCheckedEmps(n); }}
-                        className="rounded border-[var(--border-1)]" />
-                    </TD>
-                    <TD emphasis className="whitespace-nowrap">{r.name}</TD>
-                    <TD numeric>{r.work_days}</TD>
-                    <TD numeric>{r.regular_hours}</TD>
-                    <TD numeric className="text-[var(--warning-fg)]">{r.overtime_hours}</TD>
-                    <TD numeric className="text-[var(--brand-400)]">{(r.night_hours || 0).toFixed(1)}</TD>
-                    <TD numeric className="text-[var(--brand-400)]">{r.weekly_holiday_hours}</TD>
-                    <TD numeric>{fmt.format(r.basePay)}</TD>
-                    <TD numeric className="text-[var(--warning-fg)]">{fmt.format(r.overtimePay)}</TD>
-                    <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.nightPay)}</TD>
-                    <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.whPay)}</TD>
-                    <TD numeric emphasis>{fmt.format(r.grossPay)}</TD>
-                    <TD>
-                      <Input type="number" inputSize="sm" value={mealDeductions[r.idx] || ''} onChange={e => setMealDeductions({...mealDeductions, [r.idx]: parseInt(e.target.value) || 0})}
-                        className="w-16 text-right" placeholder="0" />
-                    </TD>
-                    <TD numeric muted>{fmt.format(r.np)}</TD>
-                    <TD numeric muted>{fmt.format(r.hi)}</TD>
-                    <TD numeric muted>{fmt.format(r.ia)}</TD>
-                    <TD numeric muted>{fmt.format(r.ei)}</TD>
-                    <TD numeric muted>{fmt.format(r.ltc)}</TD>
-                    <TD numeric emphasis>{fmt.format(r.ins)}</TD>
-                    <TD numeric className="text-[var(--brand-400)]">{r.fee > 0 ? fmt.format(r.fee) : '-'}</TD>
-                    <TD numeric muted>{fmt.format(r.vat)}</TD>
-                    <TD numeric emphasis className="text-[var(--brand-400)]">{fmt.format(r.total)}</TD>
-                  </TR>
+                        className="rounded border-[#23252A]" />
+                    </td>
+                    <td className="py-1.5 px-1.5 font-medium text-[#F7F8F8] whitespace-nowrap">{r.name}</td>
+                    <td className="py-1.5 px-1.5 text-right">{r.work_days}</td>
+                    <td className="py-1.5 px-1.5 text-right">{r.regular_hours}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#F0BF00]">{r.overtime_hours}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{(r.night_hours || 0).toFixed(1)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{r.weekly_holiday_hours}</td>
+                    <td className="py-1.5 px-1.5 text-right">{fmt.format(r.basePay)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#F0BF00]">{fmt.format(r.overtimePay)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{fmt.format(r.nightPay)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{fmt.format(r.whPay)}</td>
+                    <td className="py-1.5 px-1.5 text-right font-medium">{fmt.format(r.grossPay)}</td>
+                    <td className="py-1.5 px-1.5">
+                      <input type="number" value={mealDeductions[r.idx] || ''} onChange={e => setMealDeductions({...mealDeductions, [r.idx]: parseInt(e.target.value) || 0})}
+                        className="w-16 px-1 py-0.5 border border-[#23252A] rounded text-[10px] text-right" placeholder="0" />
+                    </td>
+                    <td className="py-1.5 px-1.5 text-right text-[#8A8F98]">{fmt.format(r.np)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#8A8F98]">{fmt.format(r.hi)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#8A8F98]">{fmt.format(r.ia)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#8A8F98]">{fmt.format(r.ei)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#8A8F98]">{fmt.format(r.ltc)}</td>
+                    <td className="py-1.5 px-1.5 text-right font-medium">{fmt.format(r.ins)}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#7070FF]">{r.fee > 0 ? fmt.format(r.fee) : '-'}</td>
+                    <td className="py-1.5 px-1.5 text-right text-[#8A8F98]">{fmt.format(r.vat)}</td>
+                    <td className="py-1.5 px-1.5 text-right font-bold text-[#828FFF]">{fmt.format(r.total)}</td>
+                  </tr>
                 ))}
-              </TBody>
+              </tbody>
               <tfoot>
-                <TR className="bg-[var(--info-bg)] border-t-2 border-[var(--info-border)] font-bold text-[10px]">
-                  <TD className="text-[var(--info-fg)]" colSpan={2}>합계 ({rows.length}명)</TD>
-                  <TD numeric>{totals.work_days}</TD>
-                  <TD numeric>{(totals.regular_hours || 0).toFixed(1)}</TD>
-                  <TD numeric>{(totals.overtime_hours || 0).toFixed(1)}</TD>
-                  <TD numeric>{(totals.night_hours || 0).toFixed(1)}</TD>
-                  <TD numeric>{totals.weekly_holiday_hours || 0}</TD>
-                  <TD numeric>{fmt.format(totals.basePay)}</TD>
-                  <TD numeric>{fmt.format(totals.overtimePay)}</TD>
-                  <TD numeric>{fmt.format(totals.nightPay)}</TD>
-                  <TD numeric>{fmt.format(totals.whPay)}</TD>
-                  <TD numeric>{fmt.format(totals.grossPay)}</TD>
-                  <TD numeric className="text-[var(--danger-fg)]">{fmt.format(totals.meal)}</TD>
-                  <TD numeric>{fmt.format(totals.np)}</TD>
-                  <TD numeric>{fmt.format(totals.hi)}</TD>
-                  <TD numeric>{fmt.format(totals.ia)}</TD>
-                  <TD numeric>{fmt.format(totals.ei)}</TD>
-                  <TD numeric>{fmt.format(totals.ltc)}</TD>
-                  <TD numeric>{fmt.format(totals.ins)}</TD>
-                  <TD numeric>{fmt.format(totals.fee)}</TD>
-                  <TD numeric>{fmt.format(totals.vat)}</TD>
-                  <TD numeric className="text-[var(--info-fg)]">{fmt.format(totals.total)}</TD>
-                </TR>
+                <tr className="bg-[#4EA7FC]/10 border-t-2 border-[#5E6AD2]/30 font-bold text-[10px]">
+                  <td className="py-2 px-1.5 text-[#4EA7FC]" colSpan={2}>합계 ({rows.length}명)</td>
+                  <td className="py-2 px-1.5 text-right">{totals.work_days}</td>
+                  <td className="py-2 px-1.5 text-right">{(totals.regular_hours || 0).toFixed(1)}</td>
+                  <td className="py-2 px-1.5 text-right">{(totals.overtime_hours || 0).toFixed(1)}</td>
+                  <td className="py-2 px-1.5 text-right">{(totals.night_hours || 0).toFixed(1)}</td>
+                  <td className="py-2 px-1.5 text-right">{totals.weekly_holiday_hours || 0}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.basePay)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.overtimePay)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.nightPay)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.whPay)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.grossPay)}</td>
+                  <td className="py-2 px-1.5 text-right text-[#EB5757]">{fmt.format(totals.meal)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.np)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.hi)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.ia)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.ei)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.ltc)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.ins)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.fee)}</td>
+                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.vat)}</td>
+                  <td className="py-2 px-1.5 text-right text-[#4EA7FC]">{fmt.format(totals.total)}</td>
+                </tr>
               </tfoot>
-            </Table>
+            </table>
           </div>
-        </Card>
+        </div>
       ) : data ? (
-        <EmptyState
-          icon={<Calculator className="w-7 h-7" />}
-          title="데이터 없음"
-          description="확정된 파견 근태 데이터가 없습니다."
-        />
+        <div className="bg-[#0F1011] rounded-xl border py-16 text-center text-sm text-[#62666D]">확정된 파견 근태 데이터가 없습니다.</div>
       ) : null}
     </div>
   );

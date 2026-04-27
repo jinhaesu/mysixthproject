@@ -567,21 +567,15 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
 
     await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'approved', admin_memo || '', id);
 
-    const reqType: string = request.type || '연차';
-    const isPublicLeave = reqType.includes('공가'); // 공가/오전공가/오후공가
-    const isFullDay = reqType === '연차' || reqType === '공가';
-
-    // Update used_days in balance — 공가는 연차 잔여에서 차감하지 않음
-    if (!isPublicLeave) {
-      const year = parseInt(request.start_date.slice(0, 4));
-      const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
-      if (balance) {
-        await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', request.days, balance.id);
-      }
+    // Update used_days in balance
+    const year = parseInt(request.start_date.slice(0, 4));
+    const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
+    if (balance) {
+      await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', request.days, balance.id);
     }
 
-    // Auto-create confirmed_attendance for full-day leave (연차/공가)
-    if (isFullDay) {
+    // Auto-create confirmed_attendance for full-day vacation (연차)
+    if (!request.type || request.type === '연차') {
       const emp = await dbGet('SELECT name, phone, department FROM regular_employees WHERE id = ?', request.employee_id) as any;
       if (emp) {
         const start = new Date(request.start_date + 'T00:00:00+09:00');
@@ -593,9 +587,9 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
           try {
             await dbRun(`
               INSERT INTO confirmed_attendance (employee_type, employee_name, employee_phone, date, confirmed_clock_in, confirmed_clock_out, source, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo, year_month, department)
-              VALUES ('정규직', ?, ?, ?, '휴가', '휴가', 'vacation', 8, 0, 0, 0, 0, ?, ?, ?)
-              ON CONFLICT (employee_type, employee_name, date) DO UPDATE SET confirmed_clock_in='휴가', confirmed_clock_out='휴가', source='vacation', regular_hours=8, overtime_hours=0, night_hours=0, break_hours=0, memo=EXCLUDED.memo
-            `, emp.name, emp.phone || '', dateStr, reqType, ym, emp.department || '');
+              VALUES ('정규직', ?, ?, ?, '휴가', '휴가', 'vacation', 8, 0, 0, 0, 0, '연차', ?, ?)
+              ON CONFLICT (employee_type, employee_name, date) DO UPDATE SET confirmed_clock_in='휴가', confirmed_clock_out='휴가', source='vacation', regular_hours=8, overtime_hours=0, night_hours=0, break_hours=0, memo='연차'
+            `, emp.name, emp.phone || '', dateStr, ym, emp.department || '');
           } catch {}
         }
       }
@@ -612,11 +606,7 @@ router.put('/vacations/:id/update-type', async (req: AuthRequest, res: Response)
   try {
     const { id } = req.params;
     const { type, days } = req.body;
-    const newType = type || '연차';
-    // 반차/공가의 오전·오후 변형은 자동 0.5일, 그 외는 클라이언트가 보낸 days 또는 1
-    const isHalf = newType.startsWith('오전') || newType.startsWith('오후');
-    const newDays = isHalf ? 0.5 : (days != null ? days : 1);
-    await dbRun('UPDATE regular_vacation_requests SET type = ?, days = ?, updated_at = NOW() WHERE id = ?', newType, newDays, id);
+    await dbRun('UPDATE regular_vacation_requests SET type = ?, days = ?, updated_at = NOW() WHERE id = ?', type || '연차', days || 1, id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -634,35 +624,27 @@ router.put('/vacations/:id/reject', async (req: AuthRequest, res: Response) => {
     const wasApproved = request.status === 'approved';
     await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'rejected', admin_memo || '', id);
 
-    // 이미 승인되었던 휴가를 거절/취소하는 경우: confirmed_attendance 삭제 + (공가가 아닌 경우) used_days 차감
+    // 이미 승인되었던 연차를 거절/취소하는 경우: confirmed_attendance 삭제 + used_days 차감
     if (wasApproved) {
-      const reqType: string = request.type || '연차';
-      const isPublicLeave = reqType.includes('공가');
-      const isFullDay = reqType === '연차' || reqType === '공가';
-
-      if (isFullDay) {
-        const emp = await dbGet('SELECT name FROM regular_employees WHERE id = ?', request.employee_id) as any;
-        if (emp) {
-          const start = new Date(request.start_date + 'T00:00:00+09:00');
-          const end = new Date(request.end_date + 'T00:00:00+09:00');
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-            try {
-              await dbRun(
-                `DELETE FROM confirmed_attendance WHERE employee_type = '정규직' AND employee_name = ? AND date = ? AND source = 'vacation'`,
-                emp.name, dateStr
-              );
-            } catch {}
-          }
+      const emp = await dbGet('SELECT name FROM regular_employees WHERE id = ?', request.employee_id) as any;
+      if (emp) {
+        const start = new Date(request.start_date + 'T00:00:00+09:00');
+        const end = new Date(request.end_date + 'T00:00:00+09:00');
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          try {
+            await dbRun(
+              `DELETE FROM confirmed_attendance WHERE employee_type = '정규직' AND employee_name = ? AND date = ? AND source = 'vacation'`,
+              emp.name, dateStr
+            );
+          } catch {}
         }
       }
-      // used_days 차감 — 공가는 차감하지 않았으므로 환원도 하지 않음
-      if (!isPublicLeave) {
-        const year = parseInt(request.start_date.slice(0, 4));
-        const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
-        if (balance) {
-          await dbRun('UPDATE regular_vacation_balances SET used_days = GREATEST(used_days - ?, 0), updated_at = NOW() WHERE id = ?', request.days, balance.id);
-        }
+      // used_days 차감
+      const year = parseInt(request.start_date.slice(0, 4));
+      const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
+      if (balance) {
+        await dbRun('UPDATE regular_vacation_balances SET used_days = GREATEST(used_days - ?, 0), updated_at = NOW() WHERE id = ?', request.days, balance.id);
       }
     }
 

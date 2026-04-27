@@ -262,17 +262,16 @@ router.get('/home-stats', async (req: AuthRequest, res: Response) => {
     let vacationCount = 0;
     let halfDayCount  = 0;
 
-    const isHalfTypeStr = (t: string) => t.startsWith('오전') || t.startsWith('오후');
     for (const v of vacFromConfirmed) {
       if (vacNames.has(v.employee_name)) continue;
       vacNames.add(v.employee_name);
-      if (isHalfTypeStr(v.memo || '')) halfDayCount++;
+      if ((v.memo || '').includes('반차')) halfDayCount++;
       else vacationCount++;
     }
     for (const v of vacFromRequests) {
       if (vacNames.has(v.employee_name)) continue;
       vacNames.add(v.employee_name);
-      if (isHalfTypeStr(v.type || '')) halfDayCount++;
+      if ((v.type || '').includes('반차')) halfDayCount++;
       else vacationCount++;
     }
 

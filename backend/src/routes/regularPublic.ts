@@ -38,32 +38,26 @@ router.post('/:token/vacation', async (req: Request, res: Response) => {
       return;
     }
 
-    const reqType = type || '연차';
-    // 공가(민방위/예비군/투표 등 법정 유급 공가)는 연차 잔여에서 차감하지 않음 → 잔여 검증 생략
-    const isPublicLeave = reqType.includes('공가');
+    // Check remaining balance
+    const year = parseInt(start_date.slice(0, 4));
+    const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employee.id, year) as any;
+    const remaining = balance ? (parseFloat(balance.total_days) - parseFloat(balance.used_days)) : 0;
 
-    if (!isPublicLeave) {
-      // Check remaining balance (연차/반차만)
-      const year = parseInt(start_date.slice(0, 4));
-      const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employee.id, year) as any;
-      const remaining = balance ? (parseFloat(balance.total_days) - parseFloat(balance.used_days)) : 0;
+    // Count pending requests too
+    const pendingResult = await dbGet(
+      "SELECT COALESCE(SUM(days), 0) as pending_days FROM regular_vacation_requests WHERE employee_id = ? AND status = 'pending' AND start_date LIKE ?",
+      employee.id, `${year}%`
+    ) as any;
+    const pendingDays = parseFloat(pendingResult?.pending_days || 0);
 
-      // Count pending requests too (공가는 제외)
-      const pendingResult = await dbGet(
-        "SELECT COALESCE(SUM(days), 0) as pending_days FROM regular_vacation_requests WHERE employee_id = ? AND status = 'pending' AND start_date LIKE ? AND COALESCE(type, '연차') NOT LIKE '%공가%'",
-        employee.id, `${year}%`
-      ) as any;
-      const pendingDays = parseFloat(pendingResult?.pending_days || 0);
-
-      if (parseFloat(days) > (remaining - pendingDays)) {
-        res.status(400).json({ error: `잔여 휴가가 부족합니다. (잔여: ${remaining - pendingDays}일)` });
-        return;
-      }
+    if (parseFloat(days) > (remaining - pendingDays)) {
+      res.status(400).json({ error: `잔여 휴가가 부족합니다. (잔여: ${remaining - pendingDays}일)` });
+      return;
     }
 
     await dbRun(
       'INSERT INTO regular_vacation_requests (employee_id, start_date, end_date, days, reason, type) VALUES (?, ?, ?, ?, ?, ?)',
-      employee.id, start_date, end_date, days, reason || '', reqType
+      employee.id, start_date, end_date, days, reason || '', type || '연차'
     );
 
     res.json({ success: true, message: '휴가 신청이 완료되었습니다. 관리자 승인을 기다려주세요.' });

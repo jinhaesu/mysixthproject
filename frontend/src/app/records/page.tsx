@@ -4,11 +4,14 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getRecords, getFilters } from "@/lib/api";
 import type { AttendanceRecord, FilterOptions } from "@/types/attendance";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ClipboardList } from "lucide-react";
+import {
+  PageHeader, Card, Badge, Button, Field, Select, Input, EmptyState, CenterSpinner, Toolbar,
+} from "@/components/ui";
 
 function RecordsContent() {
   const searchParams = useSearchParams();
-  const pageType = searchParams.get("type") || ""; // "regular" or "dispatch" or ""
+  const pageType = searchParams.get("type") || "";
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [filters, setFilters] = useState<FilterOptions | null>(null);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 0 });
@@ -64,158 +67,153 @@ function RecordsContent() {
   }
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-[#F7F8F8] mb-2">기록 조회</h2>
-      <p className="text-[#8A8F98] mb-8">전체 근태 기록을 필터링하여 조회합니다.</p>
+    <div className="space-y-4 fade-in">
+      <PageHeader
+        eyebrow="근태"
+        title="기록 조회"
+        description="전체 근태 기록을 필터링하여 조회합니다."
+      />
 
-      {/* Filters */}
-      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-4 mb-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-[#8A8F98] mb-1">시작일</label>
-            <input
-              type="date"
-              onChange={(e) => handleFilterChange("startDate", e.target.value)}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-[#8A8F98] mb-1">종료일</label>
-            <input
-              type="date"
-              onChange={(e) => handleFilterChange("endDate", e.target.value)}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-[#8A8F98] mb-1">이름 검색</label>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#62666D]" />
-              <input
-                type="text"
-                value={nameSearch}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setNameSearch(val);
-                  if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
-                  nameDebounceRef.current = setTimeout(() => {
-                    handleFilterChange("name", val);
-                  }, 400);
-                }}
-                placeholder="이름을 입력하세요"
-                className="w-full border border-[#23252A] rounded-lg pl-8 pr-3 py-2 text-sm"
-                list="name-suggestions"
-              />
-              <datalist id="name-suggestions">
-                {filters?.names.map((n) => (
-                  <option key={n} value={n} />
-                ))}
-              </datalist>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-[#8A8F98] mb-1">구분</label>
-            <select
-              onChange={(e) => handleFilterChange("category", e.target.value)}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">전체</option>
-              {filters?.categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-[#8A8F98] mb-1">부서</label>
-            <select
-              onChange={(e) => handleFilterChange("department", e.target.value)}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">전체</option>
-              {filters?.departments.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-[#8A8F98] mb-1">근무지</label>
-            <select
-              onChange={(e) => handleFilterChange("workplace", e.target.value)}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">전체</option>
-              {filters?.workplaces.map((w) => (
-                <option key={w} value={w}>{w}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      <Toolbar>
+        <Field label="시작일">
+          <Input
+            type="date"
+            inputSize="sm"
+            onChange={(e) => handleFilterChange("startDate", e.target.value)}
+            className="w-36"
+          />
+        </Field>
+        <Field label="종료일">
+          <Input
+            type="date"
+            inputSize="sm"
+            onChange={(e) => handleFilterChange("endDate", e.target.value)}
+            className="w-36"
+          />
+        </Field>
+        <Field label="이름 검색">
+          <Input
+            type="text"
+            inputSize="sm"
+            value={nameSearch}
+            iconLeft={<Search size={13} />}
+            onChange={(e) => {
+              const val = e.target.value;
+              setNameSearch(val);
+              if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
+              nameDebounceRef.current = setTimeout(() => {
+                handleFilterChange("name", val);
+              }, 400);
+            }}
+            placeholder="이름을 입력하세요"
+            className="w-40"
+            list="name-suggestions"
+          />
+          <datalist id="name-suggestions">
+            {filters?.names.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label="구분">
+          <Select
+            inputSize="sm"
+            onChange={(e) => handleFilterChange("category", e.target.value)}
+            className="w-28"
+          >
+            <option value="">전체</option>
+            {filters?.categories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="부서">
+          <Select
+            inputSize="sm"
+            onChange={(e) => handleFilterChange("department", e.target.value)}
+            className="w-28"
+          >
+            <option value="">전체</option>
+            {filters?.departments.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="근무지">
+          <Select
+            inputSize="sm"
+            onChange={(e) => handleFilterChange("workplace", e.target.value)}
+            className="w-28"
+          >
+            <option value="">전체</option>
+            {filters?.workplaces.map((w) => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+          </Select>
+        </Field>
+      </Toolbar>
 
-      {/* Table */}
-      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+      <Card padding="none" className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#08090A] border-b border-[#23252A]">
-                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">날짜</th>
-                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">이름</th>
-                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">출근</th>
-                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">퇴근</th>
-                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">구분</th>
-                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">부서</th>
-                <th className="text-left px-4 py-3 font-medium text-[#D0D6E0]">근무지</th>
-                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">총시간</th>
-                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">정규</th>
-                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">연장</th>
-                <th className="text-right px-4 py-3 font-medium text-[#D0D6E0]">휴게</th>
-                <th className="text-center px-4 py-3 font-medium text-[#D0D6E0]">연차</th>
+          <table className="w-full text-[13px] tabular border-separate border-spacing-0">
+            <thead className="sticky top-0 z-[1]">
+              <tr className="bg-[var(--bg-2)] border-b border-[var(--border-1)]">
+                {['날짜','이름','출근','퇴근'].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)] border-b border-[var(--border-1)] whitespace-nowrap">{h}</th>
+                ))}
+                <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)] border-b border-[var(--border-1)] whitespace-nowrap">구분</th>
+                {['부서','근무지'].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)] border-b border-[var(--border-1)] whitespace-nowrap">{h}</th>
+                ))}
+                {['총시간','정규','연장','휴게'].map(h => (
+                  <th key={h} className="text-right px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)] border-b border-[var(--border-1)] whitespace-nowrap">{h}</th>
+                ))}
+                <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)] border-b border-[var(--border-1)] whitespace-nowrap">연차</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-12 text-[#62666D]">
-                    <div className="w-6 h-6 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin mx-auto" />
+                  <td colSpan={12} className="py-16">
+                    <CenterSpinner />
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="text-center py-12 text-[#62666D]">
+                  <td colSpan={12} className="py-16 text-center text-[var(--text-4)]">
                     데이터가 없습니다.
                   </td>
                 </tr>
               ) : (
                 records.map((r) => (
-                  <tr key={r.id} className="border-b border-[#23252A] hover:bg-[#141516]/5">
-                    <td className="px-4 py-3 text-[#F7F8F8]">{r.date}</td>
-                    <td className="px-4 py-3 font-medium text-[#F7F8F8]">{r.name}</td>
-                    <td className="px-4 py-3 text-[#8A8F98]">{r.clock_in}</td>
-                    <td className="px-4 py-3 text-[#8A8F98]">{r.clock_out}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                        r.category === "정규직"
-                          ? "bg-[#4EA7FC]/15 text-[#828FFF]"
-                          : "bg-[#FC7840]/15 text-[#FC7840]"
-                      }`}>
+                  <tr key={r.id} className="border-b border-[var(--border-1)] hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-3 text-[var(--text-1)] border-b border-[var(--border-1)]">{r.date}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--text-1)] border-b border-[var(--border-1)]">{r.name}</td>
+                    <td className="px-4 py-3 text-[var(--text-3)] border-b border-[var(--border-1)]">{r.clock_in}</td>
+                    <td className="px-4 py-3 text-[var(--text-3)] border-b border-[var(--border-1)]">{r.clock_out}</td>
+                    <td className="px-4 py-3 border-b border-[var(--border-1)]">
+                      <Badge
+                        tone={r.category === "정규직" ? "brand" : "warning"}
+                        size="sm"
+                      >
                         {r.category}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-4 py-3 text-[#8A8F98]">{r.department}</td>
-                    <td className="px-4 py-3 text-[#8A8F98]">{r.workplace}</td>
-                    <td className="text-right px-4 py-3 text-[#F7F8F8] tabular-nums">{r.total_hours.toFixed(1)}</td>
-                    <td className="text-right px-4 py-3 text-[#8A8F98] tabular-nums">{r.regular_hours.toFixed(1)}</td>
-                    <td className="text-right px-4 py-3 tabular-nums">
-                      <span className={r.overtime_hours > 0 ? "text-[#EB5757] font-medium" : "text-[#62666D]"}>
+                    <td className="px-4 py-3 text-[var(--text-3)] border-b border-[var(--border-1)]">{r.department}</td>
+                    <td className="px-4 py-3 text-[var(--text-3)] border-b border-[var(--border-1)]">{r.workplace}</td>
+                    <td className="text-right px-4 py-3 text-[var(--text-1)] tabular border-b border-[var(--border-1)]">{r.total_hours.toFixed(1)}</td>
+                    <td className="text-right px-4 py-3 text-[var(--text-3)] tabular border-b border-[var(--border-1)]">{r.regular_hours.toFixed(1)}</td>
+                    <td className="text-right px-4 py-3 tabular border-b border-[var(--border-1)]">
+                      <span className={r.overtime_hours > 0 ? "text-[var(--danger-fg)] font-medium" : "text-[var(--text-4)]"}>
                         {r.overtime_hours.toFixed(1)}
                       </span>
                     </td>
-                    <td className="text-right px-4 py-3 text-[#8A8F98] tabular-nums">{r.break_time.toFixed(1)}</td>
-                    <td className="text-center px-4 py-3">
+                    <td className="text-right px-4 py-3 text-[var(--text-3)] tabular border-b border-[var(--border-1)]">{r.break_time.toFixed(1)}</td>
+                    <td className="text-center px-4 py-3 border-b border-[var(--border-1)]">
                       {r.annual_leave === "O" ? (
-                        <span className="bg-[#27A644]/15 text-[#27A644] px-2 py-0.5 rounded text-xs font-medium">O</span>
+                        <Badge tone="success" size="sm">O</Badge>
                       ) : (
-                        <span className="text-[#62666D]">-</span>
+                        <span className="text-[var(--text-4)]">-</span>
                       )}
                     </td>
                   </tr>
@@ -225,42 +223,53 @@ function RecordsContent() {
           </table>
         </div>
 
-        {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#23252A]">
-            <span className="text-sm text-[#8A8F98]">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-1)] bg-[var(--bg-1)]">
+            <span className="text-[var(--fs-caption)] text-[var(--text-3)]">
               총 {pagination.total.toLocaleString()}건 중 {(pagination.page - 1) * pagination.limit + 1}-
               {Math.min(pagination.page * pagination.limit, pagination.total)}건
             </span>
-            <div className="flex items-center gap-2">
-              <button
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="xs"
+                leadingIcon={<ChevronLeft size={14} />}
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="p-2 rounded-lg hover:bg-[#141516]/5 disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-sm text-[#D0D6E0]">
+                이전
+              </Button>
+              <span className="text-[var(--fs-caption)] text-[var(--text-2)] px-2 tabular">
                 {pagination.page} / {pagination.totalPages}
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="xs"
+                trailingIcon={<ChevronRight size={14} />}
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={pagination.page >= pagination.totalPages}
-                className="p-2 rounded-lg hover:bg-[#141516]/5 disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <ChevronRight size={16} />
-              </button>
+                다음
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
+
+      {!loading && records.length === 0 && (
+        <EmptyState
+          icon={<ClipboardList className="w-7 h-7" />}
+          title="기록 없음"
+          description="선택한 조건에 해당하는 기록이 없습니다."
+        />
+      )}
     </div>
   );
 }
 
 export default function RecordsPage() {
   return (
-    <Suspense fallback={<div className="py-20 text-center text-[#62666D]">로딩 중...</div>}>
+    <Suspense fallback={<CenterSpinner />}>
       <RecordsContent />
     </Suspense>
   );

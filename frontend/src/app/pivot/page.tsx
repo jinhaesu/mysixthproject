@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { getPivotData } from "@/lib/api";
 import type { PivotData } from "@/types/attendance";
+import { BarChart2 } from "lucide-react";
+import {
+  PageHeader, Card, CardHeader, Button, Field, Select, Input, EmptyState, CenterSpinner,
+} from "@/components/ui";
 
-// Match Excel column names: 이름, 부서, 근무층, 고용형태, 근무시간대, 날짜, 연차 사용여부
 const FIELD_LABELS: Record<string, string> = {
   name: "이름",
   department: "부서",
@@ -15,7 +18,6 @@ const FIELD_LABELS: Record<string, string> = {
   annual_leave: "연차 사용여부",
 };
 
-// Match Excel column names: 총 근무시간, 정규시간, 연장시간, 야간시간, 휴게시간
 const VALUE_LABELS: Record<string, string> = {
   total_hours: "총 근무시간",
   regular_hours: "정규시간",
@@ -71,117 +73,112 @@ export default function PivotPage() {
   }
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-[#F7F8F8] mb-2">피벗 테이블</h2>
-      <p className="text-[#8A8F98] mb-8">조건을 설정하여 데이터를 교차분석합니다.</p>
+    <div className="space-y-4 fade-in">
+      <PageHeader
+        eyebrow="분석"
+        title="피벗 테이블"
+        description="조건을 설정하여 데이터를 교차분석합니다."
+        actions={
+          <Button variant="primary" size="sm" leadingIcon={<BarChart2 size={14} />} onClick={loadPivot} loading={loading}>
+            분석 실행
+          </Button>
+        }
+      />
 
-      {/* Config */}
-      <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-5 mb-6">
+      <Card>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[#D0D6E0] mb-1">행 (Row)</label>
-            <select
+          <Field label="행 (Row)">
+            <Select
+              inputSize="sm"
               value={config.rowField}
               onChange={(e) => setConfig((c) => ({ ...c, rowField: e.target.value }))}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             >
               {Object.entries(FIELD_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[#D0D6E0] mb-1">열 (Column)</label>
-            <select
+            </Select>
+          </Field>
+          <Field label="열 (Column)">
+            <Select
+              inputSize="sm"
               value={config.colField}
               onChange={(e) => setConfig((c) => ({ ...c, colField: e.target.value }))}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             >
               {Object.entries(FIELD_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[#D0D6E0] mb-1">값 (Value)</label>
-            <select
+            </Select>
+          </Field>
+          <Field label="값 (Value)">
+            <Select
+              inputSize="sm"
               value={config.valueField}
               onChange={(e) => setConfig((c) => ({ ...c, valueField: e.target.value }))}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             >
               {Object.entries(VALUE_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[#D0D6E0] mb-1">집계 함수</label>
-            <select
+            </Select>
+          </Field>
+          <Field label="집계 함수">
+            <Select
+              inputSize="sm"
               value={config.aggFunc}
               onChange={(e) => setConfig((c) => ({ ...c, aggFunc: e.target.value }))}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             >
               {Object.entries(AGG_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[#D0D6E0] mb-1">시작일</label>
-            <input
+            </Select>
+          </Field>
+          <Field label="시작일">
+            <Input
               type="date"
+              inputSize="sm"
               value={config.startDate}
               onChange={(e) => setConfig((c) => ({ ...c, startDate: e.target.value }))}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[#D0D6E0] mb-1">종료일</label>
-            <input
+          </Field>
+          <Field label="종료일">
+            <Input
               type="date"
+              inputSize="sm"
               value={config.endDate}
               onChange={(e) => setConfig((c) => ({ ...c, endDate: e.target.value }))}
-              className="w-full border border-[#23252A] rounded-lg px-3 py-2 text-sm"
             />
-          </div>
+          </Field>
         </div>
-        <button
-          onClick={loadPivot}
-          className="mt-4 bg-[#5E6AD2] text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-[#828FFF] transition-colors"
-        >
-          분석 실행
-        </button>
-      </div>
+      </Card>
 
-      {error && <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-4 text-[#EB5757] text-sm mb-6">{error}</div>}
+      {error && (
+        <div className="p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] text-[var(--fs-caption)] text-[var(--danger-fg)]">
+          {error}
+        </div>
+      )}
 
-      {/* Pivot Table */}
       {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="w-8 h-8 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin" />
-        </div>
+        <CenterSpinner />
       ) : pivotData && pivotData.data.length > 0 ? (
-        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
-          <div className="px-5 py-3 bg-[#08090A] border-b border-[#23252A] flex items-center justify-between">
-            <span className="text-sm font-medium text-[#D0D6E0]">
-              {FIELD_LABELS[pivotData.rowField] || pivotData.rowField} x {FIELD_LABELS[pivotData.colField] || pivotData.colField} |{" "}
-              {AGG_LABELS[pivotData.aggFunc] || pivotData.aggFunc}({VALUE_LABELS[pivotData.valueField] || pivotData.valueField})
-            </span>
-            <span className="text-sm text-[#8A8F98]">{pivotData.data.length}행</span>
+        <Card padding="none" className="overflow-hidden">
+          <div className="px-5 py-3 bg-[var(--bg-canvas)] border-b border-[var(--border-1)] flex items-center justify-between">
+            <CardHeader
+              title={`${FIELD_LABELS[pivotData.rowField] || pivotData.rowField} × ${FIELD_LABELS[pivotData.colField] || pivotData.colField} | ${AGG_LABELS[pivotData.aggFunc] || pivotData.aggFunc}(${VALUE_LABELS[pivotData.valueField] || pivotData.valueField})`}
+            />
+            <span className="text-[var(--fs-caption)] text-[var(--text-3)]">{pivotData.data.length}행</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[#08090A] border-b border-[#23252A]">
-                  <th className="text-left px-4 py-3 font-medium text-[#D0D6E0] sticky left-0 bg-[#08090A]">
+            <table className="w-full text-[13px] tabular border-separate border-spacing-0">
+              <thead className="sticky top-0 z-[1]">
+                <tr className="bg-[var(--bg-2)] border-b border-[var(--border-1)]">
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)] border-b border-[var(--border-1)] sticky left-0 bg-[var(--bg-2)]">
                     {FIELD_LABELS[pivotData.rowField] || pivotData.rowField}
                   </th>
                   {pivotData.columns.map((col) => (
-                    <th key={col} className="text-right px-4 py-3 font-medium text-[#D0D6E0]">
+                    <th key={col} className="text-right px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-3)] border-b border-[var(--border-1)] whitespace-nowrap">
                       {col || "미분류"}
                     </th>
                   ))}
-                  <th className="text-right px-4 py-3 font-semibold text-[#F7F8F8] bg-[#4EA7FC]/10">합계</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-1)] border-b border-[var(--border-1)] bg-[var(--info-bg)]">합계</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,36 +188,35 @@ export default function PivotPage() {
                     0
                   );
                   return (
-                    <tr key={i} className="border-b border-[#23252A] hover:bg-[#141516]/5">
-                      <td className="px-4 py-3 font-medium text-[#F7F8F8] sticky left-0 bg-[#0F1011]">
+                    <tr key={i} className="border-b border-[var(--border-1)] hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3 font-medium text-[var(--text-1)] sticky left-0 bg-[var(--bg-1)] border-b border-[var(--border-1)]">
                         {row.rowKey || "미분류"}
                       </td>
                       {pivotData.columns.map((col) => (
-                        <td key={col} className="text-right px-4 py-3 text-[#8A8F98] tabular-nums">
+                        <td key={col} className="text-right px-4 py-3 text-[var(--text-3)] tabular border-b border-[var(--border-1)]">
                           {row[col] !== undefined && row[col] !== null ? Number(row[col]).toFixed(1) : "-"}
                         </td>
                       ))}
-                      <td className="text-right px-4 py-3 font-semibold text-[#F7F8F8] bg-[#4EA7FC]/10 tabular-nums">
+                      <td className="text-right px-4 py-3 font-semibold text-[var(--text-1)] bg-[var(--info-bg)] tabular border-b border-[var(--border-1)]">
                         {rowTotal.toFixed(1)}
                       </td>
                     </tr>
                   );
                 })}
-                {/* Column totals */}
-                <tr className="bg-[#4EA7FC]/10 font-semibold">
-                  <td className="px-4 py-3 text-[#F7F8F8] sticky left-0 bg-[#4EA7FC]/10">합계</td>
+                <tr className="bg-[var(--info-bg)] font-semibold border-t-2 border-[var(--info-border)]">
+                  <td className="px-4 py-3 text-[var(--text-1)] sticky left-0 bg-[var(--info-bg)] border-b border-[var(--border-1)]">합계</td>
                   {pivotData.columns.map((col) => {
                     const colTotal = pivotData.data.reduce(
                       (sum, row) => sum + (row[col] || 0),
                       0
                     );
                     return (
-                      <td key={col} className="text-right px-4 py-3 text-[#F7F8F8] tabular-nums">
+                      <td key={col} className="text-right px-4 py-3 text-[var(--text-1)] tabular border-b border-[var(--border-1)]">
                         {colTotal.toFixed(1)}
                       </td>
                     );
                   })}
-                  <td className="text-right px-4 py-3 text-[#F7F8F8] tabular-nums">
+                  <td className="text-right px-4 py-3 text-[var(--text-1)] tabular border-b border-[var(--border-1)]">
                     {pivotData.data
                       .reduce(
                         (total, row) =>
@@ -234,12 +230,14 @@ export default function PivotPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      ) : (
-        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-12 text-center text-[#62666D]">
-          데이터가 없습니다. 먼저 엑셀 파일을 업로드해주세요.
-        </div>
-      )}
+        </Card>
+      ) : pivotData ? (
+        <EmptyState
+          icon={<BarChart2 className="w-7 h-7" />}
+          title="데이터 없음"
+          description="먼저 엑셀 파일을 업로드해주세요."
+        />
+      ) : null}
     </div>
   );
 }

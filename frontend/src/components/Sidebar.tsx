@@ -12,7 +12,6 @@ import {
   Home,
   LogOut,
   Network,
-  Users,
   MessageSquare,
   Activity,
   Calculator,
@@ -25,20 +24,12 @@ import {
   HardHat,
   Lock,
   CalendarCheck,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: any;
-}
-
-interface NavGroup {
-  label: string;
-  icon: any;
-  items: NavItem[];
-}
+interface NavItem { href: string; label: string; icon: any; }
+interface NavGroup { label: string; icon: any; items: NavItem[]; }
 
 const standaloneItems: NavItem[] = [
   { href: "/", label: "홈", icon: Home },
@@ -103,111 +94,126 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    // Auto-open group containing current page
     const open = new Set<string>();
     for (const g of groups) {
-      if (g.items.some((item) => pathname === item.href)) {
-        open.add(g.label);
-      }
+      if (g.items.some((item) => pathname === item.href)) open.add(g.label);
     }
-    // Default: open all groups
-    if (open.size === 0) {
-      groups.forEach((g) => open.add(g.label));
-    }
+    if (open.size === 0) groups.forEach((g) => open.add(g.label));
     return open;
   });
 
   const toggleGroup = (label: string) => {
     setOpenGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
+      next.has(label) ? next.delete(label) : next.add(label);
       return next;
     });
   };
 
-  const renderItem = (item: NavItem) => {
+  const renderItem = (item: NavItem, depth = 0) => {
     const isActive = pathname === item.href;
     const Icon = item.icon;
     return (
       <Link
         key={item.href}
         href={item.href}
-        className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+        className={[
+          "group relative flex items-center gap-2.5 rounded-[var(--r-md)] text-[var(--fs-body)] font-medium transition-colors",
+          depth === 0 ? "px-3 py-2" : "pl-3 pr-3 py-1.5",
           isActive
-            ? "bg-[#5E6AD2]/15 text-[#828FFF]"
-            : "text-[#8A8F98] hover:bg-white/5 hover:text-[#F7F8F8]"
-        }`}
+            ? "text-[var(--text-1)] bg-[var(--bg-2)]"
+            : "text-[var(--text-3)] hover:text-[var(--text-1)] hover:bg-[var(--bg-2)]/60",
+        ].join(" ")}
       >
-        <Icon size={18} />
-        {item.label}
+        {/* Active indicator bar */}
+        {isActive && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-gradient-to-b from-[var(--brand-400)] to-[var(--brand-600)]"
+          />
+        )}
+        <Icon size={depth === 0 ? 16 : 14} className={isActive ? "text-[var(--brand-400)]" : ""} />
+        <span className="truncate">{item.label}</span>
       </Link>
     );
   };
 
   return (
-    <aside className="w-64 bg-[#0F1011] border-r border-[#23252A] fixed h-full z-10 flex flex-col">
-      <div className="p-6 border-b border-[#23252A]">
-        <h1 className="text-xl font-bold text-[#F7F8F8]">근태 관리 시스템</h1>
-        <p className="text-sm text-[#8A8F98] mt-1">Attendance Manager</p>
+    <aside className="w-64 fixed inset-y-0 z-20 flex flex-col bg-[var(--bg-0)]/95 backdrop-blur-md border-r border-[var(--border-1)]">
+      {/* Brand */}
+      <div className="px-5 pt-6 pb-5">
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-8 h-8 rounded-[10px] bg-gradient-to-br from-[var(--brand-400)] to-[var(--brand-700)] flex items-center justify-center shadow-[var(--elev-2)]">
+            <Sparkles size={16} className="text-white" />
+            <div className="absolute inset-0 rounded-[10px] ring-1 ring-white/10" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[var(--fs-base)] font-semibold text-[var(--text-1)] tracking-[var(--tracking-tight)] leading-none">근태 관리</h1>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--text-3)] mt-1">Attendance · Workforce</p>
+          </div>
+        </div>
       </div>
-      <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
-        {/* Standalone top items */}
-        {standaloneItems.map(renderItem)}
 
-        {/* Grouped items */}
+      {/* Nav */}
+      <nav className="px-3 pb-4 space-y-0.5 flex-1 overflow-y-auto">
+        {standaloneItems.map((it) => renderItem(it, 0))}
+
+        <div className="h-3" />
+
         {groups.map((group) => {
           const GroupIcon = group.icon;
           const isOpen = openGroups.has(group.label);
-          const hasActive = group.items.some(
-            (item) => pathname === item.href
-          );
+          const hasActive = group.items.some((item) => pathname === item.href);
           return (
-            <div key={group.label} className="mt-2">
+            <div key={group.label} className="mt-1">
               <button
                 onClick={() => toggleGroup(group.label)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                className={[
+                  "w-full flex items-center gap-2.5 px-3 py-2 rounded-[var(--r-md)]",
+                  "text-[var(--fs-caption)] uppercase tracking-wider font-semibold transition-colors",
                   hasActive
-                    ? "text-[#828FFF]"
-                    : "text-[#D0D6E0] hover:bg-white/5"
-                }`}
+                    ? "text-[var(--text-2)]"
+                    : "text-[var(--text-4)] hover:text-[var(--text-2)]",
+                ].join(" ")}
               >
-                <GroupIcon size={18} />
-                <span className="flex-1 text-left">{group.label}</span>
-                {isOpen ? (
-                  <ChevronDown size={16} />
-                ) : (
-                  <ChevronRight size={16} />
-                )}
+                <GroupIcon size={14} />
+                <span className="flex-1 text-left text-[11px]">{group.label}</span>
+                {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
               {isOpen && (
-                <div className="ml-3 mt-0.5 space-y-0.5 border-l-2 border-[#23252A] pl-2">
-                  {group.items.map(renderItem)}
+                <div className="mt-0.5 space-y-0.5 pl-3 ml-1.5 border-l border-[var(--border-1)]">
+                  {group.items.map((item) => renderItem(item, 1))}
                 </div>
               )}
             </div>
           );
         })}
 
-        {/* Bottom standalone items */}
-        <div className="mt-3 pt-3 border-t border-[#23252A]">
-          {bottomItems.map(renderItem)}
+        <div className="h-3" />
+        <div className="pt-3 mt-1 border-t border-[var(--border-1)] space-y-0.5">
+          {bottomItems.map((it) => renderItem(it, 0))}
         </div>
       </nav>
+
+      {/* User */}
       {user && (
-        <div className="p-4 border-t border-[#23252A]">
-          <div className="px-4 py-2 mb-2">
-            <p className="text-sm font-medium text-[#F7F8F8] truncate">
-              {user.email}
-            </p>
+        <div className="p-3 border-t border-[var(--border-1)] bg-[var(--bg-1)]">
+          <div className="flex items-center gap-2.5 px-2 py-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--bg-3)] flex items-center justify-center text-[var(--brand-400)] text-xs font-semibold ring-1 ring-[var(--border-2)]">
+              {(user.email || "?").slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[var(--fs-caption)] font-medium text-[var(--text-1)] truncate">{user.email}</p>
+              <p className="text-[10px] text-[var(--text-3)]">관리자</p>
+            </div>
+            <button
+              onClick={logout}
+              title="로그아웃"
+              className="p-1.5 rounded-[var(--r-sm)] text-[var(--text-3)] hover:text-[var(--danger-fg)] hover:bg-[var(--danger-bg)] transition-colors"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-[#8A8F98] hover:bg-[#EB5757]/10 hover:text-[#EB5757] transition-colors w-full"
-          >
-            <LogOut size={20} />
-            로그아웃
-          </button>
         </div>
       )}
     </aside>

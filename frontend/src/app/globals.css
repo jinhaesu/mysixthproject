@@ -1,78 +1,384 @@
 @import "tailwindcss";
 
+/* ───────────────────────────────────────────────────────────
+   Design System v2 — Linear-grade dark UI
+   --------------------------------------------------------------
+   1. Surface elevation (bg-0 ~ bg-3) — increasing lightness as
+      cards stack on top of each other.
+   2. Semantic intents (success/warning/danger/info/brand).
+   3. Typography scale (display/h1-h4/body/caption/micro).
+   4. Spacing scale (4-pt grid).
+   5. Motion tokens (durations + easings).
+   6. Elevation (shadows tuned for dark UI).
+   ─────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #08090A;
-  --foreground: #F7F8F8;
-  --color-bg-level-0: #08090A;
-  --color-bg-level-1: #0F1011;
-  --color-bg-level-2: #141516;
-  --color-bg-secondary: #1C1C1F;
-  --color-bg-tertiary: #232326;
+  /* Surfaces (low → high) */
+  --bg-canvas: #08090A;
+  --bg-0: #0B0C0D;
+  --bg-1: #101113;
+  --bg-2: #16181B;
+  --bg-3: #1C1F23;
+  --bg-overlay: rgba(8, 9, 10, 0.72);
+
+  /* Text */
+  --text-1: #F7F8F8;        /* primary */
+  --text-2: #C9CED6;        /* secondary */
+  --text-3: #8A8F98;        /* tertiary / muted */
+  --text-4: #5C6168;        /* placeholder / disabled */
+
+  /* Borders */
+  --border-1: #1F2226;
+  --border-2: #2A2D33;
+  --border-3: #3A3E45;
+  --border-focus: #828FFF;
+
+  /* Brand (indigo / violet) */
+  --brand-50:  #EEF0FF;
+  --brand-200: #C4CAFF;
+  --brand-400: #828FFF;
+  --brand-500: #5E6AD2;
+  --brand-600: #4A55BD;
+  --brand-700: #3942A0;
+
+  /* Semantic intents */
+  --success-fg:  #34D399;
+  --success-bg:  rgba(52, 211, 153, 0.10);
+  --success-border: rgba(52, 211, 153, 0.28);
+
+  --warning-fg:  #F5BB42;
+  --warning-bg:  rgba(245, 187, 66, 0.10);
+  --warning-border: rgba(245, 187, 66, 0.28);
+
+  --danger-fg:   #F87171;
+  --danger-bg:   rgba(248, 113, 113, 0.10);
+  --danger-border: rgba(248, 113, 113, 0.28);
+
+  --info-fg:     #60A5FA;
+  --info-bg:     rgba(96, 165, 250, 0.10);
+  --info-border: rgba(96, 165, 250, 0.28);
+
+  /* Chart palette (color-blind friendly, dark-balanced) */
+  --chart-1: #6E7CFF;
+  --chart-2: #34D399;
+  --chart-3: #F5BB42;
+  --chart-4: #F87171;
+  --chart-5: #C084FC;
+  --chart-6: #22D3EE;
+  --chart-7: #FB923C;
+  --chart-8: #94A3B8;
+
+  /* Typography */
+  --fs-micro:   0.6875rem;  /* 11 */
+  --fs-caption: 0.75rem;    /* 12 */
+  --fs-body:    0.8125rem;  /* 13 */
+  --fs-base:    0.875rem;   /* 14 */
+  --fs-lg:      1rem;       /* 16 */
+  --fs-h4:      1.125rem;   /* 18 */
+  --fs-h3:      1.3125rem;  /* 21 */
+  --fs-h2:      1.625rem;   /* 26 */
+  --fs-h1:      2rem;       /* 32 */
+  --fs-display: 2.625rem;   /* 42 */
+
+  --lh-tight:  1.25;
+  --lh-snug:   1.375;
+  --lh-normal: 1.55;
+
+  --tracking-tight: -0.015em;
+  --tracking-display: -0.025em;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 20px;
+  --r-pill: 999px;
+
+  /* Spacing (4-pt grid; for inline use only — Tailwind handles bulk) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* Elevation — tuned for dark surfaces (very subtle) */
+  --elev-1: 0 1px 0 rgba(255,255,255,0.02), 0 1px 2px rgba(0,0,0,0.40);
+  --elev-2: 0 1px 0 rgba(255,255,255,0.03), 0 4px 8px -2px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.30);
+  --elev-3: 0 1px 0 rgba(255,255,255,0.04), 0 12px 24px -6px rgba(0,0,0,0.55), 0 4px 8px rgba(0,0,0,0.30);
+  --elev-pop: 0 24px 48px -12px rgba(0,0,0,0.65), 0 8px 16px -4px rgba(0,0,0,0.45);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --d-instant: 80ms;
+  --d-fast:    140ms;
+  --d-base:    200ms;
+  --d-slow:    320ms;
+
+  /* Compatibility aliases (legacy code still uses these) */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-1);
+  --color-bg-level-0: var(--bg-canvas);
+  --color-bg-level-1: var(--bg-1);
+  --color-bg-level-2: var(--bg-2);
+  --color-bg-secondary: var(--bg-3);
+  --color-bg-tertiary: var(--bg-3);
   --color-bg-quaternary: #28282C;
-  --color-text-primary: #F7F8F8;
-  --color-text-secondary: #D0D6E0;
-  --color-text-tertiary: #8A8F98;
-  --color-text-quaternary: #62666D;
-  --color-border-primary: #23252A;
-  --color-border-secondary: #34343A;
-  --color-border-tertiary: #3E3E44;
-  --color-brand-bg: #5E6AD2;
+  --color-text-primary: var(--text-1);
+  --color-text-secondary: var(--text-2);
+  --color-text-tertiary: var(--text-3);
+  --color-text-quaternary: var(--text-4);
+  --color-border-primary: var(--border-1);
+  --color-border-secondary: var(--border-2);
+  --color-border-tertiary: var(--border-3);
+  --color-brand-bg: var(--brand-500);
   --color-link-primary: #7070FF;
-  --color-accent-hover: #828FFF;
+  --color-accent-hover: var(--brand-400);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* ────────────────────────────────────────
+   Base
+   ──────────────────────────────────────── */
 html {
   font-size: 14px;
   color-scheme: dark;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  background: var(--bg-canvas);
+  color: var(--text-1);
+  font-family: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: var(--fs-base);
+  line-height: var(--lh-normal);
+  letter-spacing: -0.005em;
+  font-feature-settings: "ss01", "cv01", "cv11"; /* Inter tabular numerals etc. */
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::selection {
-  background: rgba(94, 106, 210, 0.35);
+/* Decorative ambient gradient on the canvas (very subtle) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(80% 60% at 18% -10%, rgba(94,106,210,0.08), transparent 60%),
+    radial-gradient(60% 60% at 92% 110%, rgba(99,102,241,0.05), transparent 60%);
+  z-index: 0;
 }
+
+/* Content sits above ambient bg */
+body > * { position: relative; z-index: 1; }
+
+/* Tabular numerals for stats and tables */
+.tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1; }
+
+::selection { background: rgba(94, 106, 210, 0.35); color: var(--text-1); }
 
 input, textarea, select {
-  background-color: #141516;
-  color: #F7F8F8;
-  border-color: #23252A;
+  background-color: var(--bg-2);
+  color: var(--text-1);
+  border-color: var(--border-2);
 }
 
-input::placeholder, textarea::placeholder {
-  color: #62666D;
-}
+input::placeholder, textarea::placeholder { color: var(--text-4); }
 
 :focus-visible {
-  outline: 2px solid var(--color-brand-bg);
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0F1011;
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #34343A;
-  border-radius: 3px;
+  background: var(--border-2);
+  border-radius: 999px;
+  border: 2px solid var(--bg-canvas);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #3E3E44;
+::-webkit-scrollbar-thumb:hover { background: var(--border-3); }
+
+/* ────────────────────────────────────────
+   Utility primitives
+   ──────────────────────────────────────── */
+
+/* Card surface — used by Card component but exposed for ad-hoc */
+.surface-1 { background: var(--bg-1); border: 1px solid var(--border-1); }
+.surface-2 { background: var(--bg-2); border: 1px solid var(--border-1); }
+
+.divider-x { border-top: 1px solid var(--border-1); }
+.divider-y { border-left: 1px solid var(--border-1); }
+
+/* Subtle pattern for empty states / placeholders */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Skeleton shimmer */
+@keyframes ds-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-2) 0%, var(--bg-3) 40%, var(--bg-2) 80%);
+  background-size: 200% 100%;
+  animation: ds-shimmer 1.6s linear infinite;
+  border-radius: var(--r-md);
+}
+
+@keyframes ds-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: ds-fade-in var(--d-base) var(--ease-out) both; }
+
+@keyframes ds-pulse-dot {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.85); }
+}
+.pulse-dot { animation: ds-pulse-dot 1.4s var(--ease-in-out) infinite; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton, .fade-in, .pulse-dot { animation: none !important; }
+  *, *::before, *::after { transition: none !important; }
+}
+
+/* Focus ring helper for buttons / inputs */
+.ring-focus { transition: box-shadow var(--d-fast) var(--ease-out); }
+.ring-focus:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--bg-canvas),
+    0 0 0 4px var(--brand-400);
+}
+
+/* Soft hover lift */
+.hover-lift {
+  transition:
+    transform var(--d-base) var(--ease-out),
+    box-shadow var(--d-base) var(--ease-out),
+    border-color var(--d-base) var(--ease-out),
+    background-color var(--d-base) var(--ease-out);
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-2);
+  box-shadow: var(--elev-2);
+}
+
+/* Text gradient (for hero headings) */
+.text-gradient-brand {
+  background: linear-gradient(135deg, #FFFFFF 0%, #C4CAFF 50%, #828FFF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ────────────────────────────────────────
+   Typography utility classes
+   ──────────────────────────────────────── */
+.text-display { font-size: var(--fs-display); line-height: 1.04; letter-spacing: var(--tracking-display); font-weight: 600; }
+.text-h1      { font-size: var(--fs-h1);      line-height: 1.12; letter-spacing: var(--tracking-display); font-weight: 600; }
+.text-h2      { font-size: var(--fs-h2);      line-height: 1.18; letter-spacing: var(--tracking-tight);   font-weight: 600; }
+.text-h3      { font-size: var(--fs-h3);      line-height: 1.28; letter-spacing: var(--tracking-tight);   font-weight: 600; }
+.text-h4      { font-size: var(--fs-h4);      line-height: 1.36; letter-spacing: var(--tracking-tight);   font-weight: 600; }
+.text-body-lg { font-size: var(--fs-lg);      line-height: 1.5;  letter-spacing: -0.005em; }
+.text-body    { font-size: var(--fs-base);    line-height: 1.5;  letter-spacing: -0.005em; }
+.text-body-sm { font-size: var(--fs-body);    line-height: 1.5;  letter-spacing: -0.005em; }
+.text-caption { font-size: var(--fs-caption); line-height: 1.4;  letter-spacing: 0; }
+.text-micro   { font-size: var(--fs-micro);   line-height: 1.3;  letter-spacing: 0.01em; }
+.text-eyebrow { font-size: 0.6875rem; line-height: 1.3; letter-spacing: 0.06em; font-weight: 600; text-transform: uppercase; color: var(--text-3); }
+.text-mono    { font-family: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0; }
+
+/* ────────────────────────────────────────
+   Glass / overlay
+   ──────────────────────────────────────── */
+.glass {
+  background: rgba(16, 17, 19, 0.72);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+}
+
+/* Soft inner border on dark cards (1px highlight on top edge) */
+.surface-bevel {
+  position: relative;
+}
+.surface-bevel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent 32%);
+}
+
+/* Brand glow ring (used on focus highlights, status pills) */
+.brand-glow {
+  box-shadow: 0 0 0 1px rgba(94,106,210,0.4), 0 8px 24px -6px rgba(94,106,210,0.5);
+}
+
+/* ────────────────────────────────────────
+   Recharts global theme overrides
+   ──────────────────────────────────────── */
+.recharts-default-tooltip {
+  background: var(--bg-2) !important;
+  border: 1px solid var(--border-2) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--elev-pop) !important;
+  padding: 10px 12px !important;
+}
+.recharts-tooltip-label {
+  color: var(--text-2) !important;
+  font-size: 12px !important;
+  font-weight: 510 !important;
+  margin-bottom: 6px !important;
+  letter-spacing: -0.005em !important;
+}
+.recharts-tooltip-item {
+  color: var(--text-1) !important;
+  font-size: 12px !important;
+  padding: 2px 0 !important;
+}
+.recharts-cartesian-grid line {
+  stroke: var(--border-1);
+}
+.recharts-cartesian-axis-tick-value {
+  fill: var(--text-3);
+  font-size: 11px;
+  letter-spacing: -0.005em;
+}
+.recharts-cartesian-axis-line { stroke: var(--border-2); }
+.recharts-cartesian-axis-tick-line { stroke: transparent; }
+.recharts-legend-item-text { color: var(--text-2) !important; font-size: 12px !important; }
+.recharts-active-dot circle { stroke: var(--bg-canvas); stroke-width: 2; }
+
+/* ────────────────────────────────────────
+   Print
+   ──────────────────────────────────────── */
+@media print {
+  body { background: white; color: black; }
+  body::before { display: none; }
+  .no-print { display: none !important; }
 }

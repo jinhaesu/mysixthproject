@@ -61,8 +61,13 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.0.0',
-    features: { manualAttendance: true }, // 배포 검증용 마커 (manual-attendance 라우트 포함)
+    version: '2.1.0',
+    features: {
+      manualAttendance: true,
+      onboarding: true,
+      offboarding: true,
+      contracts: true,
+    },
   });
 });
 

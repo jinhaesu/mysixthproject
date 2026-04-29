@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   getContractsLatest,
@@ -55,6 +55,14 @@ interface ContractItem {
 }
 
 export default function ContractManagePage() {
+  return (
+    <Suspense fallback={<div className="py-12 flex items-center justify-center text-[var(--text-3)] text-[12.5px]">불러오는 중…</div>}>
+      <ContractManageInner />
+    </Suspense>
+  );
+}
+
+function ContractManageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();

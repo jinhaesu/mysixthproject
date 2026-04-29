@@ -163,7 +163,7 @@ export default function PolicyPage() {
           <Card padding="none">
             <Table>
               <TBody>
-                <TR><TH className="w-44">정규직</TH><TD>생산2층, 생산3층, 물류1층, 생산 야간, 물류 야간</TD></TR>
+                <TR><TH className="w-44">정규직</TH><TD>생산2층, 생산3층, 물류, 생산 야간, 물류 야간</TD></TR>
                 <TR><TH>파견/알바</TH><TD>물류, 생산2층, 생산3층</TD></TR>
               </TBody>
             </Table>

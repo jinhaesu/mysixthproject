@@ -22,7 +22,7 @@ interface HourlyChartProps {
 }
 
 const DEPT_COLORS: Record<string, string> = {
-  "물류1층": "#3b82f6", "물류": "#3b82f6",
+  "물류": "#3b82f6",
   "생산2층": "#10b981", "생산3층": "#f59e0b",
   "생산 야간": "#8b5cf6", "물류 야간": "#6366f1",
   "기타": "#94a3b8",

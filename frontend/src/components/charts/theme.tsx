@@ -39,6 +39,10 @@ export interface ChartTooltipProps {
   labelFormatter?: (label: string | number) => ReactNode;
   unit?: string;
   hideLabel?: boolean;
+  /** Per-item filter — return false to omit. */
+  filter?: (item: TooltipPayloadItem) => boolean;
+  /** Hide all entries whose numeric value is 0. */
+  hideZero?: boolean;
 }
 
 export function ChartTooltip({
@@ -49,8 +53,16 @@ export function ChartTooltip({
   labelFormatter,
   unit,
   hideLabel,
+  filter,
+  hideZero,
 }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
+  const items = payload.filter((p) => {
+    if (hideZero && Number(p.value) === 0) return false;
+    if (filter && !filter(p)) return false;
+    return true;
+  });
+  if (items.length === 0) return null;
   return (
     <div
       className="rounded-[var(--r-lg)] border border-[var(--border-2)] bg-[var(--bg-2)] shadow-[var(--elev-pop)] px-3 py-2 min-w-[120px] max-w-[280px]"
@@ -62,7 +74,7 @@ export function ChartTooltip({
         </div>
       )}
       <div className="flex flex-col gap-1">
-        {payload.map((p, i) => {
+        {items.map((p, i) => {
           const v =
             typeof p.value === "number"
               ? p.value.toLocaleString(undefined, { maximumFractionDigits: 2 })

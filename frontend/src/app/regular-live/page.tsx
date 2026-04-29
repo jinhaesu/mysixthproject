@@ -221,7 +221,7 @@ export default function RegularLivePage() {
         <>
           {/* Hourly Chart */}
           {(() => {
-            const DEPARTMENTS = ["생산2층", "생산3층", "물류1층", "생산 야간", "물류 야간", "카페(해방촌)", "카페(행궁동)", "카페(경복궁)"];
+            const DEPARTMENTS = ["생산2층", "생산3층", "물류", "생산 야간", "물류 야간", "카페(해방촌)", "카페(행궁동)", "카페(경복궁)"];
             const allEmps = (data.departments || []).flatMap((dept: any) => (dept.teams || []).flatMap((team: any) => team.employees || []));
             const inData = allEmps.filter((e) => e.clock_in_time).map((e) => ({
               hour: new Date(e.clock_in_time!).getHours(), count: 1, department: e.department || '기타',

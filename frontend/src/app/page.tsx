@@ -451,7 +451,7 @@ export default function HomePage() {
                 <CartesianGrid {...CHART_GRID_PROPS} />
                 <XAxis dataKey="date" tickFormatter={(d: any) => String(d).slice(8)} {...CHART_AXIS_PROPS} />
                 <YAxis {...CHART_AXIS_PROPS} unit="h" />
-                <Tooltip content={<ChartTooltip unit="h" formatter={(v) => `${fmt(Number(v))}h`} />} />
+                <Tooltip content={<ChartTooltip unit="h" formatter={(v) => `${fmt(Number(v))}h`} filter={(it) => !(it.name === "미지정" && Number(it.value) === 0)} />} />
                 <Legend wrapperStyle={{ fontSize: 10, color: 'var(--text-2)' }} />
                 {deptNames.map((dept: string, i: number) => (
                   <Bar key={dept} dataKey={`dept_${dept}`} name={dept} stackId="a" fill={getDeptColor(dept)} radius={i === deptNames.length - 1 ? [2, 2, 0, 0] : undefined} />

@@ -1,19 +1,22 @@
 /**
  * Onboarding (입사자 관리) API — 정규직 전용
  *
- * GET    /api/onboarding                         — list with completion info
- * GET    /api/onboarding/dashboard               — summary widget
+ * GET    /api/onboarding                             — list with completion info
+ * GET    /api/onboarding/dashboard                   — summary widget
  * GET    /api/onboarding/settings/email-recipients
  * PUT    /api/onboarding/settings/email-recipients
- * GET    /api/onboarding/:id                     — single record + latest contract
- * PATCH  /api/onboarding/:id                     — partial update new fields
- * POST   /api/onboarding/:id/send-email          — send onboarding notification
+ * GET    /api/onboarding/export/insurance.csv        — bulk CSV export (취득신고용)
+ * GET    /api/onboarding/:id                         — single record + latest contract
+ * GET    /api/onboarding/:id/export.csv              — single record CSV
+ * PATCH  /api/onboarding/:id                         — partial update new fields
+ * POST   /api/onboarding/:id/send-email              — send onboarding notification
  */
 
 import { Router, Response } from 'express';
 import { dbGet, dbAll, dbRun } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendOnboardingNotification, OnboardingRecord } from '../services/onboardingEmail';
+import { buildOnboardingCSV, OnboardingRecord as OnboardingCSVRecord } from '../services/insuranceExport';
 
 const router = Router();
 
@@ -277,6 +280,70 @@ router.put('/settings/email-recipients', async (req: AuthRequest, res: Response)
 });
 
 // ---------------------------------------------------------------------------
+// Helper — map regular_employees row to OnboardingCSVRecord
+// ---------------------------------------------------------------------------
+function toOnboardingCSVRecord(emp: any): OnboardingCSVRecord {
+  return {
+    id: emp.id,
+    name: emp.name,
+    id_number: emp.id_number || '',
+    hire_date: emp.hire_date || '',
+    monthly_salary: Number(emp.monthly_salary || 0),
+    job_code: emp.job_code || '',
+    weekly_work_hours: Number(emp.weekly_work_hours || 40),
+    nationality: emp.nationality || 'KR',
+    visa_type: emp.visa_type || '',
+    visa_expiry: emp.visa_expiry || '',
+    phone: emp.phone || '',
+    address: emp.address || '',
+    email: emp.email || '',
+    business_registration_no: emp.business_registration_no || '',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/onboarding/export/insurance.csv  (must come before /:id)
+// ---------------------------------------------------------------------------
+router.get('/export/insurance.csv', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.query as { ids?: string };
+
+    let rows: any[];
+    if (ids && ids.trim()) {
+      const idList = ids
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n));
+      if (idList.length === 0) {
+        res.status(400).json({ error: 'No valid ids provided' });
+        return;
+      }
+      const placeholders = idList.map(() => '?').join(',');
+      rows = await dbAll(
+        `SELECT * FROM regular_employees WHERE is_active = 1 AND id IN (${placeholders})`,
+        ...idList,
+      );
+    } else {
+      // Default: all 'ready' (정보 완료, 미발송) records
+      rows = await dbAll(
+        "SELECT * FROM regular_employees WHERE is_active = 1 AND onboarding_status = 'ready' ORDER BY hire_date DESC",
+      );
+    }
+
+    const csvRecords = rows.map(toOnboardingCSVRecord);
+    const csv = buildOnboardingCSV(csvRecords);
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''%EC%B7%A8%EB%93%9D%EC%8B%A0%EA%B3%A0_${dateStr}.csv`);
+    res.send(csv);
+  } catch (error: any) {
+    console.error('GET /api/onboarding/export/insurance.csv error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/onboarding/:id
 // ---------------------------------------------------------------------------
 router.get('/:id', async (req: AuthRequest, res: Response) => {
@@ -301,6 +368,31 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     res.json({ ...enriched, latest_contract: latestContract || null });
   } catch (error: any) {
     console.error('GET /api/onboarding/:id error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/onboarding/:id/export.csv — single record CSV
+// ---------------------------------------------------------------------------
+router.get('/:id/export.csv', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const emp = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
+    if (!emp) {
+      res.status(404).json({ error: '직원을 찾을 수 없습니다.' });
+      return;
+    }
+
+    const csvRecord = toOnboardingCSVRecord(emp);
+    const csv = buildOnboardingCSV([csvRecord]);
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''%EC%B7%A8%EB%93%9D%EC%8B%A0%EA%B3%A0_${id}_${dateStr}.csv`);
+    res.send(csv);
+  } catch (error: any) {
+    console.error('GET /api/onboarding/:id/export.csv error:', error);
     res.status(500).json({ error: error.message });
   }
 });

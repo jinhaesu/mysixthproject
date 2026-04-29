@@ -35,7 +35,23 @@ import {
   TD,
   useToast,
 } from "@/components/ui";
-import { AlertTriangle, Users, Mail, RefreshCw, Trash2, Save } from "lucide-react";
+import { AlertTriangle, Users, Mail, RefreshCw, Trash2, Save, FileDown, Receipt, Download } from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+async function downloadAuthed(url: string, filename: string) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
 
 const REASON_CODES = [
   { code: "11", label: "11 - 개인사정으로 인한 자진퇴사", hint: "실업급여 X" },
@@ -108,6 +124,7 @@ export default function OffboardingPage() {
   const [detail, setDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingDetail, setSavingDetail] = useState(false);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
 
   const [localDetail, setLocalDetail] = useState<any>(null);
 
@@ -214,8 +231,10 @@ export default function OffboardingPage() {
         annual_leave_pay_final: localDetail.annual_leave_pay_final,
         retirement_income_tax: localDetail.retirement_income_tax,
       });
+      const refreshed = await getOffboarding(detailId);
+      setDetail(refreshed);
+      setLocalDetail((prev: any) => ({ ...prev, ...(refreshed.employee || {}), ...refreshed }));
       toast.success("저장되었습니다.");
-      setDetailId(null);
       loadItems();
       loadDashboard();
     } catch (e: any) {
@@ -243,6 +262,23 @@ export default function OffboardingPage() {
       toast.success("메일이 발송되었습니다.");
     } catch (e: any) {
       toast.error(e.message || "메일 발송 실패");
+    }
+  };
+
+  const handleDownloadCsv = async () => {
+    if (!detailId) return;
+    setDownloadingCsv(true);
+    try {
+      const name = localDetail?.name ?? "퇴직자";
+      const date = (localDetail?.resign_date ?? "").replace(/-/g, "");
+      await downloadAuthed(
+        `${API_URL}/api/offboarding/${detailId}/export.csv`,
+        `상실신고_${name}_${date}.csv`
+      );
+    } catch (e: any) {
+      toast.error(e.message || "CSV 다운로드 실패");
+    } finally {
+      setDownloadingCsv(false);
     }
   };
 
@@ -461,6 +497,32 @@ export default function OffboardingPage() {
           <>
             <Button variant="danger" size="sm" leadingIcon={<Trash2 size={14} />} onClick={handleDeleteDetail}>삭제</Button>
             <Button variant="secondary" size="sm" leadingIcon={<Mail size={14} />} onClick={handleSendEmail}>메일 재발송</Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon={<FileDown size={14} />}
+              onClick={() => detailId && window.open(`/offboarding/print/severance?id=${detailId}`, "_blank")}
+            >
+              퇴직금 산정서 (PDF)
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Receipt size={14} />}
+              onClick={() => detailId && window.open(`/offboarding/print/tax-receipt?id=${detailId}`, "_blank")}
+            >
+              원천징수영수증 (임시본)
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Download size={14} />}
+              loading={downloadingCsv}
+              disabled={downloadingCsv}
+              onClick={handleDownloadCsv}
+            >
+              4INSURE 양식 (CSV)
+            </Button>
             <Button variant="primary" size="sm" leadingIcon={<Save size={14} />} onClick={handleSaveDetail} loading={savingDetail} disabled={savingDetail}>저장</Button>
           </>
         }
@@ -588,6 +650,32 @@ export default function OffboardingPage() {
                   />
                   <small className="text-[var(--text-3)] text-xs mt-0.5 block">정밀 계산은 다음 단계에서 지원 예정</small>
                 </Field>
+
+                {localDetail.tax_breakdown && (
+                  <div className="rounded-[var(--r-md)] border border-[var(--border-1)] bg-[var(--bg-1)] p-3 space-y-1.5">
+                    <p className="text-[var(--text-3)] text-xs uppercase tracking-wider mb-2">세액 산정 (자동)</p>
+                    {[
+                      ["퇴직소득금액", localDetail.tax_breakdown.retirement_income],
+                      ["근속연수공제", localDetail.tax_breakdown.tenure_deduction],
+                      ["환산급여", localDetail.tax_breakdown.annualized_income],
+                      ["산출세액", localDetail.tax_breakdown.income_tax],
+                      ["지방소득세", localDetail.tax_breakdown.local_income_tax],
+                      ["총 원천세", localDetail.tax_breakdown.total_withholding],
+                    ].map(([label, val]) =>
+                      val != null ? (
+                        <div key={String(label)} className="flex items-center justify-between text-xs">
+                          <span className="text-[var(--text-3)]">{label}</span>
+                          <span className="tabular font-medium text-[var(--text-1)]">
+                            {Number(val).toLocaleString()} 원
+                            {label === "총 원천세" && (
+                              <span className="text-[var(--text-4)] ml-1">(자동값)</span>
+                            )}
+                          </span>
+                        </div>
+                      ) : null
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

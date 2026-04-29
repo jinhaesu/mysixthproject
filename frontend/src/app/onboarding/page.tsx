@@ -45,7 +45,24 @@ import {
   Plus,
   Trash2,
   FileText,
+  Download,
 } from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
+async function downloadAuthed(url: string, filename: string) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
 
 // ── Field label map ──────────────────────────────────────────────
 const FIELD_LABELS: Record<string, string> = {
@@ -155,6 +172,7 @@ function DetailModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
   const [form, setForm] = useState<Record<string, any>>({});
 
   const loadDetail = useCallback(async () => {
@@ -222,6 +240,22 @@ function DetailModal({
     }
   };
 
+  const handleDownloadCsv = async () => {
+    setDownloadingCsv(true);
+    try {
+      const name = detail?.name ?? "입사자";
+      const date = (detail?.hire_date ?? "").replace(/-/g, "");
+      await downloadAuthed(
+        `${API_URL}/api/onboarding/${id}/export.csv`,
+        `취득신고_${name}_${date}.csv`
+      );
+    } catch (e: any) {
+      toast.error(e.message || "CSV 다운로드 실패");
+    } finally {
+      setDownloadingCsv(false);
+    }
+  };
+
   const taxable = (() => {
     const s = Number(form.monthly_salary) || 0;
     const m = Number(form.non_taxable_meal) || 0;
@@ -239,8 +273,18 @@ function DetailModal({
       title={loading ? "로딩 중..." : `${detail?.name ?? ""} — 입사자 상세`}
       description={loading ? undefined : `${detail?.department ?? ""}${detail?.team ? " / " + detail.team : ""}${detail?.position_title ? " · " + detail.position_title : ""}`}
       footer={
-        <div className="flex items-center gap-2 w-full">
+        <div className="flex items-center gap-2 w-full flex-wrap">
           <Button variant="ghost" size="sm" onClick={onClose}>닫기</Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            leadingIcon={<Download size={14} />}
+            loading={downloadingCsv}
+            disabled={downloadingCsv}
+            onClick={handleDownloadCsv}
+          >
+            4INSURE 취득신고 양식 (CSV)
+          </Button>
           <ToolbarSpacer />
           <Button variant="primary" size="sm" loading={saving} onClick={handleSave}>저장</Button>
         </div>

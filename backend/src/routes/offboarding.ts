@@ -5,11 +5,14 @@
  * GET    /api/offboarding/dashboard            — summary widget
  * GET    /api/offboarding/settings/email-recipients
  * PUT    /api/offboarding/settings/email-recipients
- * GET    /api/offboarding/:id                  — single record + employee snapshot
+ * GET    /api/offboarding/export/insurance.csv — bulk CSV export
+ * GET    /api/offboarding/:id                  — single record + employee snapshot + tax_breakdown
+ * GET    /api/offboarding/:id/export.csv       — single record CSV
  * POST   /api/offboarding                      — create
  * PATCH  /api/offboarding/:id                  — partial update
  * DELETE /api/offboarding/:id                  — hard delete
- * POST   /api/offboarding/:id/recompute        — recompute auto values
+ * POST   /api/offboarding/:id/recompute        — recompute auto values + tax
+ * POST   /api/offboarding/:id/compute-tax      — ad-hoc tax computation
  * POST   /api/offboarding/:id/send-email       — re-send email
  */
 
@@ -17,6 +20,8 @@ import { Router, Response } from 'express';
 import { dbGet, dbAll, dbRun } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendOffboardingNotification, OffboardingRecord } from '../services/offboardingEmail';
+import { computeSeveranceTax, SeveranceTaxBreakdown } from '../services/severanceTax';
+import { buildOffboardingCSV, OffboardingRecord as OffboardingCSVRecord } from '../services/insuranceExport';
 
 const router = Router();
 
@@ -44,6 +49,15 @@ function monthsBetween(startDate: string, endDate: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Helper — compute exact years of service (fractional) from hire/resign dates
+// ---------------------------------------------------------------------------
+function yearsOfServiceExact(hireDate: string, resignDate: string): number {
+  if (!hireDate) return 0;
+  const months = monthsBetween(hireDate, resignDate);
+  return months / 12;
+}
+
+// ---------------------------------------------------------------------------
 // Helper — read email recipients from admin_settings
 // ---------------------------------------------------------------------------
 async function getEmailRecipients(): Promise<string[]> {
@@ -60,7 +74,17 @@ async function getEmailRecipients(): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Helper — compute auto severance + annual leave pay for a regular employee
+// Helper — read global business_registration_no from admin_settings
+// ---------------------------------------------------------------------------
+async function getBusinessRegistrationNo(): Promise<string> {
+  const row = await dbGet(
+    "SELECT value FROM admin_settings WHERE key = 'business_registration_no'",
+  );
+  return row ? row.value : '';
+}
+
+// ---------------------------------------------------------------------------
+// Helper — compute auto severance + annual leave pay + retirement income tax
 // ---------------------------------------------------------------------------
 async function computeAutoAmounts(
   employeeRefId: number,
@@ -70,9 +94,9 @@ async function computeAutoAmounts(
   severanceAuto: number;
   annualLeaveRemaining: number;
   annualLeavePayAuto: number;
+  retirementIncomeTaxAuto: number;
+  taxBreakdown: SeveranceTaxBreakdown;
 }> {
-  // TODO Phase 2: 평균임금은 직전 3개월 임금 합 / 직전 3개월 일수, 일평균 * 30 일 기준. 현재는 단순 추정.
-
   // Read latest salary settings
   const salary = await dbGet(
     'SELECT base_pay, meal_allowance, position_allowance, other_allowance, bonus FROM regular_salary_settings WHERE employee_id = ?',
@@ -106,11 +130,59 @@ async function computeAutoAmounts(
     ? Math.max(0, Number(vacRow.total_days) - Number(vacRow.used_days))
     : 0;
 
-  // Daily wage = monthlyAvg / 30 (TODO Phase 2: use exact daily average)
+  // Daily wage = monthlyAvg / 30 (TODO Phase 3: use exact daily average from payroll)
   const dailyWage = monthlyAvg > 0 ? Math.round(monthlyAvg / 30) : 0;
   const annualLeavePayAuto = Math.round(annualLeaveRemaining * dailyWage);
 
-  return { severanceAuto, annualLeaveRemaining, annualLeavePayAuto };
+  // Retirement income tax (precise formula)
+  const taxBreakdown = computeSeveranceTax(severanceAuto, years);
+
+  return {
+    severanceAuto,
+    annualLeaveRemaining,
+    annualLeavePayAuto,
+    retirementIncomeTaxAuto: taxBreakdown.total_tax,
+    taxBreakdown,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Helper — build tax breakdown for a record (from stored severance_final + dates)
+// ---------------------------------------------------------------------------
+function buildTaxBreakdownFromRecord(record: any): SeveranceTaxBreakdown {
+  const severanceFinal = Number(record.severance_final || 0);
+  const exactYears = yearsOfServiceExact(record.hire_date || '', record.resign_date || '');
+  return computeSeveranceTax(severanceFinal, exactYears);
+}
+
+// ---------------------------------------------------------------------------
+// Helper — map DB row to CSV OffboardingRecord shape
+// ---------------------------------------------------------------------------
+async function toOffboardingCSVRecord(row: any): Promise<OffboardingCSVRecord> {
+  const bizNo = await getBusinessRegistrationNo();
+  // Try to get id_number from linked employee
+  let idNumber = '';
+  if (row.employee_type === 'regular' && row.employee_ref_id) {
+    const emp = await dbGet('SELECT id_number FROM regular_employees WHERE id = ?', row.employee_ref_id);
+    idNumber = emp?.id_number || '';
+  } else if (row.employee_ref_id) {
+    const w = await dbGet('SELECT id_number FROM workers WHERE id = ?', row.employee_ref_id);
+    idNumber = w?.id_number || '';
+  }
+  return {
+    id: row.id,
+    employee_name: row.employee_name,
+    employee_phone: row.employee_phone,
+    id_number: idNumber,
+    loss_date: row.loss_date,
+    reason_code: row.reason_code,
+    severance_final: Number(row.severance_final || 0),
+    annual_leave_pay_final: Number(row.annual_leave_pay_final || 0),
+    retirement_income_tax: Number(row.retirement_income_tax || 0),
+    severance_paid: Number(row.severance_paid || 0),
+    notes: row.notes,
+    business_registration_no: bizNo,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +321,49 @@ router.put('/settings/email-recipients', async (req: AuthRequest, res: Response)
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/offboarding/:id — single record + employee snapshot
+// GET /api/offboarding/export/insurance.csv  (must come before /:id)
+// ---------------------------------------------------------------------------
+router.get('/export/insurance.csv', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.query as { ids?: string };
+
+    let rows: any[];
+    if (ids && ids.trim()) {
+      const idList = ids
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n));
+      if (idList.length === 0) {
+        res.status(400).json({ error: 'No valid ids provided' });
+        return;
+      }
+      const placeholders = idList.map(() => '?').join(',');
+      rows = await dbAll(
+        `SELECT * FROM employee_offboardings WHERE id IN (${placeholders})`,
+        ...idList,
+      );
+    } else {
+      // Default: all in_progress records
+      rows = await dbAll(
+        "SELECT * FROM employee_offboardings WHERE status = 'in_progress' ORDER BY resign_date DESC",
+      );
+    }
+
+    const csvRecords = await Promise.all(rows.map(toOffboardingCSVRecord));
+    const csv = buildOffboardingCSV(csvRecords);
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''%EC%83%81%EC%8B%A4%EC%8B%A0%EA%B3%A0_${dateStr}.csv`);
+    res.send(csv);
+  } catch (error: any) {
+    console.error('GET /api/offboarding/export/insurance.csv error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/offboarding/:id — single record + employee snapshot + tax_breakdown
 // ---------------------------------------------------------------------------
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -280,9 +394,37 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       employee = w || null;
     }
 
-    res.json({ ...record, employee });
+    // Compute tax breakdown from current severance_final + dates
+    const taxBreakdown = buildTaxBreakdownFromRecord(record);
+
+    res.json({ ...record, employee, tax_breakdown: taxBreakdown });
   } catch (error: any) {
     console.error('GET /api/offboarding/:id error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/offboarding/:id/export.csv — single record CSV
+// ---------------------------------------------------------------------------
+router.get('/:id/export.csv', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const record = await dbGet('SELECT * FROM employee_offboardings WHERE id = ?', id);
+    if (!record) {
+      res.status(404).json({ error: '퇴사 기록을 찾을 수 없습니다.' });
+      return;
+    }
+
+    const csvRecord = await toOffboardingCSVRecord(record);
+    const csv = buildOffboardingCSV([csvRecord]);
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''%EC%83%81%EC%8B%A4%EC%8B%A0%EA%B3%A0_${id}_${dateStr}.csv`);
+    res.send(csv);
+  } catch (error: any) {
+    console.error('GET /api/offboarding/:id/export.csv error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -353,12 +495,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     let severanceAuto = 0;
     let annualLeaveRemaining = 0;
     let annualLeavePayAuto = 0;
+    let retirementIncomeTaxAuto = 0;
 
     if (employee_type === 'regular' && employee_ref_id) {
       const computed = await computeAutoAmounts(employee_ref_id, resign_date, hireDate);
       severanceAuto = computed.severanceAuto;
       annualLeaveRemaining = computed.annualLeaveRemaining;
       annualLeavePayAuto = computed.annualLeavePayAuto;
+      retirementIncomeTaxAuto = computed.retirementIncomeTaxAuto;
     }
 
     const insertResult = await dbRun(
@@ -368,8 +512,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         reason_code, reason_detail, status,
         severance_auto, severance_final,
         annual_leave_remaining, annual_leave_pay_auto, annual_leave_pay_final,
+        retirement_income_tax,
         email_sent, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
       employee_type,
       employee_ref_id ?? null,
       employeeName,
@@ -385,6 +530,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       annualLeaveRemaining,
       annualLeavePayAuto,
       annualLeavePayAuto, // annual_leave_pay_final = annual_leave_pay_auto initially
+      retirementIncomeTaxAuto,
     );
 
     const newId = insertResult.lastInsertRowid as number;
@@ -538,6 +684,7 @@ router.post('/:id/recompute', async (req: AuthRequest, res: Response) => {
       `UPDATE employee_offboardings
        SET severance_auto = ?, severance_final = ?,
            annual_leave_remaining = ?, annual_leave_pay_auto = ?, annual_leave_pay_final = ?,
+           retirement_income_tax = ?,
            updated_at = NOW()
        WHERE id = ?`,
       computed.severanceAuto,
@@ -545,13 +692,45 @@ router.post('/:id/recompute', async (req: AuthRequest, res: Response) => {
       computed.annualLeaveRemaining,
       computed.annualLeavePayAuto,
       computed.annualLeavePayAuto,
+      computed.retirementIncomeTaxAuto,
       id,
     );
 
     const updated = await dbGet('SELECT * FROM employee_offboardings WHERE id = ?', id);
-    res.json(updated);
+    res.json({ ...updated, tax_breakdown: computed.taxBreakdown });
   } catch (error: any) {
     console.error('POST /api/offboarding/:id/recompute error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/offboarding/:id/compute-tax — ad-hoc tax computation
+// Body: { severance: number, years_of_service: number }
+// ---------------------------------------------------------------------------
+router.post('/:id/compute-tax', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const existing = await dbGet('SELECT id FROM employee_offboardings WHERE id = ?', id);
+    if (!existing) {
+      res.status(404).json({ error: '퇴사 기록을 찾을 수 없습니다.' });
+      return;
+    }
+
+    const { severance, years_of_service } = req.body as {
+      severance: number;
+      years_of_service: number;
+    };
+
+    if (typeof severance !== 'number' || typeof years_of_service !== 'number') {
+      res.status(400).json({ error: 'severance and years_of_service must be numbers' });
+      return;
+    }
+
+    const breakdown = computeSeveranceTax(severance, years_of_service);
+    res.json(breakdown);
+  } catch (error: any) {
+    console.error('POST /api/offboarding/:id/compute-tax error:', error);
     res.status(500).json({ error: error.message });
   }
 });

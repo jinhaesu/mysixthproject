@@ -1,5 +1,6 @@
 import { dbAll, dbRun, dbGet, getKSTDate, getFrontendUrl } from '../db';
 import { sendSurveyMessage, sendGeneralSms } from './smsService';
+import { Resend } from 'resend';
 
 const REMINDER_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const THRESHOLD_HOURS = parseInt(process.env.REMINDER_THRESHOLD_HOURS || '2', 10);
@@ -345,6 +346,181 @@ async function checkAndUpdateVacationBalances() {
   }
 }
 
+// ===== Offboarding Deadline Reminders =====
+// Tracks the last date we ran the offboarding check (once per calendar day)
+let lastOffboardingReminderDate = '';
+
+async function sendOffboardingReminderEmail(
+  record: any,
+  daysToDeadline: number,
+  recipients: string[],
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+  const systemUrl = getFrontendUrl(`/offboarding/${record.id}`);
+
+  const subject = `[퇴사 D-${daysToDeadline} 알림] ${record.employee_name} — 자격 상실신고 마감 임박`;
+
+  // Build incomplete items list
+  const checklist: string[] = [];
+  if (!record.resignation_letter_received) checklist.push('사직서 수령');
+  if (!record.assets_returned) checklist.push('자산 반납');
+  if (!record.pension_reported) checklist.push('국민연금 상실신고');
+  if (!record.health_insurance_reported) checklist.push('건강보험 상실신고');
+  if (!record.employment_insurance_reported) checklist.push('고용보험 상실신고');
+  if (!record.industrial_accident_reported) checklist.push('산재보험 상실신고');
+  if (!record.severance_paid) checklist.push('퇴직금 지급');
+  if (!record.annual_leave_settled) checklist.push('연차수당 정산');
+  if (!record.income_tax_reported) checklist.push('퇴직소득 원천세 신고');
+
+  const checklistHtml =
+    checklist.length > 0
+      ? `<ul>${checklist.map((item) => `<li>${item}</li>`).join('')}</ul>`
+      : '<p>모든 항목이 완료되었습니다.</p>';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: 'Apple SD Gothic Neo', '맑은 고딕', sans-serif; color: #1f2937; background: #f9fafb; margin: 0; padding: 20px; }
+    .container { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .header { background: #dc2626; color: #fff; padding: 24px 32px; }
+    .header h1 { margin: 0; font-size: 20px; }
+    .header p { margin: 4px 0 0; font-size: 14px; opacity: 0.85; }
+    .body { padding: 28px 32px; }
+    table.info { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    table.info th { background: #fee2e2; color: #dc2626; text-align: left; padding: 8px 12px; font-size: 13px; width: 130px; }
+    table.info td { padding: 8px 12px; font-size: 14px; border-bottom: 1px solid #e5e7eb; }
+    .section-title { font-size: 15px; font-weight: 700; color: #dc2626; margin: 24px 0 12px; border-left: 4px solid #ef4444; padding-left: 10px; }
+    ul { margin: 0; padding-left: 20px; }
+    ul li { padding: 4px 0; font-size: 14px; color: #374151; }
+    .btn { display: inline-block; background: #dc2626; color: #fff; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; margin-top: 20px; }
+    .footer { background: #f3f4f6; padding: 16px 32px; text-align: center; font-size: 12px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>[퇴사 D-${daysToDeadline} 알림] 자격 상실신고 마감 임박</h1>
+    <p>${record.employee_name} — 퇴직일 ${record.resign_date}</p>
+  </div>
+  <div class="body">
+    <p style="font-size:14px; color:#374151;">
+      아래 직원의 4대보험 자격 상실신고 마감이 <strong>D-${daysToDeadline}</strong>입니다. 즉시 확인해 주세요.
+    </p>
+
+    <div class="section-title">직원 정보</div>
+    <table class="info">
+      <tr><th>이름</th><td>${record.employee_name}</td></tr>
+      <tr><th>부서</th><td>${record.department || '-'}</td></tr>
+      <tr><th>퇴직일</th><td>${record.resign_date}</td></tr>
+      <tr><th>자격 상실일</th><td>${record.loss_date || '-'}</td></tr>
+      <tr><th>상실사유코드</th><td>${record.reason_code || '-'}</td></tr>
+      <tr><th>처리상태</th><td>${record.status}</td></tr>
+    </table>
+
+    <div class="section-title">미완료 항목 (${checklist.length}건)</div>
+    ${checklistHtml}
+
+    <a href="${systemUrl}" class="btn">시스템에서 처리하기 →</a>
+  </div>
+  <div class="footer">
+    이 메일은 퇴사관리 시스템에서 자동 발송되었습니다. | 조인앤조인
+  </div>
+</div>
+</body>
+</html>
+  `.trim();
+
+  if (!apiKey) {
+    console.log(`[OffboardingReminder MOCK] Subject: ${subject}`);
+    console.log(`[OffboardingReminder MOCK] To: ${recipients.join(', ')}`);
+    return;
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from: `퇴사관리시스템 <${fromEmail}>`,
+      to: recipients,
+      subject,
+      html,
+    });
+    if (error) {
+      console.error('[OffboardingReminder] Resend error:', error);
+    } else {
+      console.log(`[OffboardingReminder] Sent to ${recipients.join(', ')} for ${record.employee_name} (D-${daysToDeadline})`);
+    }
+  } catch (err) {
+    console.error('[OffboardingReminder] Unexpected error:', err);
+  }
+}
+
+async function checkAndSendOffboardingReminders(): Promise<void> {
+  try {
+    const today = getKSTDate();
+
+    // Gate: run once per calendar day
+    if (today === lastOffboardingReminderDate) return;
+    lastOffboardingReminderDate = today;
+
+    // Get email recipients
+    const row = await dbGet(
+      "SELECT value FROM admin_settings WHERE key = 'offboarding_email_recipients'",
+    );
+    let recipients: string[] = [];
+    if (row) {
+      try {
+        const parsed = JSON.parse(row.value);
+        recipients = Array.isArray(parsed.emails) ? parsed.emails : [];
+      } catch {
+        recipients = [];
+      }
+    }
+
+    if (recipients.length === 0) {
+      console.log('[OffboardingReminder] No recipients configured — skipping');
+      return;
+    }
+
+    // Find in_progress records where D-3 to D-0 and not yet reminded today
+    const pending = await dbAll(`
+      SELECT *,
+        (14 - EXTRACT(DAY FROM (NOW() - resign_date::date))::int) AS days_to_loss_deadline
+      FROM employee_offboardings
+      WHERE status = 'in_progress'
+        AND (14 - EXTRACT(DAY FROM (NOW() - resign_date::date))::int) BETWEEN 0 AND 3
+        AND (last_reminder_sent_at IS NULL OR last_reminder_sent_at::date < CURRENT_DATE)
+    `);
+
+    if (pending.length === 0) {
+      console.log(`[OffboardingReminder] No deadline-imminent records for ${today}`);
+      return;
+    }
+
+    console.log(`[OffboardingReminder] Found ${pending.length} record(s) needing reminders for ${today}`);
+
+    for (const record of pending) {
+      const daysToDeadline = Number(record.days_to_loss_deadline);
+      await sendOffboardingReminderEmail(record, daysToDeadline, recipients);
+      await dbRun(
+        'UPDATE employee_offboardings SET last_reminder_sent_at = NOW() WHERE id = ?',
+        record.id,
+      );
+    }
+  } catch (err) {
+    console.error('[OffboardingReminder] Error:', err);
+  }
+}
+
+// TODO: Onboarding reminder stub — send reminder to recipients for 'ready' employees
+// not yet emailed (onboarding_email_sent=0) and created within last 7 days.
+// async function checkAndSendOnboardingReminders(): Promise<void> {
+//   // TODO Phase 3: implement
+// }
+
 export function startReminderService() {
   console.log(`[Reminder] Service started (interval: ${REMINDER_INTERVAL_MS / 60000}min, threshold: ${THRESHOLD_HOURS}h)`);
   setInterval(checkAndSendReminders, REMINDER_INTERVAL_MS);
@@ -364,4 +540,7 @@ export function startReminderService() {
   // Vacation balance auto-update: check every hour, runs once per day
   setInterval(checkAndUpdateVacationBalances, 60 * 60 * 1000);
   setTimeout(checkAndUpdateVacationBalances, 2 * 60 * 1000); // 2 min after startup
+  // Offboarding deadline reminders: check every hour, runs once per calendar day
+  setInterval(checkAndSendOffboardingReminders, 60 * 60 * 1000);
+  setTimeout(checkAndSendOffboardingReminders, 3 * 60 * 1000); // 3 min after startup
 }

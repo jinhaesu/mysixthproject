@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle } from "lucide-react";
-import { Button, Card, CardHeader, CenterSpinner, EmptyState, Field, Input, SectionHeader } from "@/components/ui";
+import { Button, Card, CardHeader, CenterSpinner, EmptyState, Field, Input, SectionHeader, SegmentedControl } from "@/components/ui";
 import { AlertTriangle } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
@@ -104,6 +104,15 @@ function SignaturePad({
       <p className="text-[var(--fs-caption)] text-[var(--text-4)] mt-1">위 영역에 서명해주세요</p>
     </div>
   );
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 }
 
 function isCanvasBlank(canvas: HTMLCanvasElement): boolean {
@@ -305,6 +314,14 @@ function RegularContractContent() {
   const [address, setAddress] = useState("");
   const [idNumber, setIdNumber] = useState("");
 
+  // Additional onboarding fields
+  const [email, setEmail] = useState("");
+  const [nationality, setNationality] = useState<"KR" | "FOREIGN">("KR");
+  const [visaType, setVisaType] = useState("");
+  const [visaExpiry, setVisaExpiry] = useState("");
+  const [bankSlipFile, setBankSlipFile] = useState<string>("");
+  const [foreignIdFile, setForeignIdFile] = useState<string>("");
+
   const [submitting, setSubmitting] = useState(false);
 
   const contractSigRef = useRef<HTMLCanvasElement>(null);
@@ -323,6 +340,13 @@ function RegularContractContent() {
     if (!birthDate.trim()) return alert("생년월일을 입력해주세요.");
     if (!address.trim()) return alert("주소를 입력해주세요.");
     if (!idNumber.trim()) return alert("주민등록번호를 입력해주세요.");
+    if (!email.trim()) return alert("이메일을 입력해주세요.");
+    if (!bankSlipFile) return alert("통장사본을 첨부해주세요.");
+    if (nationality === "FOREIGN") {
+      if (!visaType.trim()) return alert("비자종류를 입력해주세요.");
+      if (!visaExpiry.trim()) return alert("비자만료일을 입력해주세요.");
+      if (!foreignIdFile) return alert("외국인등록증 사본을 첨부해주세요.");
+    }
 
     const contractCanvas = contractSigRef.current;
     const consentCanvas = consentSigRef.current;
@@ -342,6 +366,12 @@ function RegularContractContent() {
           id_number: idNumber.trim(),
           signature_data: contractCanvas.toDataURL(),
           consent_signature_data: consentCanvas.toDataURL(),
+          email: email.trim(),
+          nationality,
+          visa_type: nationality === "FOREIGN" ? visaType.trim() : undefined,
+          visa_expiry: nationality === "FOREIGN" ? visaExpiry.trim() : undefined,
+          bank_slip_data: bankSlipFile || undefined,
+          foreign_id_card_data: nationality === "FOREIGN" ? foreignIdFile || undefined : undefined,
         }),
       });
       const body = await res.json();
@@ -517,12 +547,118 @@ function RegularContractContent() {
               />
             </Field>
 
-            <SignaturePad
-              canvasRef={contractSigRef}
-              label="근로계약서 서명 (서명/인)"
-              onClear={() => clearCanvas(contractSigRef)}
-            />
+            <Field label="이메일" required>
+              <Input
+                type="email"
+                inputSize="md"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="example@email.com"
+              />
+            </Field>
           </div>
+        </Card>
+
+        {/* Additional onboarding info */}
+        <Card padding="md" tone="default" className="shadow-[var(--elev-1)] space-y-4">
+          <SectionHeader eyebrow="추가 정보" title="4대보험 취득신고 정보" />
+
+          <Field label="국적">
+            <SegmentedControl
+              value={nationality}
+              options={[
+                { value: "KR", label: "한국" },
+                { value: "FOREIGN", label: "외국인" },
+              ]}
+              onChange={(v) => setNationality(v as "KR" | "FOREIGN")}
+              size="md"
+            />
+          </Field>
+
+          {nationality === "FOREIGN" && (
+            <>
+              <Field label="비자종류" required>
+                <Input
+                  inputSize="md"
+                  value={visaType}
+                  onChange={e => setVisaType(e.target.value)}
+                  placeholder="E-9, H-2 등"
+                />
+              </Field>
+              <Field label="비자만료일" required>
+                <Input
+                  type="date"
+                  inputSize="md"
+                  value={visaExpiry}
+                  onChange={e => setVisaExpiry(e.target.value)}
+                />
+              </Field>
+              <div className="space-y-2">
+                <p className="text-[12px] font-medium text-[var(--text-2)]">
+                  외국인등록증 사본 <span className="text-[var(--danger-fg)]">*</span>
+                </p>
+                {foreignIdFile ? (
+                  <div className="space-y-1">
+                    <img src={foreignIdFile} alt="외국인등록증" className="max-h-40 rounded-[var(--r-md)] border border-[var(--border-1)]" />
+                    <label className="inline-block cursor-pointer">
+                      <span className="text-[var(--fs-caption)] text-[var(--brand-400)] underline">교체</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                        const f = e.target.files?.[0]; if (!f) return;
+                        setForeignIdFile(await fileToBase64(f));
+                      }} />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-2 p-5 rounded-[var(--r-lg)] border-2 border-dashed border-[var(--border-2)] bg-grid cursor-pointer hover:border-[var(--brand-400)] transition-colors">
+                    <span className="text-[var(--fs-body)] text-[var(--text-4)]">파일 첨부 (클릭 또는 드래그)</span>
+                    <span className="text-[var(--fs-caption)] text-[var(--text-4)]">JPG, PNG, PDF</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                      const f = e.target.files?.[0]; if (!f) return;
+                      setForeignIdFile(await fileToBase64(f));
+                    }} />
+                  </label>
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-[12px] font-medium text-[var(--text-2)]">
+              통장사본 <span className="text-[var(--danger-fg)]">*</span>
+            </p>
+            <p className="text-[var(--fs-caption)] text-[var(--text-4)]">급여 지급 및 4대보험 환급 계좌 확인용입니다.</p>
+            {bankSlipFile ? (
+              <div className="space-y-1">
+                <img src={bankSlipFile} alt="통장사본" className="max-h-40 rounded-[var(--r-md)] border border-[var(--border-1)]" />
+                <label className="inline-block cursor-pointer">
+                  <span className="text-[var(--fs-caption)] text-[var(--brand-400)] underline">교체</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    setBankSlipFile(await fileToBase64(f));
+                  }} />
+                </label>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-2 p-5 rounded-[var(--r-lg)] border-2 border-dashed border-[var(--border-2)] bg-grid cursor-pointer hover:border-[var(--brand-400)] transition-colors">
+                <span className="text-[var(--fs-body)] text-[var(--text-4)]">파일 첨부 (클릭 또는 드래그)</span>
+                <span className="text-[var(--fs-caption)] text-[var(--text-4)]">JPG, PNG, PDF</span>
+                <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  setBankSlipFile(await fileToBase64(f));
+                }} />
+              </label>
+            )}
+          </div>
+        </Card>
+
+        {/* Signature section */}
+        <Card padding="md" tone="default" className="shadow-[var(--elev-1)] space-y-3">
+          <SectionHeader eyebrow="서명" title="근로계약서 서명" />
+          <SignaturePad
+            canvasRef={contractSigRef}
+            label="근로계약서 서명 (서명/인)"
+            onClear={() => clearCanvas(contractSigRef)}
+          />
         </Card>
 
         {/* Consent section */}
@@ -544,7 +680,7 @@ function RegularContractContent() {
           size="lg"
           onClick={handleSign}
           loading={submitting}
-          disabled={submitting || !birthDate.trim() || !address.trim() || !idNumber.trim()}
+          disabled={submitting || !birthDate.trim() || !address.trim() || !idNumber.trim() || !email.trim() || !bankSlipFile}
           className="w-full"
         >
           {submitting ? "처리 중..." : "근로계약서 서명 완료"}

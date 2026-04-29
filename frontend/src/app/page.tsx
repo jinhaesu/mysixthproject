@@ -8,11 +8,13 @@ import {
 } from "recharts";
 import {
   Users, Clock, TrendingUp, CalendarDays, AlertTriangle, Palmtree, RefreshCw, Sparkles,
+  UserPlus, UserMinus, ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import ChartCard from "@/components/charts/ChartCard";
 import { CHART_AXIS_PROPS, CHART_GRID_PROPS, ChartTooltip, ChartGradients } from "@/components/charts/theme";
 import { SEMANTIC_COLORS, CHART_COLORS } from "@/lib/chartColors";
-import { getDashboardHomeStats, getConfirmedList, getRegularVacations, getAttendanceSummaryRegular, getAttendanceSummaryDispatch } from "@/lib/api";
+import { getDashboardHomeStats, getConfirmedList, getRegularVacations, getAttendanceSummaryRegular, getAttendanceSummaryDispatch, getOnboardingDashboard, getOffboardingDashboard } from "@/lib/api";
 import {
   PageHeader, Stat, Badge, Button, EmptyState, SkeletonCard, SegmentedControl, Input,
   Card, CardHeader, Table, THead, TBody, TR, TH, TD,
@@ -34,6 +36,17 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const [dataSource, setDataSource] = usePersistedState<'confirmed' | 'all'>("home_ds", 'confirmed');
   const [timeBase, setTimeBase] = usePersistedState<'actual' | 'planned'>("home_tb", 'actual');
+  const [hr, setHr] = useState<{
+    onboarding: { pending_count: number; ready_count: number; completed_this_month: number } | null;
+    offboarding: { in_progress_count: number; deadline_warning_count: number; overdue_count: number; missing_severance: number } | null;
+  }>({ onboarding: null, offboarding: null });
+
+  useEffect(() => {
+    Promise.all([
+      getOnboardingDashboard().catch(() => null),
+      getOffboardingDashboard().catch(() => null),
+    ]).then(([on, off]) => setHr({ onboarding: on, offboarding: off }));
+  }, []);
 
   const loadVacationSummary = async () => {
     const today = new Date();
@@ -301,6 +314,80 @@ export default function HomePage() {
           </>
         }
       />
+
+      {/* HR 신고 알림 */}
+      {(hr.onboarding || hr.offboarding) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+          {hr.onboarding && (
+            <Card padding="md" className="bg-[var(--bg-1)] border-[var(--border-1)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-9 h-9 rounded-[10px] bg-[rgba(94,106,210,0.18)] text-[var(--brand-400)] flex items-center justify-center">
+                    <UserPlus size={16} />
+                  </span>
+                  <div>
+                    <div className="text-[12.5px] font-semibold text-[var(--text-1)]">입사자 취득신고</div>
+                    <div className="text-[11px] text-[var(--text-3)] mt-0.5">정규직 4대보험 취득신고 처리 현황</div>
+                  </div>
+                </div>
+                <Link href="/onboarding" className="text-[11.5px] text-[var(--brand-400)] hover:text-[var(--brand-200)] inline-flex items-center gap-1">
+                  관리 <ArrowRight size={12} />
+                </Link>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                <div className="text-center p-2 rounded-[var(--r-md)] bg-[var(--warning-bg)] border border-[var(--warning-border)]">
+                  <div className="text-[20px] font-semibold tabular text-[var(--warning-fg)] leading-none">{hr.onboarding.pending_count}</div>
+                  <div className="text-[10px] text-[var(--text-3)] mt-1">정보 수집 중</div>
+                </div>
+                <div className="text-center p-2 rounded-[var(--r-md)] bg-[rgba(94,106,210,0.14)] border border-[rgba(130,143,255,0.26)]">
+                  <div className="text-[20px] font-semibold tabular text-[var(--brand-400)] leading-none">{hr.onboarding.ready_count}</div>
+                  <div className="text-[10px] text-[var(--text-3)] mt-1">신고 발송 가능</div>
+                </div>
+                <div className="text-center p-2 rounded-[var(--r-md)] bg-[var(--success-bg)] border border-[var(--success-border)]">
+                  <div className="text-[20px] font-semibold tabular text-[var(--success-fg)] leading-none">{hr.onboarding.completed_this_month}</div>
+                  <div className="text-[10px] text-[var(--text-3)] mt-1">이번 달 완료</div>
+                </div>
+              </div>
+            </Card>
+          )}
+          {hr.offboarding && (
+            <Card padding="md" className="bg-[var(--bg-1)] border-[var(--border-1)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-9 h-9 rounded-[10px] bg-[var(--danger-bg)] text-[var(--danger-fg)] flex items-center justify-center">
+                    <UserMinus size={16} />
+                  </span>
+                  <div>
+                    <div className="text-[12.5px] font-semibold text-[var(--text-1)]">퇴사 상실신고</div>
+                    <div className="text-[11px] text-[var(--text-3)] mt-0.5">14일 이내 처리 / 퇴직금·연차수당 정산</div>
+                  </div>
+                </div>
+                <Link href="/offboarding" className="text-[11.5px] text-[var(--brand-400)] hover:text-[var(--brand-200)] inline-flex items-center gap-1">
+                  관리 <ArrowRight size={12} />
+                </Link>
+              </div>
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                <div className="text-center p-2 rounded-[var(--r-md)] bg-[var(--bg-2)] border border-[var(--border-1)]">
+                  <div className="text-[20px] font-semibold tabular text-[var(--text-1)] leading-none">{hr.offboarding.in_progress_count}</div>
+                  <div className="text-[10px] text-[var(--text-3)] mt-1">진행 중</div>
+                </div>
+                <div className="text-center p-2 rounded-[var(--r-md)] bg-[var(--warning-bg)] border border-[var(--warning-border)]">
+                  <div className="text-[20px] font-semibold tabular text-[var(--warning-fg)] leading-none">{hr.offboarding.deadline_warning_count}</div>
+                  <div className="text-[10px] text-[var(--text-3)] mt-1">D-3 임박</div>
+                </div>
+                <div className="text-center p-2 rounded-[var(--r-md)] bg-[var(--danger-bg)] border border-[var(--danger-border)]">
+                  <div className="text-[20px] font-semibold tabular text-[var(--danger-fg)] leading-none">{hr.offboarding.overdue_count}</div>
+                  <div className="text-[10px] text-[var(--text-3)] mt-1">기한 초과</div>
+                </div>
+                <div className="text-center p-2 rounded-[var(--r-md)] bg-[var(--bg-2)] border border-[var(--border-1)]">
+                  <div className="text-[20px] font-semibold tabular text-[var(--text-1)] leading-none">{hr.offboarding.missing_severance}</div>
+                  <div className="text-[10px] text-[var(--text-3)] mt-1">퇴직금 미지급</div>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* KPI Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">

@@ -16,6 +16,9 @@ import workersRoutes from './routes/workers';
 import regularRoutes from './routes/regular';
 import regularPublicRoutes from './routes/regularPublic';
 import dashboardRoutes from './routes/dashboard';
+import contractsRoutes from './routes/contracts';
+import offboardingRoutes from './routes/offboarding';
+import onboardingRoutes from './routes/onboarding';
 import { requireAuth } from './middleware/auth';
 import { startReminderService } from './services/reminderService';
 
@@ -49,6 +52,9 @@ app.use('/api/workers', requireAuth, workersRoutes);
 app.use('/api/regular', requireAuth, regularRoutes);
 app.use('/api/regular-public', regularPublicRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
+app.use('/api/contracts', requireAuth, contractsRoutes);
+app.use('/api/offboarding', requireAuth, offboardingRoutes);
+app.use('/api/onboarding', requireAuth, onboardingRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

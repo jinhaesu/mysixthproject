@@ -9,6 +9,7 @@ import {
   deleteWorker,
   importWorkers,
   addManualAttendance,
+  createOffboarding,
 } from "@/lib/api";
 import {
   Contact,
@@ -20,8 +21,18 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  UserMinus,
 } from "lucide-react";
-import { Card, PageHeader, Badge, Button, SkeletonCard, EmptyState, Input, Select, Textarea, Field, useToast } from "@/components/ui";
+import { Card, PageHeader, Badge, Button, SkeletonCard, EmptyState, Input, Select, Textarea, Field, useToast, Modal } from "@/components/ui";
+
+const REASON_CODES_OB = [
+  { code: "11", label: "11 - 개인사정으로 인한 자진퇴사", hint: "실업급여 X" },
+  { code: "22", label: "22 - 근로계약기간만료/공사종료", hint: "실업급여 O" },
+  { code: "23", label: "23 - 경영상필요/회사사정 (권고사직 등)", hint: "실업급여 O" },
+  { code: "26", label: "26 - 정년퇴직", hint: "실업급여 O" },
+  { code: "31", label: "31 - 기타 사용자 사정", hint: "실업급여 O (사례별)" },
+  { code: "41", label: "41 - 사망", hint: "유족급여 처리" },
+];
 
 interface Worker {
   id: number;
@@ -82,6 +93,39 @@ export default function WorkersPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
+
+  const [offboardingTarget, setOffboardingTarget] = useState<Worker | null>(null);
+  const [offboardingForm, setOffboardingForm] = useState({
+    resign_date: "",
+    reason_code: "",
+    reason_detail: "",
+    send_email: true,
+  });
+  const [submittingOffboarding, setSubmittingOffboarding] = useState(false);
+
+  const handleOffboardingSubmit = async () => {
+    if (!offboardingTarget) return;
+    if (!offboardingForm.resign_date) { toast.info("퇴직일을 입력해주세요."); return; }
+    if (!offboardingForm.reason_code) { toast.info("사유 코드를 선택해주세요."); return; }
+    setSubmittingOffboarding(true);
+    try {
+      await createOffboarding({
+        employee_type: "dispatch",
+        employee_ref_id: offboardingTarget.id,
+        resign_date: offboardingForm.resign_date,
+        reason_code: offboardingForm.reason_code,
+        reason_detail: offboardingForm.reason_detail,
+        send_email: offboardingForm.send_email,
+      });
+      toast.success(`${offboardingTarget.name_ko || offboardingTarget.phone} 퇴사 등록 완료. 퇴사관리 페이지에서 진행 현황을 확인하세요.`);
+      setOffboardingTarget(null);
+      setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
+    } catch (e: any) {
+      toast.error(e.message || "퇴사 등록 실패");
+    } finally {
+      setSubmittingOffboarding(false);
+    }
+  };
 
   const handleRevealId = async (workerId: number) => {
     const pw = prompt("주민번호 열람 비밀번호를 입력해주세요:");
@@ -438,6 +482,18 @@ export default function WorkersPage() {
                         >
                           <Edit3 size={15} />
                         </button>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          leadingIcon={<UserMinus size={14} />}
+                          onClick={() => {
+                            setOffboardingTarget(worker);
+                            setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
+                          }}
+                          title="퇴사 등록"
+                        >
+                          퇴사
+                        </Button>
                         <button
                           onClick={() => handleDelete(worker.id)}
                           disabled={deleting === worker.id}
@@ -712,6 +768,72 @@ export default function WorkersPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={!!offboardingTarget}
+        onClose={() => setOffboardingTarget(null)}
+        title="퇴사 등록"
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setOffboardingTarget(null)}>취소</Button>
+            <Button variant="primary" onClick={handleOffboardingSubmit} loading={submittingOffboarding} disabled={submittingOffboarding}>
+              퇴사 등록
+            </Button>
+          </>
+        }
+      >
+        {offboardingTarget && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 rounded-[var(--r-md)] bg-[var(--bg-1)] border border-[var(--border-1)]">
+              <div>
+                <p className="text-sm font-medium text-[var(--text-1)]">{offboardingTarget.name_ko || "-"}</p>
+                <p className="text-xs text-[var(--text-3)]">{offboardingTarget.department} · {offboardingTarget.category}</p>
+              </div>
+            </div>
+            <Field label="퇴직일 (마지막 근무일)" required>
+              <Input
+                type="date"
+                value={offboardingForm.resign_date}
+                onChange={(e) => setOffboardingForm((f) => ({ ...f, resign_date: e.target.value }))}
+              />
+            </Field>
+            <Field label="사유 코드" required>
+              <Select
+                value={offboardingForm.reason_code}
+                onChange={(e) => setOffboardingForm((f) => ({ ...f, reason_code: e.target.value }))}
+              >
+                <option value="">선택</option>
+                {REASON_CODES_OB.map((r) => (
+                  <option key={r.code} value={r.code}>{r.label}</option>
+                ))}
+              </Select>
+              {offboardingForm.reason_code && (
+                <small className="text-[var(--text-3)] text-xs mt-0.5 block">
+                  {REASON_CODES_OB.find((r) => r.code === offboardingForm.reason_code)?.hint}
+                </small>
+              )}
+            </Field>
+            <Field label="사유 상세">
+              <Textarea
+                value={offboardingForm.reason_detail}
+                onChange={(e) => setOffboardingForm((f) => ({ ...f, reason_detail: e.target.value }))}
+                rows={2}
+                placeholder="선택 사항"
+              />
+            </Field>
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-[var(--text-2)]">
+              <input
+                type="checkbox"
+                checked={offboardingForm.send_email}
+                onChange={(e) => setOffboardingForm((f) => ({ ...f, send_email: e.target.checked }))}
+                className="w-4 h-4 accent-[var(--brand-500)]"
+              />
+              지정된 이메일로 신고 안내 메일 발송
+            </label>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

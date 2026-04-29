@@ -932,6 +932,36 @@ function RegularContent() {
           ))}
         </div>
 
+        {/* ── Onboarding info soft gate ──────────────────────────── */}
+        {data && personalInfoDone && (data.status as string) !== "deactivated" && (() => {
+          const d = data as any;
+          const missingEmail = !d.email;
+          const missingBankSlip = !d.bank_slip_data;
+          const missingForeign = d.nationality === "FOREIGN" && (!d.visa_type || !d.foreign_id_card_data);
+          const needsOnboarding = missingEmail || missingBankSlip || missingForeign;
+          if (!needsOnboarding) return null;
+          return (
+            <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-xl)] p-5 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-[var(--warning-fg)] shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-[var(--warning-fg)] text-[var(--fs-body)]">추가 정보가 필요합니다</p>
+                  <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-80 mt-0.5">먼저 입사 정보를 완성해주세요.</p>
+                </div>
+              </div>
+              <a
+                href={`/regular-contract?token=${token}&mode=onboarding-fix`}
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-[var(--r-md)] bg-[var(--warning-fg)] text-white font-semibold text-[var(--fs-body)] transition-opacity hover:opacity-90"
+              >
+                정보 입력하러 가기
+              </a>
+              <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-70 text-center">
+                출퇴근은 정상적으로 사용할 수 있으나, 추가 정보 미완료 시 4대보험 가입이 지연될 수 있습니다.
+              </p>
+            </div>
+          );
+        })()}
+
         {/* Personal Info Required (FIRST - before contract check) */}
         {data && !personalInfoDone && (data.status as string) !== "deactivated" && (
           <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">

@@ -637,3 +637,118 @@ export async function getSettlement(yearMonth: string, type: string) {
 export async function getDashboardHomeStats(yearMonth: string) {
   return fetchAPI<any>(`/api/dashboard/home-stats?year_month=${yearMonth}`);
 }
+
+// ===== Contracts =====
+export async function getContractsLatest(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/contracts/latest${query ? '?' + query : ''}`);
+}
+
+export async function getContractsMissing(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/contracts/missing${query ? '?' + query : ''}`);
+}
+
+export async function getContractHistory(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/contracts/history${query ? '?' + query : ''}`);
+}
+
+// ===== Offboarding =====
+export async function getOffboardings(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/offboarding${query ? '?' + query : ''}`);
+}
+
+export async function getOffboarding(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}`);
+}
+
+export async function createOffboarding(body: {
+  employee_type: string;
+  employee_ref_id: number;
+  resign_date: string;
+  reason_code: string;
+  reason_detail?: string;
+  send_email?: boolean;
+}) {
+  return fetchAPI<any>('/api/offboarding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchOffboarding(id: number, partial: Record<string, any>) {
+  return fetchAPI<any>(`/api/offboarding/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partial),
+  });
+}
+
+export async function deleteOffboarding(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}`, { method: 'DELETE' });
+}
+
+export async function recomputeOffboarding(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}/recompute`, { method: 'POST' });
+}
+
+export async function sendOffboardingEmail(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}/send-email`, { method: 'POST' });
+}
+
+export async function getOffboardingDashboard() {
+  return fetchAPI<any>('/api/offboarding/dashboard');
+}
+
+export async function getOffboardingRecipients() {
+  return fetchAPI<any>('/api/offboarding/settings/email-recipients');
+}
+
+export async function setOffboardingRecipients(emails: string[]) {
+  return fetchAPI<any>('/api/offboarding/settings/email-recipients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails }),
+  });
+}
+
+// ===== Onboarding =====
+export async function getOnboardings(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/onboarding${query ? '?' + query : ''}`);
+}
+
+export async function getOnboarding(id: number) {
+  return fetchAPI<any>(`/api/onboarding/${id}`);
+}
+
+export async function patchOnboarding(id: number, partial: Record<string, any>) {
+  return fetchAPI<any>(`/api/onboarding/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partial),
+  });
+}
+
+export async function sendOnboardingEmail(id: number) {
+  return fetchAPI<any>(`/api/onboarding/${id}/send-email`, { method: 'POST' });
+}
+
+export async function getOnboardingDashboard() {
+  return fetchAPI<any>('/api/onboarding/dashboard');
+}
+
+export async function getOnboardingRecipients() {
+  return fetchAPI<any>('/api/onboarding/settings/email-recipients');
+}
+
+export async function setOnboardingRecipients(emails: string[]) {
+  return fetchAPI<any>('/api/onboarding/settings/email-recipients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails }),
+  });
+}

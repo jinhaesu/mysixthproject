@@ -34,7 +34,7 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: '요청 처리 중 오류가 발생했습니다.' }));
+    const error = await res.json().catch(() => ({ error: `HTTP ${res.status} 오류` }));
     throw new Error(error.error || `HTTP ${res.status}`);
   }
 
@@ -216,6 +216,25 @@ export async function getSurveyStats(department?: string) {
 
 export async function resendSurvey(id: number) {
   return fetchAPI<any>(`/api/survey/resend/${id}`, { method: 'POST' });
+}
+
+export async function addManualAttendance(data: { password: string; phone: string; date: string; clock_in_time?: string; clock_out_time?: string }) {
+  // 방어적 URL 해석: 오래된 캐시/환경변수 누락으로 API_URL 이 비어있어도 Railway 로 직접 호출
+  const base = API_URL || 'https://mysixthproject-production.up.railway.app';
+  const url = `${base}/api/survey/manual-attendance`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(data),
+  });
+  const text = await res.text();
+  let body: any = {};
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { error: `비JSON 응답: ${text.slice(0, 120)}` }; }
+  if (!res.ok) {
+    const suffix = body?.error ? ` — ${body.error}` : (text ? ` — ${text.slice(0, 80)}` : '');
+    throw new Error(`HTTP ${res.status} (${url})${suffix}`);
+  }
+  return body;
 }
 
 // Survey responses
@@ -529,6 +548,9 @@ export async function initVacationBalances(data: { year: number; total_days: num
 export async function autoCalcVacationBalances(year: number) {
   return fetchAPI<any>('/api/regular/vacation-balances/auto-calc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year }) });
 }
+export async function getVacationLogs() {
+  return fetchAPI<any[]>('/api/regular/vacation-logs');
+}
 
 // ===== Regular Shifts =====
 export async function getRegularShifts() {
@@ -597,7 +619,136 @@ export async function updateSalarySettings(employeeId: number, data: any) {
 export async function getPayrollCalc(yearMonth: string) {
   return fetchAPI<any>(`/api/regular/payroll-calc?year_month=${yearMonth}`);
 }
+export async function getPayrollClosing(yearMonth: string) {
+  return fetchAPI<any>(`/api/regular/payroll-closing/${yearMonth}`);
+}
+export async function closePayroll(yearMonth: string) {
+  return fetchAPI<any>(`/api/regular/payroll-closing/${yearMonth}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+}
+export async function cancelPayrollClosing(yearMonth: string) {
+  return fetchAPI<any>(`/api/regular/payroll-closing/${yearMonth}`, { method: 'DELETE' });
+}
 
 export async function getSettlement(yearMonth: string, type: string) {
   return fetchAPI<any>(`/api/survey/settlement?year_month=${yearMonth}&type=${type}`);
+}
+
+// ===== Dashboard Home Stats =====
+export async function getDashboardHomeStats(yearMonth: string) {
+  return fetchAPI<any>(`/api/dashboard/home-stats?year_month=${yearMonth}`);
+}
+
+// ===== Contracts =====
+export async function getContractsLatest(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/contracts/latest${query ? '?' + query : ''}`);
+}
+
+export async function getContractsMissing(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/contracts/missing${query ? '?' + query : ''}`);
+}
+
+export async function getContractHistory(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/contracts/history${query ? '?' + query : ''}`);
+}
+
+// ===== Offboarding =====
+export async function getOffboardings(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/offboarding${query ? '?' + query : ''}`);
+}
+
+export async function getOffboarding(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}`);
+}
+
+export async function createOffboarding(body: {
+  employee_type: string;
+  employee_ref_id: number;
+  resign_date: string;
+  reason_code: string;
+  reason_detail?: string;
+  send_email?: boolean;
+}) {
+  return fetchAPI<any>('/api/offboarding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchOffboarding(id: number, partial: Record<string, any>) {
+  return fetchAPI<any>(`/api/offboarding/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partial),
+  });
+}
+
+export async function deleteOffboarding(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}`, { method: 'DELETE' });
+}
+
+export async function recomputeOffboarding(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}/recompute`, { method: 'POST' });
+}
+
+export async function sendOffboardingEmail(id: number) {
+  return fetchAPI<any>(`/api/offboarding/${id}/send-email`, { method: 'POST' });
+}
+
+export async function getOffboardingDashboard() {
+  return fetchAPI<any>('/api/offboarding/dashboard');
+}
+
+export async function getOffboardingRecipients() {
+  return fetchAPI<any>('/api/offboarding/settings/email-recipients');
+}
+
+export async function setOffboardingRecipients(emails: string[]) {
+  return fetchAPI<any>('/api/offboarding/settings/email-recipients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails }),
+  });
+}
+
+// ===== Onboarding =====
+export async function getOnboardings(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI<any>(`/api/onboarding${query ? '?' + query : ''}`);
+}
+
+export async function getOnboarding(id: number) {
+  return fetchAPI<any>(`/api/onboarding/${id}`);
+}
+
+export async function patchOnboarding(id: number, partial: Record<string, any>) {
+  return fetchAPI<any>(`/api/onboarding/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partial),
+  });
+}
+
+export async function sendOnboardingEmail(id: number) {
+  return fetchAPI<any>(`/api/onboarding/${id}/send-email`, { method: 'POST' });
+}
+
+export async function getOnboardingDashboard() {
+  return fetchAPI<any>('/api/onboarding/dashboard');
+}
+
+export async function getOnboardingRecipients() {
+  return fetchAPI<any>('/api/onboarding/settings/email-recipients');
+}
+
+export async function setOnboardingRecipients(emails: string[]) {
+  return fetchAPI<any>('/api/onboarding/settings/email-recipients', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails }),
+  });
 }

@@ -6,6 +6,10 @@ import {
   Plus, X, Trash2, Edit3, ChevronDown, ChevronUp
 } from "lucide-react";
 import { getWorkforcePlanSlots, saveWorkforcePlanSlotsBatch, getWorkforcePlanComparison } from "@/lib/api";
+import {
+  PageHeader, Card, CardHeader, Stat, Button, Badge, CenterSpinner,
+  Table, THead, TBody, TR, TH, TD, useToast,
+} from "@/components/ui";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 const WORKER_TYPES = ["파견", "알바(사업소득)"] as const;
@@ -32,8 +36,8 @@ const PRESET_SHIFTS = [
 ];
 
 const TYPE_COLORS: Record<WorkerType, { bg: string; border: string; bar: string; barHex: string; text: string; light: string }> = {
-  "파견": { bg: "bg-[#FC7840]/10", border: "border-orange-300", bar: "bg-[#FC7840]", barHex: "#f97316", text: "text-[#FC7840]", light: "bg-[#FC7840]/15" },
-  "알바(사업소득)": { bg: "bg-emerald-50", border: "border-emerald-300", bar: "bg-emerald-500", barHex: "#10b981", text: "text-emerald-700", light: "bg-emerald-100" },
+  "파견": { bg: "bg-[var(--warning-bg)]", border: "border-[var(--warning-border)]", bar: "bg-[#FC7840]", barHex: "#FC7840", text: "text-[var(--warning-fg)]", light: "bg-[#FC7840]/15" },
+  "알바(사업소득)": { bg: "bg-[var(--success-bg)]", border: "border-[var(--success-border)]", bar: "bg-[var(--success-fg)]", barHex: "#34D399", text: "text-[var(--success-fg)]", light: "bg-[var(--success-bg)]" },
 };
 
 function getDaysInMonth(year: number, month: number) {
@@ -66,6 +70,7 @@ let localIdCounter = 0;
 function genLocalId() { return `local_${++localIdCounter}_${Date.now()}`; }
 
 export default function WorkforcePlanPage() {
+  const toast = useToast();
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
@@ -74,22 +79,16 @@ export default function WorkforcePlanPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
-  // Day detail panel
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  // Add form
   const [addForm, setAddForm] = useState<{
     worker_type: WorkerType; start_hour: number; duration: number; headcount: number; memo: string;
   } | null>(null);
-  // Edit mode
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
-  // Collapsed weeks
   const [collapsedWeeks, setCollapsedWeeks] = useState<Set<number>>(new Set());
-  // Comparison
   const [comparison, setComparison] = useState<any>(null);
   const [showComparison, setShowComparison] = useState(false);
 
   const daysInMonth = getDaysInMonth(year, month);
-
   const [apiReady, setApiReady] = useState(true);
 
   const fetchSlots = useCallback(async () => {
@@ -103,7 +102,6 @@ export default function WorkforcePlanPage() {
       setSelectedDay(null);
       setApiReady(true);
     } catch (err: any) {
-      // If API not deployed yet (404), show empty state gracefully
       if (err.message?.includes("404") || err.message?.includes("오류")) {
         setSlots([]);
         setApiReady(false);
@@ -140,7 +138,6 @@ export default function WorkforcePlanPage() {
     }
   };
 
-  // Slot CRUD
   const addSlot = (day: number, slot: Omit<TimeSlot, "_localId" | "day">) => {
     setSlots(prev => [...prev, { ...slot, day, _localId: genLocalId() }]);
     setHasChanges(true);
@@ -158,13 +155,11 @@ export default function WorkforcePlanPage() {
     setEditingSlotId(null);
   };
 
-  // Apply preset
   const applyPreset = (day: number, preset: typeof PRESET_SHIFTS[0], type: WorkerType, headcount: number) => {
     addSlot(day, { worker_type: type, start_hour: preset.start, duration: preset.dur, headcount, memo: "" });
     setAddForm(null);
   };
 
-  // Computed
   const slotsByDay = useMemo(() => {
     const map: Record<number, TimeSlot[]> = {};
     for (const s of slots) {
@@ -260,23 +255,20 @@ export default function WorkforcePlanPage() {
     }
   };
 
-  // Mini 24h timeline bar for a day - split top/bottom for 파견/알바
   const MiniTimeline = ({ day }: { day: number }) => {
     const daySlots = slotsByDay[day] || [];
-    if (daySlots.length === 0) return <div className="h-4 bg-[#141516] rounded-sm" />;
+    if (daySlots.length === 0) return <div className="h-4 bg-[var(--bg-2)] rounded-sm" />;
     const hasMultiTypes = new Set(daySlots.map(s => s.worker_type)).size > 1;
     return (
-      <div className="relative h-4 bg-[#141516] rounded-sm overflow-hidden">
-        {/* 6h grid markers */}
+      <div className="relative h-4 bg-[var(--bg-2)] rounded-sm overflow-hidden">
         {[6, 12, 18].map(h => (
-          <div key={h} className="absolute top-0 h-full w-px bg-[#232326]" style={{ left: `${(h / 24) * 100}%` }} />
+          <div key={h} className="absolute top-0 h-full w-px bg-[var(--border-1)]" style={{ left: `${(h / 24) * 100}%` }} />
         ))}
         {daySlots.map(s => {
           const left = (s.start_hour / 24) * 100;
           const width = Math.min((s.duration / 24) * 100, 100 - left);
           const colors = TYPE_COLORS[s.worker_type as WorkerType];
           const isAlba = s.worker_type === "알바(사업소득)";
-          // When both types exist, split vertically: 파견=top half, 알바=bottom half
           const topStyle = hasMultiTypes ? (isAlba ? "top-[50%] h-[50%]" : "top-0 h-[50%]") : "top-0 h-full";
           return (
             <div
@@ -300,164 +292,147 @@ export default function WorkforcePlanPage() {
 
   return (
     <div className="flex gap-4">
-      {/* Main content */}
       <div className={`flex-1 min-w-0 ${selectedDay ? "max-w-[calc(100%-380px)]" : ""}`}>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-2xl font-bold text-[#F7F8F8]">인력 조달 계획 수립</h2>
-            <p className="text-[#8A8F98] mt-1 text-sm">일별 시간대 기반으로 인력 투입을 계획합니다.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-[#0F1011] rounded-xl border border-[#23252A] px-3 py-2">
-              <button onClick={prevMonth} className="p-1 hover:bg-[#141516]/5 rounded"><ChevronLeft size={18} /></button>
-              <span className="text-base font-semibold text-[#F7F8F8] min-w-[110px] text-center">{year}년 {month}월</span>
-              <button onClick={nextMonth} className="p-1 hover:bg-[#141516]/5 rounded"><ChevronRight size={18} /></button>
+        <PageHeader
+          eyebrow="인력 계획"
+          title="인력 조달 계획 수립"
+          description="일별 시간대 기반으로 인력 투입을 계획합니다."
+          actions={
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-[var(--bg-1)] rounded-[var(--r-lg)] border border-[var(--border-1)] px-2 py-1.5">
+                <Button variant="ghost" size="xs" onClick={prevMonth} leadingIcon={<ChevronLeft size={16} />} />
+                <span className="text-[var(--fs-base)] font-semibold text-[var(--text-1)] min-w-[110px] text-center tabular">
+                  {year}년 {month}월
+                </span>
+                <Button variant="ghost" size="xs" onClick={nextMonth} leadingIcon={<ChevronRight size={16} />} />
+              </div>
+              <Button
+                variant={showComparison ? "primary" : "secondary"}
+                size="sm"
+                onClick={() => { setShowComparison(!showComparison); if (!showComparison) loadComparison(); }}
+              >
+                계획 vs 실적
+              </Button>
+              <Button
+                variant={hasChanges ? "primary" : saved ? "secondary" : "ghost"}
+                size="sm"
+                onClick={handleSave}
+                disabled={saving || !hasChanges}
+                loading={saving}
+                leadingIcon={<Save size={14} />}
+              >
+                {saving ? "저장 중..." : saved ? "저장됨" : "저장"}
+              </Button>
             </div>
-            <button
-              onClick={() => { setShowComparison(!showComparison); if (!showComparison) loadComparison(); }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                showComparison ? 'bg-[#5E6AD2] text-white' : 'bg-[#141516] text-[#D0D6E0] hover:bg-[#141516]/7'
-              }`}
-            >
-              계획 vs 실적
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !hasChanges}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                hasChanges ? "bg-[#5E6AD2] text-white hover:bg-[#828FFF]"
-                  : saved ? "bg-[#27A644]/15 text-[#27A644] border border-[#27A644]/30"
-                    : "bg-[#141516] text-[#62666D] cursor-not-allowed"
-              }`}
-            >
-              <Save size={16} />
-              {saving ? "저장 중..." : saved ? "저장됨" : "저장"}
-            </button>
-          </div>
-        </div>
+          }
+        />
 
-        {/* Notice */}
-        <div className="bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 rounded-xl p-3 mb-4 flex items-start gap-3">
-          <Info size={16} className="text-[#7070FF] shrink-0 mt-0.5" />
-          <div className="text-xs text-[#828FFF]">
+        <Card tone="ghost" className="border-[var(--info-border)] bg-[var(--info-bg)] mb-4 flex items-start gap-3">
+          <Info size={15} className="text-[var(--brand-400)] shrink-0 mt-0.5" />
+          <p className="text-[var(--fs-caption)] text-[var(--brand-400)]">
             <strong>계획 수립용</strong>이며, 실제 운영 결과는 <strong>대시보드</strong>를 참고하세요.
             날짜를 클릭하면 00~24시 시간대별로 인력을 배치할 수 있습니다.
-          </div>
-        </div>
+          </p>
+        </Card>
 
         {!apiReady && (
-          <div className="bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-xl p-3 mb-4 flex items-start gap-3">
-            <Info size={16} className="text-[#F0BF00] shrink-0 mt-0.5" />
-            <div className="text-xs text-[#F0BF00]">
-              <strong>서버 배포 대기 중</strong> - PR을 머지하면 새 기능이 활성화됩니다.
+          <Card tone="ghost" className="border-[var(--warning-border)] bg-[var(--warning-bg)] mb-4 flex items-start gap-3">
+            <Info size={15} className="text-[var(--warning-fg)] shrink-0 mt-0.5" />
+            <p className="text-[var(--fs-caption)] text-[var(--warning-fg)]">
+              <strong>서버 배포 대기 중</strong> — PR을 머지하면 새 기능이 활성화됩니다.
               지금은 로컬에서 계획을 작성하고, 배포 후 저장할 수 있습니다.
-            </div>
-          </div>
+            </p>
+          </Card>
         )}
-        {error && <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-3 text-[#EB5757] text-sm mb-4">{error}</div>}
+        {error && (
+          <Card tone="ghost" className="border-[var(--danger-border)] bg-[var(--danger-bg)] mb-4">
+            <p className="text-[var(--danger-fg)] text-[var(--fs-body)]">{error}</p>
+          </Card>
+        )}
 
-        {/* Comparison Table */}
         {showComparison && comparison && (
-          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden mb-4">
-            <div className="px-5 py-4 border-b border-[#23252A]">
-              <h2 className="text-base font-semibold text-[#F7F8F8]">계획 vs 실적 비교</h2>
+          <Card padding="none" className="mb-4 overflow-hidden">
+            <div className="px-5 py-3 border-b border-[var(--border-1)]">
+              <CardHeader title="계획 vs 실적 비교" />
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[#08090A]">
-                    <th className="py-2.5 px-3 text-left font-medium text-[#8A8F98]">일</th>
-                    <th className="py-2.5 px-3 text-right font-medium text-[#7070FF]">계획(h)</th>
-                    <th className="py-2.5 px-3 text-right font-medium text-[#27A644]">실적(h)</th>
-                    <th className="py-2.5 px-3 text-right font-medium text-[#8A8F98]">인원</th>
-                    <th className="py-2.5 px-3 text-left font-medium text-[#8A8F98]">달성률</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#23252A]">
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>일</TH>
+                    <TH numeric>계획(h)</TH>
+                    <TH numeric>실적(h)</TH>
+                    <TH numeric>인원</TH>
+                    <TH>달성률</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {comparison.days.filter((d: any) => d.planned_hours > 0 || d.actual_hours > 0).map((d: any) => {
                     const rate = d.planned_hours > 0 ? Math.round((d.actual_hours / d.planned_hours) * 100) : 0;
                     return (
-                      <tr key={d.day} className="hover:bg-[#141516]/5/50">
-                        <td className="py-2 px-3 font-medium">{d.day}일</td>
-                        <td className="py-2 px-3 text-right text-[#828FFF]">{d.planned_hours}</td>
-                        <td className="py-2 px-3 text-right text-[#27A644]">{d.actual_hours}</td>
-                        <td className="py-2 px-3 text-right">{d.worker_count}명</td>
-                        <td className="py-2 px-3">
+                      <TR key={d.day}>
+                        <TD emphasis>{d.day}일</TD>
+                        <TD numeric><span className="text-[var(--brand-400)]">{d.planned_hours}</span></TD>
+                        <TD numeric><span className="text-[var(--success-fg)]">{d.actual_hours}</span></TD>
+                        <TD numeric>{d.worker_count}명</TD>
+                        <TD>
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-[#141516] rounded-full overflow-hidden">
+                            <div className="flex-1 h-2 bg-[var(--bg-3)] rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full ${rate >= 100 ? 'bg-[#27A644]' : rate >= 70 ? 'bg-[#F0BF00]/100' : 'bg-red-400'}`}
+                                className={`h-full rounded-full ${rate >= 100 ? 'bg-[var(--success-fg)]' : rate >= 70 ? 'bg-[var(--warning-fg)]' : 'bg-[var(--danger-fg)]'}`}
                                 style={{ width: `${Math.min(rate, 100)}%` }}
                               />
                             </div>
-                            <span className={`text-xs font-medium ${rate >= 100 ? 'text-[#27A644]' : rate >= 70 ? 'text-[#F0BF00]' : 'text-[#EB5757]'}`}>
+                            <span className={`text-[var(--fs-caption)] font-medium tabular ${rate >= 100 ? 'text-[var(--success-fg)]' : rate >= 70 ? 'text-[var(--warning-fg)]' : 'text-[var(--danger-fg)]'}`}>
                               {rate}%
                             </span>
                           </div>
-                        </td>
-                      </tr>
+                        </TD>
+                      </TR>
                     );
                   })}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3">
-            <div className="flex items-center gap-1.5 text-xs text-[#8A8F98] mb-1"><Clock size={12} /> 월간 총 시수</div>
-            <div className="text-xl font-bold text-[#F7F8F8]">{formatHours(monthlyTotals.total)}<span className="text-xs font-normal text-[#62666D] ml-0.5">h</span></div>
-          </div>
-          <div className="bg-[#FC7840]/10 rounded-xl border border-[#FC7840]/30 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-[#FC7840] mb-1"><UserCheck size={12} /> 파견 시수</div>
-            <div className="text-xl font-bold text-[#FC7840]">{formatHours(monthlyTotals.byType["파견"] || 0)}<span className="text-xs font-normal text-orange-400 ml-0.5">h</span></div>
-          </div>
-          <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 mb-1"><UserCheck size={12} /> 알바 시수</div>
-            <div className="text-xl font-bold text-emerald-700">{formatHours(monthlyTotals.byType["알바(사업소득)"] || 0)}<span className="text-xs font-normal text-emerald-400 ml-0.5">h</span></div>
-          </div>
-          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3">
-            <div className="text-xs text-[#8A8F98] mb-1">투입 일수</div>
-            <div className="text-xl font-bold text-[#F7F8F8]">{activeDays}<span className="text-xs font-normal text-[#62666D] ml-0.5">/ {daysInMonth}일</span></div>
-          </div>
-          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] p-3">
-            <div className="text-xs text-[#8A8F98] mb-1">일평균 시수</div>
-            <div className="text-xl font-bold text-[#F7F8F8]">
-              {activeDays > 0 ? formatHours(monthlyTotals.total / activeDays) : "0"}<span className="text-xs font-normal text-[#62666D] ml-0.5">h</span>
-            </div>
-          </div>
+          <Stat label="월간 총 시수" value={formatHours(monthlyTotals.total)} unit="h" tone="brand" icon={<Clock size={14} />} />
+          <Stat label="파견 시수" value={formatHours(monthlyTotals.byType["파견"] || 0)} unit="h" tone="warning" icon={<UserCheck size={14} />} />
+          <Stat label="알바 시수" value={formatHours(monthlyTotals.byType["알바(사업소득)"] || 0)} unit="h" tone="success" icon={<UserCheck size={14} />} />
+          <Stat label="투입 일수" value={String(activeDays)} unit={`/ ${daysInMonth}일`} tone="info" />
+          <Stat
+            label="일평균 시수"
+            value={activeDays > 0 ? formatHours(monthlyTotals.total / activeDays) : "0"}
+            unit="h"
+          />
         </div>
 
-        {/* Weekly Calendar with Timeline */}
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="w-8 h-8 border-4 border-[#5E6AD2]/30 border-t-blue-600 rounded-full animate-spin" />
-          </div>
+          <CenterSpinner />
         ) : (
           <div className="space-y-3">
             {weeks.map((week, wi) => {
               const collapsed = collapsedWeeks.has(wi);
               return (
-                <div key={wi} className="bg-[#0F1011] rounded-xl border border-[#23252A] overflow-hidden">
+                <Card key={wi} padding="none" className="overflow-hidden">
                   <div
-                    className="px-4 py-2.5 bg-[#08090A] border-b border-[#23252A] flex items-center justify-between cursor-pointer hover:bg-[#141516]/5 transition-colors"
+                    className="px-4 py-2.5 bg-[var(--bg-0)] border-b border-[var(--border-1)] flex items-center justify-between cursor-pointer hover:bg-[var(--bg-1)] transition-colors"
                     onClick={() => toggleWeek(wi)}
                   >
                     <div className="flex items-center gap-2">
-                      {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                      <h3 className="font-semibold text-[#F7F8F8] text-sm">{week.week}주차</h3>
+                      {collapsed ? <ChevronDown size={14} className="text-[var(--text-3)]" /> : <ChevronUp size={14} className="text-[var(--text-3)]" />}
+                      <span className="font-semibold text-[var(--text-1)] text-[var(--fs-body)]">{week.week}주차</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="text-[#FC7840] font-medium">파견: {formatHours(weeklyTotals[wi]?.byType["파견"] || 0)}h</span>
-                      <span className="text-emerald-600 font-medium">알바: {formatHours(weeklyTotals[wi]?.byType["알바(사업소득)"] || 0)}h</span>
-                      <span className="text-[#D0D6E0] font-semibold">합계: {formatHours(weeklyTotals[wi]?.total || 0)}h</span>
+                    <div className="flex items-center gap-3 text-[var(--fs-caption)]">
+                      <span className="text-[var(--warning-fg)] font-medium">파견: {formatHours(weeklyTotals[wi]?.byType["파견"] || 0)}h</span>
+                      <span className="text-[var(--success-fg)] font-medium">알바: {formatHours(weeklyTotals[wi]?.byType["알바(사업소득)"] || 0)}h</span>
+                      <span className="text-[var(--text-2)] font-semibold">합계: {formatHours(weeklyTotals[wi]?.total || 0)}h</span>
                     </div>
                   </div>
                   {!collapsed && (
-                    <div className="divide-y divide-[#23252A]">
+                    <div className="divide-y divide-[var(--border-1)]">
                       {week.days.map(day => {
                         const dow = getDayOfWeek(year, month, day);
                         const dayName = DAY_NAMES[dow];
@@ -468,41 +443,42 @@ export default function WorkforcePlanPage() {
                           <div
                             key={day}
                             className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
-                              isSelected ? "bg-[#4EA7FC]/10 border-l-4 border-l-blue-500" : weekend ? "bg-[#FC7840]/10/30 hover:bg-[#FC7840]/10/60" : "hover:bg-[#141516]/5"
+                              isSelected
+                                ? "bg-[var(--info-bg)] border-l-2 border-l-[var(--brand-400)]"
+                                : weekend
+                                ? "bg-[var(--warning-bg)]/30 hover:bg-[var(--warning-bg)]/60"
+                                : "hover:bg-[var(--bg-2)]"
                             }`}
                             onClick={() => setSelectedDay(isSelected ? null : day)}
                           >
-                            {/* Date label */}
                             <div className="flex items-center gap-1.5 w-16 shrink-0">
-                              <span className={`text-sm font-semibold tabular-nums ${
-                                dow === 0 ? "text-[#EB5757]" : dow === 6 ? "text-blue-500" : "text-[#F7F8F8]"
+                              <span className={`text-[var(--fs-body)] font-semibold tabular ${
+                                dow === 0 ? "text-[var(--danger-fg)]" : dow === 6 ? "text-[var(--brand-400)]" : "text-[var(--text-1)]"
                               }`}>{day}일</span>
-                              <span className={`text-xs ${
-                                dow === 0 ? "text-red-400" : dow === 6 ? "text-blue-400" : "text-[#62666D]"
+                              <span className={`text-[var(--fs-caption)] ${
+                                dow === 0 ? "text-[var(--danger-fg)]" : dow === 6 ? "text-[var(--brand-400)]" : "text-[var(--text-4)]"
                               }`}>{dayName}</span>
                             </div>
-                            {/* Mini 24h timeline */}
                             <div className="flex-1 min-w-0">
                               <MiniTimeline day={day} />
                             </div>
-                            {/* Day stats */}
                             <div className="flex items-center gap-2 shrink-0 w-44 justify-end">
                               {ds && ds.totalHours > 0 ? (
                                 <>
                                   {ds.byType["파견"] && (
-                                    <span className="text-[10px] bg-[#FC7840]/15 text-[#FC7840] px-1.5 py-0.5 rounded font-medium">
+                                    <Badge tone="warning" size="xs">
                                       파견 {ds.byType["파견"].people}명 {formatHours(ds.byType["파견"].hours)}h
-                                    </span>
+                                    </Badge>
                                   )}
                                   {ds.byType["알바(사업소득)"] && (
-                                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                                    <Badge tone="success" size="xs">
                                       알바 {ds.byType["알바(사업소득)"].people}명 {formatHours(ds.byType["알바(사업소득)"].hours)}h
-                                    </span>
+                                    </Badge>
                                   )}
-                                  <span className="text-xs font-bold text-[#D0D6E0] tabular-nums">{formatHours(ds.totalHours)}h</span>
+                                  <span className="text-[var(--fs-caption)] font-bold text-[var(--text-2)] tabular">{formatHours(ds.totalHours)}h</span>
                                 </>
                               ) : (
-                                <span className="text-xs text-[#62666D]">-</span>
+                                <span className="text-[var(--fs-caption)] text-[var(--text-4)]">-</span>
                               )}
                             </div>
                           </div>
@@ -510,109 +486,108 @@ export default function WorkforcePlanPage() {
                       })}
                     </div>
                   )}
-                </div>
+                </Card>
               );
             })}
 
-            {/* Monthly Total */}
-            <div className="bg-blue-900 rounded-xl p-4 text-white">
+            <Card className="bg-[var(--bg-2)] border-[var(--border-2)]">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold">{month}월 전체 계획 요약</h3>
-                <div className="flex items-center gap-5">
+                <h3 className="text-[var(--fs-base)] font-bold text-[var(--text-1)]">{month}월 전체 계획 요약</h3>
+                <div className="flex items-center gap-6">
                   <div className="text-center">
-                    <div className="text-blue-200 text-xs">파견</div>
-                    <div className="text-lg font-bold">{formatHours(monthlyTotals.byType["파견"] || 0)}<span className="text-xs font-normal text-blue-300 ml-0.5">h</span></div>
+                    <div className="text-[var(--fs-caption)] text-[var(--warning-fg)]">파견</div>
+                    <div className="text-[var(--fs-h4)] font-bold text-[var(--warning-fg)] tabular">
+                      {formatHours(monthlyTotals.byType["파견"] || 0)}<span className="text-[var(--fs-caption)] font-normal ml-0.5">h</span>
+                    </div>
                   </div>
                   <div className="text-center">
-                    <div className="text-blue-200 text-xs">알바</div>
-                    <div className="text-lg font-bold">{formatHours(monthlyTotals.byType["알바(사업소득)"] || 0)}<span className="text-xs font-normal text-blue-300 ml-0.5">h</span></div>
+                    <div className="text-[var(--fs-caption)] text-[var(--success-fg)]">알바</div>
+                    <div className="text-[var(--fs-h4)] font-bold text-[var(--success-fg)] tabular">
+                      {formatHours(monthlyTotals.byType["알바(사업소득)"] || 0)}<span className="text-[var(--fs-caption)] font-normal ml-0.5">h</span>
+                    </div>
                   </div>
-                  <div className="text-center border-l border-blue-700 pl-5">
-                    <div className="text-blue-200 text-xs">총 시수</div>
-                    <div className="text-xl font-bold">{formatHours(monthlyTotals.total)}<span className="text-xs font-normal text-blue-300 ml-0.5">h</span></div>
+                  <div className="text-center border-l border-[var(--border-2)] pl-6">
+                    <div className="text-[var(--fs-caption)] text-[var(--text-3)]">총 시수</div>
+                    <div className="text-[var(--fs-h3)] font-bold text-[var(--text-1)] tabular">
+                      {formatHours(monthlyTotals.total)}<span className="text-[var(--fs-caption)] font-normal ml-0.5">h</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
           </div>
         )}
       </div>
 
-      {/* Day Detail Side Panel */}
       {selectedDay && (
         <div className="w-[360px] shrink-0 sticky top-4 self-start">
-          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_7px_32px_rgba(0,0,0,0.35)] overflow-hidden">
-            {/* Panel header */}
-            <div className="px-4 py-3 bg-[#08090A] border-b border-[#23252A] flex items-center justify-between">
+          <Card padding="none" className="overflow-hidden shadow-[var(--elev-3)]">
+            <div className="px-4 py-3 bg-[var(--bg-0)] border-b border-[var(--border-1)] flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-[#F7F8F8]">
+                <h3 className="font-bold text-[var(--text-1)]">
                   {month}월 {selectedDay}일
-                  <span className={`ml-1.5 text-sm font-medium ${
-                    selectedDayDow === 0 ? "text-[#EB5757]" : selectedDayDow === 6 ? "text-blue-500" : "text-[#8A8F98]"
+                  <span className={`ml-1.5 text-[var(--fs-body)] font-medium ${
+                    selectedDayDow === 0 ? "text-[var(--danger-fg)]" : selectedDayDow === 6 ? "text-[var(--brand-400)]" : "text-[var(--text-3)]"
                   }`}>({DAY_NAMES[selectedDayDow]})</span>
                 </h3>
-                <p className="text-xs text-[#8A8F98] mt-0.5">
-                  총 {formatHours(dayStats[selectedDay]?.totalHours || 0)}h / {dayStats[selectedDay]?.totalPeople || 0}명
+                <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-0.5">
+                  총 <span className="tabular">{formatHours(dayStats[selectedDay]?.totalHours || 0)}</span>h / {dayStats[selectedDay]?.totalPeople || 0}명
                 </p>
               </div>
-              <button onClick={() => { setSelectedDay(null); setAddForm(null); setEditingSlotId(null); }} className="p-1 hover:bg-[#141516]/7 rounded">
-                <X size={16} />
-              </button>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => { setSelectedDay(null); setAddForm(null); setEditingSlotId(null); }}
+                leadingIcon={<X size={14} />}
+              />
             </div>
 
-            {/* 24h Visual Timeline */}
-            <div className="px-4 py-3 border-b border-[#23252A]">
+            <div className="px-4 py-3 border-b border-[var(--border-1)]">
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-[#8A8F98] font-medium">24시간 타임라인</div>
+                <div className="text-eyebrow">24시간 타임라인</div>
                 <div className="flex items-center gap-2">
                   {WORKER_TYPES.map(type => {
                     const colors = TYPE_COLORS[type];
                     return (
                       <div key={type} className="flex items-center gap-1">
                         <div className={`w-2.5 h-2.5 rounded-sm ${colors.bar}`} />
-                        <span className="text-[9px] text-[#8A8F98]">{type === "알바(사업소득)" ? "알바" : type}</span>
+                        <span className="text-[9px] text-[var(--text-3)]">{type === "알바(사업소득)" ? "알바" : type}</span>
                       </div>
                     );
                   })}
                 </div>
               </div>
               <div className="relative">
-                {/* Hour markers */}
-                <div className="flex h-5 border-b border-[#23252A]">
+                <div className="flex h-5 border-b border-[var(--border-1)]">
                   {Array.from({ length: 24 }, (_, i) => (
-                    <div key={i} className={`flex-1 border-l text-center ${
-                      i % 6 === 0 ? "border-[#23252A]" : "border-[#23252A]"
-                    }`}>
-                      {i % 3 === 0 && <span className="text-[9px] text-[#62666D] tabular-nums">{String(i).padStart(2, "0")}</span>}
+                    <div key={i} className="flex-1 border-l border-[var(--border-1)] text-center">
+                      {i % 3 === 0 && <span className="text-[9px] text-[var(--text-4)] tabular">{String(i).padStart(2, "0")}</span>}
                     </div>
                   ))}
-                  <div className="border-l border-[#23252A] w-0" />
+                  <div className="border-l border-[var(--border-1)] w-0" />
                 </div>
-                {/* Timeline bars - one row per type */}
                 {WORKER_TYPES.map(type => {
                   const typeSlots = selectedDaySlots.filter(s => s.worker_type === type);
                   const colors = TYPE_COLORS[type];
                   return (
                     <div key={type} className="relative h-8 mt-px">
-                      <div className="absolute inset-0 bg-[#08090A]/50 rounded-sm" />
-                      {/* Hour grid lines */}
+                      <div className="absolute inset-0 bg-[var(--bg-0)] rounded-sm" />
                       <div className="absolute inset-0 flex">
                         {Array.from({ length: 24 }, (_, i) => (
-                          <div key={i} className={`flex-1 border-l ${i % 6 === 0 ? "border-[#23252A]" : "border-[#23252A]/50"}`} />
+                          <div key={i} className={`flex-1 border-l ${i % 6 === 0 ? "border-[var(--border-1)]" : "border-[var(--border-1)]/40"}`} />
                         ))}
                       </div>
-                      {/* Type label on left */}
                       <div className="absolute -left-0 top-0 h-full flex items-center z-10">
-                        <span className={`text-[8px] font-semibold ${colors.text} bg-[#0F1011]/80 px-0.5 rounded`}>
+                        <span className={`text-[8px] font-semibold ${colors.text} bg-[var(--bg-1)] px-0.5 rounded`}>
                           {type === "알바(사업소득)" ? "알바" : type}
                         </span>
                       </div>
                       {typeSlots.length === 0 ? (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-[9px] text-[#62666D]">-</span>
+                          <span className="text-[9px] text-[var(--text-4)]">-</span>
                         </div>
                       ) : (
-                        typeSlots.map((s, si) => {
+                        typeSlots.map((s) => {
                           const left = (s.start_hour / 24) * 100;
                           const width = Math.min((s.duration / 24) * 100, 100 - left);
                           const isEditing = editingSlotId === s._localId;
@@ -620,7 +595,7 @@ export default function WorkforcePlanPage() {
                             <div
                               key={s._localId}
                               className={`absolute top-1 h-6 rounded cursor-pointer transition-all ${
-                                isEditing ? "ring-2 ring-blue-500 ring-offset-1 z-20" : "hover:brightness-110 z-10"
+                                isEditing ? "ring-2 ring-[var(--brand-400)] ring-offset-1 z-20" : "hover:brightness-110 z-10"
                               }`}
                               style={{
                                 left: `${left}%`,
@@ -633,14 +608,8 @@ export default function WorkforcePlanPage() {
                               title={`${formatTimeRange(s.start_hour, s.duration)} ${s.headcount}명 (${formatHours(s.duration * s.headcount)}h)`}
                             >
                               <div className="flex items-center justify-center h-full gap-0.5 px-1">
-                                <span className="text-white text-[9px] font-bold truncate drop-shadow-[0px_1px_3px_rgba(0,0,0,0.2)]">
-                                  {s.headcount}명
-                                </span>
-                                {width > 12 && (
-                                  <span className="text-white/70 text-[8px] truncate">
-                                    {s.duration}h
-                                  </span>
-                                )}
+                                <span className="text-white text-[9px] font-bold truncate">{s.headcount}명</span>
+                                {width > 12 && <span className="text-white/70 text-[8px] truncate">{s.duration}h</span>}
                               </div>
                             </div>
                           );
@@ -650,71 +619,69 @@ export default function WorkforcePlanPage() {
                   );
                 })}
                 {selectedDaySlots.length === 0 && (
-                  <div className="h-10 flex items-center justify-center text-xs text-[#62666D]">시간 블록을 추가하세요</div>
+                  <div className="h-10 flex items-center justify-center text-[var(--fs-caption)] text-[var(--text-4)]">시간 블록을 추가하세요</div>
                 )}
               </div>
             </div>
 
-            {/* Slot list */}
             <div className="px-4 py-2 max-h-[300px] overflow-y-auto">
-              <div className="text-xs text-[#8A8F98] font-medium mb-2">배치 목록</div>
+              <div className="text-eyebrow mb-2">배치 목록</div>
               {selectedDaySlots.length === 0 ? (
-                <div className="text-center py-4 text-xs text-[#62666D]">아직 배치된 인력이 없습니다</div>
+                <div className="text-center py-4 text-[var(--fs-caption)] text-[var(--text-4)]">아직 배치된 인력이 없습니다</div>
               ) : (
                 <div className="space-y-1.5">
                   {selectedDaySlots.map(s => {
                     const colors = TYPE_COLORS[s.worker_type as WorkerType];
                     const isEditing = editingSlotId === s._localId;
                     return (
-                      <div key={s._localId} className={`rounded-lg border p-2 ${isEditing ? "border-blue-300 bg-[#4EA7FC]/10" : `${colors.border} ${colors.bg}`}`}>
+                      <div
+                        key={s._localId}
+                        className={`rounded-[var(--r-md)] border p-2 ${isEditing ? "border-[var(--brand-400)] bg-[var(--info-bg)]" : `${colors.border} ${colors.bg}`}`}
+                      >
                         {isEditing ? (
                           <div className="space-y-2">
                             <div className="flex gap-2">
                               <select
                                 value={s.worker_type}
                                 onChange={(e) => updateSlot(s._localId, { worker_type: e.target.value as WorkerType })}
-                                className="text-xs border rounded px-1.5 py-1 flex-1"
+                                className="text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-1.5 py-1 flex-1 bg-[var(--bg-2)] text-[var(--text-1)]"
                               >
                                 {WORKER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                               </select>
                               <input type="number" min={0} max={23} value={s.start_hour}
                                 onChange={e => updateSlot(s._localId, { start_hour: parseInt(e.target.value) || 0 })}
-                                className="w-14 text-xs border rounded px-1.5 py-1 text-center" placeholder="시작"
+                                className="w-14 text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-1.5 py-1 text-center bg-[var(--bg-2)] text-[var(--text-1)]" placeholder="시작"
                               />
-                              <span className="text-xs text-[#62666D] self-center">~</span>
+                              <span className="text-[var(--fs-caption)] text-[var(--text-3)] self-center">~</span>
                               <input type="number" min={1} max={24} value={s.duration}
                                 onChange={e => updateSlot(s._localId, { duration: parseFloat(e.target.value) || 1 })}
-                                className="w-14 text-xs border rounded px-1.5 py-1 text-center" placeholder="시간"
+                                className="w-14 text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-1.5 py-1 text-center bg-[var(--bg-2)] text-[var(--text-1)]" placeholder="시간"
                               />
-                              <span className="text-[10px] text-[#62666D] self-center">h</span>
+                              <span className="text-[9px] text-[var(--text-3)] self-center">h</span>
                             </div>
                             <div className="flex gap-2 items-center">
-                              <span className="text-xs text-[#8A8F98]">인원:</span>
+                              <span className="text-[var(--fs-caption)] text-[var(--text-3)]">인원:</span>
                               <input type="number" min={1} max={99} value={s.headcount}
                                 onChange={e => updateSlot(s._localId, { headcount: parseInt(e.target.value) || 1 })}
-                                className="w-14 text-xs border rounded px-1.5 py-1 text-center"
+                                className="w-14 text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-1.5 py-1 text-center bg-[var(--bg-2)] text-[var(--text-1)]"
                               />
-                              <span className="text-[10px] text-[#62666D]">명</span>
-                              <span className="text-[10px] text-[#8A8F98] ml-auto">= {formatHours(s.duration * s.headcount)}h</span>
+                              <span className="text-[9px] text-[var(--text-3)]">명</span>
+                              <span className="text-[9px] text-[var(--text-3)] ml-auto tabular">= {formatHours(s.duration * s.headcount)}h</span>
                             </div>
                           </div>
                         ) : (
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${colors.light} ${colors.text}`}>
+                              <Badge tone={s.worker_type === "파견" ? "warning" : "success"} size="xs">
                                 {s.worker_type === "알바(사업소득)" ? "알바" : s.worker_type}
-                              </span>
-                              <span className="text-xs font-mono text-[#D0D6E0]">{formatTimeRange(s.start_hour, s.duration)}</span>
-                              <span className="text-xs font-medium text-[#F7F8F8]">{s.headcount}명</span>
+                              </Badge>
+                              <span className="text-[var(--fs-caption)] text-mono text-[var(--text-2)]">{formatTimeRange(s.start_hour, s.duration)}</span>
+                              <span className="text-[var(--fs-caption)] font-medium text-[var(--text-1)]">{s.headcount}명</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-[#8A8F98] mr-1">{formatHours(s.duration * s.headcount)}h</span>
-                              <button onClick={(e) => { e.stopPropagation(); setEditingSlotId(s._localId); }} className="p-0.5 hover:bg-[#141516]/7 rounded">
-                                <Edit3 size={12} className="text-[#62666D]" />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); removeSlot(s._localId); }} className="p-0.5 hover:bg-[#EB5757]/15 rounded">
-                                <Trash2 size={12} className="text-red-400" />
-                              </button>
+                              <span className="text-[9px] text-[var(--text-3)] mr-1 tabular">{formatHours(s.duration * s.headcount)}h</span>
+                              <Button variant="ghost" size="xs" onClick={(e) => { e.stopPropagation(); setEditingSlotId(s._localId); }} leadingIcon={<Edit3 size={11} />} />
+                              <Button variant="danger" size="xs" onClick={(e) => { e.stopPropagation(); removeSlot(s._localId); }} leadingIcon={<Trash2 size={11} />} />
                             </div>
                           </div>
                         )}
@@ -725,51 +692,48 @@ export default function WorkforcePlanPage() {
               )}
             </div>
 
-            {/* Add new slot */}
-            <div className="px-4 py-3 border-t border-[#23252A]">
+            <div className="px-4 py-3 border-t border-[var(--border-1)]">
               {addForm ? (
                 <div className="space-y-3">
-                  <div className="text-xs font-medium text-[#D0D6E0]">시간 블록 추가</div>
-                  {/* Presets */}
+                  <div className="text-eyebrow">시간 블록 추가</div>
                   <div className="flex flex-wrap gap-1.5">
                     {PRESET_SHIFTS.map(p => (
                       <button
                         key={p.label}
                         onClick={() => setAddForm(f => f ? { ...f, start_hour: p.start, duration: p.dur } : f)}
-                        className={`px-2 py-1 text-[10px] rounded-md border transition-colors ${
+                        className={`px-2 py-1 text-[9px] rounded-[var(--r-sm)] border transition-colors ${
                           addForm.start_hour === p.start && addForm.duration === p.dur
-                            ? "bg-[#4EA7FC]/15 border-blue-300 text-[#828FFF] font-medium"
-                            : "bg-[#08090A] border-[#23252A] text-[#8A8F98] hover:bg-[#141516]/5"
+                            ? "bg-[var(--info-bg)] border-[var(--brand-400)] text-[var(--brand-400)] font-medium"
+                            : "bg-[var(--bg-0)] border-[var(--border-1)] text-[var(--text-3)] hover:bg-[var(--bg-2)]"
                         }`}
                       >
-                        {p.label} <span className="text-[#62666D]">{p.desc}</span>
+                        {p.label} <span className="text-[var(--text-4)]">{p.desc}</span>
                       </button>
                     ))}
                   </div>
-                  {/* Custom inputs */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-[#8A8F98]">유형</label>
+                      <label className="text-[9px] text-[var(--text-3)]">유형</label>
                       <select
                         value={addForm.worker_type}
                         onChange={e => setAddForm(f => f ? { ...f, worker_type: e.target.value as WorkerType } : f)}
-                        className="w-full text-xs border rounded-md px-2 py-1.5 mt-0.5"
+                        className="w-full text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-2 py-1.5 mt-0.5 bg-[var(--bg-2)] text-[var(--text-1)]"
                       >
                         {WORKER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-[#8A8F98]">인원</label>
+                      <label className="text-[9px] text-[var(--text-3)]">인원</label>
                       <input type="number" min={1} max={99} value={addForm.headcount}
                         onChange={e => setAddForm(f => f ? { ...f, headcount: parseInt(e.target.value) || 1 } : f)}
-                        className="w-full text-xs border rounded-md px-2 py-1.5 mt-0.5 text-center" />
+                        className="w-full text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-2 py-1.5 mt-0.5 text-center bg-[var(--bg-2)] text-[var(--text-1)]" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-[#8A8F98]">시작 시간</label>
+                      <label className="text-[9px] text-[var(--text-3)]">시작 시간</label>
                       <select
                         value={addForm.start_hour}
                         onChange={e => setAddForm(f => f ? { ...f, start_hour: parseInt(e.target.value) } : f)}
-                        className="w-full text-xs border rounded-md px-2 py-1.5 mt-0.5"
+                        className="w-full text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-2 py-1.5 mt-0.5 bg-[var(--bg-2)] text-[var(--text-1)]"
                       >
                         {Array.from({ length: 24 }, (_, i) => (
                           <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>
@@ -777,11 +741,11 @@ export default function WorkforcePlanPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-[#8A8F98]">근무 시간</label>
+                      <label className="text-[9px] text-[var(--text-3)]">근무 시간</label>
                       <select
                         value={addForm.duration}
                         onChange={e => setAddForm(f => f ? { ...f, duration: parseFloat(e.target.value) } : f)}
-                        className="w-full text-xs border rounded-md px-2 py-1.5 mt-0.5"
+                        className="w-full text-[var(--fs-caption)] border border-[var(--border-2)] rounded-[var(--r-sm)] px-2 py-1.5 mt-0.5 bg-[var(--bg-2)] text-[var(--text-1)]"
                       >
                         {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24].map(h => (
                           <option key={h} value={h}>{h}시간</option>
@@ -789,11 +753,14 @@ export default function WorkforcePlanPage() {
                       </select>
                     </div>
                   </div>
-                  <div className="text-[10px] text-[#8A8F98] bg-[#08090A] rounded p-2">
-                    {formatTimeRange(addForm.start_hour, addForm.duration)} | {addForm.headcount}명 x {addForm.duration}h = <strong>{formatHours(addForm.duration * addForm.headcount)}h</strong>
+                  <div className="text-[9px] text-[var(--text-3)] bg-[var(--bg-0)] rounded-[var(--r-sm)] p-2">
+                    {formatTimeRange(addForm.start_hour, addForm.duration)} | {addForm.headcount}명 x {addForm.duration}h = <strong className="text-[var(--text-2)] tabular">{formatHours(addForm.duration * addForm.headcount)}h</strong>
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="flex-1"
                       onClick={() => {
                         addSlot(selectedDay!, {
                           worker_type: addForm.worker_type,
@@ -802,49 +769,40 @@ export default function WorkforcePlanPage() {
                           headcount: addForm.headcount,
                           memo: addForm.memo,
                         });
-                        // Keep form open for quick adding
                       }}
-                      className="flex-1 bg-[#5E6AD2] text-white text-xs font-medium py-2 rounded-lg hover:bg-[#828FFF] transition-colors"
                     >
                       추가
-                    </button>
-                    <button
-                      onClick={() => setAddForm(null)}
-                      className="px-3 text-xs text-[#8A8F98] border border-[#23252A] rounded-lg hover:bg-[#141516]/5"
-                    >
-                      닫기
-                    </button>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setAddForm(null)}>닫기</Button>
                   </div>
                 </div>
               ) : (
                 <button
                   onClick={() => setAddForm({ worker_type: "파견", start_hour: 8, duration: 9, headcount: 1, memo: "" })}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 border-2 border-dashed border-[#23252A] rounded-lg text-xs text-[#8A8F98] hover:border-blue-400 hover:text-[#7070FF] transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 border-2 border-dashed border-[var(--border-1)] rounded-[var(--r-md)] text-[var(--fs-caption)] text-[var(--text-3)] hover:border-[var(--brand-400)] hover:text-[var(--brand-400)] transition-colors"
                 >
                   <Plus size={14} />
                   시간 블록 추가
                 </button>
               )}
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
-      {/* Floating Save Button */}
       {hasChanges && (
         <div className="fixed bottom-8 right-8 z-40">
-          <button
+          <Button
+            variant="primary"
+            size="lg"
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 bg-[#5E6AD2] text-white px-6 py-3 rounded-xl text-sm font-medium shadow-[0px_7px_32px_rgba(0,0,0,0.35)] hover:bg-[#828FFF] transition-all hover:shadow-[0px_7px_32px_rgba(0,0,0,0.35)]"
+            loading={saving}
+            leadingIcon={<Save size={16} />}
+            className="shadow-[var(--elev-pop)] brand-glow"
           >
-            {saving ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Save size={18} />
-            )}
             {saving ? "저장 중..." : "변경사항 저장"}
-          </button>
+          </Button>
         </div>
       )}
     </div>

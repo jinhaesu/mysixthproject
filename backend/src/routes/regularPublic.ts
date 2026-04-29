@@ -38,26 +38,32 @@ router.post('/:token/vacation', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check remaining balance
-    const year = parseInt(start_date.slice(0, 4));
-    const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employee.id, year) as any;
-    const remaining = balance ? (parseFloat(balance.total_days) - parseFloat(balance.used_days)) : 0;
+    const reqType = type || '연차';
+    // 공가(민방위/예비군/투표 등 법정 유급 공가)는 연차 잔여에서 차감하지 않음 → 잔여 검증 생략
+    const isPublicLeave = reqType.includes('공가');
 
-    // Count pending requests too
-    const pendingResult = await dbGet(
-      "SELECT COALESCE(SUM(days), 0) as pending_days FROM regular_vacation_requests WHERE employee_id = ? AND status = 'pending' AND start_date LIKE ?",
-      employee.id, `${year}%`
-    ) as any;
-    const pendingDays = parseFloat(pendingResult?.pending_days || 0);
+    if (!isPublicLeave) {
+      // Check remaining balance (연차/반차만)
+      const year = parseInt(start_date.slice(0, 4));
+      const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', employee.id, year) as any;
+      const remaining = balance ? (parseFloat(balance.total_days) - parseFloat(balance.used_days)) : 0;
 
-    if (parseFloat(days) > (remaining - pendingDays)) {
-      res.status(400).json({ error: `잔여 휴가가 부족합니다. (잔여: ${remaining - pendingDays}일)` });
-      return;
+      // Count pending requests too (공가는 제외)
+      const pendingResult = await dbGet(
+        "SELECT COALESCE(SUM(days), 0) as pending_days FROM regular_vacation_requests WHERE employee_id = ? AND status = 'pending' AND start_date LIKE ? AND COALESCE(type, '연차') NOT LIKE '%공가%'",
+        employee.id, `${year}%`
+      ) as any;
+      const pendingDays = parseFloat(pendingResult?.pending_days || 0);
+
+      if (parseFloat(days) > (remaining - pendingDays)) {
+        res.status(400).json({ error: `잔여 휴가가 부족합니다. (잔여: ${remaining - pendingDays}일)` });
+        return;
+      }
     }
 
     await dbRun(
       'INSERT INTO regular_vacation_requests (employee_id, start_date, end_date, days, reason, type) VALUES (?, ?, ?, ?, ?, ?)',
-      employee.id, start_date, end_date, days, reason || '', type || '연차'
+      employee.id, start_date, end_date, days, reason || '', reqType
     );
 
     res.json({ success: true, message: '휴가 신청이 완료되었습니다. 관리자 승인을 기다려주세요.' });
@@ -107,17 +113,63 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
 router.post('/contract/:token/sign', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const { address, signature_data, birth_date, id_number, consent_signed, consent_signature_data } = req.body;
+    const {
+      address, signature_data, birth_date, id_number, consent_signed, consent_signature_data,
+      // New onboarding fields (optional)
+      email, nationality, visa_type, visa_expiry, bank_slip_data, foreign_id_card_data,
+    } = req.body;
     if (!address || !signature_data) { res.status(400).json({ error: '주소와 서명은 필수입니다.' }); return; }
 
     const contract = await dbGet('SELECT * FROM regular_labor_contracts WHERE token = ?', token) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
     if (contract.status === 'signed') { res.status(400).json({ error: '이미 서명된 계약서입니다.' }); return; }
 
+    // Build SET clauses for new optional fields in regular_labor_contracts
+    const contractUpdateClauses: string[] = [
+      'address = ?', 'signature_data = ?', 'birth_date = ?', 'id_number = ?',
+      'consent_signed = ?', 'consent_signature_data = ?', 'status = ?',
+    ];
+    const contractParams: any[] = [
+      address, signature_data, birth_date || '', id_number || '',
+      consent_signed ? 1 : 0, consent_signature_data || '', 'signed',
+    ];
+    if (email !== undefined)             { contractUpdateClauses.push('email = ?');             contractParams.push(email); }
+    if (nationality !== undefined)       { contractUpdateClauses.push('nationality = ?');       contractParams.push(nationality); }
+    if (visa_type !== undefined)         { contractUpdateClauses.push('visa_type = ?');         contractParams.push(visa_type); }
+    if (visa_expiry !== undefined)       { contractUpdateClauses.push('visa_expiry = ?');       contractParams.push(visa_expiry); }
+    if (bank_slip_data !== undefined)    { contractUpdateClauses.push('bank_slip_data = ?');    contractParams.push(bank_slip_data); }
+    if (foreign_id_card_data !== undefined) { contractUpdateClauses.push('foreign_id_card_data = ?'); contractParams.push(foreign_id_card_data); }
+    contractParams.push(token);
+
     await dbRun(
-      'UPDATE regular_labor_contracts SET address = ?, signature_data = ?, birth_date = ?, id_number = ?, consent_signed = ?, consent_signature_data = ?, status = ? WHERE token = ?',
-      address, signature_data, birth_date || '', id_number || '', consent_signed ? 1 : 0, consent_signature_data || '', 'signed', token
+      `UPDATE regular_labor_contracts SET ${contractUpdateClauses.join(', ')} WHERE token = ?`,
+      ...contractParams
     );
+
+    // Propagate new fields to regular_employees (only non-empty values, don't overwrite existing)
+    if (contract.employee_id) {
+      const empUpdateClauses: string[] = [];
+      const empParams: any[] = [];
+
+      if (address)              { empUpdateClauses.push('address = CASE WHEN COALESCE(address, \'\') = \'\' THEN ? ELSE address END');              empParams.push(address); }
+      if (email)                { empUpdateClauses.push('email = CASE WHEN COALESCE(email, \'\') = \'\' THEN ? ELSE email END');                    empParams.push(email); }
+      if (nationality)          { empUpdateClauses.push('nationality = CASE WHEN COALESCE(nationality, \'\') IN (\'\', \'KR\') THEN ? ELSE nationality END'); empParams.push(nationality); }
+      if (visa_type)            { empUpdateClauses.push('visa_type = CASE WHEN COALESCE(visa_type, \'\') = \'\' THEN ? ELSE visa_type END');        empParams.push(visa_type); }
+      if (visa_expiry)          { empUpdateClauses.push('visa_expiry = CASE WHEN COALESCE(visa_expiry, \'\') = \'\' THEN ? ELSE visa_expiry END');  empParams.push(visa_expiry); }
+      if (bank_slip_data)       { empUpdateClauses.push('bank_slip_data = CASE WHEN COALESCE(bank_slip_data, \'\') = \'\' THEN ? ELSE bank_slip_data END'); empParams.push(bank_slip_data); }
+      if (foreign_id_card_data) { empUpdateClauses.push('foreign_id_card_data = CASE WHEN COALESCE(foreign_id_card_data, \'\') = \'\' THEN ? ELSE foreign_id_card_data END'); empParams.push(foreign_id_card_data); }
+      if (id_number)            { empUpdateClauses.push('id_number = CASE WHEN COALESCE(id_number, \'\') = \'\' THEN ? ELSE id_number END');        empParams.push(id_number); }
+      if (birth_date)           { empUpdateClauses.push('birth_date = CASE WHEN COALESCE(birth_date, \'\') = \'\' THEN ? ELSE birth_date END');     empParams.push(birth_date); }
+
+      if (empUpdateClauses.length > 0) {
+        empUpdateClauses.push('updated_at = NOW()');
+        empParams.push(contract.employee_id);
+        await dbRun(
+          `UPDATE regular_employees SET ${empUpdateClauses.join(', ')} WHERE id = ?`,
+          ...empParams
+        );
+      }
+    }
 
     // Send confirmation SMS with contract view link
     const viewLink = getFrontendUrl(`/regular-contract?token=${token}`);

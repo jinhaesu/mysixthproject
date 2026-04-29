@@ -567,15 +567,21 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
 
     await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'approved', admin_memo || '', id);
 
-    // Update used_days in balance
-    const year = parseInt(request.start_date.slice(0, 4));
-    const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
-    if (balance) {
-      await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', request.days, balance.id);
+    const reqType: string = request.type || '연차';
+    const isPublicLeave = reqType.includes('공가'); // 공가/오전공가/오후공가
+    const isFullDay = reqType === '연차' || reqType === '공가';
+
+    // Update used_days in balance — 공가는 연차 잔여에서 차감하지 않음
+    if (!isPublicLeave) {
+      const year = parseInt(request.start_date.slice(0, 4));
+      const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
+      if (balance) {
+        await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', request.days, balance.id);
+      }
     }
 
-    // Auto-create confirmed_attendance for full-day vacation (연차)
-    if (!request.type || request.type === '연차') {
+    // Auto-create confirmed_attendance for full-day leave (연차/공가)
+    if (isFullDay) {
       const emp = await dbGet('SELECT name, phone, department FROM regular_employees WHERE id = ?', request.employee_id) as any;
       if (emp) {
         const start = new Date(request.start_date + 'T00:00:00+09:00');
@@ -587,9 +593,9 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
           try {
             await dbRun(`
               INSERT INTO confirmed_attendance (employee_type, employee_name, employee_phone, date, confirmed_clock_in, confirmed_clock_out, source, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo, year_month, department)
-              VALUES ('정규직', ?, ?, ?, '휴가', '휴가', 'vacation', 8, 0, 0, 0, 0, '연차', ?, ?)
-              ON CONFLICT (employee_type, employee_name, date) DO UPDATE SET confirmed_clock_in='휴가', confirmed_clock_out='휴가', source='vacation', regular_hours=8, overtime_hours=0, night_hours=0, break_hours=0, memo='연차'
-            `, emp.name, emp.phone || '', dateStr, ym, emp.department || '');
+              VALUES ('정규직', ?, ?, ?, '휴가', '휴가', 'vacation', 8, 0, 0, 0, 0, ?, ?, ?)
+              ON CONFLICT (employee_type, employee_name, date) DO UPDATE SET confirmed_clock_in='휴가', confirmed_clock_out='휴가', source='vacation', regular_hours=8, overtime_hours=0, night_hours=0, break_hours=0, memo=EXCLUDED.memo
+            `, emp.name, emp.phone || '', dateStr, reqType, ym, emp.department || '');
           } catch {}
         }
       }
@@ -606,7 +612,11 @@ router.put('/vacations/:id/update-type', async (req: AuthRequest, res: Response)
   try {
     const { id } = req.params;
     const { type, days } = req.body;
-    await dbRun('UPDATE regular_vacation_requests SET type = ?, days = ?, updated_at = NOW() WHERE id = ?', type || '연차', days || 1, id);
+    const newType = type || '연차';
+    // 반차/공가의 오전·오후 변형은 자동 0.5일, 그 외는 클라이언트가 보낸 days 또는 1
+    const isHalf = newType.startsWith('오전') || newType.startsWith('오후');
+    const newDays = isHalf ? 0.5 : (days != null ? days : 1);
+    await dbRun('UPDATE regular_vacation_requests SET type = ?, days = ?, updated_at = NOW() WHERE id = ?', newType, newDays, id);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -618,7 +628,44 @@ router.put('/vacations/:id/reject', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { admin_memo } = req.body;
+    const request = await dbGet('SELECT * FROM regular_vacation_requests WHERE id = ?', id) as any;
+    if (!request) { res.status(404).json({ error: '휴가 신청을 찾을 수 없습니다.' }); return; }
+
+    const wasApproved = request.status === 'approved';
     await dbRun('UPDATE regular_vacation_requests SET status = ?, admin_memo = ?, updated_at = NOW() WHERE id = ?', 'rejected', admin_memo || '', id);
+
+    // 이미 승인되었던 휴가를 거절/취소하는 경우: confirmed_attendance 삭제 + (공가가 아닌 경우) used_days 차감
+    if (wasApproved) {
+      const reqType: string = request.type || '연차';
+      const isPublicLeave = reqType.includes('공가');
+      const isFullDay = reqType === '연차' || reqType === '공가';
+
+      if (isFullDay) {
+        const emp = await dbGet('SELECT name FROM regular_employees WHERE id = ?', request.employee_id) as any;
+        if (emp) {
+          const start = new Date(request.start_date + 'T00:00:00+09:00');
+          const end = new Date(request.end_date + 'T00:00:00+09:00');
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            try {
+              await dbRun(
+                `DELETE FROM confirmed_attendance WHERE employee_type = '정규직' AND employee_name = ? AND date = ? AND source = 'vacation'`,
+                emp.name, dateStr
+              );
+            } catch {}
+          }
+        }
+      }
+      // used_days 차감 — 공가는 차감하지 않았으므로 환원도 하지 않음
+      if (!isPublicLeave) {
+        const year = parseInt(request.start_date.slice(0, 4));
+        const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
+        if (balance) {
+          await dbRun('UPDATE regular_vacation_balances SET used_days = GREATEST(used_days - ?, 0), updated_at = NOW() WHERE id = ?', request.days, balance.id);
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -956,7 +1003,7 @@ router.get('/employees/resigned', async (_req: AuthRequest, res: Response) => {
 // POST /api/regular/contracts/send - Send contract link to employee
 router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
   try {
-    const { employee_id, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours } = req.body;
+    const { employee_id, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place } = req.body;
     const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ?', employee_id) as any;
     if (!employee) { res.status(404).json({ error: '직원을 찾을 수 없습니다.' }); return; }
 
@@ -966,11 +1013,11 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
     const endDate = endYear + today.slice(4);
 
     await dbRun(
-      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       employee.id, employee.phone, employee.name, today, endDate, token,
       work_start_date || '', department || employee.department || '', position_title || '사원',
-      annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00'
+      annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00', work_place || ''
     );
 
     const contractLink = getFrontendUrl(`/regular-contract?token=${token}`);
@@ -1526,6 +1573,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     // Get salary settings
     const salaries = await dbAll(`
       SELECT re.name, re.phone, re.department, re.team, re.hire_date,
+             COALESCE(re.resign_date, '') as resign_date,
              COALESCE(re.bank_name, '') as bank_name,
              COALESCE(re.bank_account, '') as bank_account,
              COALESCE(re.id_number, '') as id_number,
@@ -1537,10 +1585,15 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
              COALESCE(ss.overtime_hourly_rate, 0) as overtime_hourly_rate
       FROM regular_employees re
       LEFT JOIN regular_salary_settings ss ON re.id = ss.employee_id
-      WHERE re.is_active = 1
-    `) as any[];
+      WHERE re.is_active = 1 OR (re.resign_date != '' AND re.resign_date >= ?)
+    `, monthStart) as any[];
+
+    // 마감 여부 먼저 확인 (마감 전이면 기본급 전액, 마감 후면 결근 차감)
+    const closingCheck = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
+    const payrollClosed = !!closingCheck;
 
     const results = [];
+    const daysInMonth = lastDay;
     for (const sal of salaries) {
       const att = confirmedWithVacation.find(c => c.employee_name === sal.name);
       const overtimeHours = att?.total_overtime || 0;
@@ -1548,10 +1601,59 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;
       const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
-      const grossPay = parseFloat(sal.base_pay) + parseFloat(sal.meal_allowance) + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
 
-      // 4대보험 계산 (근로자 부담분)
-      const taxBase = parseFloat(sal.base_pay) + parseFloat(sal.meal_allowance);
+      // 소정근로일 계산
+      const hireDate = sal.hire_date || '';
+      const resignDate = sal.resign_date || '';
+      const todayStr = getKSTDate();
+      const cutoffDate = todayStr < monthEnd ? todayStr : monthEnd;
+
+      // 전체 월 소정근로일 (입사일/퇴사일 고려)
+      let totalScheduledDays = 0;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${yearMonth}-${String(day).padStart(2, '0')}`;
+        if (isHolidayOrWeekend(dateStr)) continue;
+        if (hireDate && dateStr < hireDate) continue;
+        if (resignDate && resignDate >= monthStart && resignDate <= monthEnd && dateStr > resignDate) continue;
+        totalScheduledDays++;
+      }
+
+      // 오늘까지 경과한 소정근로일 (결근 계산용)
+      let elapsedScheduledDays = 0;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${yearMonth}-${String(day).padStart(2, '0')}`;
+        if (dateStr > cutoffDate) break;
+        if (isHolidayOrWeekend(dateStr)) continue;
+        if (hireDate && dateStr < hireDate) continue;
+        if (resignDate && resignDate >= monthStart && resignDate <= monthEnd && dateStr > resignDate) continue;
+        elapsedScheduledDays++;
+      }
+
+      // 실제 근무일 = 평일 확정 출근일 + 휴가일 (주말/휴일 근무는 제외 - 별도 수당)
+      const weekdayWorkDays = att ? att.work_days - (att.holiday_days || 0) : 0;
+      const actualWorkDays = weekdayWorkDays;
+
+      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일
+      const absentDays = Math.max(elapsedScheduledDays - actualWorkDays, 0);
+
+      // 기본급: 마감 후에만 결근 차감, 마감 전에는 전액
+      let basePay: number, mealAllowance: number, prorateRatio: number;
+      if (payrollClosed) {
+        const dailyRate = totalScheduledDays > 0 ? parseFloat(sal.base_pay) / totalScheduledDays : 0;
+        const mealDailyRate = totalScheduledDays > 0 ? parseFloat(sal.meal_allowance) / totalScheduledDays : 0;
+        prorateRatio = totalScheduledDays > 0 ? Math.round((1 - absentDays / totalScheduledDays) * 100) : 100;
+        basePay = Math.round(parseFloat(sal.base_pay) - dailyRate * absentDays);
+        mealAllowance = Math.round(parseFloat(sal.meal_allowance) - mealDailyRate * absentDays);
+      } else {
+        // 마감 전: 기본급 전액
+        basePay = parseFloat(sal.base_pay);
+        mealAllowance = parseFloat(sal.meal_allowance);
+        prorateRatio = 100;
+      }
+      const grossPay = basePay + mealAllowance + parseFloat(sal.bonus) + parseFloat(sal.position_allowance) + parseFloat(sal.other_allowance) + overtimePay + holidayPay;
+
+      // 4대보험 계산 (근로자 부담분) - 일할 계산 기준
+      const taxBase = basePay + mealAllowance;
       const nationalPension = Math.round(taxBase * 0.045);      // 국민연금 4.5%
       const healthInsurance = Math.round(taxBase * 0.03545);     // 건강보험 3.545%
       const longTermCare = Math.round(healthInsurance * 0.1281); // 장기요양 12.81%
@@ -1565,9 +1667,14 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const netPay = grossPay - totalDeductions - incomeTax - localTax;
 
       results.push({
-        name: sal.name, phone: sal.phone, department: sal.department, team: sal.team, hire_date: sal.hire_date,
+        name: sal.name, phone: sal.phone, department: sal.department, team: sal.team,
+        hire_date: sal.hire_date || '', resign_date: resignDate,
         bank_name: sal.bank_name || '', bank_account: sal.bank_account || '', id_number: sal.id_number || '',
-        base_pay: parseFloat(sal.base_pay), meal_allowance: parseFloat(sal.meal_allowance),
+        base_pay_full: parseFloat(sal.base_pay), base_pay: basePay,
+        meal_allowance_full: parseFloat(sal.meal_allowance), meal_allowance: mealAllowance,
+        prorate_ratio: prorateRatio,
+        scheduled_work_days: totalScheduledDays, elapsed_scheduled_days: elapsedScheduledDays,
+        actual_work_days: actualWorkDays, absent_days: absentDays,
         bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),
         other_allowance: parseFloat(sal.other_allowance),
         overtime_hourly_rate: hourlyRate,
@@ -1589,10 +1696,42 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       });
     }
 
-    res.json({ year_month: yearMonth, results });
+    // 마감 여부 확인
+    const closing = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
+    const isClosed = !!closing;
+
+    res.json({ year_month: yearMonth, is_closed: isClosed, closed_at: closing?.closed_at || null, results });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// ===== Payroll Closing (급여 마감) =====
+
+// GET /api/regular/payroll-closing/:yearMonth
+router.get('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    const closing = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', req.params.yearMonth) as any;
+    res.json({ is_closed: !!closing, closed_at: closing?.closed_at || null, closed_by: closing?.closed_by || '' });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// POST /api/regular/payroll-closing/:yearMonth - 마감
+router.post('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    const { yearMonth } = req.params;
+    await dbRun('INSERT INTO payroll_closing (year_month, closed_by) VALUES (?, ?) ON CONFLICT (year_month) DO UPDATE SET closed_at = NOW(), closed_by = ?',
+      yearMonth, req.body.closed_by || '', req.body.closed_by || '');
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// DELETE /api/regular/payroll-closing/:yearMonth - 마감 취소
+router.delete('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM payroll_closing WHERE year_month = ?', req.params.yearMonth);
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
 export default router;

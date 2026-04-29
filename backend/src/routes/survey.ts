@@ -1403,12 +1403,157 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
         emp.actuals.push(a);
       }
     }
+
+    // Get planned-only survey_requests (past/today dates with planned times but no actual clock-in).
+    // KST date 기준이어야 이번 달 말일 포함 처리가 UTC 오프셋 때문에 잘리지 않는다.
+    const today = getKSTDate();
+
+    // Fallback name/type source: 과거(이번 달 이외 포함) 응답이 있는 phone들.
+    // workers 테이블에 없는 phone도 planned-only 행을 요약에 포함시키기 위함.
+    const pastResponseNames = await dbAll(`
+      SELECT DISTINCT ON (sr.phone) sr.phone,
+             resp.worker_name_ko, resp.worker_type
+      FROM survey_requests sr
+      JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE resp.worker_name_ko IS NOT NULL AND resp.worker_name_ko != ''
+      ORDER BY sr.phone, resp.created_at DESC
+    `) as any[];
+    const pastNameMap = new Map<string, { name: string; worker_type: string }>();
+    for (const r of pastResponseNames) {
+      pastNameMap.set(r.phone, { name: r.worker_name_ko, worker_type: r.worker_type || '' });
+    }
+
+    const plannedOnly = await dbAll(`
+      SELECT sr.phone, sr.date, sr.planned_clock_in, sr.planned_clock_out, sr.department
+      FROM survey_requests sr
+      LEFT JOIN survey_responses resp ON sr.id = resp.request_id
+      WHERE sr.date >= ? AND sr.date <= ? AND sr.date <= ?
+        AND sr.planned_clock_in IS NOT NULL AND sr.planned_clock_in != ''
+        AND (resp.clock_in_time IS NULL OR resp.id IS NULL)
+      ORDER BY sr.date
+    `, startDate, endDate, today) as any[];
+
+    // Add planned-only rows to actuals (skip duplicates)
+    for (const p of plannedOnly) {
+      let emp = phoneMap.get(p.phone);
+      // phoneMap에 없으면(이 달에 응답한 적 없는 직원) workers/과거응답/phone 순으로 fallback 생성
+      if (!emp) {
+        const wk = workerCategories.find((w: any) => w.phone === p.phone);
+        const past = pastNameMap.get(p.phone);
+        const rawType = (catMap.get(p.phone) || past?.worker_type || '').toString();
+        let type = '';
+        if (rawType === 'dispatch' || rawType.includes('파견')) type = '파견';
+        else if (rawType === 'alba' || rawType.includes('알바') || rawType.includes('사업소득')) type = '알바';
+        const displayName = wk?.name_ko || past?.name || p.phone;
+        emp = { phone: p.phone, name: displayName, department: p.department || '', type, actuals: [], shifts: [] };
+        if (p.planned_clock_in) {
+          emp.shifts.push({ planned_clock_in: p.planned_clock_in, planned_clock_out: p.planned_clock_out || '', days_of_week: '1,2,3,4,5', day_of_week: 1 });
+        }
+        phoneMap.set(p.phone, emp);
+      }
+      // Skip if already has an actual for this date
+      if (emp.actuals.some((a: any) => a.date === p.date)) continue;
+      emp.actuals.push({
+        phone: p.phone,
+        date: p.date,
+        clock_in_time: null,
+        clock_out_time: null,
+        planned_clock_in: p.planned_clock_in,
+        planned_clock_out: p.planned_clock_out,
+        isPlannedOnly: true,
+      });
+    }
+
     for (const [phone, emp] of phoneMap) {
       emp.actual_days = emp.actuals.length;
       emp.id = phone;
     }
 
     res.json({ employees: Array.from(phoneMap.values()), startDate, endDate });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/survey/manual-attendance - 근무자 DB 상세에서 출퇴근 이력을 수동 추가
+// 계획출퇴근 설문 경로를 거치지 않고 survey_requests/survey_responses 에 직접 INSERT하여
+// 근태정보종합요약(attendance-summary)에 즉시 반영된다.
+router.post('/manual-attendance', async (req: AuthRequest, res: Response) => {
+  try {
+    const { password, phone: rawPhone, date, clock_in_time, clock_out_time } = req.body as {
+      password?: string; phone?: string; date?: string; clock_in_time?: string; clock_out_time?: string;
+    };
+
+    // 비밀번호 검증: contract_password 설정을 재사용
+    const pwSetting = await dbGet("SELECT value FROM admin_settings WHERE key = 'contract_password'") as any;
+    if (pwSetting?.value && pwSetting.value !== password) {
+      res.status(403).json({ error: '비밀번호가 일치하지 않습니다.' });
+      return;
+    }
+
+    const phone = normalizePhone(rawPhone || '');
+    if (!phone || !date) {
+      res.status(400).json({ error: '전화번호와 날짜는 필수입니다.' });
+      return;
+    }
+    if (!clock_in_time) {
+      res.status(400).json({ error: '출근 시간은 필수입니다. (퇴근 시간은 선택)' });
+      return;
+    }
+
+    // workers 테이블 조회 (attendance-summary가 worker_name_ko 기반으로 필터링하므로 필수)
+    const worker = await dbGet('SELECT * FROM workers WHERE phone = ?', phone) as any;
+    if (!worker) {
+      res.status(404).json({ error: '근무자 DB에 등록된 전화번호만 수동 추가 가능합니다.' });
+      return;
+    }
+
+    // 근무지: 활성화된 첫 근무지 사용 (수동 입력이므로 GPS 무관)
+    const defaultWorkplace = await dbGet('SELECT id FROM survey_workplaces WHERE is_active = 1 ORDER BY id LIMIT 1') as any;
+    if (!defaultWorkplace) {
+      res.status(400).json({ error: '활성화된 근무지가 없습니다. 근무지를 먼저 등록하세요.' });
+      return;
+    }
+
+    // HH:MM (KST) -> ISO UTC timestamp. 프론트 표시는 toLocaleTimeString으로 KST 변환됨.
+    const toIso = (t?: string) => {
+      if (!t) return null;
+      const m = /^(\d{2}):(\d{2})$/.exec(t.trim());
+      if (!m) return null;
+      return new Date(`${date}T${m[1]}:${m[2]}:00+09:00`).toISOString();
+    };
+    const clockInIso = toIso(clock_in_time);
+    const clockOutIso = toIso(clock_out_time);
+
+    // category → worker_type 정규화 (요약 집계 시 파견/알바 구분을 유지)
+    let workerType = '';
+    const cat: string = worker.category || '';
+    if (cat === 'dispatch' || cat.includes('파견')) workerType = 'dispatch';
+    else if (cat === 'alba' || cat.includes('알바') || cat.includes('사업소득')) workerType = 'alba';
+
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+    const result = await dbRun(`
+      INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, token, phone, defaultWorkplace.id, date, 'manual', expiresAt, worker.department || '', 'manual');
+
+    await dbRun(`
+      INSERT INTO survey_responses (
+        request_id, clock_in_time, clock_out_time,
+        worker_name_ko, worker_name_en, worker_type,
+        bank_name, bank_account, id_number, emergency_contact
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      result.lastInsertRowid, clockInIso, clockOutIso,
+      worker.name_ko || phone, worker.name_en || '', workerType,
+      worker.bank_name || '', worker.bank_account || '',
+      worker.id_number || '', worker.emergency_contact || ''
+    );
+
+    res.status(201).json({ success: true, request_id: result.lastInsertRowid });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

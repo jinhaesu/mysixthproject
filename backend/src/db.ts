@@ -632,6 +632,7 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS id_number TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS consent_signed INTEGER DEFAULT 0"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS consent_signature_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_place TEXT DEFAULT ''"); } catch {}
 
   // Admin password settings
   try {
@@ -692,6 +693,99 @@ export async function initializeDB(): Promise<void> {
       )
     `);
   } catch {}
+
+  // Payroll closing (급여 마감)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payroll_closing (
+        id SERIAL PRIMARY KEY,
+        year_month TEXT NOT NULL UNIQUE,
+        closed_at TIMESTAMPTZ DEFAULT NOW(),
+        closed_by TEXT DEFAULT ''
+      )
+    `);
+  } catch {}
+
+  // Offboarding management
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employee_offboardings (
+        id SERIAL PRIMARY KEY,
+        employee_type TEXT NOT NULL,
+        employee_ref_id INTEGER,
+        employee_name TEXT NOT NULL,
+        employee_phone TEXT DEFAULT '',
+        department TEXT DEFAULT '',
+        hire_date TEXT DEFAULT '',
+        resign_date TEXT NOT NULL,
+        loss_date TEXT DEFAULT '',
+        reason_code TEXT NOT NULL DEFAULT '',
+        reason_detail TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'in_progress',
+        resignation_letter_received INTEGER DEFAULT 0,
+        assets_returned INTEGER DEFAULT 0,
+        pension_reported INTEGER DEFAULT 0,
+        health_insurance_reported INTEGER DEFAULT 0,
+        employment_insurance_reported INTEGER DEFAULT 0,
+        industrial_accident_reported INTEGER DEFAULT 0,
+        severance_paid INTEGER DEFAULT 0,
+        annual_leave_settled INTEGER DEFAULT 0,
+        income_tax_reported INTEGER DEFAULT 0,
+        severance_method TEXT DEFAULT 'avg_3m',
+        severance_auto NUMERIC(12,0) DEFAULT 0,
+        severance_final NUMERIC(12,0) DEFAULT 0,
+        annual_leave_remaining NUMERIC(5,1) DEFAULT 0,
+        annual_leave_pay_auto NUMERIC(12,0) DEFAULT 0,
+        annual_leave_pay_final NUMERIC(12,0) DEFAULT 0,
+        retirement_income_tax NUMERIC(12,0) DEFAULT 0,
+        notes TEXT DEFAULT '',
+        email_sent INTEGER DEFAULT 0,
+        email_sent_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_offboarding_status ON employee_offboardings(status);
+      CREATE INDEX IF NOT EXISTS idx_offboarding_resign_date ON employee_offboardings(resign_date);
+      CREATE INDEX IF NOT EXISTS idx_offboarding_employee ON employee_offboardings(employee_type, employee_ref_id);
+    `);
+  } catch (err) {
+    console.error('Offboarding table init error:', err);
+  }
+
+  // Onboarding columns for regular_employees
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS birth_date TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS address TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS nationality TEXT DEFAULT 'KR'"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS visa_type TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS visa_expiry TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS bank_slip_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS foreign_id_card_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS family_register_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS resident_register_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS signed_contract_url TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS business_registration_no TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS monthly_salary INTEGER DEFAULT 0"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS non_taxable_meal INTEGER DEFAULT 0"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS non_taxable_vehicle INTEGER DEFAULT 0"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS job_code TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS weekly_work_hours NUMERIC(4,1) DEFAULT 40"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS employment_type TEXT DEFAULT 'regular'"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS onboarding_status TEXT DEFAULT 'pending'"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS onboarding_email_sent INTEGER DEFAULT 0"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS onboarding_email_sent_at TIMESTAMPTZ"); } catch {}
+
+  // Onboarding columns for regular_labor_contracts
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS nationality TEXT DEFAULT 'KR'"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS visa_type TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS visa_expiry TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS bank_slip_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS foreign_id_card_data TEXT DEFAULT ''"); } catch {}
+
+  // Phase 2: offboarding deadline reminder tracking
+  try { await pool.query('ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS last_reminder_sent_at TIMESTAMPTZ'); } catch {}
 
   console.log('Database initialized successfully');
 }

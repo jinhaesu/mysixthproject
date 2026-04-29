@@ -205,7 +205,7 @@ function SurveyContent() {
     const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#000';
+    ctx.strokeStyle = '#222';
     ctx.lineTo(x, y);
     ctx.stroke();
   };
@@ -215,7 +215,9 @@ function SurveyContent() {
   const clearSignature = () => {
     if (!signatureRef) return;
     const ctx = signatureRef.getContext('2d');
-    if (ctx) ctx.clearRect(0, 0, signatureRef.width, signatureRef.height);
+    if (!ctx) return;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, signatureRef.width, signatureRef.height);
   };
 
   const handleContractSubmit = async () => {
@@ -228,6 +230,8 @@ function SurveyContent() {
     const blankCanvas = document.createElement('canvas');
     blankCanvas.width = signatureRef.width;
     blankCanvas.height = signatureRef.height;
+    const blankCtx = blankCanvas.getContext('2d');
+    if (blankCtx) { blankCtx.fillStyle = '#FFFFFF'; blankCtx.fillRect(0, 0, blankCanvas.width, blankCanvas.height); }
     if (signatureData === blankCanvas.toDataURL()) {
       alert('서명을 해주세요.');
       return;
@@ -303,10 +307,10 @@ function SurveyContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" />
-          <p className="mt-3 text-[#8A8F98]">{t(lang, 'loading')}</p>
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-400)] mx-auto" />
+          <p className="mt-3 text-[var(--text-3)]">{t(lang, 'loading')}</p>
         </div>
       </div>
     );
@@ -314,11 +318,11 @@ function SurveyContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
-        <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-8 max-w-sm w-full text-center">
-          <AlertCircle className="w-12 h-12 text-[#EB5757] mx-auto" />
-          <h2 className="mt-4 text-lg font-semibold text-[#F7F8F8]">{t(lang, 'error')}</h2>
-          <p className="mt-2 text-[#8A8F98]">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)] p-4">
+        <div className="bg-[var(--bg-1)] rounded-[var(--r-lg)] shadow-[var(--elev-2)] border border-[var(--border-1)] p-8 max-w-sm w-full text-center">
+          <AlertCircle className="w-12 h-12 text-[var(--danger-fg)] mx-auto" />
+          <h2 className="mt-4 text-[var(--fs-lg)] font-semibold text-[var(--text-1)]">{t(lang, 'error')}</h2>
+          <p className="mt-2 text-[var(--text-3)]">{error}</p>
         </div>
       </div>
     );
@@ -334,24 +338,24 @@ function SurveyContent() {
   const showForm = data.status === "sent" || data.status === "clock_in";
 
   return (
-    <div className="min-h-screen bg-[#08090A]">
+    <div className="min-h-screen bg-[var(--bg-canvas)] fade-in">
       {/* Header */}
-      <div className="bg-[#5E6AD2] text-white px-4 py-5">
-        <h1 className="text-lg font-bold">{t(lang, 'pageTitle')}</h1>
-        <p className="text-blue-100 text-sm mt-1">{data.date} {t(lang, 'workDate')}</p>
+      <div className="text-white px-4 py-5" style={{ background: 'linear-gradient(135deg, var(--brand-600) 0%, var(--brand-500) 100%)' }}>
+        <h1 className="text-[var(--fs-lg)] font-bold">{t(lang, 'pageTitle')}</h1>
+        <p className="text-white/70 text-[var(--fs-caption)] mt-1">{data.date} {t(lang, 'workDate')}</p>
         {(data.workplace || data.department) && (
-          <div className="mt-2 bg-[#4EA7FC]/30 rounded-lg px-3 py-2 space-y-1">
+          <div className="mt-2 bg-white/10 rounded-[var(--r-md)] px-3 py-2 space-y-1">
             {data.workplace && (
-              <p className="text-sm font-medium flex items-center gap-1.5">
+              <p className="text-[var(--fs-body)] font-medium flex items-center gap-1.5">
                 <MapPin className="w-4 h-4" />
                 {data.workplace.name}
               </p>
             )}
             {data.workplace?.address && (
-              <p className="text-blue-200 text-xs">{data.workplace.address}</p>
+              <p className="text-white/60 text-[var(--fs-caption)]">{data.workplace.address}</p>
             )}
             {data.department && (
-              <p className="text-sm font-semibold text-yellow-200 flex items-center gap-1.5">
+              <p className="text-[var(--fs-body)] font-semibold text-yellow-200 flex items-center gap-1.5">
                 {t(lang, 'assignedDept')}: {data.department}
               </p>
             )}
@@ -360,9 +364,9 @@ function SurveyContent() {
 
         {/* Parking Notice (F2) */}
         {showForm && (
-          <div className="mt-3 bg-[#F0BF00]/100/20 border border-amber-400/40 rounded-lg px-3 py-2 flex items-start gap-2">
-            <Car className="w-4 h-4 text-amber-200 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-100">{t(lang, 'parkingNotice')}</p>
+          <div className="mt-3 bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-md)] px-3 py-2 flex items-start gap-2">
+            <Car className="w-4 h-4 text-[var(--warning-fg)] shrink-0 mt-0.5" />
+            <p className="text-[var(--fs-caption)] text-[var(--warning-fg)]">{t(lang, 'parkingNotice')}</p>
           </div>
         )}
       </div>
@@ -375,10 +379,10 @@ function SurveyContent() {
             <button
               key={l}
               onClick={() => setLang(l)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-[var(--r-pill)] text-[var(--fs-body)] font-medium transition-colors ${
                 lang === l
-                  ? "bg-[#5E6AD2] text-white"
-                  : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A] hover:bg-[#141516]/5"
+                  ? "bg-[var(--brand-500)] text-white"
+                  : "bg-[var(--bg-1)] text-[var(--text-3)] border border-[var(--border-1)] hover:bg-[var(--bg-2)]"
               }`}
             >
               {t(l, `lang${l.charAt(0).toUpperCase() + l.slice(1)}` as string)}
@@ -391,25 +395,25 @@ function SurveyContent() {
           <>
             {/* GPS acquiring */}
             {gpsStatus === "acquiring" && (
-              <div className="rounded-lg p-5 bg-[#4EA7FC]/10 border border-[#5E6AD2]/30 text-center">
-                <Navigation className="w-8 h-8 text-blue-500 animate-pulse mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#828FFF]">{t(lang, 'gpsAcquiring')}</p>
-                <p className="text-xs text-blue-500 mt-1">{t(lang, 'gpsAllowPermission')}</p>
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--info-bg)] border border-[var(--info-border)] text-center">
+                <Navigation className="w-8 h-8 text-[var(--info-fg)] animate-pulse mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--info-fg)]">{t(lang, 'gpsAcquiring')}</p>
+                <p className="text-[var(--fs-caption)] text-[var(--info-fg)] mt-1">{t(lang, 'gpsAllowPermission')}</p>
               </div>
             )}
 
             {/* GPS denied / error */}
             {(gpsStatus === "denied" || gpsStatus === "error") && (
-              <div className="rounded-lg p-5 bg-[#EB5757]/10 border border-[#EB5757]/30 text-center">
-                <ShieldAlert className="w-8 h-8 text-[#EB5757] mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#EB5757]">
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--danger-bg)] border border-[var(--danger-border)] text-center">
+                <ShieldAlert className="w-8 h-8 text-[var(--danger-fg)] mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--danger-fg)]">
                   {gpsStatus === "denied" ? t(lang, 'gpsDenied') : t(lang, 'gpsUnavailable')}
                 </p>
-                <p className="text-xs text-[#EB5757] mt-1">
+                <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-1">
                   {t(lang, 'gpsRequiredNotice')}
                 </p>
                 {hasWorkplace && (
-                  <p className="text-xs text-[#EB5757] mt-2 font-medium">
+                  <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-2 font-medium">
                     {t(lang, 'gpsCannotRecord')}
                   </p>
                 )}
@@ -418,13 +422,13 @@ function SurveyContent() {
 
             {/* GPS acquired + within range */}
             {gpsReady && isWithinRadius && (
-              <div className="rounded-lg p-4 bg-[#27A644]/10 border border-[#27A644]/30 flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-[#27A644] shrink-0" />
+              <div className="rounded-[var(--r-lg)] p-4 bg-[var(--success-bg)] border border-[var(--success-border)] flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-[var(--success-fg)] shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-[#27A644]">
-                    {data.workplace!.name} — {distance}m {t(lang, 'distance')}
+                  <p className="text-[var(--fs-body)] font-medium text-[var(--success-fg)]">
+                    {data.workplace!.name} — <span className="tabular">{distance}m</span> {t(lang, 'distance')}
                   </p>
-                  <p className="text-xs text-[#27A644] mt-0.5">
+                  <p className="text-[var(--fs-caption)] text-[var(--success-fg)] mt-0.5">
                     {t(lang, 'withinRange')}
                   </p>
                 </div>
@@ -433,15 +437,15 @@ function SurveyContent() {
 
             {/* GPS acquired + out of range */}
             {isOutOfRange && (
-              <div className="rounded-lg p-5 bg-[#EB5757]/10 border border-[#EB5757]/30 text-center">
-                <XCircle className="w-8 h-8 text-[#EB5757] mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#EB5757]">
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--danger-bg)] border border-[var(--danger-border)] text-center">
+                <XCircle className="w-8 h-8 text-[var(--danger-fg)] mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--danger-fg)]">
                   {t(lang, 'outOfRange')}
                 </p>
-                <p className="text-base font-bold text-[#EB5757] mt-1">
+                <p className="text-[var(--fs-base)] font-bold text-[var(--danger-fg)] mt-1 tabular">
                   {distance}m {t(lang, 'distance')} ({t(lang, 'allowed')}: {data.workplace!.radius_meters}m)
                 </p>
-                <p className="text-xs text-[#EB5757] mt-2">
+                <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-2">
                   {data.workplace!.name} {t(lang, 'moveCloser')}
                 </p>
               </div>
@@ -449,12 +453,12 @@ function SurveyContent() {
 
             {/* No workplace assigned */}
             {!hasWorkplace && (
-              <div className="rounded-lg p-5 bg-[#F0BF00]/10 border border-[#F0BF00]/30 text-center">
-                <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#F0BF00]">
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--warning-bg)] border border-[var(--warning-border)] text-center">
+                <AlertCircle className="w-8 h-8 text-[var(--warning-fg)] mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--warning-fg)]">
                   {t(lang, 'noWorkplace')}
                 </p>
-                <p className="text-xs text-[#F0BF00] mt-1">
+                <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-1">
                   {t(lang, 'contactAdmin')}
                 </p>
               </div>
@@ -464,31 +468,31 @@ function SurveyContent() {
 
         {/* Safety Agreement (F5) - shown regardless of GPS, before clock-in */}
         {data.status === "sent" && !agreementAccepted && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-            <div className="flex items-center gap-2 text-[#EB5757] mb-2">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+            <div className="flex items-center gap-2 text-[var(--danger-fg)] mb-2">
               <Shield className="w-5 h-5" />
               <h2 className="font-semibold">{t(lang, 'safetyAgreementTitle')}</h2>
             </div>
 
-            <div className="max-h-72 overflow-y-auto border border-[#23252A] rounded-lg p-4 bg-[#08090A] space-y-4 text-sm text-[#D0D6E0]">
+            <div className="max-h-72 overflow-y-auto border border-[var(--border-2)] rounded-[var(--r-md)] p-4 bg-[var(--bg-0)] space-y-4 text-[var(--fs-body)] text-[var(--text-2)]">
               <div>
-                <p className="font-bold text-[#F7F8F8]">{t(lang, 'safetyRule1Title')}</p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, 'safetyRule1Title')}</p>
                 <p className="whitespace-pre-line mt-1">{t(lang, 'safetyRule1')}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">{t(lang, 'safetyRule2Title')}</p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, 'safetyRule2Title')}</p>
                 <p className="whitespace-pre-line mt-1">{t(lang, 'safetyRule2')}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">{t(lang, 'safetyRule3Title')}</p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, 'safetyRule3Title')}</p>
                 <p className="whitespace-pre-line mt-1">{t(lang, 'safetyRule3')}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">{t(lang, 'safetyRule4Title')}</p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, 'safetyRule4Title')}</p>
                 <p className="whitespace-pre-line mt-1">{t(lang, 'safetyRule4')}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">{t(lang, 'safetyRule5Title')}</p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, 'safetyRule5Title')}</p>
                 <p className="whitespace-pre-line mt-1">{t(lang, 'safetyRule5')}</p>
               </div>
             </div>
@@ -498,28 +502,28 @@ function SurveyContent() {
                 type="checkbox"
                 checked={agreementAccepted}
                 onChange={(e) => setAgreementAccepted(e.target.checked)}
-                className="mt-1 w-5 h-5 text-[#7070FF] rounded border-[#23252A] focus:ring-blue-500"
+                className="mt-1 w-5 h-5 accent-[var(--brand-500)] rounded border-[var(--border-2)]"
               />
-              <span className="text-sm font-medium text-[#F7F8F8]">{t(lang, 'agreementCheckbox')}</span>
+              <span className="text-[var(--fs-body)] font-medium text-[var(--text-1)]">{t(lang, 'agreementCheckbox')}</span>
             </label>
 
             {!agreementAccepted && (
-              <p className="text-xs text-[#EB5757] font-medium">{t(lang, 'agreementRequired')}</p>
+              <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] font-medium">{t(lang, 'agreementRequired')}</p>
             )}
           </div>
         )}
 
         {/* Factory Guide Video - after agreement, shown regardless of GPS */}
         {data.status === "sent" && agreementAccepted && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] overflow-hidden">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] overflow-hidden">
             <div className="px-5 pt-4 pb-2">
-              <h2 className="font-semibold text-[#F7F8F8] text-sm">
+              <h2 className="font-semibold text-[var(--text-1)] text-[var(--fs-body)]">
                 {lang === 'ko' ? '조인앤조인 공장 진입 안내 영상' :
                  lang === 'en' ? 'Factory Entry Guide Video' :
                  lang === 'zh' ? '工厂入场指南视频' :
                  'Video hướng dẫn vào nhà máy'}
               </h2>
-              <p className="text-xs text-[#8A8F98] mt-0.5">
+              <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-0.5">
                 {lang === 'ko' ? '출근 기록 전 반드시 시청해 주세요.' :
                  lang === 'en' ? 'Please watch before clocking in.' :
                  lang === 'zh' ? '请在打卡前观看。' :
@@ -542,24 +546,24 @@ function SurveyContent() {
 
         {/* Worker Type Selection */}
         {data.status === "sent" && agreementAccepted && !workerType && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-            <h2 className="font-semibold text-[#F7F8F8] text-center">근무 유형을 선택해주세요</h2>
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+            <h2 className="font-semibold text-[var(--text-1)] text-center">근무 유형을 선택해주세요</h2>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setWorkerType("dispatch")}
-                className="py-6 bg-[#4EA7FC]/10 border-2 border-[#5E6AD2]/30 rounded-xl text-center hover:bg-[#4EA7FC]/15 hover:border-blue-400 transition-all"
+                className="py-6 bg-[var(--info-bg)] border-2 border-[var(--info-border)] rounded-[var(--r-xl)] text-center hover:bg-[var(--brand-500)]/10 hover:border-[var(--brand-400)] transition-all"
               >
                 <p className="text-2xl mb-1">🏢</p>
-                <p className="font-bold text-[#828FFF]">파견</p>
-                <p className="text-xs text-[#7070FF] mt-1">파견업체 소속</p>
+                <p className="font-bold text-[var(--brand-400)]">파견</p>
+                <p className="text-[var(--fs-caption)] text-[var(--brand-400)] mt-1">파견업체 소속</p>
               </button>
               <button
                 onClick={() => setWorkerType("alba")}
-                className="py-6 bg-[#FC7840]/10 border-2 border-[#FC7840]/30 rounded-xl text-center hover:bg-[#FC7840]/15 hover:border-orange-400 transition-all"
+                className="py-6 bg-[var(--warning-bg)] border-2 border-[var(--warning-border)] rounded-[var(--r-xl)] text-center hover:bg-[var(--warning-fg)]/10 hover:border-[var(--warning-fg)] transition-all"
               >
                 <p className="text-2xl mb-1">📋</p>
-                <p className="font-bold text-orange-800">알바</p>
-                <p className="text-xs text-[#FC7840] mt-1">단기 근로계약</p>
+                <p className="font-bold text-[var(--warning-fg)]">알바</p>
+                <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-1">단기 근로계약</p>
               </button>
             </div>
           </div>
@@ -567,15 +571,15 @@ function SurveyContent() {
 
         {/* Labor Contract (Alba only) */}
         {data.status === "sent" && agreementAccepted && workerType === "alba" && !contractDone && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-            <h2 className="font-semibold text-[#F7F8F8] flex items-center gap-2">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+            <h2 className="font-semibold text-[var(--text-1)] flex items-center gap-2">
               📋 단시간 근로자 표준근로계약서
             </h2>
 
             {/* Contract Content */}
-            <div className="max-h-64 overflow-y-auto border border-[#23252A] rounded-lg p-4 bg-[#08090A] text-xs text-[#D0D6E0] space-y-2">
-              <p className="font-bold text-center text-sm text-[#F7F8F8]">단시간 근로자 표준근로계약서</p>
-              <p>조인앤조인 (이하 &quot;사업주&quot;라 함)과 <span className="font-bold text-[#828FFF]">{nameKo || '______'}</span> (이하 &quot;근로자&quot;이라 함)은 다음과 같이 근로계약을 체결한다.</p>
+            <div className="max-h-64 overflow-y-auto border border-[var(--border-2)] rounded-[var(--r-md)] p-4 bg-[var(--bg-0)] text-[var(--fs-caption)] text-[var(--text-2)] space-y-2">
+              <p className="font-bold text-center text-[var(--fs-body)] text-[var(--text-1)]">단시간 근로자 표준근로계약서</p>
+              <p>조인앤조인 (이하 &quot;사업주&quot;라 함)과 <span className="font-bold text-[var(--brand-400)]">{nameKo || '______'}</span> (이하 &quot;근로자&quot;이라 함)은 다음과 같이 근로계약을 체결한다.</p>
               <p><b>1. 근로계약기간:</b> {new Date().toLocaleDateString('sv-SE')} ~ {(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toLocaleDateString('sv-SE'); })()}</p>
               <p>- 본 계약은 위 기간 내에서 사업주의 업무 지시가 있는 날에 한하여 근로를 제공하는 호출형 단시간 근로계약이다.</p>
               <p><b>2. 근무 장소:</b> 경기도 안산시 단원구 신길동 1122</p>
@@ -595,12 +599,12 @@ function SurveyContent() {
             </div>
 
             {/* Date */}
-            <div className="text-center text-sm text-[#D0D6E0] font-medium">
+            <div className="text-center text-[var(--fs-body)] text-[var(--text-2)] font-medium">
               {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
             </div>
 
             {/* Employer info (fixed) */}
-            <div className="bg-[#4EA7FC]/10 rounded-lg p-3 text-xs text-[#828FFF]">
+            <div className="bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] p-3 text-[var(--fs-caption)] text-[var(--info-fg)]">
               <p className="font-bold">(사업주)</p>
               <p>사업체명: (주)조인앤조인</p>
               <p>주소: 전북특별자치도 전주시 덕진구 기린대로 458</p>
@@ -609,25 +613,28 @@ function SurveyContent() {
 
             {/* Worker info (editable) */}
             <div className="space-y-3">
-              <p className="font-bold text-sm text-[#F7F8F8]">(근로자)</p>
+              <p className="font-bold text-[var(--fs-body)] text-[var(--text-1)]">(근로자)</p>
               <div>
-                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">성명 <span className="text-[#EB5757]">*</span></label>
+                <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">성명 <span className="text-[var(--danger-fg)]">*</span></label>
                 <input type="text" value={nameKo} onChange={(e) => setNameKo(e.target.value)} placeholder="홍길동"
-                  className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
+                  className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)]" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">주소 <span className="text-[#EB5757]">*</span></label>
+                <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">주소 <span className="text-[var(--danger-fg)]">*</span></label>
                 <input type="text" value={contractAddress} onChange={(e) => setContractAddress(e.target.value)} placeholder="서울시 강남구..."
-                  className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
+                  className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)]" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#D0D6E0] mb-1">서명 <span className="text-[#EB5757]">*</span></label>
-                <div className="border-2 border-[#23252A] rounded-lg bg-[#0F1011] relative" style={{ touchAction: 'none' }}>
+                <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">서명 <span className="text-[var(--danger-fg)]">*</span></label>
+                <div className="border-2 border-[var(--border-2)] rounded-[var(--r-md)] overflow-hidden relative" style={{ touchAction: 'none' }}>
                   <canvas
-                    ref={(el) => setSignatureRef(el)}
+                    ref={(el) => {
+                      setSignatureRef(el);
+                      if (el) { const ctx = el.getContext('2d'); if (ctx) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, el.width, el.height); } }
+                    }}
                     width={320}
                     height={150}
-                    className="w-full cursor-crosshair"
+                    className="w-full cursor-crosshair bg-white"
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
@@ -637,16 +644,16 @@ function SurveyContent() {
                     onTouchEnd={stopDrawing}
                   />
                   <button onClick={clearSignature}
-                    className="absolute top-1 right-1 px-2 py-0.5 text-xs bg-[#141516] text-[#8A8F98] rounded hover:bg-[#141516]/7">
+                    className="absolute top-1 right-1 px-2 py-0.5 text-[var(--fs-caption)] bg-[var(--bg-2)] text-[var(--text-3)] rounded-[var(--r-sm)] hover:text-[var(--text-1)] transition-colors">
                     지우기
                   </button>
                 </div>
-                <p className="text-xs text-[#62666D] mt-1">위 영역에 서명해주세요</p>
+                <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-1">위 영역에 서명해주세요</p>
               </div>
             </div>
 
             <button onClick={handleContractSubmit} disabled={contractSubmitting || !nameKo.trim() || !contractAddress.trim()}
-              className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-[#28282C] hover:bg-orange-700 transition-colors">
+              className="w-full py-3 bg-[var(--brand-500)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 hover:bg-[var(--brand-600)] transition-colors">
               {contractSubmitting ? "처리 중..." : "근로계약서 서명 및 제출"}
             </button>
           </div>
@@ -654,27 +661,27 @@ function SurveyContent() {
 
         {/* Worker type badge (auto-filled from previous) */}
         {data.status === "sent" && agreementAccepted && workerType && (
-          <div className="flex items-center justify-between bg-[#08090A] rounded-xl px-4 py-3 border border-[#23252A]">
+          <div className="flex items-center justify-between bg-[var(--bg-0)] rounded-[var(--r-xl)] px-4 py-3 border border-[var(--border-2)]">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[#8A8F98]">근무 유형:</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-bold ${workerType === 'dispatch' ? 'bg-[#4EA7FC]/15 text-[#828FFF]' : 'bg-[#FC7840]/15 text-orange-800'}`}>
+              <span className="text-[var(--fs-body)] text-[var(--text-3)]">근무 유형:</span>
+              <span className={`px-3 py-1 rounded-[var(--r-pill)] text-[var(--fs-body)] font-bold ${workerType === 'dispatch' ? 'bg-[var(--info-bg)] text-[var(--info-fg)]' : 'bg-[var(--warning-bg)] text-[var(--warning-fg)]'}`}>
                 {workerType === 'dispatch' ? '파견' : '알바'}
               </span>
             </div>
-            <button onClick={() => setWorkerType("")} className="text-xs text-[#8A8F98] hover:text-[#D0D6E0] underline">변경</button>
+            <button onClick={() => setWorkerType("")} className="text-[var(--fs-caption)] text-[var(--text-3)] hover:text-[var(--text-1)] underline">변경</button>
           </div>
         )}
 
         {/* Clock-in Form (F3) - GPS confirmed + within range + agreement accepted */}
         {data.status === "sent" && canAct && agreementAccepted && workerType && (workerType === "dispatch" || contractDone) && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-            <div className="flex items-center gap-2 text-[#828FFF] mb-2">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+            <div className="flex items-center gap-2 text-[var(--brand-400)] mb-2">
               <LogIn className="w-5 h-5" />
               <h2 className="font-semibold">{t(lang, 'clockInTitle')}</h2>
             </div>
 
-            <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg p-3">
-              <p className="text-xs text-[#EB5757] font-bold">
+            <div className="bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] p-3">
+              <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] font-bold">
                 {lang === 'ko' ? '정확하게 입력하지 않으면 급여가 지급되지 않습니다.' :
                  lang === 'en' ? 'Payment will not be made if information is not entered accurately.' :
                  lang === 'zh' ? '如未准确填写，将不予支付工资。' :
@@ -684,41 +691,41 @@ function SurveyContent() {
 
             {/* Korean Name */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {t(lang, 'nameKo')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {t(lang, 'nameKo')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <input
                 type="text"
                 value={nameKo}
                 onChange={(e) => setNameKo(e.target.value)}
                 placeholder="홍길동"
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)]"
               />
             </div>
 
             {/* English Name */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {t(lang, 'nameEn')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {t(lang, 'nameEn')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <input
                 type="text"
                 value={nameEn}
                 onChange={(e) => setNameEn(e.target.value)}
                 placeholder="Hong Gildong"
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)]"
               />
             </div>
 
             {/* Bank Name */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {t(lang, 'bankName')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {t(lang, 'bankName')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <select
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base bg-[#0F1011]"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)]"
               >
                 <option value="">{t(lang, 'selectBank')}</option>
                 {BANKS.map((b) => (
@@ -729,52 +736,52 @@ function SurveyContent() {
 
             {/* Bank Account */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {t(lang, 'bankAccount')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {t(lang, 'bankAccount')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <input
                 type="text"
                 value={bankAccount}
                 onChange={(e) => setBankAccount(e.target.value)}
                 placeholder={t(lang, 'bankAccountPlaceholder')}
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)] tabular"
                 inputMode="numeric"
               />
             </div>
 
             {/* ID Number */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {t(lang, 'idNumber')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {t(lang, 'idNumber')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <input
                 type="password"
                 value={idNumber}
                 onChange={(e) => setIdNumber(e.target.value)}
                 placeholder={t(lang, 'idNumberPlaceholder')}
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)]"
                 inputMode="numeric"
               />
             </div>
 
             {/* Emergency Contact */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {t(lang, 'emergencyContact')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {t(lang, 'emergencyContact')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <input
                 type="tel"
                 value={emergencyContact}
                 onChange={(e) => setEmergencyContact(e.target.value)}
                 placeholder="010-0000-0000"
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)] tabular"
               />
             </div>
 
             {/* Gender (F3) */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-2">
-                {t(lang, 'gender')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-2">
+                {t(lang, 'gender')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -784,9 +791,9 @@ function SurveyContent() {
                     value="male"
                     checked={gender === "male"}
                     onChange={(e) => setGender(e.target.value)}
-                    className="w-4 h-4 text-[#7070FF] border-[#23252A] focus:ring-blue-500"
+                    className="w-4 h-4 accent-[var(--brand-500)]"
                   />
-                  <span className="text-sm text-[#D0D6E0]">{t(lang, 'male')}</span>
+                  <span className="text-[var(--fs-body)] text-[var(--text-2)]">{t(lang, 'male')}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -795,24 +802,24 @@ function SurveyContent() {
                     value="female"
                     checked={gender === "female"}
                     onChange={(e) => setGender(e.target.value)}
-                    className="w-4 h-4 text-[#7070FF] border-[#23252A] focus:ring-blue-500"
+                    className="w-4 h-4 accent-[var(--brand-500)]"
                   />
-                  <span className="text-sm text-[#D0D6E0]">{t(lang, 'female')}</span>
+                  <span className="text-[var(--fs-body)] text-[var(--text-2)]">{t(lang, 'female')}</span>
                 </label>
               </div>
             </div>
 
             {/* Birth Year (F3) */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {t(lang, 'birthYear')} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {t(lang, 'birthYear')} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <input
                 type="text"
                 value={birthYear}
                 onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder={t(lang, 'birthYearPlaceholder')}
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)] tabular"
                 inputMode="numeric"
                 maxLength={4}
               />
@@ -820,53 +827,53 @@ function SurveyContent() {
 
             {/* Agency */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {lang === 'ko' ? '연결 업체 (파견/알바)' : lang === 'en' ? 'Recruitment Agency' : lang === 'zh' ? '派遣公司' : 'Công ty phái cử'} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {lang === 'ko' ? '연결 업체 (파견/알바)' : lang === 'en' ? 'Recruitment Agency' : lang === 'zh' ? '派遣公司' : 'Công ty phái cử'} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <input
                 type="text"
                 value={agency}
                 onChange={(e) => setAgency(e.target.value)}
                 placeholder={lang === 'ko' ? '예: 주식회사 채용, 급구앱 등' : 'e.g. Agency name'}
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)]"
               />
             </div>
 
             {/* Overtime Availability */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
-                {lang === 'ko' ? '추가 잔업 가능 시, 희망 여부' : lang === 'en' ? 'Overtime Availability' : lang === 'zh' ? '加班意愿' : 'Sẵn sàng làm thêm'} <span className="text-[#EB5757]">*</span>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
+                {lang === 'ko' ? '추가 잔업 가능 시, 희망 여부' : lang === 'en' ? 'Overtime Availability' : lang === 'zh' ? '加班意愿' : 'Sẵn sàng làm thêm'} <span className="text-[var(--danger-fg)]">*</span>
               </label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" name="overtime" value="가능" checked={overtimeWilling === '가능'}
-                    onChange={(e) => setOvertimeWilling(e.target.value)} className="accent-blue-600" />
-                  <span className="text-sm text-[#D0D6E0]">{lang === 'ko' ? '가능(여)' : lang === 'en' ? 'Yes' : lang === 'zh' ? '可以' : 'Có'}</span>
+                    onChange={(e) => setOvertimeWilling(e.target.value)} className="accent-[var(--brand-500)]" />
+                  <span className="text-[var(--fs-body)] text-[var(--text-2)]">{lang === 'ko' ? '가능(여)' : lang === 'en' ? 'Yes' : lang === 'zh' ? '可以' : 'Có'}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" name="overtime" value="불가" checked={overtimeWilling === '불가'}
-                    onChange={(e) => setOvertimeWilling(e.target.value)} className="accent-blue-600" />
-                  <span className="text-sm text-[#D0D6E0]">{lang === 'ko' ? '불가(부)' : lang === 'en' ? 'No' : lang === 'zh' ? '不可以' : 'Không'}</span>
+                    onChange={(e) => setOvertimeWilling(e.target.value)} className="accent-[var(--brand-500)]" />
+                  <span className="text-[var(--fs-body)] text-[var(--text-2)]">{lang === 'ko' ? '불가(부)' : lang === 'en' ? 'No' : lang === 'zh' ? '不可以' : 'Không'}</span>
                 </label>
               </div>
             </div>
 
             {/* Memo */}
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{t(lang, 'memo')}</label>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">{t(lang, 'memo')}</label>
               <textarea
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
                 placeholder={t(lang, 'memoPlaceholder')}
                 rows={2}
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] text-base resize-none"
+                className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)] resize-none"
               />
             </div>
 
             <button
               onClick={handleClockIn}
               disabled={submitting || !nameKo.trim() || !nameEn.trim() || !bankName || !bankAccount.trim() || !idNumber.trim() || !emergencyContact.trim() || !gender || !birthYear || !agreementAccepted || !agency.trim() || !overtimeWilling}
-              className="w-full py-3 bg-[#5E6AD2] text-white rounded-lg font-semibold text-base disabled:bg-[#28282C] disabled:cursor-not-allowed hover:bg-[#828FFF] transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 bg-[var(--brand-500)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--brand-600)] transition-colors flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -883,36 +890,36 @@ function SurveyContent() {
         {/* Clock-in success / Waiting for clock-out */}
         {data.status === "clock_in" && (
           <div className="space-y-4">
-            <div className="bg-[#27A644]/10 border border-[#27A644]/30 rounded-xl p-5">
-              <div className="flex items-center gap-2 text-[#27A644] mb-3">
+            <div className="bg-[var(--success-bg)] border border-[var(--success-border)] rounded-[var(--r-xl)] p-5">
+              <div className="flex items-center gap-2 text-[var(--success-fg)] mb-3">
                 <CheckCircle className="w-5 h-5" />
                 <h2 className="font-semibold">{t(lang, 'clockInComplete')}</h2>
               </div>
-              <div className="space-y-1 text-sm text-[#27A644]">
+              <div className="space-y-1 text-[var(--fs-body)] text-[var(--success-fg)]">
                 <p><span className="font-medium">{t(lang, 'name')}:</span> {data.response?.worker_name_ko} ({data.response?.worker_name_en})</p>
                 <p>
                   <span className="font-medium">{t(lang, 'clockInTime')}:</span>{" "}
-                  {data.response?.clock_in_time
+                  <span className="tabular">{data.response?.clock_in_time
                     ? new Date(data.response.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-                    : "-"}
+                    : "-"}</span>
                 </p>
               </div>
             </div>
 
             {/* Clock-out button - only active within range */}
             {canAct && (
-              <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
-                <div className="flex items-center gap-2 text-[#FC7840] mb-4">
+              <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5">
+                <div className="flex items-center gap-2 text-[var(--warning-fg)] mb-4">
                   <LogOut className="w-5 h-5" />
                   <h2 className="font-semibold">{t(lang, 'clockOutTitle')}</h2>
                 </div>
-                <p className="text-sm text-[#8A8F98] mb-4">
+                <p className="text-[var(--fs-body)] text-[var(--text-3)] mb-4">
                   {t(lang, 'clockOutDesc')}
                 </p>
                 <button
                   onClick={handleClockOut}
                   disabled={submitting}
-                  className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-[#28282C] hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[var(--warning-fg)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -923,8 +930,8 @@ function SurveyContent() {
                     </>
                   )}
                 </button>
-                <div className="mt-3 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg p-3">
-                  <p className="text-xs text-[#EB5757] font-bold text-center">
+                <div className="mt-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] p-3">
+                  <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] font-bold text-center">
                     {lang === 'ko' ? '퇴근 처리를 정확히 하지 않으면 급여가 지급되지 않습니다.' :
                      lang === 'en' ? 'Payment will not be made if clock-out is not recorded properly.' :
                      lang === 'zh' ? '如未正确记录下班，将不予支付工资。' :
@@ -938,25 +945,25 @@ function SurveyContent() {
 
         {/* Completed */}
         {data.status === "completed" && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-6 text-center">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="mt-4 text-xl font-bold text-[#F7F8F8]">{t(lang, 'completedTitle')}</h2>
-            <div className="mt-4 space-y-2 text-sm text-[#D0D6E0]">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-2)] border border-[var(--border-1)] p-6 text-center">
+            <CheckCircle className="w-16 h-16 text-[var(--success-fg)] mx-auto" />
+            <h2 className="mt-4 text-[var(--fs-h3)] font-bold text-[var(--text-1)]">{t(lang, 'completedTitle')}</h2>
+            <div className="mt-4 space-y-2 text-[var(--fs-body)] text-[var(--text-2)]">
               <p><span className="font-medium">{t(lang, 'name')}:</span> {data.response?.worker_name_ko} ({data.response?.worker_name_en})</p>
               <p>
                 <span className="font-medium">{t(lang, 'clockIn')}:</span>{" "}
-                {data.response?.clock_in_time
+                <span className="tabular">{data.response?.clock_in_time
                   ? new Date(data.response.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-                  : "-"}
+                  : "-"}</span>
               </p>
               <p>
                 <span className="font-medium">{t(lang, 'clockOut')}:</span>{" "}
-                {data.response?.clock_out_time
+                <span className="tabular">{data.response?.clock_out_time
                   ? new Date(data.response.clock_out_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
-                  : "-"}
+                  : "-"}</span>
               </p>
               {data.response?.clock_in_time && data.response?.clock_out_time && (
-                <p className="font-medium text-[#828FFF] mt-2">
+                <p className="font-medium text-[var(--brand-400)] mt-2 tabular">
                   {t(lang, 'totalWorkHours')}:{" "}
                   {(
                     (new Date(data.response.clock_out_time).getTime() -
@@ -967,16 +974,16 @@ function SurveyContent() {
                 </p>
               )}
             </div>
-            <p className="mt-6 text-[#8A8F98] text-sm">{t(lang, 'thankYou')}</p>
+            <p className="mt-6 text-[var(--text-3)] text-[var(--fs-body)]">{t(lang, 'thankYou')}</p>
           </div>
         )}
 
         {/* Expired */}
         {data.status === "expired" && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-6 text-center">
-            <AlertCircle className="w-12 h-12 text-[#62666D] mx-auto" />
-            <h2 className="mt-4 text-lg font-semibold text-[#F7F8F8]">{t(lang, 'expiredTitle')}</h2>
-            <p className="mt-2 text-[#8A8F98]">{t(lang, 'expiredDesc')}</p>
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-2)] border border-[var(--border-1)] p-6 text-center">
+            <AlertCircle className="w-12 h-12 text-[var(--text-3)] mx-auto" />
+            <h2 className="mt-4 text-[var(--fs-lg)] font-semibold text-[var(--text-1)]">{t(lang, 'expiredTitle')}</h2>
+            <p className="mt-2 text-[var(--text-3)]">{t(lang, 'expiredDesc')}</p>
           </div>
         )}
       </div>
@@ -988,8 +995,8 @@ export default function SurveyPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
+        <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-400)]" />
         </div>
       }
     >

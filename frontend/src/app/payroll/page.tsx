@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calculator, Download, Save, Loader2, Settings } from "lucide-react";
+import { Calculator, Download, Save, Settings } from "lucide-react";
 import {
   calculatePayroll,
   getPayrollSettings,
   savePayrollSettings,
   exportPayrollExcel,
 } from "@/lib/api";
+import {
+  PageHeader, Card, CardHeader, Badge, Button, Input, Select, Field, Tabs, EmptyState, SkeletonCard, useToast,
+} from "@/components/ui";
 
 interface PayrollSetting {
   id?: number;
@@ -45,24 +48,20 @@ interface GrandTotal {
 }
 
 const DEFAULT_CATEGORIES = ["파견", "알바", "사업소득", "정규직"];
-
 const fmt = new Intl.NumberFormat("ko-KR");
 
-function formatNum(n: number): string {
-  return fmt.format(n);
-}
+type TabId = "calculate" | "settings";
 
 export default function PayrollPage() {
-  const [activeTab, setActiveTab] = useState<"calculate" | "settings">("calculate");
+  const toast = useToast();
+  const [activeTab, setActiveTab] = useState<TabId>("calculate");
 
-  // Settings state
   const [settings, setSettings] = useState<PayrollSetting[]>([]);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [settingsSaved, setSettingsSaved] = useState(false);
 
-  // Calculate state
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [results, setResults] = useState<PayrollResult[]>([]);
@@ -71,10 +70,7 @@ export default function PayrollPage() {
   const [calcError, setCalcError] = useState("");
   const [exporting, setExporting] = useState(false);
 
-  // Load settings on mount
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  useEffect(() => { loadSettings(); }, []);
 
   async function loadSettings() {
     setSettingsLoading(true);
@@ -84,7 +80,6 @@ export default function PayrollPage() {
       if (data && data.length > 0) {
         setSettings(data);
       } else {
-        // Initialize with defaults
         setSettings(
           DEFAULT_CATEGORIES.map((cat) => ({
             category: cat,
@@ -111,6 +106,7 @@ export default function PayrollPage() {
       const updated = await savePayrollSettings(settings);
       setSettings(updated);
       setSettingsSaved(true);
+      toast.success("설정이 저장되었습니다.");
       setTimeout(() => setSettingsSaved(false), 2000);
     } catch (err: any) {
       setSettingsError(err.message || "저장에 실패했습니다.");
@@ -154,144 +150,115 @@ export default function PayrollPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err.message || "엑셀 다운로드에 실패했습니다.");
+      toast.error(err.message || "엑셀 다운로드에 실패했습니다.");
     } finally {
       setExporting(false);
     }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
-            <Calculator size={28} />
-            급여 자동계산
-          </h1>
-          <p className="text-sm text-[#8A8F98] mt-1">
-            근태 데이터 기반 급여를 자동으로 계산합니다.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6 fade-in">
+      <PageHeader
+        eyebrow="급여"
+        title="급여 자동계산"
+        description="근태 데이터 기반 급여를 자동으로 계산합니다."
+      />
 
-      {/* Tabs */}
-      <div className="border-b border-[#23252A]">
-        <nav className="flex -mb-px">
-          <button
-            onClick={() => setActiveTab("calculate")}
-            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "calculate"
-                ? "border-[#5E6AD2] text-[#7070FF]"
-                : "border-transparent text-[#8A8F98] hover:text-[#D0D6E0] hover:border-[#23252A]"
-            }`}
-          >
-            <Calculator size={16} className="inline mr-2" />
-            급여 계산
-          </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "settings"
-                ? "border-[#5E6AD2] text-[#7070FF]"
-                : "border-transparent text-[#8A8F98] hover:text-[#D0D6E0] hover:border-[#23252A]"
-            }`}
-          >
-            <Settings size={16} className="inline mr-2" />
-            단가 설정
-          </button>
-        </nav>
-      </div>
+      <Tabs<TabId>
+        tabs={[
+          { id: "calculate", label: "급여 계산", icon: <Calculator size={14} /> },
+          { id: "settings", label: "단가 설정", icon: <Settings size={14} /> },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
-      {/* Settings Tab */}
       {activeTab === "settings" && (
-        <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)]">
-          <div className="px-6 py-4 border-b border-[#23252A] flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[#F7F8F8]">구분별 단가 설정</h2>
-            <button
+        <Card padding="none" className="overflow-hidden">
+          <div className="px-5 py-3 border-b border-[var(--border-1)] flex items-center justify-between">
+            <CardHeader title="구분별 단가 설정" />
+            <Button
+              variant="primary"
+              size="sm"
+              leadingIcon={<Save size={14} />}
+              loading={settingsSaving}
               onClick={handleSaveSettings}
-              disabled={settingsSaving}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#5E6AD2] text-white text-sm font-medium rounded-lg hover:bg-[#828FFF] disabled:opacity-50 transition-colors"
             >
-              {settingsSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {settingsSaving ? "저장 중..." : "저장"}
-            </button>
+              저장
+            </Button>
           </div>
 
           {settingsError && (
-            <div className="mx-6 mt-4 p-3 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg text-sm text-[#EB5757]">
+            <div className="mx-5 mt-4 p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] text-[var(--fs-caption)] text-[var(--danger-fg)]">
               {settingsError}
             </div>
           )}
           {settingsSaved && (
-            <div className="mx-6 mt-4 p-3 bg-[#27A644]/10 border border-[#27A644]/30 rounded-lg text-sm text-[#27A644]">
+            <div className="mx-5 mt-4 p-3 bg-[var(--success-bg)] border border-[var(--success-border)] rounded-[var(--r-md)] text-[var(--fs-caption)] text-[var(--success-fg)]">
               설정이 저장되었습니다.
             </div>
           )}
 
           {settingsLoading ? (
-            <div className="p-12 text-center text-[#62666D]">
-              <Loader2 size={32} className="animate-spin mx-auto mb-2" />
-              설정 로딩 중...
-            </div>
+            <div className="p-12 text-center text-[var(--text-4)]">설정 로딩 중...</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-[var(--fs-body)]">
                 <thead>
-                  <tr className="bg-[#08090A] border-b border-[#23252A]">
-                    <th className="text-left px-6 py-3 font-semibold text-[#D0D6E0]">구분</th>
-                    <th className="text-right px-6 py-3 font-semibold text-[#D0D6E0]">시급 (원)</th>
-                    <th className="text-right px-6 py-3 font-semibold text-[#D0D6E0]">연장배율</th>
-                    <th className="text-right px-6 py-3 font-semibold text-[#D0D6E0]">야간배율</th>
-                    <th className="text-center px-6 py-3 font-semibold text-[#D0D6E0]">주휴수당</th>
-                    <th className="text-left px-6 py-3 font-semibold text-[#D0D6E0]">메모</th>
+                  <tr className="bg-[var(--bg-canvas)] border-b border-[var(--border-1)]">
+                    {['구분','시급 (원)','연장배율','야간배율','주휴수당','메모'].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left text-eyebrow">{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {settings.map((s, i) => (
-                    <tr key={s.category} className="border-b border-[#23252A] hover:bg-[#141516]/5">
-                      <td className="px-6 py-3 font-medium text-[#F7F8F8]">{s.category}</td>
-                      <td className="px-6 py-3">
-                        <input
+                    <tr key={s.category} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/40 transition-colors">
+                      <td className="px-4 py-3 font-medium text-[var(--text-1)]">{s.category}</td>
+                      <td className="px-4 py-3">
+                        <Input
                           type="number"
+                          inputSize="sm"
                           value={s.hourly_rate}
                           onChange={(e) => updateSetting(i, "hourly_rate", Number(e.target.value))}
-                          className="w-32 text-right border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
+                          className="w-32 text-right"
                         />
                       </td>
-                      <td className="px-6 py-3">
-                        <input
+                      <td className="px-4 py-3">
+                        <Input
                           type="number"
+                          inputSize="sm"
                           step="0.1"
                           value={s.overtime_multiplier}
                           onChange={(e) => updateSetting(i, "overtime_multiplier", Number(e.target.value))}
-                          className="w-24 text-right border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
+                          className="w-24 text-right"
                         />
                       </td>
-                      <td className="px-6 py-3">
-                        <input
+                      <td className="px-4 py-3">
+                        <Input
                           type="number"
+                          inputSize="sm"
                           step="0.1"
                           value={s.night_multiplier}
                           onChange={(e) => updateSetting(i, "night_multiplier", Number(e.target.value))}
-                          className="w-24 text-right border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
+                          className="w-24 text-right"
                         />
                       </td>
-                      <td className="px-6 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
                           checked={!!s.weekly_holiday_enabled}
                           onChange={(e) => updateSetting(i, "weekly_holiday_enabled", e.target.checked ? 1 : 0)}
-                          className="w-4 h-4 text-[#7070FF] border-[#23252A] rounded focus:ring-blue-500"
+                          className="w-4 h-4 rounded"
                         />
                       </td>
-                      <td className="px-6 py-3">
-                        <input
+                      <td className="px-4 py-3">
+                        <Input
                           type="text"
+                          inputSize="sm"
                           value={s.memo || ""}
                           onChange={(e) => updateSetting(i, "memo", e.target.value)}
                           placeholder="메모"
-                          className="w-full border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
                         />
                       </td>
                     </tr>
@@ -300,147 +267,127 @@ export default function PayrollPage() {
               </table>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
-      {/* Calculate Tab */}
       {activeTab === "calculate" && (
         <div className="space-y-6">
-          {/* Controls */}
-          <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] px-6 py-4">
+          <Card>
             <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-[#D0D6E0]">연도</label>
-                <select
+              <Field label="연도">
+                <Select
+                  inputSize="sm"
                   value={year}
                   onChange={(e) => setYear(Number(e.target.value))}
-                  className="border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
+                  className="w-24"
                 >
                   {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
                     <option key={y} value={y}>{y}년</option>
                   ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-[#D0D6E0]">월</label>
-                <select
+                </Select>
+              </Field>
+              <Field label="월">
+                <Select
+                  inputSize="sm"
                   value={month}
                   onChange={(e) => setMonth(Number(e.target.value))}
-                  className="border border-[#23252A] rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-[#5E6AD2] outline-none"
+                  className="w-20"
                 >
                   {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                     <option key={m} value={m}>{m}월</option>
                   ))}
-                </select>
-              </div>
-              <button
-                onClick={handleCalculate}
-                disabled={calcLoading}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-[#5E6AD2] text-white text-sm font-medium rounded-lg hover:bg-[#828FFF] disabled:opacity-50 transition-colors"
-              >
-                {calcLoading ? <Loader2 size={16} className="animate-spin" /> : <Calculator size={16} />}
-                {calcLoading ? "계산 중..." : "계산"}
-              </button>
-              {results.length > 0 && (
-                <button
-                  onClick={handleExport}
-                  disabled={exporting}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#27A644] text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                </Select>
+              </Field>
+              <div className="self-end">
+                <Button
+                  variant="primary"
+                  leadingIcon={<Calculator size={14} />}
+                  loading={calcLoading}
+                  onClick={handleCalculate}
                 >
-                  {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                  {exporting ? "다운로드 중..." : "엑셀 다운로드"}
-                </button>
+                  계산
+                </Button>
+              </div>
+              {results.length > 0 && (
+                <div className="self-end">
+                  <Button
+                    variant="secondary"
+                    leadingIcon={<Download size={14} />}
+                    loading={exporting}
+                    onClick={handleExport}
+                  >
+                    엑셀 다운로드
+                  </Button>
+                </div>
               )}
             </div>
-          </div>
+          </Card>
 
           {calcError && (
-            <div className="p-3 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg text-sm text-[#EB5757]">
+            <div className="p-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] text-[var(--fs-caption)] text-[var(--danger-fg)]">
               {calcError}
             </div>
           )}
 
-          {/* Results Table */}
           {results.length > 0 && (
-            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#23252A]">
-                <h2 className="text-lg font-semibold text-[#F7F8F8]">
-                  {year}년 {month}월 급여 계산 결과
-                </h2>
-                <p className="text-sm text-[#8A8F98] mt-1">
-                  총 {grandTotal?.workers || 0}명 | 총 급여: {formatNum(grandTotal?.total_pay || 0)}원
-                </p>
+            <Card padding="none" className="overflow-hidden hover-lift">
+              <div className="px-5 py-3 border-b border-[var(--border-1)]">
+                <CardHeader
+                  title={`${year}년 ${month}월 급여 계산 결과`}
+                  subtitle={`총 ${grandTotal?.workers || 0}명 | 총 급여: ${fmt.format(grandTotal?.total_pay || 0)}원`}
+                />
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-[var(--fs-body)]">
                   <thead>
-                    <tr className="bg-[#08090A] border-b border-[#23252A]">
-                      <th className="text-left px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">이름</th>
-                      <th className="text-left px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">구분</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">근무일</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">정규시간</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">연장시간</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">야간시간</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">시급</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">기본급</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">연장수당</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">야간수당</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">주휴수당</th>
-                      <th className="text-right px-4 py-3 font-semibold text-[#D0D6E0] whitespace-nowrap">총급여</th>
+                    <tr className="bg-[var(--bg-canvas)] border-b border-[var(--border-1)]">
+                      {['이름','구분','근무일','정규시간','연장시간','야간시간','시급','기본급','연장수당','야간수당','주휴수당','총급여'].map(h => (
+                        <th key={h} className={`px-4 py-2.5 text-eyebrow whitespace-nowrap ${['근무일','정규시간','연장시간','야간시간','시급','기본급','연장수당','야간수당','주휴수당','총급여'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {results.map((r, i) => (
-                      <tr
-                        key={`${r.name}-${i}`}
-                        className="border-b border-[#23252A] hover:bg-[#141516]/5"
-                      >
-                        <td className="px-4 py-3 font-medium text-[#F7F8F8] whitespace-nowrap">{r.name}</td>
-                        <td className="px-4 py-3 text-[#8A8F98] whitespace-nowrap">
-                          <span className="inline-block px-2 py-0.5 bg-[#4EA7FC]/10 text-[#828FFF] rounded text-xs font-medium">
-                            {r.category || "-"}
-                          </span>
+                      <tr key={`${r.name}-${i}`} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/40 transition-colors">
+                        <td className="px-4 py-3 font-medium text-[var(--text-1)] whitespace-nowrap">{r.name}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <Badge tone="brand" size="sm">{r.category || "-"}</Badge>
                         </td>
-                        <td className="px-4 py-3 text-right text-[#D0D6E0]">{r.work_days}</td>
-                        <td className="px-4 py-3 text-right text-[#D0D6E0]">{r.regular_hours}</td>
-                        <td className="px-4 py-3 text-right text-[#D0D6E0]">{r.overtime_hours}</td>
-                        <td className="px-4 py-3 text-right text-[#D0D6E0]">{r.night_hours}</td>
-                        <td className="px-4 py-3 text-right text-[#D0D6E0]">{formatNum(r.hourly_rate)}</td>
-                        <td className="px-4 py-3 text-right text-[#F7F8F8] font-medium">{formatNum(r.base_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#FC7840] font-medium">{formatNum(r.overtime_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#7070FF] font-medium">{formatNum(r.night_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#27A644] font-medium">{formatNum(r.weekly_holiday_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#828FFF] font-bold whitespace-nowrap">{formatNum(r.total_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{r.work_days}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{r.regular_hours}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{r.overtime_hours}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{r.night_hours}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--text-2)]">{fmt.format(r.hourly_rate)}</td>
+                        <td className="px-4 py-3 text-right tabular font-medium text-[var(--text-1)]">{fmt.format(r.base_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular font-medium text-[var(--warning-fg)]">{fmt.format(r.overtime_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular font-medium text-[var(--brand-400)]">{fmt.format(r.night_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular font-medium text-[var(--success-fg)]">{fmt.format(r.weekly_holiday_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular font-bold text-[var(--brand-400)] whitespace-nowrap">{fmt.format(r.total_pay)}</td>
                       </tr>
                     ))}
                   </tbody>
                   {grandTotal && (
                     <tfoot>
-                      <tr className="bg-[#4EA7FC]/10 border-t-2 border-[#5E6AD2]/30 font-bold">
-                        <td className="px-4 py-3 text-blue-900" colSpan={7}>
-                          합계 ({grandTotal.workers}명)
-                        </td>
-                        <td className="px-4 py-3 text-right text-[#F7F8F8]">{formatNum(grandTotal.base_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#FC7840]">{formatNum(grandTotal.overtime_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#828FFF]">{formatNum(grandTotal.night_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#27A644]">{formatNum(grandTotal.weekly_holiday_pay)}</td>
-                        <td className="px-4 py-3 text-right text-[#828FFF] whitespace-nowrap">{formatNum(grandTotal.total_pay)}</td>
+                      <tr className="bg-[var(--brand-500)]/10 border-t-2 border-[var(--brand-500)]/30 font-bold">
+                        <td className="px-4 py-3 text-[var(--brand-400)]" colSpan={7}>합계 ({grandTotal.workers}명)</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--text-1)]">{fmt.format(grandTotal.base_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--warning-fg)]">{fmt.format(grandTotal.overtime_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--brand-400)]">{fmt.format(grandTotal.night_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--success-fg)]">{fmt.format(grandTotal.weekly_holiday_pay)}</td>
+                        <td className="px-4 py-3 text-right tabular text-[var(--brand-400)] whitespace-nowrap">{fmt.format(grandTotal.total_pay)}</td>
                       </tr>
                     </tfoot>
                   )}
                 </table>
               </div>
-            </div>
+            </Card>
           )}
 
-          {/* Empty state */}
           {!calcLoading && results.length === 0 && !calcError && (
-            <div className="bg-[#0F1011] rounded-xl border border-[#23252A] shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-12 text-center">
-              <Calculator size={48} className="mx-auto mb-4 text-[#62666D]" />
-              <p className="text-[#8A8F98] text-sm">
-                연도와 월을 선택한 후 "계산" 버튼을 눌러주세요.
-              </p>
-            </div>
+            <EmptyState
+              icon={<Calculator className="w-7 h-7" />}
+              title="연도와 월을 선택 후 계산 버튼을 눌러주세요."
+            />
           )}
         </div>
       )}

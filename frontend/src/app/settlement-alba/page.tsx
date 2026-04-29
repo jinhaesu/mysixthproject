@@ -2,12 +2,17 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Loader2, Download } from "lucide-react";
+import { Calculator, Download, Users } from "lucide-react";
 import { getConfirmedList, getWorkers } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import ChartCard from "@/components/charts/ChartCard";
 import { SEMANTIC_COLORS } from "@/lib/chartColors";
+import { CHART_AXIS_PROPS, CHART_GRID_PROPS, ChartTooltip } from "@/components/charts/theme";
+import {
+  PageHeader, Card, Stat, Button, Field, Input, EmptyState, CenterSpinner, useToast,
+  Table, THead, TBody, TR, TH, TD, Toolbar,
+} from "@/components/ui";
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
@@ -37,6 +42,7 @@ const normType = (t: string | null | undefined): string => {
 };
 
 export default function SettlementAlbaPage() {
+  const toast = useToast();
   const [authorized, setAuthorized] = useState(false);
   const [yearMonth, setYearMonth] = usePersistedState("sa_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any>(null);
@@ -47,8 +53,6 @@ export default function SettlementAlbaPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // confirmed-list + workers 직접 조회 → 로컬에서 분류/집계/정산 계산
-      // (기존 /api/survey/settlement 엔드포인트의 '정규직' 오분류 버그 우회)
       const [workersResp, confList] = await Promise.all([
         getWorkers({ limit: '10000' }).catch(() => ({ workers: [] })),
         getConfirmedList(yearMonth, ''),
@@ -67,11 +71,9 @@ export default function SettlementAlbaPage() {
         if (w.name_ko) workerByIdentity.set(w.name_ko, w);
       }
 
-      // 레코드 flat 수집 + 분류
       const empMap = new Map<string, any>();
       for (const e of (confList || [])) {
         for (const r of (e.records || [])) {
-          // 분류: 명시값 우선, 빈 값일 때만 workers.category fallback
           const raw = (r.employee_type || '').toString().trim();
           let t = raw;
           if (!t) {
@@ -79,8 +81,7 @@ export default function SettlementAlbaPage() {
             t = catMap.get(np) || catMap.get(r.employee_phone) || catMap.get(r.employee_name) || '';
           }
           const effType = normType(t);
-          if (effType !== '알바') continue; // 알바만 정산
-          // Identity = 이름 기준 (수빈 vs 수빈(HO THI BICH) 별개 사람)
+          if (effType !== '알바') continue;
           const identity = `n:${r.employee_name || ''}`;
           if (!empMap.has(identity)) {
             const worker = workerByIdentity.get(normalizePhone(r.employee_phone || '')) || workerByIdentity.get(r.employee_name) || {};
@@ -108,7 +109,6 @@ export default function SettlementAlbaPage() {
           emp.regular_hours += regH;
           emp.overtime_hours += otH;
           emp.night_hours += nightH;
-          // 주차 추적 (주휴수당 + 휴일수당)
           const isHoliday = isHolidayOrWeekend(r.date);
           const isPublicHoliday = isKoreanHoliday(r.date);
           const d = new Date(r.date + 'T00:00:00+09:00');
@@ -124,7 +124,6 @@ export default function SettlementAlbaPage() {
         }
       }
 
-      // 주휴수당 + 휴일수당 시간 계산
       const results: any[] = [];
       for (const [, emp] of empMap) {
         let weeklyHolidayWeeks = 0;
@@ -149,7 +148,7 @@ export default function SettlementAlbaPage() {
       const meals: Record<number, number> = {};
       results.forEach((_, i) => { meals[i] = 0; });
       setMealDeductions(meals);
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
   }, [yearMonth]);
 
@@ -195,7 +194,7 @@ export default function SettlementAlbaPage() {
     const header = ['이름','연락처','은행','계좌번호','근무일','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','소득세(3.3%)','지방세(0.33%)','실지급'];
     const csvRows = rows.map((r: any) => [r.name,r.phone,r.bank_name,r.bank_account,r.work_days,r.regular_hours,r.overtime_hours,r.night_hours || 0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.incomeTax,r.localTax,r.netPay]);
     const csv = [header, ...csvRows].map(r => r.join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `알바정산_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
   };
@@ -203,39 +202,35 @@ export default function SettlementAlbaPage() {
   if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
 
   return (
-    <div className="min-w-0">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-[#F7F8F8] flex items-center gap-2">
-          <Calculator className="w-6 h-6 text-[#FC7840]" />
-          알바(사업소득) 정산관리
-        </h1>
-        <div className="mt-2 bg-[#FC7840]/10 border border-[#FC7840]/30 rounded-lg px-3 py-2 text-xs text-orange-800">
-          <b>수당 계산:</b> 시급×1.5배 | <b>30분 내림</b> | 주5일 이하 휴일→수당없음 | 주5일 초과+휴일→휴일수당 | 공휴일→무조건 휴일수당 | 야간(22~06)→연장 | 소득세3.3%+지방세0.33%
-        </div>
-      </div>
+    <div className="min-w-0 space-y-4 fade-in">
+      <PageHeader
+        eyebrow="정산"
+        title="알바(사업소득) 정산관리"
+        description="수당 계산: 시급×1.5배 | 30분 내림 | 주5일 이하 휴일→수당없음 | 공휴일→휴일수당 | 야간(22~06)→연장 | 소득세3.3%+지방세0.33%"
+        actions={
+          rows.length > 0 ? (
+            <Button variant="secondary" size="sm" leadingIcon={<Download size={14} />} onClick={handleExcel}>
+              엑셀 다운로드
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="bg-[#0F1011] rounded-xl border p-4 mb-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs font-medium text-[#8A8F98] mb-1">연월</label>
-          <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[#8A8F98] mb-1">시간당 급여</label>
-          <input type="number" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="px-3 py-2 border border-[#23252A] rounded-lg text-sm w-28" />
-        </div>
-        {rows.length > 0 && (
-          <button onClick={handleExcel} className="px-4 py-2 bg-[#27A644] text-white rounded-lg text-sm font-medium flex items-center gap-1">
-            <Download className="w-4 h-4" /> 엑셀 다운로드
-          </button>
-        )}
-      </div>
+      <Toolbar>
+        <Field label="연월">
+          <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
+        </Field>
+        <Field label="시간당 급여">
+          <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" />
+        </Field>
+      </Toolbar>
 
       {rows.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div className="bg-[#0F1011] rounded-xl border p-3 text-center"><p className="text-xl font-bold">{rows.length}</p><p className="text-xs text-[#8A8F98]">인원</p></div>
-          <div className="bg-[#FC7840]/10 rounded-xl border border-[#FC7840]/30 p-3 text-center"><p className="text-lg font-bold text-[#FC7840]">{fmt.format(totals.grossPay)}</p><p className="text-xs text-[#FC7840]">급여 합계</p></div>
-          <div className="bg-[#EB5757]/10 rounded-xl border border-[#EB5757]/30 p-3 text-center"><p className="text-lg font-bold text-[#EB5757]">{fmt.format(totals.incomeTax + totals.localTax)}</p><p className="text-xs text-[#EB5757]">세금 합계</p></div>
-          <div className="bg-[#27A644]/10 rounded-xl border border-[#27A644]/30 p-3 text-center"><p className="text-lg font-bold text-[#27A644]">{fmt.format(totals.netPay)}</p><p className="text-xs text-[#27A644]">실지급 합계</p></div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Stat label="인원" value={rows.length} unit="명" tone="neutral" icon={<Users size={14} />} />
+          <Stat label="급여 합계" value={fmt.format(totals.grossPay)} unit="원" tone="warning" />
+          <Stat label="세금 합계" value={fmt.format(totals.incomeTax + totals.localTax)} unit="원" tone="danger" />
+          <Stat label="실지급 합계" value={fmt.format(totals.netPay)} unit="원" tone="success" />
         </div>
       )}
 
@@ -245,122 +240,124 @@ export default function SettlementAlbaPage() {
           .slice(0, 10)
           .map((r: any) => ({ name: r.name, 기본: r.regular_hours, 연장: r.overtime_hours, 야간: r.night_hours || 0 }));
         return (
-          <div className="mb-4">
-            <ChartCard title="근무시간 상위 인원 (기본/연장/야간)" subtitle="최대 10명, 총 근무시간 내림차순" height={320}>
-              <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 48 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10 }} unit="h" />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={48} />
-                <Tooltip formatter={(value: number | string | Array<number | string> | undefined, name: string | undefined) => [`${value ?? 0}h`, name ?? '']} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="기본" stackId="a" fill={SEMANTIC_COLORS.regular} />
-                <Bar dataKey="연장" stackId="a" fill={SEMANTIC_COLORS.overtime} />
-                <Bar dataKey="야간" stackId="a" fill={SEMANTIC_COLORS.night} radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ChartCard>
-          </div>
+          <ChartCard title="근무시간 상위 인원 (기본/연장/야간)" subtitle="최대 10명, 총 근무시간 내림차순" height={320}>
+            <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 48 }}>
+              <CartesianGrid {...CHART_GRID_PROPS} />
+              <XAxis type="number" {...CHART_AXIS_PROPS} unit="h" />
+              <YAxis type="category" dataKey="name" {...CHART_AXIS_PROPS} width={48} />
+              <Tooltip content={<ChartTooltip unit="h" />} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="기본" stackId="a" fill={SEMANTIC_COLORS.regular} />
+              <Bar dataKey="연장" stackId="a" fill={SEMANTIC_COLORS.overtime} />
+              <Bar dataKey="야간" stackId="a" fill={SEMANTIC_COLORS.night} radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ChartCard>
         );
       })()}
 
       {loading ? (
-        <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin text-[#FC7840] mx-auto" /></div>
+        <CenterSpinner />
       ) : rows.length > 0 ? (
-        <div className="bg-[#0F1011] rounded-xl border overflow-hidden">
+        <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-[10px] table-fixed">
+            <Table className="text-[10px] table-fixed">
               <colgroup>
-                <col className="w-[70px]" />{/* 이름 */}
-                <col className="w-[55px]" />{/* 은행 */}
-                <col className="w-[90px]" />{/* 계좌 */}
-                <col className="w-[80px]" />{/* 주민번호 */}
-                <col className="w-[28px]" />{/* 일 */}
-                <col className="w-[38px]" />{/* 기본h */}
-                <col className="w-[38px]" />{/* 연장h */}
-                <col className="w-[38px]" />{/* 야간h */}
-                <col className="w-[38px]" />{/* 주휴h */}
-                <col className="w-[65px]" />{/* 기본급 */}
-                <col className="w-[65px]" />{/* 연장수당 */}
-                <col className="w-[65px]" />{/* 야간수당 */}
-                <col className="w-[65px]" />{/* 주휴수당 */}
-                <col className="w-[70px]" />{/* 급여계 */}
-                <col className="w-[65px]" />{/* 식대 */}
-                <col className="w-[60px]" />{/* 소득세 */}
-                <col className="w-[55px]" />{/* 지방세 */}
-                <col className="w-[75px]" />{/* 실지급 */}
+                <col className="w-[70px]" />
+                <col className="w-[55px]" />
+                <col className="w-[90px]" />
+                <col className="w-[80px]" />
+                <col className="w-[28px]" />
+                <col className="w-[38px]" />
+                <col className="w-[38px]" />
+                <col className="w-[38px]" />
+                <col className="w-[38px]" />
+                <col className="w-[65px]" />
+                <col className="w-[65px]" />
+                <col className="w-[65px]" />
+                <col className="w-[65px]" />
+                <col className="w-[70px]" />
+                <col className="w-[65px]" />
+                <col className="w-[60px]" />
+                <col className="w-[55px]" />
+                <col className="w-[75px]" />
               </colgroup>
-              <thead>
-                <tr className="bg-[#08090A] text-left">
-                  <th className="py-2 px-1.5">이름</th>
-                  <th className="py-2 px-1.5">은행</th>
-                  <th className="py-2 px-1.5">계좌번호</th>
-                  <th className="py-2 px-1.5">주민번호</th>
-                  <th className="py-2 px-1.5 text-right">일</th>
-                  <th className="py-2 px-1.5 text-right">기본h</th>
-                  <th className="py-2 px-1.5 text-right">연장h</th>
-                  <th className="py-2 px-1.5 text-right">야간h</th>
-                  <th className="py-2 px-1.5 text-right">주휴h</th>
-                  <th className="py-2 px-1.5 text-right">기본급</th>
-                  <th className="py-2 px-1.5 text-right">연장수당</th>
-                  <th className="py-2 px-1.5 text-right">야간수당</th>
-                  <th className="py-2 px-1.5 text-right">주휴수당</th>
-                  <th className="py-2 px-1.5 text-right">급여계</th>
-                  <th className="py-2 px-1.5 text-right">식대공제</th>
-                  <th className="py-2 px-1.5 text-right">소득세</th>
-                  <th className="py-2 px-1.5 text-right">지방세</th>
-                  <th className="py-2 px-1.5 text-right font-bold text-[#27A644]">실지급</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#23252A]">
+              <THead>
+                <TR>
+                  <TH>이름</TH>
+                  <TH>은행</TH>
+                  <TH>계좌번호</TH>
+                  <TH>주민번호</TH>
+                  <TH numeric>일</TH>
+                  <TH numeric>기본h</TH>
+                  <TH numeric>연장h</TH>
+                  <TH numeric>야간h</TH>
+                  <TH numeric>주휴h</TH>
+                  <TH numeric>기본급</TH>
+                  <TH numeric>연장수당</TH>
+                  <TH numeric>야간수당</TH>
+                  <TH numeric>주휴수당</TH>
+                  <TH numeric>급여계</TH>
+                  <TH numeric>식대공제</TH>
+                  <TH numeric>소득세</TH>
+                  <TH numeric>지방세</TH>
+                  <TH numeric className="text-[var(--success-fg)]">실지급</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {rows.map((r: any) => (
-                  <tr key={r.idx} className="hover:bg-[#141516]/5">
-                    <td className="py-1.5 px-1.5 font-medium text-[#F7F8F8] truncate">{r.name}</td>
-                    <td className="py-1.5 px-1.5 text-[#8A8F98] truncate">{r.bank_name || '-'}</td>
-                    <td className="py-1.5 px-1.5 text-[#8A8F98] font-mono text-[9px] truncate">{r.bank_account || '-'}</td>
-                    <td className="py-1.5 px-1.5 text-[#8A8F98] font-mono text-[9px] truncate">{r.id_number || '-'}</td>
-                    <td className="py-1.5 px-1.5 text-right">{r.work_days}</td>
-                    <td className="py-1.5 px-1.5 text-right">{r.regular_hours}</td>
-                    <td className="py-1.5 px-1.5 text-right text-[#F0BF00]">{r.overtime_hours}</td>
-                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{(r.night_hours || 0).toFixed(1)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{r.weekly_holiday_hours}</td>
-                    <td className="py-1.5 px-1.5 text-right">{fmt.format(r.basePay)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-[#F0BF00]">{fmt.format(r.overtimePay)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{fmt.format(r.nightPay)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-[#828FFF]">{fmt.format(r.whPay)}</td>
-                    <td className="py-1.5 px-1.5 text-right font-medium">{fmt.format(r.grossPay)}</td>
-                    <td className="py-1.5 px-1.5">
-                      <input type="number" value={mealDeductions[r.idx] || ''} onChange={e => setMealDeductions({...mealDeductions, [r.idx]: parseInt(e.target.value) || 0})}
-                        className="w-full px-1 py-0.5 border border-[#23252A] rounded text-[10px] text-right" placeholder="0" />
-                    </td>
-                    <td className="py-1.5 px-1.5 text-right text-[#EB5757]">{fmt.format(r.incomeTax)}</td>
-                    <td className="py-1.5 px-1.5 text-right text-[#EB5757]">{fmt.format(r.localTax)}</td>
-                    <td className="py-1.5 px-1.5 text-right font-bold text-[#27A644]">{fmt.format(r.netPay)}</td>
-                  </tr>
+                  <TR key={r.idx}>
+                    <TD emphasis className="truncate">{r.name}</TD>
+                    <TD muted className="truncate">{r.bank_name || '-'}</TD>
+                    <TD muted className="font-mono text-[9px] truncate">{r.bank_account || '-'}</TD>
+                    <TD muted className="font-mono text-[9px] truncate">{r.id_number || '-'}</TD>
+                    <TD numeric>{r.work_days}</TD>
+                    <TD numeric>{r.regular_hours}</TD>
+                    <TD numeric className="text-[var(--warning-fg)]">{r.overtime_hours}</TD>
+                    <TD numeric className="text-[var(--brand-400)]">{(r.night_hours || 0).toFixed(1)}</TD>
+                    <TD numeric className="text-[var(--brand-400)]">{r.weekly_holiday_hours}</TD>
+                    <TD numeric>{fmt.format(r.basePay)}</TD>
+                    <TD numeric className="text-[var(--warning-fg)]">{fmt.format(r.overtimePay)}</TD>
+                    <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.nightPay)}</TD>
+                    <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.whPay)}</TD>
+                    <TD numeric emphasis>{fmt.format(r.grossPay)}</TD>
+                    <TD>
+                      <Input type="number" inputSize="sm" value={mealDeductions[r.idx] || ''} onChange={e => setMealDeductions({...mealDeductions, [r.idx]: parseInt(e.target.value) || 0})}
+                        className="w-full text-right" placeholder="0" />
+                    </TD>
+                    <TD numeric className="text-[var(--danger-fg)]">{fmt.format(r.incomeTax)}</TD>
+                    <TD numeric className="text-[var(--danger-fg)]">{fmt.format(r.localTax)}</TD>
+                    <TD numeric emphasis className="text-[var(--success-fg)]">{fmt.format(r.netPay)}</TD>
+                  </TR>
                 ))}
-              </tbody>
+              </TBody>
               <tfoot>
-                <tr className="bg-[#FC7840]/10 border-t-2 border-[#FC7840]/30 font-bold text-[10px]">
-                  <td className="py-2 px-1.5 text-orange-900" colSpan={4}>합계 ({rows.length}명)</td>
-                  <td className="py-2 px-1.5 text-right">{totals.work_days}</td>
-                  <td className="py-2 px-1.5 text-right">{(totals.regular_hours || 0).toFixed(1)}</td>
-                  <td className="py-2 px-1.5 text-right">{(totals.overtime_hours || 0).toFixed(1)}</td>
-                  <td className="py-2 px-1.5 text-right">{(totals.night_hours || 0).toFixed(1)}</td>
-                  <td className="py-2 px-1.5 text-right">{totals.weekly_holiday_hours || 0}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.basePay || 0)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.overtimePay || 0)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.nightPay || 0)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.whPay || 0)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.grossPay || 0)}</td>
-                  <td className="py-2 px-1.5 text-right text-[#EB5757]">{fmt.format(totals.meal || 0)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.incomeTax || 0)}</td>
-                  <td className="py-2 px-1.5 text-right">{fmt.format(totals.localTax || 0)}</td>
-                  <td className="py-2 px-1.5 text-right text-[#27A644]">{fmt.format(totals.netPay || 0)}</td>
-                </tr>
+                <TR className="bg-[var(--warning-bg)] border-t-2 border-[var(--warning-border)] font-bold text-[10px]">
+                  <TD colSpan={4} className="text-[var(--text-2)]">합계 ({rows.length}명)</TD>
+                  <TD numeric>{totals.work_days}</TD>
+                  <TD numeric>{(totals.regular_hours || 0).toFixed(1)}</TD>
+                  <TD numeric>{(totals.overtime_hours || 0).toFixed(1)}</TD>
+                  <TD numeric>{(totals.night_hours || 0).toFixed(1)}</TD>
+                  <TD numeric>{totals.weekly_holiday_hours || 0}</TD>
+                  <TD numeric>{fmt.format(totals.basePay || 0)}</TD>
+                  <TD numeric>{fmt.format(totals.overtimePay || 0)}</TD>
+                  <TD numeric>{fmt.format(totals.nightPay || 0)}</TD>
+                  <TD numeric>{fmt.format(totals.whPay || 0)}</TD>
+                  <TD numeric>{fmt.format(totals.grossPay || 0)}</TD>
+                  <TD numeric className="text-[var(--danger-fg)]">{fmt.format(totals.meal || 0)}</TD>
+                  <TD numeric>{fmt.format(totals.incomeTax || 0)}</TD>
+                  <TD numeric>{fmt.format(totals.localTax || 0)}</TD>
+                  <TD numeric className="text-[var(--success-fg)]">{fmt.format(totals.netPay || 0)}</TD>
+                </TR>
               </tfoot>
-            </table>
+            </Table>
           </div>
-        </div>
+        </Card>
       ) : data ? (
-        <div className="bg-[#0F1011] rounded-xl border py-16 text-center text-sm text-[#62666D]">확정된 알바 근태 데이터가 없습니다.</div>
+        <EmptyState
+          icon={<Calculator className="w-7 h-7" />}
+          title="데이터 없음"
+          description="확정된 알바 근태 데이터가 없습니다."
+        />
       ) : null}
     </div>
   );

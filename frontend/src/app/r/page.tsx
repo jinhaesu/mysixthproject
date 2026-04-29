@@ -541,7 +541,7 @@ function RegularContent() {
   const [vacStartDate, setVacStartDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [vacEndDate, setVacEndDate] = useState(new Date().toLocaleDateString('sv-SE'));
   const [vacDays, setVacDays] = useState("1");
-  const [vacType, setVacType] = useState<'연차' | '오전반차' | '오후반차'>('연차');
+  const [vacType, setVacType] = useState<'연차' | '오전반차' | '오후반차' | '공가' | '오전공가' | '오후공가'>('연차');
   const [vacReason, setVacReason] = useState("");
   const [vacSubmitting, setVacSubmitting] = useState(false);
   const [vacData, setVacData] = useState<any>(null);
@@ -608,7 +608,8 @@ function RegularContent() {
   useEffect(() => { loadVacations(); }, [loadVacations]);
 
   useEffect(() => {
-    if (vacType === '오전반차' || vacType === '오후반차') {
+    const isHalf = vacType.startsWith('오전') || vacType.startsWith('오후');
+    if (isHalf) {
       setVacEndDate(vacStartDate);
       setVacDays("0.5");
     } else if (vacStartDate && vacEndDate) {
@@ -817,10 +818,10 @@ function RegularContent() {
   // ── Loading state ──────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#7070FF] mx-auto" />
-          <p className="mt-3 text-[#8A8F98]">{t(lang, "loading")}</p>
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-400)] mx-auto" />
+          <p className="mt-3 text-[var(--text-3)]">{t(lang, "loading")}</p>
         </div>
       </div>
     );
@@ -829,13 +830,13 @@ function RegularContent() {
   // ── Error state ────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
-        <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-8 max-w-sm w-full text-center">
-          <AlertCircle className="w-12 h-12 text-[#EB5757] mx-auto" />
-          <h2 className="mt-4 text-lg font-semibold text-[#F7F8F8]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)] p-4">
+        <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-2)] border border-[var(--border-1)] p-8 max-w-sm w-full text-center">
+          <AlertCircle className="w-12 h-12 text-[var(--danger-fg)] mx-auto" />
+          <h2 className="mt-4 text-[var(--fs-lg)] font-semibold text-[var(--text-1)]">
             {t(lang, "error")}
           </h2>
-          <p className="mt-2 text-[#8A8F98]">{error}</p>
+          <p className="mt-2 text-[var(--text-3)]">{error}</p>
         </div>
       </div>
     );
@@ -846,13 +847,13 @@ function RegularContent() {
   // ── Deactivated employee ───────────────────────────────────────
   if (data.status === "deactivated") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#08090A] p-4">
-        <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-8 max-w-sm w-full text-center">
-          <Ban className="w-12 h-12 text-[#EB5757] mx-auto" />
-          <h2 className="mt-4 text-lg font-semibold text-[#F7F8F8]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)] p-4">
+        <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-2)] border border-[var(--border-1)] p-8 max-w-sm w-full text-center">
+          <Ban className="w-12 h-12 text-[var(--danger-fg)] mx-auto" />
+          <h2 className="mt-4 text-[var(--fs-lg)] font-semibold text-[var(--text-1)]">
             {t(lang, "deactivated")}
           </h2>
-          <p className="mt-2 text-[#8A8F98]">{t(lang, "deactivatedDesc")}</p>
+          <p className="mt-2 text-[var(--text-3)]">{t(lang, "deactivatedDesc")}</p>
         </div>
       </div>
     );
@@ -872,41 +873,41 @@ function RegularContent() {
   const showForm = (data.status === "ready" || data.status === "clocked_in") && !contractMissing && personalInfoDone;
 
   return (
-    <div className="min-h-screen bg-[#08090A]">
+    <div className="min-h-screen bg-[var(--bg-canvas)] fade-in">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-5">
-        <h1 className="text-lg font-bold">{t(lang, "pageTitle")}</h1>
-        <p className="text-indigo-200 text-sm mt-0.5">{data.date} {t(lang, "workDate")}</p>
-        <div className="mt-2 bg-[#5E6AD2]/100/30 rounded-lg px-3 py-2 space-y-1">
+      <div className="bg-[var(--brand-600)] text-white px-4 py-5" style={{ background: 'linear-gradient(135deg, var(--brand-600) 0%, var(--brand-500) 100%)' }}>
+        <h1 className="text-[var(--fs-h4)] font-bold tracking-[var(--tracking-tight)]">{t(lang, "pageTitle")}</h1>
+        <p className="text-[var(--brand-200)] text-[var(--fs-body)] mt-0.5 tabular">{data.date} {t(lang, "workDate")}</p>
+        <div className="mt-2 bg-white/10 rounded-[var(--r-md)] px-3 py-2 space-y-1">
           <div className="flex items-center gap-2">
-            <p className="text-base font-semibold">{data.employee_name}</p>
+            <p className="text-[var(--fs-base)] font-semibold">{data.employee_name}</p>
             {data.role && data.role !== '일반' && (
-              <span className="px-2 py-0.5 bg-yellow-400 text-yellow-900 rounded text-xs font-bold">{data.role}</span>
+              <span className="px-2 py-0.5 bg-yellow-400 text-yellow-900 rounded-[var(--r-sm)] text-[var(--fs-caption)] font-bold">{data.role}</span>
             )}
           </div>
           {(data.department || data.team) && (
-            <p className="text-indigo-200 text-sm">
+            <p className="text-[var(--brand-200)] text-[var(--fs-body)]">
               {data.department}
               {data.department && data.team && " · "}
               {data.team}
             </p>
           )}
           {data.workplace && (
-            <p className="text-sm font-medium flex items-center gap-1.5 mt-1">
+            <p className="text-[var(--fs-body)] font-medium flex items-center gap-1.5 mt-1">
               <MapPin className="w-4 h-4" />
               {data.workplace.name}
             </p>
           )}
           {data.workplace?.address && (
-            <p className="text-indigo-200 text-xs">{data.workplace.address}</p>
+            <p className="text-[var(--brand-200)] text-[var(--fs-caption)]">{data.workplace.address}</p>
           )}
         </div>
 
         {/* Parking Notice */}
         {showForm && (
-          <div className="mt-3 bg-[#F0BF00]/100/20 border border-amber-400/40 rounded-lg px-3 py-2 flex items-start gap-2">
-            <Car className="w-4 h-4 text-amber-200 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-100">
+          <div className="mt-3 bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-md)] px-3 py-2 flex items-start gap-2">
+            <Car className="w-4 h-4 text-[var(--warning-fg)] shrink-0 mt-0.5" />
+            <p className="text-[var(--fs-caption)] text-[var(--warning-fg)]">
               {t(lang, "parkingNotice")}
             </p>
           </div>
@@ -920,10 +921,10 @@ function RegularContent() {
             <button
               key={l}
               onClick={() => setLang(l)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-[var(--r-pill)] text-[var(--fs-body)] font-medium transition-colors ${
                 lang === l
-                  ? "bg-indigo-600 text-white"
-                  : "bg-[#0F1011] text-[#8A8F98] border border-[#23252A] hover:bg-[#141516]/5"
+                  ? "bg-[var(--brand-500)] text-white"
+                  : "bg-[var(--bg-1)] text-[var(--text-3)] border border-[var(--border-1)]"
               }`}
             >
               {t(l, `lang${l.charAt(0).toUpperCase() + l.slice(1)}`)}
@@ -931,41 +932,71 @@ function RegularContent() {
           ))}
         </div>
 
+        {/* ── Onboarding info soft gate ──────────────────────────── */}
+        {data && personalInfoDone && (data.status as string) !== "deactivated" && (() => {
+          const d = data as any;
+          const missingEmail = !d.email;
+          const missingBankSlip = !d.bank_slip_data;
+          const missingForeign = d.nationality === "FOREIGN" && (!d.visa_type || !d.foreign_id_card_data);
+          const needsOnboarding = missingEmail || missingBankSlip || missingForeign;
+          if (!needsOnboarding) return null;
+          return (
+            <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-xl)] p-5 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-[var(--warning-fg)] shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-[var(--warning-fg)] text-[var(--fs-body)]">추가 정보가 필요합니다</p>
+                  <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-80 mt-0.5">먼저 입사 정보를 완성해주세요.</p>
+                </div>
+              </div>
+              <a
+                href={`/regular-contract?token=${token}&mode=onboarding-fix`}
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-[var(--r-md)] bg-[var(--warning-fg)] text-white font-semibold text-[var(--fs-body)] transition-opacity hover:opacity-90"
+              >
+                정보 입력하러 가기
+              </a>
+              <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-70 text-center">
+                출퇴근은 정상적으로 사용할 수 있으나, 추가 정보 미완료 시 4대보험 가입이 지연될 수 있습니다.
+              </p>
+            </div>
+          );
+        })()}
+
         {/* Personal Info Required (FIRST - before contract check) */}
         {data && !personalInfoDone && (data.status as string) !== "deactivated" && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-            <div className="flex items-center gap-2 text-[#828FFF] mb-2">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+            <div className="flex items-center gap-2 text-[var(--brand-400)] mb-2">
               <Users className="w-5 h-5" />
               <h2 className="font-semibold">{t(lang, "personalInfo") || "개인정보 입력"}</h2>
             </div>
-            <p className="text-sm text-[#8A8F98]">출퇴근 기록을 위해 개인정보를 먼저 입력해주세요. (최초 1회)</p>
+            <p className="text-[var(--fs-body)] text-[var(--text-3)]">출퇴근 기록을 위해 개인정보를 먼저 입력해주세요. (최초 1회)</p>
 
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">영문이름</label>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">영문이름</label>
               <input type="text" value={piNameEn} onChange={e => setPiNameEn(e.target.value)} placeholder="Hong Gildong"
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
+                className="w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] bg-[var(--bg-2)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] transition-colors placeholder:text-[var(--text-4)]" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">주민번호 <span className="text-[#EB5757]">*</span></label>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">주민번호 <span className="text-[var(--danger-fg)]">*</span></label>
               <input type="password" value={piIdNumber} onChange={e => setPiIdNumber(e.target.value)} placeholder="000000-0000000"
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" inputMode="numeric" />
+                className="w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] bg-[var(--bg-2)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] transition-colors placeholder:text-[var(--text-4)]" inputMode="numeric" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">은행명 <span className="text-[#EB5757]">*</span></label>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">은행명 <span className="text-[var(--danger-fg)]">*</span></label>
               <select value={piBankName} onChange={e => setPiBankName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base bg-[#0F1011]">
+                className="w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] bg-[var(--bg-2)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] transition-colors">
                 <option value="">은행 선택</option>
                 {["국민은행","신한은행","우리은행","하나은행","농협은행","기업은행","카카오뱅크","토스뱅크","SC제일은행","대구은행","부산은행","경남은행","광주은행","전북은행","제주은행","새마을금고","신협","우체국","수협은행"].map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#D0D6E0] mb-1">계좌번호 <span className="text-[#EB5757]">*</span></label>
+              <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">계좌번호 <span className="text-[var(--danger-fg)]">*</span></label>
               <input type="text" value={piBankAccount} onChange={e => setPiBankAccount(e.target.value)} placeholder="계좌번호 입력"
-                className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" inputMode="numeric" />
+                className="w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] bg-[var(--bg-2)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] transition-colors placeholder:text-[var(--text-4)]" inputMode="numeric" />
             </div>
 
             <button onClick={handleSavePersonalInfo} disabled={piSaving || !piIdNumber.trim() || !piBankName || !piBankAccount.trim()}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-[#28282C]">
+              className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
               {piSaving ? "저장 중..." : "개인정보 저장"}
             </button>
           </div>
@@ -973,12 +1004,12 @@ function RegularContent() {
 
         {/* ── Contract Missing Warning (shown after personal info is done) ── */}
         {contractMissing && personalInfoDone && (
-          <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-xl p-5 text-center">
-            <ShieldAlert className="w-10 h-10 text-[#EB5757] mx-auto mb-2" />
-            <h2 className="font-semibold text-[#EB5757]">근로계약서 미체결</h2>
-            <p className="text-sm text-[#EB5757] mt-2">개인정보가 등록되었습니다. 감사합니다.</p>
-            <p className="text-sm text-[#EB5757] mt-1">근로계약서 체결 후 출퇴근을 시작할 수 있습니다.</p>
-            <p className="text-xs text-[#EB5757] mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
+          <div className="bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-xl)] p-5 text-center">
+            <ShieldAlert className="w-10 h-10 text-[var(--danger-fg)] mx-auto mb-2" />
+            <h2 className="font-semibold text-[var(--danger-fg)]">근로계약서 미체결</h2>
+            <p className="text-[var(--fs-body)] text-[var(--danger-fg)] mt-2">개인정보가 등록되었습니다. 감사합니다.</p>
+            <p className="text-[var(--fs-body)] text-[var(--danger-fg)] mt-1">근로계약서 체결 후 출퇴근을 시작할 수 있습니다.</p>
+            <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-2">관리자에게 문의하여 근로계약서를 작성해주세요.</p>
           </div>
         )}
 
@@ -987,12 +1018,12 @@ function RegularContent() {
           <>
             {/* GPS acquiring */}
             {gpsStatus === "acquiring" && (
-              <div className="rounded-lg p-5 bg-[#5E6AD2]/10 border border-[#5E6AD2]/30 text-center">
-                <Navigation className="w-8 h-8 text-indigo-500 animate-pulse mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#828FFF]">
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--info-bg)] border border-[var(--info-border)] text-center">
+                <Navigation className="w-8 h-8 text-[var(--info-fg)] animate-pulse mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--info-fg)]">
                   {t(lang, "gpsAcquiring")}
                 </p>
-                <p className="text-xs text-indigo-500 mt-1">
+                <p className="text-[var(--fs-caption)] text-[var(--info-fg)] mt-1">
                   {t(lang, "gpsAllowPermission")}
                 </p>
               </div>
@@ -1000,18 +1031,18 @@ function RegularContent() {
 
             {/* GPS denied / error */}
             {(gpsStatus === "denied" || gpsStatus === "error") && (
-              <div className="rounded-lg p-5 bg-[#EB5757]/10 border border-[#EB5757]/30 text-center">
-                <ShieldAlert className="w-8 h-8 text-[#EB5757] mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#EB5757]">
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--danger-bg)] border border-[var(--danger-border)] text-center">
+                <ShieldAlert className="w-8 h-8 text-[var(--danger-fg)] mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--danger-fg)]">
                   {gpsStatus === "denied"
                     ? t(lang, "gpsDenied")
                     : t(lang, "gpsUnavailable")}
                 </p>
-                <p className="text-xs text-[#EB5757] mt-1">
+                <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-1">
                   {t(lang, "gpsRequiredNotice")}
                 </p>
                 {hasWorkplace && (
-                  <p className="text-xs text-[#EB5757] mt-2 font-medium">
+                  <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-2 font-medium">
                     {t(lang, "gpsCannotRecord")}
                   </p>
                 )}
@@ -1020,13 +1051,13 @@ function RegularContent() {
 
             {/* GPS acquired + within range */}
             {gpsReady && isWithinRadius && (
-              <div className="rounded-lg p-4 bg-[#27A644]/10 border border-[#27A644]/30 flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-[#27A644] shrink-0" />
+              <div className="rounded-[var(--r-lg)] p-4 bg-[var(--success-bg)] border border-[var(--success-border)] flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-[var(--success-fg)] shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-[#27A644]">
-                    {data.workplace!.name} — {distance}m {t(lang, "distance")}
+                  <p className="text-[var(--fs-body)] font-medium text-[var(--success-fg)]">
+                    {data.workplace!.name} — <span className="tabular">{distance}m</span> {t(lang, "distance")}
                   </p>
-                  <p className="text-xs text-[#27A644] mt-0.5">
+                  <p className="text-[var(--fs-caption)] text-[var(--success-fg)] mt-0.5">
                     {t(lang, "withinRange")}
                   </p>
                 </div>
@@ -1035,16 +1066,16 @@ function RegularContent() {
 
             {/* GPS acquired + out of range */}
             {isOutOfRange && (
-              <div className="rounded-lg p-5 bg-[#EB5757]/10 border border-[#EB5757]/30 text-center">
-                <XCircle className="w-8 h-8 text-[#EB5757] mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#EB5757]">
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--danger-bg)] border border-[var(--danger-border)] text-center">
+                <XCircle className="w-8 h-8 text-[var(--danger-fg)] mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--danger-fg)]">
                   {t(lang, "outOfRange")}
                 </p>
-                <p className="text-base font-bold text-[#EB5757] mt-1">
+                <p className="text-[var(--fs-base)] font-bold text-[var(--danger-fg)] mt-1 tabular">
                   {distance}m {t(lang, "distance")} ({t(lang, "allowed")}:{" "}
                   {data.workplace!.radius_meters}m)
                 </p>
-                <p className="text-xs text-[#EB5757] mt-2">
+                <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-2">
                   {data.workplace!.name} {t(lang, "moveCloser")}
                 </p>
               </div>
@@ -1052,12 +1083,12 @@ function RegularContent() {
 
             {/* No workplace assigned */}
             {!hasWorkplace && (
-              <div className="rounded-lg p-5 bg-[#F0BF00]/10 border border-[#F0BF00]/30 text-center">
-                <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto" />
-                <p className="mt-3 text-sm font-medium text-[#F0BF00]">
+              <div className="rounded-[var(--r-lg)] p-5 bg-[var(--warning-bg)] border border-[var(--warning-border)] text-center">
+                <AlertCircle className="w-8 h-8 text-[var(--warning-fg)] mx-auto" />
+                <p className="mt-3 text-[var(--fs-body)] font-medium text-[var(--warning-fg)]">
                   {t(lang, "noWorkplace")}
                 </p>
-                <p className="text-xs text-[#F0BF00] mt-1">
+                <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-1">
                   {t(lang, "contactAdmin")}
                 </p>
               </div>
@@ -1067,54 +1098,32 @@ function RegularContent() {
 
         {/* ── Safety Agreement (daily, before clock-in) ───────────── */}
         {data.status === "ready" && !agreementAccepted && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-            <div className="flex items-center gap-2 text-[#EB5757] mb-2">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+            <div className="flex items-center gap-2 text-[var(--danger-fg)] mb-2">
               <Shield className="w-5 h-5" />
-              <h2 className="font-semibold">
-                {t(lang, "safetyAgreementTitle")}
-              </h2>
+              <h2 className="font-semibold">{t(lang, "safetyAgreementTitle")}</h2>
             </div>
 
-            <div className="max-h-72 overflow-y-auto border border-[#23252A] rounded-lg p-4 bg-[#08090A] space-y-4 text-sm text-[#D0D6E0]">
+            <div className="max-h-72 overflow-y-auto border border-[var(--border-2)] rounded-[var(--r-md)] p-4 bg-[var(--bg-0)] space-y-4 text-[var(--fs-body)] text-[var(--text-2)]">
               <div>
-                <p className="font-bold text-[#F7F8F8]">
-                  {t(lang, "safetyRule1Title")}
-                </p>
-                <p className="whitespace-pre-line mt-1">
-                  {t(lang, "safetyRule1")}
-                </p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, "safetyRule1Title")}</p>
+                <p className="whitespace-pre-line mt-1">{t(lang, "safetyRule1")}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">
-                  {t(lang, "safetyRule2Title")}
-                </p>
-                <p className="whitespace-pre-line mt-1">
-                  {t(lang, "safetyRule2")}
-                </p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, "safetyRule2Title")}</p>
+                <p className="whitespace-pre-line mt-1">{t(lang, "safetyRule2")}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">
-                  {t(lang, "safetyRule3Title")}
-                </p>
-                <p className="whitespace-pre-line mt-1">
-                  {t(lang, "safetyRule3")}
-                </p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, "safetyRule3Title")}</p>
+                <p className="whitespace-pre-line mt-1">{t(lang, "safetyRule3")}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">
-                  {t(lang, "safetyRule4Title")}
-                </p>
-                <p className="whitespace-pre-line mt-1">
-                  {t(lang, "safetyRule4")}
-                </p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, "safetyRule4Title")}</p>
+                <p className="whitespace-pre-line mt-1">{t(lang, "safetyRule4")}</p>
               </div>
               <div>
-                <p className="font-bold text-[#F7F8F8]">
-                  {t(lang, "safetyRule5Title")}
-                </p>
-                <p className="whitespace-pre-line mt-1">
-                  {t(lang, "safetyRule5")}
-                </p>
+                <p className="font-bold text-[var(--text-1)]">{t(lang, "safetyRule5Title")}</p>
+                <p className="whitespace-pre-line mt-1">{t(lang, "safetyRule5")}</p>
               </div>
             </div>
 
@@ -1123,15 +1132,15 @@ function RegularContent() {
                 type="checkbox"
                 checked={agreementAccepted}
                 onChange={(e) => setAgreementAccepted(e.target.checked)}
-                className="mt-1 w-5 h-5 text-[#7070FF] rounded border-[#23252A] focus:ring-indigo-500"
+                className="mt-1 w-5 h-5 rounded border-[var(--border-2)] accent-[var(--brand-500)] focus:ring-[var(--brand-500)]"
               />
-              <span className="text-sm font-medium text-[#F7F8F8]">
+              <span className="text-[var(--fs-body)] font-medium text-[var(--text-1)]">
                 {t(lang, "agreementCheckbox")}
               </span>
             </label>
 
             {!agreementAccepted && (
-              <p className="text-xs text-[#EB5757] font-medium">
+              <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] font-medium">
                 {t(lang, "agreementRequired")}
               </p>
             )}
@@ -1140,12 +1149,12 @@ function RegularContent() {
 
         {/* ── Factory Guide Video ─────────────────────────────────── */}
         {data.status === "ready" && agreementAccepted && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] overflow-hidden">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] overflow-hidden">
             <div className="px-5 pt-4 pb-2">
-              <h2 className="font-semibold text-[#F7F8F8] text-sm">
+              <h2 className="font-semibold text-[var(--text-1)] text-[var(--fs-body)]">
                 {t(lang, "videoTitle")}
               </h2>
-              <p className="text-xs text-[#8A8F98] mt-0.5">
+              <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-0.5">
                 {t(lang, "videoDesc")}
               </p>
             </div>
@@ -1167,22 +1176,22 @@ function RegularContent() {
         {data.status === "ready" &&
           agreementAccepted &&
           (data.notices?.length ?? 0) > 0 && (
-            <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
-              <div className="flex items-center gap-2 text-[#828FFF] mb-3">
+            <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5">
+              <div className="flex items-center gap-2 text-[var(--brand-400)] mb-3">
                 <Megaphone className="w-5 h-5" />
-                <h2 className="font-semibold text-[#F7F8F8] text-sm">
+                <h2 className="font-semibold text-[var(--text-1)] text-[var(--fs-body)]">
                   {t(lang, "noticesTitle")}
                 </h2>
               </div>
               {data.notices.map((notice) => (
                 <div
                   key={notice.id}
-                  className="border-l-4 border-indigo-500 pl-3 py-2 mb-2"
+                  className="border-l-4 border-[var(--brand-500)] pl-3 py-2 mb-2"
                 >
-                  <p className="font-medium text-sm text-[#F7F8F8]">
+                  <p className="font-medium text-[var(--fs-body)] text-[var(--text-1)]">
                     {notice.title}
                   </p>
-                  <pre className="text-xs text-[#8A8F98] whitespace-pre-wrap mt-1 font-sans">
+                  <pre className="text-[var(--fs-caption)] text-[var(--text-3)] whitespace-pre-wrap mt-1 font-sans">
                     {notice.content}
                   </pre>
                 </div>
@@ -1194,10 +1203,10 @@ function RegularContent() {
         {data.status === "ready" &&
           agreementAccepted &&
           (data.org_chart?.length ?? 0) > 0 && (
-            <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
-              <div className="flex items-center gap-2 text-[#828FFF] mb-3">
+            <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5">
+              <div className="flex items-center gap-2 text-[var(--brand-400)] mb-3">
                 <Users className="w-5 h-5" />
-                <h2 className="font-semibold text-[#F7F8F8] text-sm">
+                <h2 className="font-semibold text-[var(--text-1)] text-[var(--fs-body)]">
                   {t(lang, "orgChartTitle")}
                 </h2>
               </div>
@@ -1205,22 +1214,22 @@ function RegularContent() {
                 {(data.org_chart || []).map((dept: any) => (
                   <div
                     key={dept.department}
-                    className="border border-[#23252A] rounded-lg overflow-hidden"
+                    className="border border-[var(--border-1)] rounded-[var(--r-md)] overflow-hidden"
                   >
                     <button
                       onClick={() => toggleDept(dept.department)}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/15 transition-colors"
+                      className="w-full flex items-center justify-between px-4 py-3 bg-[var(--brand-500)]/10 hover:bg-[var(--brand-500)]/15 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-[#7070FF]" />
-                        <span className="font-semibold text-sm text-indigo-900">
+                        <Building2 className="w-4 h-4 text-[var(--brand-400)]" />
+                        <span className="font-semibold text-[var(--fs-body)] text-[var(--text-1)]">
                           {dept.department}
                         </span>
                       </div>
                       {expandedDepts.has(dept.department) ? (
-                        <ChevronUp className="w-4 h-4 text-indigo-400" />
+                        <ChevronUp className="w-4 h-4 text-[var(--brand-400)]" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-indigo-400" />
+                        <ChevronDown className="w-4 h-4 text-[var(--brand-400)]" />
                       )}
                     </button>
                     {expandedDepts.has(dept.department) && (
@@ -1228,13 +1237,13 @@ function RegularContent() {
                         {(dept.teams || []).map((team: any) => (
                           <div
                             key={team.team}
-                            className="flex items-center gap-2 py-1.5 border-b border-[#23252A] last:border-b-0"
+                            className="flex items-center gap-2 py-1.5 border-b border-[var(--border-1)] last:border-b-0"
                           >
-                            <span className="text-sm font-medium text-[#F7F8F8]">
+                            <span className="text-[var(--fs-body)] font-medium text-[var(--text-1)]">
                               {team.team}
                             </span>
                             {team.leader && (
-                              <span className="text-xs bg-[#5E6AD2]/15 text-[#828FFF] px-2 py-0.5 rounded-full">
+                              <span className="text-[var(--fs-caption)] bg-[var(--brand-500)]/15 text-[var(--brand-400)] px-2 py-0.5 rounded-[var(--r-pill)]">
                                 {team.leader_role || '반장'}: {team.leader}
                               </span>
                             )}
@@ -1253,15 +1262,15 @@ function RegularContent() {
           <div className="space-y-4">
             {/* Phone Verification */}
             {!phoneVerified ? (
-              <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-                <div className="flex items-center gap-2 text-[#828FFF] mb-2">
+              <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+                <div className="flex items-center gap-2 text-[var(--brand-400)] mb-2">
                   <Shield className="w-5 h-5" />
                   <h2 className="font-semibold">{t(lang, "phoneVerification")}</h2>
                 </div>
-                <p className="text-sm text-[#8A8F98]">{t(lang, "phoneVerificationDesc")}</p>
+                <p className="text-[var(--fs-body)] text-[var(--text-3)]">{t(lang, "phoneVerificationDesc")}</p>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">
+                  <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">
                     {t(lang, "phoneVerification")}
                   </label>
                   <input
@@ -1270,12 +1279,12 @@ function RegularContent() {
                     onChange={(e) => setPhoneInput(e.target.value)}
                     placeholder="010-0000-0000"
                     disabled={phoneVerified}
-                    className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                    className="w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] bg-[var(--bg-2)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] transition-colors text-[var(--fs-base)] placeholder:text-[var(--text-4)]"
                   />
                   <button
                     onClick={handleSendOtp}
                     disabled={otpSending || !phoneInput.trim()}
-                    className="w-full mt-2 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium disabled:bg-[#28282C] hover:bg-indigo-700"
+                    className="w-full mt-2 py-2.5 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] text-[var(--fs-body)] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {otpSending ? "..." : otpSent ? t(lang, "resendOtp") : t(lang, "requestOtp")}
                   </button>
@@ -1283,7 +1292,7 @@ function RegularContent() {
 
                 {otpSent && (
                   <div className="space-y-2">
-                    <p className="text-xs text-[#27A644] font-medium">{t(lang, "otpSent")}</p>
+                    <p className="text-[var(--fs-caption)] text-[var(--success-fg)] font-medium">{t(lang, "otpSent")}</p>
                     <input
                       type="text"
                       value={otpCode}
@@ -1291,12 +1300,12 @@ function RegularContent() {
                       placeholder={t(lang, "otpPlaceholder")}
                       maxLength={6}
                       inputMode="numeric"
-                      className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base text-center tracking-widest font-mono"
+                      className="w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] bg-[var(--bg-2)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] transition-colors text-[var(--fs-base)] text-center tracking-widest font-mono tabular"
                     />
                     <button
                       onClick={handleVerifyOtp}
                       disabled={otpVerifying || otpCode.length !== 6}
-                      className="w-full py-2.5 bg-[#27A644] text-white rounded-lg text-sm font-medium disabled:bg-[#28282C] hover:bg-green-700"
+                      className="w-full py-2.5 bg-[var(--success-fg)] hover:opacity-90 text-white rounded-[var(--r-md)] text-[var(--fs-body)] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       {otpVerifying ? "..." : t(lang, "verifyOtp")}
                     </button>
@@ -1304,32 +1313,26 @@ function RegularContent() {
                 )}
 
                 {otpError && (
-                  <p className="text-xs text-[#EB5757] font-medium">{otpError}</p>
+                  <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] font-medium">{otpError}</p>
                 )}
               </div>
             ) : (
-              <div className="bg-[#27A644]/10 border border-[#27A644]/30 rounded-xl p-4 flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-[#27A644] shrink-0" />
-                <p className="text-sm font-medium text-[#27A644]">{t(lang, "phoneVerified")}</p>
+              <div className="bg-[var(--success-bg)] border border-[var(--success-border)] rounded-[var(--r-xl)] p-4 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-[var(--success-fg)] shrink-0" />
+                <p className="text-[var(--fs-body)] font-medium text-[var(--success-fg)]">{t(lang, "phoneVerified")}</p>
               </div>
             )}
 
-            <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
-              <div className="flex items-center gap-2 text-[#828FFF] mb-2">
+            <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5">
+              <div className="flex items-center gap-2 text-[var(--brand-400)] mb-2">
                 <LogIn className="w-5 h-5" />
                 <h2 className="font-semibold">
-                  {lang === "ko"
-                    ? "출근 기록"
-                    : lang === "en"
-                    ? "Clock In"
-                    : lang === "zh"
-                    ? "上班打卡"
-                    : "Chấm công vào"}
+                  {lang === "ko" ? "출근 기록" : lang === "en" ? "Clock In" : lang === "zh" ? "上班打卡" : "Chấm công vào"}
                 </h2>
               </div>
 
-              <div className="bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg p-3 mb-4">
-                <p className="text-xs text-[#EB5757] font-bold">
+              <div className="bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] p-3 mb-4">
+                <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] font-bold">
                   {t(lang, "clockInWarning")}
                 </p>
               </div>
@@ -1337,7 +1340,7 @@ function RegularContent() {
               <button
                 onClick={handleClockIn}
                 disabled={submitting || !agreementAccepted || !phoneVerified}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg font-semibold text-base disabled:bg-[#28282C] disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -1355,21 +1358,19 @@ function RegularContent() {
         {/* ── Clocked-in: show clock-out ──────────────────────────── */}
         {data.status === "clocked_in" && (
           <div className="space-y-4">
-            <div className="bg-[#27A644]/10 border border-[#27A644]/30 rounded-xl p-5">
-              <div className="flex items-center gap-2 text-[#27A644] mb-3">
+            <div className="bg-[var(--success-bg)] border border-[var(--success-border)] rounded-[var(--r-xl)] p-5">
+              <div className="flex items-center gap-2 text-[var(--success-fg)] mb-3">
                 <CheckCircle className="w-5 h-5" />
                 <h2 className="font-semibold">{t(lang, "clockInComplete")}</h2>
               </div>
-              <div className="space-y-1 text-sm text-[#27A644]">
+              <div className="space-y-1 text-[var(--fs-body)] text-[var(--success-fg)]">
                 <p>
                   <span className="font-medium">{t(lang, "name")}:</span>{" "}
                   {data.employee_name}
                 </p>
                 {data.department && (
                   <p>
-                    <span className="font-medium">
-                      {t(lang, "department")}:
-                    </span>{" "}
+                    <span className="font-medium">{t(lang, "department")}:</span>{" "}
                     {data.department}
                   </p>
                 )}
@@ -1380,37 +1381,30 @@ function RegularContent() {
                   </p>
                 )}
                 <p>
-                  <span className="font-medium">
-                    {t(lang, "clockInTime")}:
-                  </span>{" "}
-                  {data.attendance?.clock_in_time
-                    ? new Date(
-                        data.attendance.clock_in_time
-                      ).toLocaleTimeString("ko-KR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "-"}
+                  <span className="font-medium">{t(lang, "clockInTime")}:</span>{" "}
+                  <span className="tabular">{data.attendance?.clock_in_time
+                    ? new Date(data.attendance.clock_in_time).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+                    : "-"}</span>
                 </p>
               </div>
             </div>
 
             {/* Clock-out button */}
             {canAct && (
-              <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5">
-                <div className="flex items-center gap-2 text-[#FC7840] mb-4">
+              <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5">
+                <div className="flex items-center gap-2 text-[var(--warning-fg)] mb-4">
                   <LogOut className="w-5 h-5" />
                   <h2 className="font-semibold">
                     {t(lang, "clockOutTitle")}
                   </h2>
                 </div>
-                <p className="text-sm text-[#8A8F98] mb-4">
+                <p className="text-[var(--fs-body)] text-[var(--text-3)] mb-4">
                   {t(lang, "clockOutDesc")}
                 </p>
                 <button
                   onClick={handleClockOut}
                   disabled={submitting}
-                  className="w-full py-3 bg-orange-600 text-white rounded-lg font-semibold text-base disabled:bg-[#28282C] hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[var(--warning-fg)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -1421,8 +1415,8 @@ function RegularContent() {
                     </>
                   )}
                 </button>
-                <div className="mt-3 bg-[#EB5757]/10 border border-[#EB5757]/30 rounded-lg p-3">
-                  <p className="text-xs text-[#EB5757] font-bold text-center">
+                <div className="mt-3 bg-[var(--danger-bg)] border border-[var(--danger-border)] rounded-[var(--r-md)] p-3">
+                  <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] font-bold text-center">
                     {t(lang, "clockOutWarning")}
                   </p>
                 </div>
@@ -1433,12 +1427,12 @@ function RegularContent() {
 
         {/* ── Completed ───────────────────────────────────────────── */}
         {data.status === "completed" && (
-          <div className="bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-6 text-center">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-            <h2 className="mt-4 text-xl font-bold text-[#F7F8F8]">
+          <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-2)] border border-[var(--border-1)] p-6 text-center">
+            <CheckCircle className="w-16 h-16 text-[var(--success-fg)] mx-auto" />
+            <h2 className="mt-4 text-[var(--fs-h3)] font-bold text-[var(--text-1)]">
               {t(lang, "completedTitle")}
             </h2>
-            <div className="mt-4 space-y-2 text-sm text-[#D0D6E0]">
+            <div className="mt-4 space-y-2 text-[var(--fs-body)] text-[var(--text-2)]">
               <p>
                 <span className="font-medium">{t(lang, "name")}:</span>{" "}
                 {data.employee_name}
@@ -1453,29 +1447,29 @@ function RegularContent() {
               )}
               <p>
                 <span className="font-medium">{t(lang, "clockIn")}:</span>{" "}
-                {data.attendance?.clock_in_time
+                <span className="tabular">{data.attendance?.clock_in_time
                   ? new Date(
                       data.attendance.clock_in_time
                     ).toLocaleTimeString("ko-KR", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })
-                  : "-"}
+                  : "-"}</span>
               </p>
               <p>
                 <span className="font-medium">{t(lang, "clockOut")}:</span>{" "}
-                {data.attendance?.clock_out_time
+                <span className="tabular">{data.attendance?.clock_out_time
                   ? new Date(
                       data.attendance.clock_out_time
                     ).toLocaleTimeString("ko-KR", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })
-                  : "-"}
+                  : "-"}</span>
               </p>
               {data.attendance?.clock_in_time &&
                 data.attendance?.clock_out_time && (
-                  <p className="font-medium text-[#828FFF] mt-2">
+                  <p className="font-medium text-[var(--brand-400)] mt-2 tabular">
                     {t(lang, "totalWorkHours")}:{" "}
                     {(
                       (new Date(data.attendance.clock_out_time).getTime() -
@@ -1486,7 +1480,7 @@ function RegularContent() {
                   </p>
                 )}
             </div>
-            <p className="mt-6 text-[#8A8F98] text-sm">
+            <p className="mt-6 text-[var(--text-3)] text-[var(--fs-body)]">
               {t(lang, "thankYou")}
             </p>
           </div>
@@ -1497,111 +1491,140 @@ function RegularContent() {
             <button
               type="button"
               onClick={() => setShowVacation(!showVacation)}
-              className="w-full py-4 bg-purple-600 text-white rounded-xl font-semibold text-base hover:bg-purple-700 active:bg-purple-800 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-4 bg-[var(--brand-500)] text-white rounded-[var(--r-xl)] font-semibold text-[var(--fs-base)] hover:bg-[var(--brand-600)] active:bg-[var(--brand-700)] transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <Calendar className="w-5 h-5" />
               {t(lang, "vacation")}
             </button>
 
             {showVacation && (
-              <div className="mt-3 bg-[#0F1011] rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.2)] p-5 space-y-4">
-                <p className="text-sm text-[#8A8F98]">{t(lang, "vacationDesc")}</p>
+              <div className="mt-3 bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
+                <p className="text-[var(--fs-body)] text-[var(--text-3)]">{t(lang, "vacationDesc")}</p>
 
                 {/* Balance display */}
                 {vacData?.balance && (
                   <div className="flex gap-3">
-                    <div className="flex-1 bg-[#4EA7FC]/10 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-[#828FFF]">{vacData.balance.total}</p>
-                      <p className="text-xs text-[#7070FF]">{t(lang, "vacationBalance")}</p>
+                    <div className="flex-1 bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] p-3 text-center">
+                      <p className="text-[var(--fs-lg)] font-bold text-[var(--info-fg)] tabular">{vacData.balance.total}</p>
+                      <p className="text-[var(--fs-caption)] text-[var(--info-fg)]">{t(lang, "vacationBalance")}</p>
                     </div>
-                    <div className="flex-1 bg-[#F0BF00]/10 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-[#F0BF00]">{vacData.balance.used}</p>
-                      <p className="text-xs text-[#F0BF00]">{t(lang, "vacationUsed")}</p>
+                    <div className="flex-1 bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-md)] p-3 text-center">
+                      <p className="text-[var(--fs-lg)] font-bold text-[var(--warning-fg)] tabular">{vacData.balance.used}</p>
+                      <p className="text-[var(--fs-caption)] text-[var(--warning-fg)]">{t(lang, "vacationUsed")}</p>
                     </div>
-                    <div className="flex-1 bg-[#27A644]/10 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-[#27A644]">{(vacData.balance.total - vacData.balance.used).toFixed(1)}</p>
-                      <p className="text-xs text-[#27A644]">{t(lang, "vacationRemaining")}</p>
+                    <div className="flex-1 bg-[var(--success-bg)] border border-[var(--success-border)] rounded-[var(--r-md)] p-3 text-center">
+                      <p className="text-[var(--fs-lg)] font-bold text-[var(--success-fg)] tabular">{(vacData.balance.total - vacData.balance.used).toFixed(1)}</p>
+                      <p className="text-[var(--fs-caption)] text-[var(--success-fg)]">{t(lang, "vacationRemaining")}</p>
                     </div>
                   </div>
                 )}
 
                 {/* Request form */}
                 <div>
-                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">휴가 종류</label>
+                  <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">휴가 종류</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['연차', '오전반차', '오후반차'] as const).map(t => (
+                    {(['연차', '오전반차', '오후반차', '공가', '오전공가', '오후공가'] as const).map(t => (
                       <button key={t} onClick={() => setVacType(t)}
-                        className={`py-2.5 rounded-lg text-sm font-medium border transition-colors ${vacType === t ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#0F1011] text-[#D0D6E0] border-[#23252A] hover:bg-[#141516]/5'}`}>
+                        className={`py-2.5 rounded-[var(--r-md)] text-[var(--fs-body)] font-medium border transition-colors ${vacType === t ? 'bg-[var(--brand-500)] text-white border-[var(--brand-500)]' : 'bg-[var(--bg-2)] text-[var(--text-2)] border-[var(--border-2)] hover:bg-[var(--bg-3)]'}`}>
                         {t}
                       </button>
                     ))}
                   </div>
                   {vacType === '오전반차' && (
-                    <div className="mt-2 bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg px-3 py-2 text-xs text-[#F0BF00]">
+                    <div className="mt-2 bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-caption)] text-[var(--warning-fg)]">
                       오전 09:00 ~ 14:00 (0.5일) · 오후 정상 출근
                     </div>
                   )}
                   {vacType === '오후반차' && (
-                    <div className="mt-2 bg-[#F0BF00]/10 border border-[#F0BF00]/30 rounded-lg px-3 py-2 text-xs text-[#F0BF00]">
+                    <div className="mt-2 bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-caption)] text-[var(--warning-fg)]">
                       오후 14:00 ~ 18:00 (0.5일) · 오전 정상 근무 후 퇴근
                     </div>
                   )}
-                </div>
-                <div className={`grid gap-3 ${vacType === '연차' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  <div>
-                    <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{vacType === '연차' ? '시작일' : '날짜'}</label>
-                    <input type="date" value={vacStartDate} onChange={(e) => setVacStartDate(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
-                  </div>
-                  {vacType === '연차' && (
-                    <div>
-                      <label className="block text-sm font-medium text-[#D0D6E0] mb-1">종료일</label>
-                      <input type="date" value={vacEndDate} onChange={(e) => setVacEndDate(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base" />
+                  {vacType === '공가' && (
+                    <div className="mt-2 bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-caption)] text-[var(--info-fg)]">
+                      유급 공가 (예비군/투표/법정 의무 등) · 연차 잔여 차감 없음
+                    </div>
+                  )}
+                  {vacType === '오전공가' && (
+                    <div className="mt-2 bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-caption)] text-[var(--info-fg)]">
+                      오전 공가 09:00 ~ 14:00 (0.5일) · 민방위 훈련 등 · 연차 잔여 차감 없음
+                    </div>
+                  )}
+                  {vacType === '오후공가' && (
+                    <div className="mt-2 bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] px-3 py-2 text-[var(--fs-caption)] text-[var(--info-fg)]">
+                      오후 공가 14:00 ~ 18:00 (0.5일) · 민방위 훈련 등 · 연차 잔여 차감 없음
                     </div>
                   )}
                 </div>
+                {(() => {
+                  const isFullDay = vacType === '연차' || vacType === '공가';
+                  return (
+                    <>
+                      <div className={`grid gap-3 ${isFullDay ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        <div>
+                          <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">{isFullDay ? '시작일' : '날짜'}</label>
+                          <input type="date" value={vacStartDate} onChange={(e) => setVacStartDate(e.target.value)}
+                            className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)]" />
+                        </div>
+                        {isFullDay && (
+                          <div>
+                            <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">종료일</label>
+                            <input type="date" value={vacEndDate} onChange={(e) => setVacEndDate(e.target.value)}
+                              className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)]" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">{isFullDay ? '일수' : '사용 일수'}</label>
+                        <input type="number" step="0.5" min="0.5" value={vacDays} readOnly={!isFullDay}
+                          onChange={(e) => setVacDays(e.target.value)}
+                          className={`w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] tabular ${!isFullDay ? 'bg-[var(--bg-0)]' : 'bg-[var(--bg-2)]'}`} />
+                      </div>
+                    </>
+                  );
+                })()}
                 <div>
-                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{vacType === '연차' ? '일수' : '사용 일수'}</label>
-                  <input type="number" step="0.5" min="0.5" value={vacDays} readOnly={vacType !== '연차'}
-                    onChange={(e) => setVacDays(e.target.value)}
-                    className={`w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base ${vacType !== '연차' ? 'bg-[#08090A]' : ''}`} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#D0D6E0] mb-1">{t(lang, "vacationReason")}</label>
+                  <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">{t(lang, "vacationReason")}</label>
                   <textarea value={vacReason} onChange={(e) => setVacReason(e.target.value)}
                     placeholder={t(lang, "vacationReasonPlaceholder")}
-                    rows={2} className="w-full px-3 py-2.5 border border-[#23252A] rounded-lg text-base resize-none" />
+                    rows={2} className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)] resize-none" />
                 </div>
                 <button onClick={handleVacationSubmit} disabled={vacSubmitting || !vacStartDate || !vacEndDate}
-                  className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold disabled:bg-[#28282C] hover:bg-purple-700 transition-colors">
+                  className="w-full py-3 bg-[var(--brand-500)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 hover:bg-[var(--brand-600)] transition-colors">
                   {vacSubmitting ? "..." : t(lang, "vacationSubmit")}
                 </button>
 
                 {/* History */}
                 {vacData?.requests && vacData.requests.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-[#D0D6E0] mb-2">{t(lang, "vacationHistory")}</h3>
+                    <h3 className="text-[var(--fs-body)] font-semibold text-[var(--text-2)] mb-2">{t(lang, "vacationHistory")}</h3>
                     <div className="space-y-2">
                       {vacData.requests.map((r: any) => (
-                        <div key={r.id} className="bg-[#08090A] rounded-lg p-3 text-sm">
+                        <div key={r.id} className="bg-[var(--bg-0)] rounded-[var(--r-md)] border border-[var(--border-1)] p-3 text-[var(--fs-body)]">
                           <div className="flex justify-between items-center">
-                            <span className="font-medium">
-                              {r.type && r.type !== '연차' && <span className={`mr-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${r.type === '오전반차' ? 'bg-[#F0BF00]/15 text-[#F0BF00]' : 'bg-[#FC7840]/15 text-[#FC7840]'}`}>{r.type}</span>}
+                            <span className="font-medium text-[var(--text-1)]">
+                              {r.type && r.type !== '연차' && (() => {
+                                const isPub = (r.type as string).includes('공가');
+                                const isAm = (r.type as string).startsWith('오전');
+                                const cls = isPub
+                                  ? 'bg-[var(--info-bg)] text-[var(--info-fg)]'
+                                  : isAm ? 'bg-[var(--warning-bg)] text-[var(--warning-fg)]' : 'bg-[var(--danger-bg)] text-[var(--danger-fg)]';
+                                return <span className={`mr-1 px-1.5 py-0.5 rounded-[var(--r-sm)] text-[var(--fs-micro)] font-medium ${cls}`}>{r.type}</span>;
+                              })()}
                               {r.start_date}{r.start_date !== r.end_date ? ` ~ ${r.end_date}` : ''} ({r.days}{t(lang, "vacationDaysUnit")})
                             </span>
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              r.status === 'approved' ? 'bg-[#27A644]/15 text-[#27A644]' :
-                              r.status === 'rejected' ? 'bg-[#EB5757]/15 text-[#EB5757]' :
-                              'bg-[#F0BF00]/15 text-[#F0BF00]'
+                            <span className={`px-2 py-0.5 rounded-[var(--r-pill)] text-[var(--fs-caption)] font-medium ${
+                              r.status === 'approved' ? 'bg-[var(--success-bg)] text-[var(--success-fg)]' :
+                              r.status === 'rejected' ? 'bg-[var(--danger-bg)] text-[var(--danger-fg)]' :
+                              'bg-[var(--warning-bg)] text-[var(--warning-fg)]'
                             }`}>
                               {r.status === 'approved' ? t(lang, "vacationApproved") :
                                r.status === 'rejected' ? t(lang, "vacationRejected") :
                                t(lang, "vacationPending")}
                             </span>
                           </div>
-                          {r.reason && <p className="text-[#8A8F98] text-xs mt-1">{r.reason}</p>}
-                          {r.admin_memo && <p className="text-[#7070FF] text-xs mt-1">관리자: {r.admin_memo}</p>}
+                          {r.reason && <p className="text-[var(--text-3)] text-[var(--fs-caption)] mt-1">{r.reason}</p>}
+                          {r.admin_memo && <p className="text-[var(--brand-400)] text-[var(--fs-caption)] mt-1">관리자: {r.admin_memo}</p>}
                         </div>
                       ))}
                     </div>
@@ -1621,8 +1644,8 @@ export default function RegularPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#08090A]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#7070FF]" />
+        <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-400)]" />
         </div>
       }
     >

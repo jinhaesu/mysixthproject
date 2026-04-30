@@ -730,14 +730,6 @@ function ListTab({
 
   return (
     <>
-      <div className="mb-3 p-3 rounded-[var(--r-md)] bg-[var(--info-bg)] border border-[var(--info-border)] text-[12px] text-[var(--info-fg)]">
-        <div className="font-medium mb-1">사용 방법</div>
-        <ul className="space-y-1 text-[var(--text-2)] list-disc pl-4">
-          <li><b>상세</b> — 누락된 정보(이메일·주소·통장사본·외국인 정보 등)를 관리자가 직접 입력하거나 첨부 파일을 업로드하는 화면을 엽니다.</li>
-          <li><b>정보수집 링크</b> — 직원에게 SMS로 정보 입력 웹페이지 링크를 발송합니다. 직원이 본인 휴대폰에서 직접 입력 → 자동으로 입사자 관리에 반영됩니다.</li>
-          <li>모든 정보가 완료되면 <b>발송 가능</b> 탭으로 이동하며, 거기서 <b>4대보험 취득신고 메일 발송</b> 버튼이 활성화됩니다.</li>
-        </ul>
-      </div>
       <Table>
       <THead>
         <TR>
@@ -807,9 +799,10 @@ function ListTab({
                   variant="ghost"
                   size="sm"
                   title="누락된 정보를 관리자가 직접 입력/업로드"
-                  onClick={() => {
-                    try { onOpenDetail(item.id); }
-                    catch (e: any) { console.error("상세 버튼 오류:", e); }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('상세 click', item.id, item.name);
+                    onOpenDetail(item.id);
                   }}
                 >
                   상세
@@ -820,7 +813,11 @@ function ListTab({
                     size="sm"
                     leadingIcon={<Send size={13} />}
                     title="직원에게 정보 입력 웹페이지 SMS 발송"
-                    onClick={() => handleSendCollectLink(item)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('정보수집 링크 click', item.id, item.name);
+                      handleSendCollectLink(item);
+                    }}
                     loading={sendingId === item.id}
                   >
                     정보수집 링크
@@ -885,6 +882,16 @@ export default function OnboardingPage() {
         title="입사자 관리"
         description="정규직 입사자 정보 수집 현황 · 4대보험 취득신고 안내"
       />
+
+      {/* Always-visible InfoBox */}
+      <div className="mb-4 p-3 rounded-[var(--r-md)] bg-[var(--info-bg)] border border-[var(--info-border)] text-[12px] text-[var(--info-fg)]">
+        <div className="font-medium mb-1">사용 방법</div>
+        <ul className="space-y-1 text-[var(--text-2)] list-disc pl-4">
+          <li><b>상세</b> — 누락된 정보(이메일·주소·통장사본·외국인 정보 등)를 관리자가 직접 입력하거나 첨부 파일을 업로드하는 화면을 엽니다.</li>
+          <li><b>정보수집 링크</b> — 직원에게 SMS로 정보 입력 웹페이지 링크를 발송합니다. 직원이 본인 휴대폰에서 직접 입력 → 자동으로 입사자 관리에 반영됩니다.</li>
+          <li>모든 정보가 완료되면 <b>발송 가능</b> 탭으로 이동하며, 거기서 <b>4대보험 취득신고 메일 발송</b> 버튼이 활성화됩니다.</li>
+        </ul>
+      </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">

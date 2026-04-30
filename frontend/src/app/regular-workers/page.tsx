@@ -163,6 +163,22 @@ export default function RegularWorkersPage() {
   });
   const [workplaces, setWorkplaces] = useState<any[]>([]);
 
+  const [resignedAll, setResignedAll] = useState<Employee[]>([]);
+  const [resignedLoading, setResignedLoading] = useState(false);
+
+  const loadResigned = useCallback(async () => {
+    setResignedLoading(true);
+    try {
+      const data = await getRegularEmployees({ include_resigned: "1", limit: "500", page: "1" });
+      const list: Employee[] = data.employees || data || [];
+      setResignedAll(list.filter(e => e.is_active === 0 || (e.resign_date && String(e.resign_date).trim() !== "") || (e.resigned_at && String(e.resigned_at).trim() !== "")));
+    } catch {
+      // silent
+    } finally {
+      setResignedLoading(false);
+    }
+  }, []);
+
   const [offboardingTarget, setOffboardingTarget] = useState<Employee | null>(null);
   const [offboardingForm, setOffboardingForm] = useState({
     resign_date: "",
@@ -190,6 +206,7 @@ export default function RegularWorkersPage() {
       setOffboardingTarget(null);
       setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
       loadEmployees();
+      loadResigned();
     } catch (e: any) {
       toast.error(e.message || "퇴사 등록 실패");
     } finally {
@@ -200,6 +217,10 @@ export default function RegularWorkersPage() {
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadResigned();
+  }, [loadResigned]);
 
   const loadContracts = useCallback(async () => {
     try {
@@ -426,9 +447,6 @@ export default function RegularWorkersPage() {
         const activeEmployees = employees.filter(
           (e) => e.is_active !== 0 && !e.resign_date && !e.resigned_at
         );
-        const resignedEmployees = employees.filter(
-          (e) => e.is_active === 0 || e.resign_date || e.resigned_at
-        );
 
         if (loading) {
           return (
@@ -558,7 +576,9 @@ export default function RegularWorkersPage() {
                             variant="ghost"
                             size="xs"
                             leadingIcon={<UserMinus size={14} />}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('퇴사 click', emp.id, emp.name);
                               setOffboardingTarget(emp);
                               setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
                             }}
@@ -587,7 +607,7 @@ export default function RegularWorkersPage() {
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Pagination inside active-employees card */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-1)]">
               <p className="text-sm text-[var(--text-3)] tabular">
@@ -610,21 +630,25 @@ export default function RegularWorkersPage() {
           )}
         </Card>
 
-        {/* 퇴사자 별도 섹션 */}
-        {resignedEmployees.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-[var(--fs-body)] font-semibold text-[var(--text-1)]">
-                  퇴사자 ({resignedEmployees.length}명)
-                </p>
-                <p className="text-[var(--fs-caption)] text-[var(--text-3)]">퇴사 처리된 정규직 명단.</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowResigned((s) => !s)}>
-                {showResigned ? "접기" : "펼치기"}
-              </Button>
+        {/* 퇴사자 별도 섹션 — uses resignedAll (full fetch, pagination-independent) */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[var(--fs-body)] font-semibold text-[var(--text-1)]">
+                퇴사자 ({resignedAll.length}명)
+              </p>
+              <p className="text-[var(--fs-caption)] text-[var(--text-3)]">퇴사 처리된 정규직 명단.</p>
             </div>
-            {showResigned && (
+            <Button variant="ghost" size="sm" onClick={() => setShowResigned((s) => !s)}>
+              {showResigned ? "접기" : "펼치기"}
+            </Button>
+          </div>
+          {showResigned && (
+            resignedLoading ? (
+              <div className="py-4 text-center text-xs text-[var(--text-4)]">불러오는 중...</div>
+            ) : resignedAll.length === 0 ? (
+              <div className="py-4 text-center text-xs text-[var(--text-4)]">퇴사자가 없습니다.</div>
+            ) : (
               <Card padding="none" className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -636,7 +660,7 @@ export default function RegularWorkersPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {resignedEmployees.map((e) => (
+                      {resignedAll.map((e) => (
                         <tr key={e.id} className="border-b border-[var(--border-1)] opacity-70 hover:opacity-100 transition-opacity">
                           <td className="px-4 py-3 font-medium text-[var(--text-1)]">{e.name}</td>
                           <td className="px-4 py-3 text-[var(--text-3)] tabular">{e.phone}</td>
@@ -653,9 +677,9 @@ export default function RegularWorkersPage() {
                   </table>
                 </div>
               </Card>
-            )}
-          </div>
-        )}
+            )
+          )}
+        </div>
           </>
         );
       })()}

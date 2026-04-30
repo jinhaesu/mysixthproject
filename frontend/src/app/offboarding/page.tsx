@@ -82,7 +82,9 @@ type TabId = "in_progress" | "completed" | "all" | "settings";
 interface OffboardingRecord {
   id: number;
   employee_type: string;
-  name?: string;
+  employee_name?: string;
+  employee_phone?: string;
+  hire_date?: string;
   department?: string;
   resign_date?: string;
   loss_date?: string;
@@ -91,6 +93,12 @@ interface OffboardingRecord {
   days_to_loss_deadline?: number;
   checklist_done?: number;
   [key: string]: any;
+}
+
+function formatDate(s?: string | null): string {
+  if (!s) return "-";
+  const m = String(s).match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : "-";
 }
 
 function dBadgeTone(days: number | undefined | null): "success" | "warning" | "danger" {
@@ -274,7 +282,7 @@ export default function OffboardingPage() {
     if (!detailId) return;
     setDownloadingCsv(true);
     try {
-      const name = localDetail?.name ?? "퇴직자";
+      const name = localDetail?.employee_name ?? "퇴직자";
       const date = (localDetail?.resign_date ?? "").replace(/-/g, "");
       await downloadAuthed(
         `${API_URL}/api/offboarding/${detailId}/export.csv`,
@@ -384,7 +392,9 @@ export default function OffboardingPage() {
                   <TR>
                     <TH>구분</TH>
                     <TH>이름</TH>
+                    <TH>연락처</TH>
                     <TH>부서</TH>
+                    <TH>입사일</TH>
                     <TH>퇴직일</TH>
                     <TH>자격상실일</TH>
                     <TH>D-카운트</TH>
@@ -405,8 +415,10 @@ export default function OffboardingPage() {
                             {item.employee_type === "regular" ? "정규" : "파견"}
                           </Badge>
                         </TD>
-                        <TD emphasis>{item.name || "-"}</TD>
+                        <TD emphasis>{item.employee_name || "-"}</TD>
+                        <TD muted>{item.employee_phone || "-"}</TD>
                         <TD muted>{item.department || "-"}</TD>
+                        <TD muted>{formatDate(item.hire_date)}</TD>
                         <TD muted>{item.resign_date || "-"}</TD>
                         <TD muted>{item.loss_date || "-"}</TD>
                         <TD>
@@ -449,7 +461,11 @@ export default function OffboardingPage() {
                           </div>
                         </TD>
                         <TD align="right">
-                          <Button variant="ghost" size="xs" onClick={() => openDetail(item.id)}>상세</Button>
+                          <Button variant="ghost" size="xs" onClick={(e) => {
+                            e.stopPropagation();
+                            console.log('퇴사 상세 click', item.id, item.employee_name);
+                            openDetail(item.id);
+                          }}>상세</Button>
                         </TD>
                       </TR>
                     );
@@ -546,7 +562,7 @@ export default function OffboardingPage() {
         ) : localDetail ? (
           <div className="space-y-5">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Stat label="이름" value={localDetail.name || "-"} tone="neutral" />
+              <Stat label="이름" value={localDetail.employee_name || "-"} tone="neutral" />
               <Stat label="부서/팀" value={localDetail.department || "-"} tone="neutral" />
               <Stat label="입사일" value={localDetail.hire_date || "-"} tone="neutral" />
               <Stat label="퇴직일" value={localDetail.resign_date || "-"} tone="warning" />

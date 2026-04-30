@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import PasswordGate from "@/components/PasswordGate";
 import {
   PageHeader,
   Card,
@@ -806,6 +807,18 @@ function ListTab({
 
 // ── Main Page ────────────────────────────────────────────────────
 export default function OnboardingPage() {
+  const [authorized, setAuthorized] = useState(false);
+  const verifyPassword = async (pw: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/regular/verify-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password: pw }),
+    });
+    const body = await res.json();
+    return !!body.verified;
+  };
+
   const [tab, setTab] = useState<OnboardingTab>("pending");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -819,10 +832,11 @@ export default function OnboardingPage() {
   }, [search]);
 
   useEffect(() => {
+    if (!authorized) return;
     getOnboardingDashboard()
       .then(setDashboard)
       .catch(() => {});
-  }, [listKey]);
+  }, [authorized, listKey]);
 
   const refreshList = () => setListKey((k) => k + 1);
 
@@ -833,6 +847,16 @@ export default function OnboardingPage() {
     { id: "all" as const, label: "전체" },
     { id: "settings" as const, label: "설정" },
   ];
+
+  if (!authorized) {
+    return (
+      <PasswordGate
+        onVerified={() => setAuthorized(true)}
+        verifyPassword={verifyPassword}
+        title="입사자 관리 접근 비밀번호"
+      />
+    );
+  }
 
   return (
     <>

@@ -6,7 +6,9 @@ import {
   getContractsLatest,
   getContractsMissing,
   getContractHistory,
+  uploadLegacyContract,
 } from "@/lib/api";
+import PasswordGate from "@/components/PasswordGate";
 import {
   PageHeader,
   Stat,
@@ -14,6 +16,7 @@ import {
   Toolbar,
   Segmented,
   Input,
+  Field,
   Badge,
   Button,
   Card,
@@ -28,7 +31,16 @@ import {
   TD,
   useToast,
 } from "@/components/ui";
-import { Search, FileText, History } from "lucide-react";
+import { Search, FileText, History, Paperclip } from "lucide-react";
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
 
 const TYPE_OPTIONS: { id: "all" | "regular" | "dispatch"; label: string }[] = [
   { id: "all", label: "전체" },
@@ -39,7 +51,7 @@ const TYPE_OPTIONS: { id: "all" | "regular" | "dispatch"; label: string }[] = [
 type TabId = "latest" | "missing" | "history";
 
 interface ContractItem {
-  employee_type: string;
+  employee_type: "regular" | "dispatch";
   employee_id: number;
   employee_name: string;
   employee_phone: string;
@@ -62,6 +74,9 @@ interface ContractItem {
     other_allowance?: string;
     work_hours?: string;
     department?: string;
+    is_legacy_scan?: number;
+    legacy_filename?: string;
+    scanned_file_data?: string;
   } | null;
   contract_count?: number;
   [key: string]: any;
@@ -87,6 +102,9 @@ interface ViewModalItem {
   work_start_date?: string;
   work_place?: string;
   token?: string;
+  is_legacy_scan?: number;
+  legacy_filename?: string;
+  scanned_file_data?: string;
   [key: string]: any;
 }
 
@@ -102,6 +120,18 @@ function ContractManageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
+
+  const [authorized, setAuthorized] = useState(false);
+  const verifyPassword = async (pw: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/regular/verify-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password: pw }),
+    });
+    const body = await res.json();
+    return !!body.verified;
+  };
 
   const [tab, setTab] = useState<TabId>(() => {
     const t = searchParams.get("tab");
@@ -129,6 +159,13 @@ function ContractManageInner() {
   });
 
   const [viewModal, setViewModal] = useState<ViewModalItem | null>(null);
+
+  // Legacy contract attach state
+  const [attachTarget, setAttachTarget] = useState<ContractItem | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachContractStart, setAttachContractStart] = useState("");
+  const [attachContractEnd, setAttachContractEnd] = useState("");
+  const [attaching, setAttaching] = useState(false);
 
   const loadLatest = useCallback(async () => {
     setLoading(true);
@@ -183,11 +220,42 @@ function ContractManageInner() {
     }
   }, [historyEmployee, toast]);
 
+  const handleAttach = async () => {
+    if (!attachTarget || !attachFile) return;
+    setAttaching(true);
+    try {
+      const file_data = await fileToBase64(attachFile);
+      const body: Parameters<typeof uploadLegacyContract>[0] = {
+        employee_type: attachTarget.employee_type,
+        filename: attachFile.name,
+        file_data,
+        contract_start: attachContractStart || undefined,
+        contract_end: attachContractEnd || undefined,
+      };
+      if (attachTarget.employee_type === "regular") body.employee_id = attachTarget.employee_id;
+      else body.phone = attachTarget.employee_phone;
+
+      await uploadLegacyContract(body);
+      toast.success(`${attachTarget.employee_name} 님 계약서 파일 첨부 완료`);
+      setAttachTarget(null);
+      setAttachFile(null);
+      setAttachContractStart("");
+      setAttachContractEnd("");
+      if (tab === "latest") loadLatest();
+      else if (tab === "missing") loadMissing();
+    } catch (e: any) {
+      toast.error(e.message || "첨부 실패");
+    } finally {
+      setAttaching(false);
+    }
+  };
+
   useEffect(() => {
+    if (!authorized) return;
     if (tab === "latest") loadLatest();
     else if (tab === "missing") loadMissing();
     else if (tab === "history") loadHistory();
-  }, [tab, loadLatest, loadMissing, loadHistory]);
+  }, [authorized, tab, loadLatest, loadMissing, loadHistory]);
 
   function handleHistoryFromRow(item: ContractItem) {
     setHistoryEmployee({
@@ -211,6 +279,16 @@ function ContractManageInner() {
 
   // Latest tab shows only rows WITH a contract
   const latestWithContract = latestItems.filter((i) => i.contract != null);
+
+  if (!authorized) {
+    return (
+      <PasswordGate
+        onVerified={() => setAuthorized(true)}
+        verifyPassword={verifyPassword}
+        title="근로계약서 관리 접근 비밀번호"
+      />
+    );
+  }
 
   return (
     <div className="fade-in">
@@ -360,17 +438,27 @@ function ContractManageInner() {
                   <TD muted>{item.department || "-"}</TD>
                   <TD muted>{item.hire_date || "-"}</TD>
                   <TD align="right">
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => {
-                        if (item.employee_type === "regular") {
-                          router.push(`/regular-workers`);
-                        }
-                      }}
-                    >
-                      계약서 작성
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => {
+                          if (item.employee_type === "regular") {
+                            router.push(`/regular-workers`);
+                          }
+                        }}
+                      >
+                        계약서 작성
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        leadingIcon={<Paperclip size={12} />}
+                        onClick={() => setAttachTarget(item)}
+                      >
+                        파일 첨부
+                      </Button>
+                    </div>
                   </TD>
                 </TR>
               ))}
@@ -452,6 +540,46 @@ function ContractManageInner() {
       >
         {viewModal && (
           <div className="space-y-4">
+            {viewModal.is_legacy_scan === 1 && (
+              <div className="flex items-center gap-2">
+                <Badge tone="violet" size="xs">스캔 첨부본</Badge>
+                {viewModal.legacy_filename && (
+                  <span className="text-[11.5px] text-[var(--text-3)]">{viewModal.legacy_filename}</span>
+                )}
+              </div>
+            )}
+
+            {viewModal.is_legacy_scan === 1 && viewModal.scanned_file_data && (
+              <div>
+                <p className="text-xs text-[var(--text-3)] mb-1.5">첨부 파일</p>
+                {viewModal.scanned_file_data.startsWith("data:image") ? (
+                  <div className="border border-[var(--border-1)] rounded-[var(--r-md)] overflow-hidden bg-white">
+                    <img src={viewModal.scanned_file_data} alt="계약서 스캔" className="w-full object-contain max-h-[480px]" />
+                  </div>
+                ) : viewModal.scanned_file_data.startsWith("data:application/pdf") ? (
+                  <a
+                    href={viewModal.scanned_file_data}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--r-md)] border border-[var(--border-1)] bg-[var(--bg-1)] text-[12.5px] text-[var(--brand-400)] hover:bg-[var(--bg-2)]"
+                  >
+                    <FileText size={14} />
+                    PDF 열기
+                  </a>
+                ) : (
+                  <a
+                    href={viewModal.scanned_file_data}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--r-md)] border border-[var(--border-1)] bg-[var(--bg-1)] text-[12.5px] text-[var(--brand-400)] hover:bg-[var(--bg-2)]"
+                  >
+                    <FileText size={14} />
+                    파일 열기
+                  </a>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-[var(--text-3)] text-xs mb-0.5">이름</p>
@@ -512,7 +640,7 @@ function ContractManageInner() {
               </table>
             </div>
 
-            {viewModal.status === "signed" && viewModal.token && (
+            {viewModal.status === "signed" && viewModal.token && viewModal.is_legacy_scan !== 1 && (
               <Button
                 variant="secondary"
                 size="sm"
@@ -521,6 +649,69 @@ function ContractManageInner() {
                 원본 계약서 열람
               </Button>
             )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!attachTarget}
+        onClose={() => setAttachTarget(null)}
+        title="기존 계약서 파일 첨부"
+        size="md"
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setAttachTarget(null)}>취소</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleAttach}
+              loading={attaching}
+              disabled={!attachFile}
+            >
+              업로드
+            </Button>
+          </>
+        }
+      >
+        {attachTarget && (
+          <div className="space-y-3">
+            <p className="text-[12.5px] text-[var(--text-3)]">
+              {attachTarget.employee_name} ({attachTarget.employee_phone})
+            </p>
+            <Field label="계약서 스캔 파일" required>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => setAttachFile(e.target.files?.[0] ?? null)}
+                className="w-full text-[13px] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-[var(--brand-500)] file:text-white file:cursor-pointer"
+              />
+              {attachFile && (
+                <p className="text-[11.5px] text-[var(--text-3)] mt-1.5">
+                  {attachFile.name} ({(attachFile.size / 1024).toFixed(1)} KB)
+                </p>
+              )}
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="계약 시작일">
+                <Input
+                  type="date"
+                  inputSize="sm"
+                  value={attachContractStart}
+                  onChange={(e) => setAttachContractStart(e.target.value)}
+                />
+              </Field>
+              <Field label="계약 종료일">
+                <Input
+                  type="date"
+                  inputSize="sm"
+                  value={attachContractEnd}
+                  onChange={(e) => setAttachContractEnd(e.target.value)}
+                />
+              </Field>
+            </div>
+            <p className="text-[11.5px] text-[var(--text-3)] bg-[var(--info-bg)] border border-[var(--info-border)] rounded-md p-2">
+              시스템 도입 전 종이 또는 외부 양식으로 작성된 계약서를 첨부하면 시스템에 보관됩니다.
+            </p>
           </div>
         )}
       </Modal>

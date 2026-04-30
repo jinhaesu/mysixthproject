@@ -654,6 +654,24 @@ export async function getContractHistory(params: Record<string, string> = {}) {
   return fetchAPI<any>(`/api/contracts/history${query ? '?' + query : ''}`);
 }
 
+export async function uploadLegacyContract(body: {
+  employee_type: 'regular' | 'dispatch';
+  employee_id?: number;
+  phone?: string;
+  filename: string;
+  file_data: string;
+  contract_start?: string;
+  contract_end?: string;
+  work_start_date?: string;
+  notes?: string;
+}) {
+  return fetchAPI<{ ok: boolean; contract_id: number }>('/api/contracts/upload-legacy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 // ===== Offboarding =====
 export async function getOffboardings(params: Record<string, string> = {}) {
   const query = new URLSearchParams(params).toString();

@@ -5,7 +5,8 @@
  */
 
 import { Router, Response } from 'express';
-import { dbGet, dbAll, normalizePhone } from '../db';
+import crypto from 'crypto';
+import { dbGet, dbAll, dbRun, normalizePhone } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -282,6 +283,140 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
     }
   } catch (error: any) {
     console.error('GET /api/contracts/history error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/contracts/upload-legacy
+// 시스템 도입 전 종이 또는 외부 양식으로 작성된 기존 계약서를 첨부 보관
+// ---------------------------------------------------------------------------
+router.post('/upload-legacy', async (req: AuthRequest, res: Response) => {
+  try {
+    const {
+      employee_type,
+      employee_id,
+      phone,
+      filename,
+      file_data,
+      contract_start,
+      contract_end,
+      work_start_date,
+      // notes: not stored in current schema (kept for forward compatibility)
+    } = (req.body || {}) as {
+      employee_type?: 'regular' | 'dispatch';
+      employee_id?: number;
+      phone?: string;
+      filename?: string;
+      file_data?: string;
+      contract_start?: string;
+      contract_end?: string;
+      work_start_date?: string;
+      notes?: string;
+    };
+
+    if (employee_type !== 'regular' && employee_type !== 'dispatch') {
+      res.status(400).json({ error: "employee_type은 'regular' 또는 'dispatch' 여야 합니다." });
+      return;
+    }
+    if (!filename || typeof filename !== 'string') {
+      res.status(400).json({ error: 'filename이 필요합니다.' });
+      return;
+    }
+    if (!file_data || typeof file_data !== 'string' || !file_data.startsWith('data:')) {
+      res.status(400).json({ error: 'file_data는 Base64 data URL 형식이어야 합니다.' });
+      return;
+    }
+    // Reject > 10MB Base64 string length
+    if (file_data.length > 10 * 1024 * 1024) {
+      res.status(413).json({ error: '파일이 너무 큽니다. 10MB 이하로 첨부해주세요.' });
+      return;
+    }
+
+    const cStart = contract_start || '';
+    const cEnd = contract_end || '';
+    const wStart = work_start_date || cStart || '';
+
+    if (employee_type === 'regular') {
+      if (!employee_id || isNaN(Number(employee_id))) {
+        res.status(400).json({ error: '정규직의 경우 employee_id가 필요합니다.' });
+        return;
+      }
+      const empId = Number(employee_id);
+      const employee = await dbGet(
+        'SELECT id, name, phone FROM regular_employees WHERE id = ?',
+        empId,
+      );
+      if (!employee) {
+        res.status(404).json({ error: '직원을 찾을 수 없습니다.' });
+        return;
+      }
+
+      const token = crypto.randomBytes(16).toString('hex');
+
+      const result = await dbRun(
+        `INSERT INTO regular_labor_contracts (
+          employee_id, phone, worker_name, contract_start, contract_end,
+          address, signature_data, token, status, sms_sent,
+          work_start_date, is_legacy_scan, legacy_filename, scanned_file_data
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        empId,
+        employee.phone,
+        employee.name,
+        cStart,
+        cEnd,
+        '',
+        '',
+        token,
+        'signed',
+        0,
+        wStart,
+        1,
+        filename,
+        file_data,
+      );
+
+      res.json({ ok: true, contract_id: result.lastInsertRowid });
+      return;
+    }
+
+    // dispatch
+    if (!phone) {
+      res.status(400).json({ error: '파견·알바의 경우 phone이 필요합니다.' });
+      return;
+    }
+    const normalized = normalizePhone(phone);
+    const worker = await dbGet(
+      'SELECT id, name_ko, category, phone FROM workers WHERE phone = ?',
+      normalized,
+    );
+    if (!worker) {
+      res.status(404).json({ error: '근무자를 찾을 수 없습니다.' });
+      return;
+    }
+
+    const result = await dbRun(
+      `INSERT INTO labor_contracts (
+        phone, worker_name, worker_type, contract_start, contract_end,
+        address, signature_data, sms_sent,
+        is_legacy_scan, legacy_filename, scanned_file_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      normalized,
+      worker.name_ko || '',
+      worker.category || 'alba',
+      cStart,
+      cEnd,
+      '',
+      '',
+      0,
+      1,
+      filename,
+      file_data,
+    );
+
+    res.json({ ok: true, contract_id: result.lastInsertRowid });
+  } catch (error: any) {
+    console.error('POST /api/contracts/upload-legacy error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -12,6 +12,7 @@ import {
   getOffboardingRecipients,
   setOffboardingRecipients,
 } from "@/lib/api";
+import PasswordGate from "@/components/PasswordGate";
 import {
   PageHeader,
   Stat,
@@ -116,6 +117,18 @@ function checklistCount(rec: OffboardingRecord): number {
 
 export default function OffboardingPage() {
   const toast = useToast();
+  const [authorized, setAuthorized] = useState(false);
+  const verifyPassword = async (pw: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/regular/verify-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password: pw }),
+    });
+    const body = await res.json();
+    return !!body.verified;
+  };
+
   const [tab, setTab] = useState<TabId>("in_progress");
   const [items, setItems] = useState<OffboardingRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -173,16 +186,18 @@ export default function OffboardingPage() {
   }, []);
 
   useEffect(() => {
+    if (!authorized) return;
     loadDashboard();
-  }, [loadDashboard]);
+  }, [authorized, loadDashboard]);
 
   useEffect(() => {
+    if (!authorized) return;
     if (tab === "settings") {
       loadRecipients();
     } else {
       loadItems();
     }
-  }, [tab, loadItems, loadRecipients]);
+  }, [authorized, tab, loadItems, loadRecipients]);
 
   const openDetail = async (id: number) => {
     setDetailId(id);
@@ -336,6 +351,16 @@ export default function OffboardingPage() {
     { field: "annual_leave_settled", label: "연차수당 정산", desc: "" },
     { field: "income_tax_reported", label: "퇴직소득 원천세 신고", desc: "" },
   ];
+
+  if (!authorized) {
+    return (
+      <PasswordGate
+        onVerified={() => setAuthorized(true)}
+        verifyPassword={verifyPassword}
+        title="퇴사관리 접근 비밀번호"
+      />
+    );
+  }
 
   return (
     <div className="fade-in">

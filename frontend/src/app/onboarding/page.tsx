@@ -36,6 +36,8 @@ import {
   getOnboardingRecipients,
   setOnboardingRecipients,
   sendRegularLink,
+  bulkSendOnboardingLinks,
+  bulkUpdateOnboarding,
 } from "@/lib/api";
 import {
   Search,
@@ -48,6 +50,7 @@ import {
   Trash2,
   FileText,
   Download,
+  Settings,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -685,6 +688,32 @@ function ListTab({
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<number | null>(null);
 
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkAdminOpen, setBulkAdminOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkForm, setBulkForm] = useState({
+    monthly_salary: '',
+    non_taxable_meal: '',
+    non_taxable_vehicle: '',
+    weekly_work_hours: '',
+    job_code: '',
+    business_registration_no: '',
+    employment_type: '',
+  });
+
+  const toggleId = (id: number) => setSelected(prev => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const toggleAll = (allIds: number[]) => setSelected(prev => {
+    if (prev.size === allIds.length) return new Set();
+    return new Set(allIds);
+  });
+  const allSelected = items.length > 0 && selected.size === items.length;
+  const someSelected = selected.size > 0;
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -701,6 +730,7 @@ function ListTab({
   }, [status, search]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelected(new Set()); }, [status, search]);
 
   const handleSendCollectLink = async (item: any) => {
     if (!confirm(`${item.name} 님에게 정보 입력용 웹링크 SMS를 발송할까요?`)) return;
@@ -714,6 +744,40 @@ function ListTab({
     } finally {
       setSendingId(null);
     }
+  };
+
+  const handleBulkSendLinks = async () => {
+    if (selected.size === 0) return;
+    if (!confirm(`선택된 ${selected.size}명에게 정보수집 링크 SMS를 일괄 발송할까요?`)) return;
+    setBulkSending(true);
+    try {
+      const res = await bulkSendOnboardingLinks(Array.from(selected));
+      toast.success(`${res.sent}명 발송 완료${res.failed?.length ? `, ${res.failed.length}명 실패` : ''}`);
+      setSelected(new Set());
+      onListChanged?.();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkSending(false); }
+  };
+
+  const handleBulkUpdate = async () => {
+    const updates: Record<string, any> = {};
+    for (const k of ['monthly_salary', 'non_taxable_meal', 'non_taxable_vehicle', 'weekly_work_hours'] as const) {
+      if (bulkForm[k] !== '' && bulkForm[k] != null) updates[k] = Number(bulkForm[k]);
+    }
+    for (const k of ['job_code', 'business_registration_no', 'employment_type'] as const) {
+      if (bulkForm[k]) updates[k] = bulkForm[k];
+    }
+    if (Object.keys(updates).length === 0) { toast.info('변경할 값을 입력해주세요.'); return; }
+    setBulkUpdating(true);
+    try {
+      const res = await bulkUpdateOnboarding(Array.from(selected), updates);
+      toast.success(`${res.updated}명 업데이트 완료`);
+      setBulkAdminOpen(false);
+      setSelected(new Set());
+      setBulkForm({ monthly_salary: '', non_taxable_meal: '', non_taxable_vehicle: '', weekly_work_hours: '', job_code: '', business_registration_no: '', employment_type: '' });
+      onListChanged?.();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
   };
 
   if (loading) return <SkeletonTable rows={6} />;
@@ -730,9 +794,25 @@ function ListTab({
 
   return (
     <>
+      {someSelected && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] bg-[rgba(94,106,210,0.14)] border border-[rgba(130,143,255,0.26)]">
+          <span className="text-[13px] text-[var(--brand-300)] font-medium">{selected.size}명 선택됨</span>
+          <Button size="sm" variant="primary" leadingIcon={<Send size={13}/>} loading={bulkSending} onClick={handleBulkSendLinks}>일괄 정보수집 링크 발송</Button>
+          <Button size="sm" variant="secondary" leadingIcon={<Settings size={13}/>} onClick={() => setBulkAdminOpen(true)}>관리자 일괄 설정</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>선택 해제</Button>
+        </div>
+      )}
       <Table>
       <THead>
         <TR>
+          <TH>
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => toggleAll(items.map(i => i.id))}
+              className="w-4 h-4"
+            />
+          </TH>
           <TH>이름</TH>
           <TH>연락처</TH>
           <TH>부서 / 팀</TH>
@@ -746,6 +826,15 @@ function ListTab({
       <TBody>
         {items.map((item) => (
           <TR key={item.id}>
+            <TD>
+              <input
+                type="checkbox"
+                checked={selected.has(item.id)}
+                onChange={() => toggleId(item.id)}
+                className="w-4 h-4"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </TD>
             <TD>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-[var(--text-1)]">{item.name}</span>
@@ -829,6 +918,49 @@ function ListTab({
         ))}
       </TBody>
     </Table>
+
+      <Modal
+        open={bulkAdminOpen}
+        onClose={() => setBulkAdminOpen(false)}
+        title="관리자 일괄 설정"
+        size="md"
+        description={`선택된 ${selected.size}명에게 일괄 적용됩니다. 빈 칸은 변경 안 됨.`}
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setBulkAdminOpen(false)}>취소</Button>
+            <Button variant="primary" size="sm" loading={bulkUpdating} onClick={handleBulkUpdate}>적용</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="월 급여 (원)" hint="비과세 식대·차량유지비 포함 총액">
+            <Input inputSize="md" type="number" value={bulkForm.monthly_salary} onChange={e => setBulkForm(p => ({ ...p, monthly_salary: e.target.value }))} />
+          </Field>
+          <Field label="비과세 식대 (원)" hint="비과세 처리할 식대 (월)">
+            <Input inputSize="md" type="number" value={bulkForm.non_taxable_meal} onChange={e => setBulkForm(p => ({ ...p, non_taxable_meal: e.target.value }))} />
+          </Field>
+          <Field label="비과세 차량유지비 (원)">
+            <Input inputSize="md" type="number" value={bulkForm.non_taxable_vehicle} onChange={e => setBulkForm(p => ({ ...p, non_taxable_vehicle: e.target.value }))} />
+          </Field>
+          <Field label="직종코드" hint="고용·산재 신고용 6자리">
+            <Input inputSize="md" value={bulkForm.job_code} onChange={e => setBulkForm(p => ({ ...p, job_code: e.target.value }))} />
+          </Field>
+          <Field label="사업장관리번호" hint="4대보험 신고용">
+            <Input inputSize="md" value={bulkForm.business_registration_no} onChange={e => setBulkForm(p => ({ ...p, business_registration_no: e.target.value }))} />
+          </Field>
+          <Field label="소정근로시간 (주)">
+            <Input inputSize="md" type="number" value={bulkForm.weekly_work_hours} onChange={e => setBulkForm(p => ({ ...p, weekly_work_hours: e.target.value }))} />
+          </Field>
+          <Field label="고용형태">
+            <Select inputSize="md" value={bulkForm.employment_type} onChange={e => setBulkForm(p => ({ ...p, employment_type: e.target.value }))}>
+              <option value="">변경 안 함</option>
+              <option value="regular">정규</option>
+              <option value="contract">계약</option>
+              <option value="daily">일용</option>
+            </Select>
+          </Field>
+        </div>
+      </Modal>
     </>
   );
 }
@@ -889,6 +1021,8 @@ export default function OnboardingPage() {
         <ul className="space-y-1 text-[var(--text-2)] list-disc pl-4">
           <li><b>상세</b> — 누락된 정보(이메일·주소·통장사본·외국인 정보 등)를 관리자가 직접 입력하거나 첨부 파일을 업로드하는 화면을 엽니다.</li>
           <li><b>정보수집 링크</b> — 직원에게 SMS로 정보 입력 웹페이지 링크를 발송합니다. 직원이 본인 휴대폰에서 직접 입력 → 자동으로 입사자 관리에 반영됩니다.</li>
+          <li>월 급여, 직종코드, 사업장관리번호 등은 관리자가 <b>일괄 설정</b>에서 한꺼번에 입력할 수 있습니다.</li>
+          <li>이메일·통장사본·외국인 정보 등은 <b>정보수집 링크</b>로 직원이 직접 입력합니다.</li>
           <li>모든 정보가 완료되면 <b>발송 가능</b> 탭으로 이동하며, 거기서 <b>4대보험 취득신고 메일 발송</b> 버튼이 활성화됩니다.</li>
         </ul>
       </div>

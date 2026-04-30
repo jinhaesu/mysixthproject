@@ -185,6 +185,7 @@ export default function RegularWorkersPage() {
     reason_code: "",
     reason_detail: "",
     send_email: true,
+    send_resignation_letter_sms: true,
   });
   const [submittingOffboarding, setSubmittingOffboarding] = useState(false);
 
@@ -201,10 +202,11 @@ export default function RegularWorkersPage() {
         reason_code: offboardingForm.reason_code,
         reason_detail: offboardingForm.reason_detail,
         send_email: offboardingForm.send_email,
+        send_resignation_letter_sms: offboardingForm.send_resignation_letter_sms,
       });
       toast.success(`${offboardingTarget.name} 퇴사 등록 완료. 퇴사관리 페이지에서 진행 현황을 확인하세요.`);
       setOffboardingTarget(null);
-      setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
+      setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true, send_resignation_letter_sms: true });
       loadEmployees();
       loadResigned();
     } catch (e: any) {
@@ -580,7 +582,7 @@ export default function RegularWorkersPage() {
                               e.stopPropagation();
                               console.log('퇴사 click', emp.id, emp.name);
                               setOffboardingTarget(emp);
-                              setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
+                              setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true, send_resignation_letter_sms: true });
                             }}
                             title="퇴사 등록"
                           >
@@ -912,6 +914,11 @@ export default function RegularWorkersPage() {
                 className="w-4 h-4 accent-[var(--brand-500)]"
               />
               지정된 이메일로 신고 안내 메일 발송
+            </label>
+            <label className="flex items-center gap-2 text-[12.5px] text-[var(--text-2)]">
+              <input type="checkbox" checked={offboardingForm.send_resignation_letter_sms ?? true}
+                onChange={(e) => setOffboardingForm(p => ({...p, send_resignation_letter_sms: e.target.checked}))} />
+              직원에게 사직서 작성 SMS 자동 발송
             </label>
           </div>
         )}

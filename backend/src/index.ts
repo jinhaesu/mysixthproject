@@ -18,6 +18,7 @@ import regularPublicRoutes from './routes/regularPublic';
 import dashboardRoutes from './routes/dashboard';
 import contractsRoutes from './routes/contracts';
 import offboardingRoutes from './routes/offboarding';
+import offboardingPublicRoutes from './routes/offboardingPublic';
 import onboardingRoutes from './routes/onboarding';
 import { requireAuth } from './middleware/auth';
 import { startReminderService } from './services/reminderService';
@@ -54,6 +55,7 @@ app.use('/api/regular-public', regularPublicRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/contracts', requireAuth, contractsRoutes);
 app.use('/api/offboarding', requireAuth, offboardingRoutes);
+app.use('/api/offboarding-public', offboardingPublicRoutes);  // no auth
 app.use('/api/onboarding', requireAuth, onboardingRoutes);
 
 // Health check

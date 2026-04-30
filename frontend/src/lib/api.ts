@@ -689,6 +689,7 @@ export async function createOffboarding(body: {
   reason_code: string;
   reason_detail?: string;
   send_email?: boolean;
+  send_resignation_letter_sms?: boolean;
 }) {
   return fetchAPI<any>('/api/offboarding', {
     method: 'POST',
@@ -768,5 +769,21 @@ export async function setOnboardingRecipients(emails: string[]) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ emails }),
+  });
+}
+
+export async function bulkSendOnboardingLinks(ids: number[]) {
+  return fetchAPI<any>('/api/onboarding/bulk-send-links', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function bulkUpdateOnboarding(ids: number[], updates: Record<string, any>) {
+  return fetchAPI<any>('/api/onboarding/bulk-update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, updates }),
   });
 }

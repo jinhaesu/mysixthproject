@@ -8,7 +8,7 @@ import {
   getContractHistory,
   uploadLegacyContract,
 } from "@/lib/api";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import {
   PageHeader,
   Stat,
@@ -74,6 +74,7 @@ interface ContractItem {
     other_allowance?: string;
     work_hours?: string;
     department?: string;
+    token?: string;
     is_legacy_scan?: number;
     legacy_filename?: string;
     scanned_file_data?: string;
@@ -122,16 +123,6 @@ function ContractManageInner() {
   const toast = useToast();
 
   const [authorized, setAuthorized] = useState(false);
-  const verifyPassword = async (pw: string) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/regular/verify-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
 
   const [tab, setTab] = useState<TabId>(() => {
     const t = searchParams.get("tab");
@@ -268,8 +259,8 @@ function ContractManageInner() {
   }
 
   const tabs: { id: TabId; label: string }[] = [
-    { id: "latest", label: "최근 계약서" },
-    { id: "missing", label: "미작성" },
+    { id: "latest", label: "계약서 작성됨" },
+    { id: "missing", label: "계약서 미작성" },
     { id: "history", label: "이력 조회" },
   ];
 
@@ -282,10 +273,9 @@ function ContractManageInner() {
 
   if (!authorized) {
     return (
-      <PasswordGate
+      <SessionPasswordGate
+        title="근로계약서 관리 접근"
         onVerified={() => setAuthorized(true)}
-        verifyPassword={verifyPassword}
-        title="근로계약서 관리 접근 비밀번호"
       />
     );
   }
@@ -298,9 +288,14 @@ function ContractManageInner() {
         description="직원별 최신 계약서 / 미작성 직원 / 과거 이력 조회"
       />
 
+      <div className="mb-3 text-[12.5px] text-[var(--text-3)]">
+        계약서 체결 직원과 미작성 직원을 분리해서 확인할 수 있습니다.
+        계약서 작성은 <b className="text-[var(--text-1)]">근무자 DB → 계약서</b> 버튼으로 진행합니다. 시스템 도입 전 종이 계약서는 <b className="text-[var(--text-1)]">미작성 탭의 파일 첨부</b> 버튼으로 등록할 수 있습니다.
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <Stat label="전체 인원" value={String(latestTotal)} unit="명" tone="neutral" />
-        <Stat label="계약서 보유" value={String(contractedCount)} unit="명" tone="success" />
+        <Stat label="작성됨" value={String(contractedCount)} unit="명" tone="success" />
         <Stat label="미작성" value={String(latestMissing)} unit="명" tone="warning" />
         <Stat label="미작성 비율" value={String(missingRatio)} unit="%" tone={latestMissing > 0 ? "danger" : "success"} />
       </div>
@@ -388,12 +383,40 @@ function ContractManageInner() {
                         <Button
                           variant="ghost"
                           size="xs"
-                          onClick={() => setViewModal({
-                            employee_name: item.employee_name,
-                            employee_phone: item.employee_phone,
-                            department: item.department,
-                            ...item.contract,
-                          })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log('보기 click', item);
+                            const c = item.contract;
+                            if (!c) {
+                              toast.info("계약서가 없습니다.");
+                              return;
+                            }
+                            // Legacy scan → open Base64 in new tab
+                            if (c.is_legacy_scan === 1 && c.scanned_file_data) {
+                              const win = window.open();
+                              if (!win) { toast.error("팝업이 차단되었습니다."); return; }
+                              if (c.scanned_file_data.startsWith('data:image')) {
+                                win.document.write(`<title>${item.employee_name} 계약서</title><img src="${c.scanned_file_data}" style="max-width:100%;height:auto">`);
+                              } else if (c.scanned_file_data.startsWith('data:application/pdf')) {
+                                win.location.href = c.scanned_file_data;
+                              } else {
+                                win.location.href = c.scanned_file_data;
+                              }
+                              return;
+                            }
+                            // Regular contract with token → open contract page in new tab
+                            if (item.employee_type === 'regular' && c.token) {
+                              window.open(`/regular-contract?token=${c.token}`, '_blank');
+                              return;
+                            }
+                            // Fallback: open in-page modal
+                            setViewModal({
+                              employee_name: item.employee_name,
+                              employee_phone: item.employee_phone,
+                              department: item.department,
+                              ...c,
+                            });
+                          }}
                         >
                           보기
                         </Button>

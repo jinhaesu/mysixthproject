@@ -172,7 +172,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Decorative ambient gradient on the canvas (very subtle) */
+/* Decorative ambient gradient on the canvas (very subtle).
+   z-index: -1 so it renders behind body content naturally —
+   this also avoids needing a `body > *` rule that would override
+   Tailwind utilities like .fixed on portal-rendered modals. */
 body::before {
   content: "";
   position: fixed;
@@ -181,11 +184,8 @@ body::before {
   background:
     radial-gradient(80% 60% at 18% -10%, rgba(94,106,210,0.08), transparent 60%),
     radial-gradient(60% 60% at 92% 110%, rgba(99,102,241,0.05), transparent 60%);
-  z-index: 0;
+  z-index: -1;
 }
-
-/* Content sits above ambient bg */
-body > * { position: relative; z-index: 1; }
 
 /* Tabular numerals for stats and tables */
 .tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1; }

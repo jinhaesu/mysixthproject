@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { usePersistedState } from "@/lib/usePersistedState";
 import {
   getRegularEmployees,
@@ -56,6 +57,8 @@ interface Employee {
   id_number?: string | null;
   name_en?: string | null;
   hire_date?: string | null;
+  resign_date?: string | null;
+  resigned_at?: string | null;
   is_active?: number;
 }
 
@@ -77,8 +80,28 @@ const emptyForm = {
   bank_account: "",
 };
 
+// ── Helpers for resigned section ──────────────────────────────────
+function formatDate(s?: string | null): string {
+  if (!s) return "-";
+  const m = String(s).match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : "-";
+}
+function calcTenure(hire?: string | null, resign?: string | null): string {
+  const h = formatDate(hire), r = formatDate(resign);
+  if (h === "-" || r === "-") return "-";
+  const ms = new Date(r).getTime() - new Date(h).getTime();
+  if (ms < 0) return "-";
+  const days = Math.floor(ms / 86400000);
+  const years = Math.floor(days / 365);
+  const months = Math.floor((days % 365) / 30);
+  if (years > 0) return `${years}년 ${months}개월`;
+  if (months > 0) return `${months}개월 ${days % 30}일`;
+  return `${days}일`;
+}
+
 export default function RegularWorkersPage() {
   const toast = useToast();
+  const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
@@ -92,6 +115,8 @@ export default function RegularWorkersPage() {
   const [filterTeam, setFilterTeam] = usePersistedState("rw_filterTeam", "");
   const [filterRole, setFilterRole] = usePersistedState("rw_filterRole", "");
   const [page, setPage] = usePersistedState("rw_page", 1);
+
+  const [showResigned, setShowResigned] = useState(true);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -138,6 +163,22 @@ export default function RegularWorkersPage() {
   });
   const [workplaces, setWorkplaces] = useState<any[]>([]);
 
+  const [resignedAll, setResignedAll] = useState<Employee[]>([]);
+  const [resignedLoading, setResignedLoading] = useState(false);
+
+  const loadResigned = useCallback(async () => {
+    setResignedLoading(true);
+    try {
+      const data = await getRegularEmployees({ include_resigned: "1", limit: "500", page: "1" });
+      const list: Employee[] = data.employees || data || [];
+      setResignedAll(list.filter(e => e.is_active === 0 || (e.resign_date && String(e.resign_date).trim() !== "") || (e.resigned_at && String(e.resigned_at).trim() !== "")));
+    } catch {
+      // silent
+    } finally {
+      setResignedLoading(false);
+    }
+  }, []);
+
   const [offboardingTarget, setOffboardingTarget] = useState<Employee | null>(null);
   const [offboardingForm, setOffboardingForm] = useState({
     resign_date: "",
@@ -165,6 +206,7 @@ export default function RegularWorkersPage() {
       setOffboardingTarget(null);
       setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
       loadEmployees();
+      loadResigned();
     } catch (e: any) {
       toast.error(e.message || "퇴사 등록 실패");
     } finally {
@@ -175,6 +217,10 @@ export default function RegularWorkersPage() {
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadResigned();
+  }, [loadResigned]);
 
   const loadContracts = useCallback(async () => {
     try {
@@ -397,15 +443,29 @@ export default function RegularWorkersPage() {
       </form>
 
       {/* Table */}
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : employees.length === 0 ? (
-        <EmptyState
-          title={search ? `"${search}" 검색 결과가 없습니다.` : '등록된 정규직 직원이 없습니다.'}
-        />
-      ) : (
+      {(() => {
+        const activeEmployees = employees.filter(
+          (e) => e.is_active !== 0 && !e.resign_date && !e.resigned_at
+        );
+
+        if (loading) {
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          );
+        }
+
+        if (employees.length === 0) {
+          return (
+            <EmptyState
+              title={search ? `"${search}" 검색 결과가 없습니다.` : '등록된 정규직 직원이 없습니다.'}
+            />
+          );
+        }
+
+        return (
+          <>
         <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -417,7 +477,7 @@ export default function RegularWorkersPage() {
                 </tr>
               </thead>
               <tbody>
-                {employees.map((emp) => (
+                {activeEmployees.map((emp) => (
                   <tr
                     key={emp.id}
                     className={`border-b border-[var(--border-1)] hover:bg-[var(--bg-2)] cursor-pointer transition-colors ${emp.is_active === 0 ? 'opacity-50 bg-[var(--bg-0)]' : ''}`}
@@ -516,7 +576,9 @@ export default function RegularWorkersPage() {
                             variant="ghost"
                             size="xs"
                             leadingIcon={<UserMinus size={14} />}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('퇴사 click', emp.id, emp.name);
                               setOffboardingTarget(emp);
                               setOffboardingForm({ resign_date: "", reason_code: "", reason_detail: "", send_email: true });
                             }}
@@ -545,7 +607,7 @@ export default function RegularWorkersPage() {
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Pagination inside active-employees card */}
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-1)]">
               <p className="text-sm text-[var(--text-3)] tabular">
@@ -567,7 +629,60 @@ export default function RegularWorkersPage() {
             </div>
           )}
         </Card>
-      )}
+
+        {/* 퇴사자 별도 섹션 — uses resignedAll (full fetch, pagination-independent) */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[var(--fs-body)] font-semibold text-[var(--text-1)]">
+                퇴사자 ({resignedAll.length}명)
+              </p>
+              <p className="text-[var(--fs-caption)] text-[var(--text-3)]">퇴사 처리된 정규직 명단.</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowResigned((s) => !s)}>
+              {showResigned ? "접기" : "펼치기"}
+            </Button>
+          </div>
+          {showResigned && (
+            resignedLoading ? (
+              <div className="py-4 text-center text-xs text-[var(--text-4)]">불러오는 중...</div>
+            ) : resignedAll.length === 0 ? (
+              <div className="py-4 text-center text-xs text-[var(--text-4)]">퇴사자가 없습니다.</div>
+            ) : (
+              <Card padding="none" className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-[var(--bg-0)] border-b border-[var(--border-1)]">
+                        {["이름","연락처","부서/팀","입사일","퇴사일","근속기간","액션"].map(h => (
+                          <th key={h} className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resignedAll.map((e) => (
+                        <tr key={e.id} className="border-b border-[var(--border-1)] opacity-70 hover:opacity-100 transition-opacity">
+                          <td className="px-4 py-3 font-medium text-[var(--text-1)]">{e.name}</td>
+                          <td className="px-4 py-3 text-[var(--text-3)] tabular">{e.phone}</td>
+                          <td className="px-4 py-3 text-[var(--text-3)]">{e.department}{e.team ? ` / ${e.team}` : ""}</td>
+                          <td className="px-4 py-3 text-[var(--text-3)] tabular">{formatDate(e.hire_date)}</td>
+                          <td className="px-4 py-3 text-[var(--text-3)] tabular">{formatDate(e.resign_date || e.resigned_at)}</td>
+                          <td className="px-4 py-3 text-[var(--text-3)]">{calcTenure(e.hire_date, e.resign_date || e.resigned_at)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <Button variant="ghost" size="xs" onClick={() => router.push("/offboarding")}>퇴사 처리 보기</Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )
+          )}
+        </div>
+          </>
+        );
+      })()}
 
       {/* Contract Send Modal */}
       {contractModal && (

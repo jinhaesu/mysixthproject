@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import {
   PageHeader,
   Card,
@@ -68,22 +68,36 @@ async function downloadAuthed(url: string, filename: string) {
 
 // ── Field label map ──────────────────────────────────────────────
 const FIELD_LABELS: Record<string, string> = {
+  name: "이름",
+  phone: "연락처",
   email: "이메일",
   address: "주소",
+  id_number: "주민등록번호",
+  birth_date: "생년월일",
+  department: "부서",
+  team: "팀",
+  role: "직책",
+  employment_type: "고용형태",
+  hire_date: "입사일",
+  monthly_salary: "월 급여(보수월액)",
+  job_code: "직종코드",
+  weekly_work_hours: "소정근로시간",
+  business_registration_no: "사업장관리번호",
+  bank_name: "은행명",
+  bank_account: "계좌번호",
+  bank_slip_data: "통장사본",
+  family_register_data: "가족관계증명서",
+  resident_register_data: "주민등록등본",
+  signed_contract_url: "근로계약서 서명본",
   nationality: "국적",
   visa_type: "비자종류",
   visa_expiry: "비자만료일",
-  bank_slip_data: "통장사본",
-  foreign_id_card_data: "외국인등록증",
-  resident_register_data: "주민등록등본",
-  family_register_data: "가족관계증명서",
-  monthly_salary: "월 급여(보수월액)",
-  business_registration_no: "사업장관리번호",
-  job_code: "직종코드",
-  weekly_work_hours: "소정근로시간",
-  signed_contract_url: "서명된 계약서",
-  id_number: "주민등록번호",
+  foreign_id_card_data: "외국인등록증 사본",
 };
+
+function labelFields(fields: string[]): string {
+  return fields.map((f) => FIELD_LABELS[f] || f).join(", ");
+}
 
 type OnboardingTab = "pending" | "ready" | "completed" | "all" | "settings";
 
@@ -715,7 +729,8 @@ function ListTab({
   }
 
   return (
-    <Table>
+    <>
+      <Table>
       <THead>
         <TR>
           <TH>이름</TH>
@@ -762,7 +777,12 @@ function ListTab({
                   <span className="tabular text-[var(--fs-caption)] text-[var(--text-3)] w-8 text-right">{item.completion_pct ?? 0}%</span>
                 </div>
                 {(item.missing_fields?.length ?? 0) > 0 && (
-                  <p className="text-[var(--fs-micro)] text-[var(--danger-fg)]">{item.missing_fields.length}개 항목 누락</p>
+                  <p
+                    className="text-[var(--fs-micro)] text-[var(--danger-fg)] truncate max-w-[280px]"
+                    title={labelFields(item.missing_fields)}
+                  >
+                    {item.missing_fields.length}개 누락 — {labelFields(item.missing_fields)}
+                  </p>
                 )}
               </div>
             </TD>
@@ -778,9 +798,11 @@ function ListTab({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    try { onOpenDetail(item.id); }
-                    catch (e: any) { console.error("상세 버튼 오류:", e); }
+                  title="누락된 정보를 관리자가 직접 입력/업로드"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('상세 click', item.id, item.name);
+                    onOpenDetail(item.id);
                   }}
                 >
                   상세
@@ -790,7 +812,12 @@ function ListTab({
                     variant="ghost"
                     size="sm"
                     leadingIcon={<Send size={13} />}
-                    onClick={() => handleSendCollectLink(item)}
+                    title="직원에게 정보 입력 웹페이지 SMS 발송"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('정보수집 링크 click', item.id, item.name);
+                      handleSendCollectLink(item);
+                    }}
                     loading={sendingId === item.id}
                   >
                     정보수집 링크
@@ -802,22 +829,13 @@ function ListTab({
         ))}
       </TBody>
     </Table>
+    </>
   );
 }
 
 // ── Main Page ────────────────────────────────────────────────────
 export default function OnboardingPage() {
   const [authorized, setAuthorized] = useState(false);
-  const verifyPassword = async (pw: string) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/regular/verify-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
 
   const [tab, setTab] = useState<OnboardingTab>("pending");
   const [search, setSearch] = useState("");
@@ -850,10 +868,9 @@ export default function OnboardingPage() {
 
   if (!authorized) {
     return (
-      <PasswordGate
+      <SessionPasswordGate
+        title="입사자 관리 접근"
         onVerified={() => setAuthorized(true)}
-        verifyPassword={verifyPassword}
-        title="입사자 관리 접근 비밀번호"
       />
     );
   }
@@ -865,6 +882,16 @@ export default function OnboardingPage() {
         title="입사자 관리"
         description="정규직 입사자 정보 수집 현황 · 4대보험 취득신고 안내"
       />
+
+      {/* Always-visible InfoBox */}
+      <div className="mb-4 p-3 rounded-[var(--r-md)] bg-[var(--info-bg)] border border-[var(--info-border)] text-[12px] text-[var(--info-fg)]">
+        <div className="font-medium mb-1">사용 방법</div>
+        <ul className="space-y-1 text-[var(--text-2)] list-disc pl-4">
+          <li><b>상세</b> — 누락된 정보(이메일·주소·통장사본·외국인 정보 등)를 관리자가 직접 입력하거나 첨부 파일을 업로드하는 화면을 엽니다.</li>
+          <li><b>정보수집 링크</b> — 직원에게 SMS로 정보 입력 웹페이지 링크를 발송합니다. 직원이 본인 휴대폰에서 직접 입력 → 자동으로 입사자 관리에 반영됩니다.</li>
+          <li>모든 정보가 완료되면 <b>발송 가능</b> 탭으로 이동하며, 거기서 <b>4대보험 취득신고 메일 발송</b> 버튼이 활성화됩니다.</li>
+        </ul>
+      </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">

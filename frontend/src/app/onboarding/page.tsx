@@ -34,6 +34,7 @@ import {
   getOnboardingDashboard,
   getOnboardingRecipients,
   setOnboardingRecipients,
+  sendRegularLink,
 } from "@/lib/api";
 import {
   Search,
@@ -160,10 +161,12 @@ function FileUploadCell({
 // ── Detail Modal ─────────────────────────────────────────────────
 function DetailModal({
   id,
+  open,
   onClose,
   onSaved,
 }: {
   id: number;
+  open: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -173,9 +176,11 @@ function DetailModal({
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [downloadingCsv, setDownloadingCsv] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
   const [form, setForm] = useState<Record<string, any>>({});
 
   const loadDetail = useCallback(async () => {
+    if (!open || !id) return;
     setLoading(true);
     try {
       const d = await getOnboarding(id);
@@ -206,7 +211,7 @@ function DetailModal({
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, open]);
 
   useEffect(() => { loadDetail(); }, [loadDetail]);
 
@@ -256,6 +261,21 @@ function DetailModal({
     }
   };
 
+  const handleSendCollectLinkFromModal = async () => {
+    if (!detail) return;
+    if (!confirm(`${detail.name} 님에게 정보 입력용 웹링크 SMS를 발송할까요?`)) return;
+    setSendingLink(true);
+    try {
+      await sendRegularLink(id);
+      toast.success(`${detail.name} 님에게 SMS 발송됨. 정보 입력 후 입사자관리에 자동 반영됩니다.`);
+      onSaved();
+    } catch (e: any) {
+      toast.error(e.message || "SMS 발송 실패");
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
   const taxable = (() => {
     const s = Number(form.monthly_salary) || 0;
     const m = Number(form.non_taxable_meal) || 0;
@@ -264,10 +284,11 @@ function DetailModal({
   })();
 
   const isComplete = detail?.missing_fields?.length === 0;
+  const hasMissing = (detail?.missing_fields?.length ?? 0) > 0;
 
   return (
     <Modal
-      open
+      open={open}
       onClose={onClose}
       size="xl"
       title={loading ? "로딩 중..." : `${detail?.name ?? ""} — 입사자 상세`}
@@ -285,6 +306,18 @@ function DetailModal({
           >
             4INSURE 취득신고 양식 (CSV)
           </Button>
+          {hasMissing && (
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Send size={13} />}
+              loading={sendingLink}
+              disabled={sendingLink}
+              onClick={handleSendCollectLinkFromModal}
+            >
+              근로자에게 정보 입력 SMS 발송
+            </Button>
+          )}
           <ToolbarSpacer />
           <Button variant="primary" size="sm" loading={saving} onClick={handleSave}>저장</Button>
         </div>
@@ -625,13 +658,17 @@ function ListTab({
   status,
   search,
   onOpenDetail,
+  onListChanged,
 }: {
   status: string;
   search: string;
   onOpenDetail: (id: number) => void;
+  onListChanged?: () => void;
 }) {
+  const toast = useToast();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sendingId, setSendingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -649,6 +686,20 @@ function ListTab({
   }, [status, search]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleSendCollectLink = async (item: any) => {
+    if (!confirm(`${item.name} 님에게 정보 입력용 웹링크 SMS를 발송할까요?`)) return;
+    setSendingId(item.id);
+    try {
+      await sendRegularLink(item.id);
+      toast.success(`${item.name} 님에게 SMS 발송됨. 정보 입력 후 입사자관리에 자동 반영됩니다.`);
+      onListChanged?.();
+    } catch (e: any) {
+      toast.error(e.message || "SMS 발송 실패");
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   if (loading) return <SkeletonTable rows={6} />;
 
@@ -722,7 +773,29 @@ function ListTab({
               )}
             </TD>
             <TD>
-              <Button variant="ghost" size="sm" onClick={() => onOpenDetail(item.id)}>상세</Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    try { onOpenDetail(item.id); }
+                    catch (e: any) { console.error("상세 버튼 오류:", e); }
+                  }}
+                >
+                  상세
+                </Button>
+                {(item.missing_fields?.length ?? 0) > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leadingIcon={<Send size={13} />}
+                    onClick={() => handleSendCollectLink(item)}
+                    loading={sendingId === item.id}
+                  >
+                    정보수집 링크
+                  </Button>
+                )}
+              </div>
             </TD>
           </TR>
         ))}
@@ -829,18 +902,19 @@ export default function OnboardingPage() {
               status={tab}
               search={debouncedSearch}
               onOpenDetail={(id) => setDetailId(id)}
+              onListChanged={refreshList}
             />
           )}
         </div>
       </Card>
 
-      {detailId !== null && (
-        <DetailModal
-          id={detailId}
-          onClose={() => setDetailId(null)}
-          onSaved={refreshList}
-        />
-      )}
+      {/* Always mounted, guarded by open prop */}
+      <DetailModal
+        id={detailId ?? 0}
+        open={detailId !== null}
+        onClose={() => setDetailId(null)}
+        onSaved={refreshList}
+      />
     </>
   );
 }

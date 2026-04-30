@@ -39,18 +39,54 @@ const TYPE_OPTIONS: { id: "all" | "regular" | "dispatch"; label: string }[] = [
 type TabId = "latest" | "missing" | "history";
 
 interface ContractItem {
-  id: number;
   employee_type: string;
   employee_id: number;
-  name: string;
-  phone: string;
+  employee_name: string;
+  employee_phone: string;
   department?: string;
+  team?: string;
   hire_date?: string;
+  resigned_at?: string;
+  is_active?: number;
+  contract: {
+    id: number;
+    contract_start?: string;
+    contract_end?: string;
+    status?: string;
+    signature_data?: string;
+    created_at?: string;
+    position_title?: string;
+    annual_salary?: string;
+    base_pay?: string;
+    meal_allowance?: string;
+    other_allowance?: string;
+    work_hours?: string;
+    department?: string;
+  } | null;
+  contract_count?: number;
+  [key: string]: any;
+}
+
+/** Shape used for the view modal — always flat after spreading */
+interface ViewModalItem {
+  employee_name?: string;
+  employee_phone?: string;
+  department?: string;
+  id?: number;
   contract_start?: string;
   contract_end?: string;
-  contract_count?: number;
   status?: string;
   signature_data?: string;
+  created_at?: string;
+  position_title?: string;
+  annual_salary?: string;
+  base_pay?: string;
+  meal_allowance?: string;
+  other_allowance?: string;
+  work_hours?: string;
+  work_start_date?: string;
+  work_place?: string;
+  token?: string;
   [key: string]: any;
 }
 
@@ -83,7 +119,7 @@ function ContractManageInner() {
   const [missingItems, setMissingItems] = useState<ContractItem[]>([]);
   const [missingTotal, setMissingTotal] = useState(0);
 
-  const [historyItems, setHistoryItems] = useState<ContractItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [historyEmployee, setHistoryEmployee] = useState<{ type: string; id?: string; phone?: string; name?: string } | null>(() => {
     const et = searchParams.get("employee_type");
     const eid = searchParams.get("employee_id");
@@ -92,7 +128,7 @@ function ContractManageInner() {
     return null;
   });
 
-  const [viewModal, setViewModal] = useState<ContractItem | null>(null);
+  const [viewModal, setViewModal] = useState<ViewModalItem | null>(null);
 
   const loadLatest = useCallback(async () => {
     setLoading(true);
@@ -135,7 +171,11 @@ function ContractManageInner() {
       if (historyEmployee.id) params.employee_id = historyEmployee.id;
       if (historyEmployee.phone) params.phone = historyEmployee.phone;
       const data = await getContractHistory(params);
-      setHistoryItems(Array.isArray(data) ? data : data.items || []);
+      // Backend returns { employee: {...}, contracts: [...] }
+      setHistoryItems(Array.isArray(data) ? data : data.contracts || []);
+      if (!Array.isArray(data) && data.employee?.name) {
+        setHistoryEmployee((prev) => prev ? { ...prev, name: data.employee.name } : prev);
+      }
     } catch (e: any) {
       toast.error(e.message || "이력을 불러올 수 없습니다.");
     } finally {
@@ -153,8 +193,8 @@ function ContractManageInner() {
     setHistoryEmployee({
       type: item.employee_type,
       id: item.employee_type === "regular" ? String(item.employee_id) : undefined,
-      phone: item.employee_type !== "regular" ? item.phone : undefined,
-      name: item.name,
+      phone: item.employee_type !== "regular" ? item.employee_phone : undefined,
+      name: item.employee_name,
     });
     setTab("history");
   }
@@ -165,7 +205,12 @@ function ContractManageInner() {
     { id: "history", label: "이력 조회" },
   ];
 
-  const contractedCount = latestItems.length;
+  // KPI: latestTotal already includes all employees (with + without contract)
+  const contractedCount = latestItems.filter((i) => i.contract != null).length;
+  const missingRatio = latestTotal > 0 ? Math.round((latestMissing / latestTotal) * 100) : 0;
+
+  // Latest tab shows only rows WITH a contract
+  const latestWithContract = latestItems.filter((i) => i.contract != null);
 
   return (
     <div className="fade-in">
@@ -176,10 +221,10 @@ function ContractManageInner() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <Stat label="전체 인원" value={String(latestTotal + latestMissing)} unit="명" tone="neutral" />
+        <Stat label="전체 인원" value={String(latestTotal)} unit="명" tone="neutral" />
         <Stat label="계약서 보유" value={String(contractedCount)} unit="명" tone="success" />
         <Stat label="미작성" value={String(latestMissing)} unit="명" tone="warning" />
-        <Stat label="미작성 비율" value={latestTotal + latestMissing > 0 ? ((latestMissing / (latestTotal + latestMissing)) * 100).toFixed(0) : "0"} unit="%" tone={latestMissing > 0 ? "danger" : "success"} />
+        <Stat label="미작성 비율" value={String(missingRatio)} unit="%" tone={latestMissing > 0 ? "danger" : "success"} />
       </div>
 
       <div className="mb-4">
@@ -209,7 +254,7 @@ function ContractManageInner() {
       {tab === "latest" && (
         loading ? (
           <SkeletonTable />
-        ) : latestItems.length === 0 ? (
+        ) : latestWithContract.length === 0 ? (
           <EmptyState icon={<FileText size={32} />} title="계약서가 없습니다" description="직원 계약서를 등록해주세요." />
         ) : (
           <Table>
@@ -227,44 +272,59 @@ function ContractManageInner() {
               </TR>
             </THead>
             <TBody>
-              {latestItems.map((item) => (
-                <TR key={`${item.employee_type}-${item.employee_id}`}>
-                  <TD>
-                    <Badge tone={item.employee_type === "regular" ? "brand" : "violet"} size="xs">
-                      {item.employee_type === "regular" ? "정규" : "파견"}
-                    </Badge>
-                  </TD>
-                  <TD emphasis>{item.name}</TD>
-                  <TD muted>{item.phone}</TD>
-                  <TD muted>{item.department || "-"}</TD>
-                  <TD muted>{item.hire_date || "-"}</TD>
-                  <TD muted>
-                    {item.contract_start && item.contract_end
-                      ? `${item.contract_start} ~ ${item.contract_end}`
-                      : item.contract_start || "-"}
-                  </TD>
-                  <TD>
-                    {item.contract_count != null ? (
-                      <Badge tone="neutral" size="xs">{item.contract_count}회</Badge>
-                    ) : "-"}
-                  </TD>
-                  <TD>
-                    <Badge
-                      tone={item.status === "signed" ? "success" : item.status === "pending" ? "warning" : "neutral"}
-                      size="xs"
-                      dot
-                    >
-                      {item.status === "signed" ? "체결" : item.status === "pending" ? "발송됨" : "미체결"}
-                    </Badge>
-                  </TD>
-                  <TD align="right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="xs" onClick={() => setViewModal(item)}>보기</Button>
-                      <Button variant="ghost" size="xs" onClick={() => handleHistoryFromRow(item)}>이력</Button>
-                    </div>
-                  </TD>
-                </TR>
-              ))}
+              {latestWithContract.map((item) => {
+                const c = item.contract;
+                const status = c?.status ?? "";
+                return (
+                  <TR key={`${item.employee_type}-${item.employee_id}`}>
+                    <TD>
+                      <Badge tone={item.employee_type === "regular" ? "brand" : "violet"} size="xs">
+                        {item.employee_type === "regular" ? "정규" : "파견"}
+                      </Badge>
+                    </TD>
+                    <TD emphasis>{item.employee_name}</TD>
+                    <TD muted>{item.employee_phone}</TD>
+                    <TD muted>{item.department || "-"}</TD>
+                    <TD muted>{item.hire_date || "-"}</TD>
+                    <TD muted>
+                      {c?.contract_start && c?.contract_end
+                        ? `${c.contract_start} ~ ${c.contract_end}`
+                        : c?.contract_start || "—"}
+                    </TD>
+                    <TD>
+                      {item.contract_count != null ? (
+                        <Badge tone="neutral" size="xs">{item.contract_count}회</Badge>
+                      ) : "-"}
+                    </TD>
+                    <TD>
+                      <Badge
+                        tone={status === "signed" ? "success" : status === "pending" ? "warning" : "neutral"}
+                        size="xs"
+                        dot
+                      >
+                        {status === "signed" ? "체결" : status === "pending" ? "발송됨" : "미체결"}
+                      </Badge>
+                    </TD>
+                    <TD align="right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => setViewModal({
+                            employee_name: item.employee_name,
+                            employee_phone: item.employee_phone,
+                            department: item.department,
+                            ...item.contract,
+                          })}
+                        >
+                          보기
+                        </Button>
+                        <Button variant="ghost" size="xs" onClick={() => handleHistoryFromRow(item)}>이력</Button>
+                      </div>
+                    </TD>
+                  </TR>
+                );
+              })}
             </TBody>
           </Table>
         )
@@ -295,8 +355,8 @@ function ContractManageInner() {
                       {item.employee_type === "regular" ? "정규" : "파견"}
                     </Badge>
                   </TD>
-                  <TD emphasis>{item.name}</TD>
-                  <TD muted>{item.phone}</TD>
+                  <TD emphasis>{item.employee_name}</TD>
+                  <TD muted>{item.employee_phone}</TD>
                   <TD muted>{item.department || "-"}</TD>
                   <TD muted>{item.hire_date || "-"}</TD>
                   <TD align="right">
@@ -312,8 +372,8 @@ function ContractManageInner() {
                       계약서 작성
                     </Button>
                   </TD>
-              </TR>
-            ))}
+                </TR>
+              ))}
             </TBody>
           </Table>
         )
@@ -339,7 +399,7 @@ function ContractManageInner() {
                 </span>
                 <Button variant="ghost" size="xs" onClick={() => { setHistoryEmployee(null); setHistoryItems([]); }}>초기화</Button>
               </div>
-              {historyItems.map((item, idx) => (
+              {historyItems.map((item: any, idx: number) => (
                 <Card key={item.id || idx} padding="md">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
@@ -359,7 +419,15 @@ function ContractManageInner() {
                       </p>
                     </div>
                     {item.status === "signed" && (
-                      <Button variant="ghost" size="xs" onClick={() => setViewModal(item)}>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setViewModal({
+                          employee_name: historyEmployee?.name,
+                          employee_phone: historyEmployee?.phone,
+                          ...item,
+                        })}
+                      >
                         보기
                       </Button>
                     )}
@@ -387,11 +455,11 @@ function ContractManageInner() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-[var(--text-3)] text-xs mb-0.5">이름</p>
-                <p className="text-[var(--text-1)] font-medium">{viewModal.name}</p>
+                <p className="text-[var(--text-1)] font-medium">{viewModal.employee_name}</p>
               </div>
               <div>
                 <p className="text-[var(--text-3)] text-xs mb-0.5">연락처</p>
-                <p className="text-[var(--text-2)]">{viewModal.phone}</p>
+                <p className="text-[var(--text-2)]">{viewModal.employee_phone}</p>
               </div>
               <div>
                 <p className="text-[var(--text-3)] text-xs mb-0.5">부서</p>

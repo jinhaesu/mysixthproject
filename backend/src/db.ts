@@ -787,6 +787,18 @@ export async function initializeDB(): Promise<void> {
   // Phase 2: offboarding deadline reminder tracking
   try { await pool.query('ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS last_reminder_sent_at TIMESTAMPTZ'); } catch {}
 
+  // Phase 3: resignation letter fields
+  try { await pool.query("ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_filename TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_token TEXT DEFAULT ''"); } catch {}
+  try { await pool.query('ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_token_expires_at TIMESTAMPTZ'); } catch {}
+  try { await pool.query('ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_sms_sent INTEGER DEFAULT 0'); } catch {}
+  try { await pool.query('ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_sms_sent_at TIMESTAMPTZ'); } catch {}
+  try { await pool.query('ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_submitted_at TIMESTAMPTZ'); } catch {}
+  try { await pool.query("ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_employee_reason TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_detail TEXT DEFAULT ''"); } catch {}
+  try { await pool.query('CREATE INDEX IF NOT EXISTS idx_offboarding_resignation_token ON employee_offboardings(resignation_letter_token)'); } catch {}
+
   // Legacy contract scan attachments (regular + dispatch)
   try { await pool.query('ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS is_legacy_scan INTEGER DEFAULT 0'); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS legacy_filename TEXT DEFAULT ''"); } catch {}

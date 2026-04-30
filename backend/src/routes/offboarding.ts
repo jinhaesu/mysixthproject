@@ -16,12 +16,14 @@
  * POST   /api/offboarding/:id/send-email       — re-send email
  */
 
+import crypto from 'crypto';
 import { Router, Response } from 'express';
-import { dbGet, dbAll, dbRun } from '../db';
+import { dbGet, dbAll, dbRun, getFrontendUrl } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendOffboardingNotification, OffboardingRecord } from '../services/offboardingEmail';
 import { computeSeveranceTax, SeveranceTaxBreakdown } from '../services/severanceTax';
 import { buildOffboardingCSV, OffboardingRecord as OffboardingCSVRecord } from '../services/insuranceExport';
+import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
@@ -196,29 +198,40 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const params: any[] = [];
 
     if (status !== 'all') {
-      where += ' AND status = ?';
+      where += ' AND eo.status = ?';
       params.push(status);
     }
     if (search) {
-      where += ' AND employee_name ILIKE ?';
+      where += ' AND eo.employee_name ILIKE ?';
       params.push(`%${search}%`);
     }
 
     const rows = await dbAll(
-      `SELECT *,
-         CASE WHEN status = 'in_progress'
-              THEN 14 - EXTRACT(DAY FROM (NOW() - (resign_date::date)))::int
-              ELSE NULL
+      `SELECT eo.*,
+         CASE
+           WHEN eo.hire_date IS NULL OR eo.hire_date = ''
+           THEN COALESCE(re.hire_date, '')
+           ELSE eo.hire_date
+         END AS hire_date_effective,
+         CASE
+           WHEN eo.status = 'in_progress'
+           THEN 14 - EXTRACT(DAY FROM (NOW() - (eo.resign_date::date)))::int
+           ELSE NULL
          END AS days_to_loss_deadline
-       FROM employee_offboardings
+       FROM employee_offboardings eo
+       LEFT JOIN regular_employees re
+         ON eo.employee_type = 'regular' AND eo.employee_ref_id = re.id
+       LEFT JOIN workers w
+         ON eo.employee_type IN ('dispatch','alba') AND eo.employee_ref_id = w.id
        ${where}
        ORDER BY
-         CASE status WHEN 'in_progress' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END,
-         resign_date DESC`,
+         CASE eo.status WHEN 'in_progress' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END,
+         eo.resign_date DESC`,
       ...params,
     );
 
-    res.json({ items: rows });
+    const enriched = rows.map((r: any) => ({ ...r, hire_date: r.hire_date_effective ?? r.hire_date }));
+    res.json({ items: enriched });
   } catch (error: any) {
     console.error('GET /api/offboarding error:', error);
     res.status(500).json({ error: error.message });
@@ -257,12 +270,21 @@ router.get('/dashboard', async (req: AuthRequest, res: Response) => {
       FROM employee_offboardings
     `, yearMonth);
 
-    const recent = await dbAll(`
-      SELECT * FROM employee_offboardings
-      WHERE status = 'in_progress'
-      ORDER BY resign_date DESC
+    const recentRaw = await dbAll(`
+      SELECT eo.*,
+        CASE
+          WHEN eo.hire_date IS NULL OR eo.hire_date = ''
+          THEN COALESCE(re.hire_date, '')
+          ELSE eo.hire_date
+        END AS hire_date_effective
+      FROM employee_offboardings eo
+      LEFT JOIN regular_employees re
+        ON eo.employee_type = 'regular' AND eo.employee_ref_id = re.id
+      WHERE eo.status = 'in_progress'
+      ORDER BY eo.resign_date DESC
       LIMIT 5
     `);
+    const recent = recentRaw.map((r: any) => ({ ...r, hire_date: r.hire_date_effective ?? r.hire_date }));
 
     res.json({
       in_progress_count: Number(summary?.in_progress_count ?? 0),
@@ -368,11 +390,23 @@ router.get('/export/insurance.csv', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    const record = await dbGet('SELECT * FROM employee_offboardings WHERE id = ?', id);
-    if (!record) {
+    const recordRaw = await dbGet(`
+      SELECT eo.*,
+        CASE
+          WHEN eo.hire_date IS NULL OR eo.hire_date = ''
+          THEN COALESCE(re.hire_date, '')
+          ELSE eo.hire_date
+        END AS hire_date_effective
+      FROM employee_offboardings eo
+      LEFT JOIN regular_employees re
+        ON eo.employee_type = 'regular' AND eo.employee_ref_id = re.id
+      WHERE eo.id = ?
+    `, id);
+    if (!recordRaw) {
       res.status(404).json({ error: '퇴사 기록을 찾을 수 없습니다.' });
       return;
     }
+    const record = { ...recordRaw, hire_date: recordRaw.hire_date_effective ?? recordRaw.hire_date };
 
     let employee: any = null;
 
@@ -441,6 +475,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       reason_code,
       reason_detail = '',
       send_email = false,
+      send_resignation_letter_sms = false,
     } = req.body as {
       employee_type: string;
       employee_ref_id: number;
@@ -448,6 +483,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       reason_code: string;
       reason_detail?: string;
       send_email?: boolean;
+      send_resignation_letter_sms?: boolean;
     };
 
     if (!employee_type || !resign_date || !reason_code) {
@@ -562,6 +598,14 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         );
         newRecord.email_sent = 1;
       }
+    }
+
+    // Send resignation letter SMS if requested
+    if (send_resignation_letter_sms && newRecord.employee_phone) {
+      await sendResignationLetterSms(newId, newRecord.employee_name, newRecord.employee_phone);
+      // Re-fetch to include updated token fields
+      const refreshed = await dbGet('SELECT * FROM employee_offboardings WHERE id = ?', newId);
+      if (refreshed) Object.assign(newRecord, refreshed);
     }
 
     res.status(201).json(newRecord);
@@ -776,6 +820,117 @@ router.post('/:id/send-email', async (req: AuthRequest, res: Response) => {
     res.json({ ok: result.ok, sent_to: result.sent_to ?? recipients, mock: result.mock });
   } catch (error: any) {
     console.error('POST /api/offboarding/:id/send-email error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Helper — generate token + send resignation letter SMS (reused in create + endpoint)
+// ---------------------------------------------------------------------------
+async function sendResignationLetterSms(
+  offboardingId: number,
+  employeeName: string,
+  employeePhone: string,
+): Promise<{ token: string; sms_result: { success: boolean; messageId?: string; error?: string } }> {
+  const token = crypto.randomBytes(20).toString('hex');
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+  await dbRun(
+    `UPDATE employee_offboardings
+     SET resignation_letter_token = ?,
+         resignation_letter_token_expires_at = ?,
+         resignation_letter_sms_sent = 1,
+         resignation_letter_sms_sent_at = NOW(),
+         updated_at = NOW()
+     WHERE id = ?`,
+    token,
+    expiresAt.toISOString(),
+    offboardingId,
+  );
+
+  const frontendUrl = getFrontendUrl(`/resignation-letter?token=${token}`);
+  const message = `[조인앤조인] 사직서 작성 안내\n${employeeName} 님의 사직 처리에 따라 사직서 작성이 필요합니다.\n아래 링크에서 사직 사유와 정보를 입력해주세요. (30일 유효)\n${frontendUrl}`;
+  const smsResult = await sendGeneralSms(employeePhone, message);
+
+  return { token, sms_result: smsResult };
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /api/offboarding/:id/upload-resignation-letter (requireAuth)
+// Body: { file_data: string (Base64 data URL), filename: string }
+// ---------------------------------------------------------------------------
+router.patch('/:id/upload-resignation-letter', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const { file_data, filename } = req.body as { file_data: string; filename: string };
+
+    if (!file_data || !filename) {
+      res.status(400).json({ error: 'file_data and filename are required' });
+      return;
+    }
+    if (!file_data.startsWith('data:')) {
+      res.status(400).json({ error: 'file_data must be a Base64 data URL' });
+      return;
+    }
+    // ~10MB limit: Base64 overhead is ~4/3, so 10MB binary ~ 13.3MB Base64 string
+    if (file_data.length > 14_000_000) {
+      res.status(400).json({ error: '파일 크기가 10MB를 초과합니다.' });
+      return;
+    }
+
+    const existing = await dbGet('SELECT id FROM employee_offboardings WHERE id = ?', id);
+    if (!existing) {
+      res.status(404).json({ error: '퇴사 기록을 찾을 수 없습니다.' });
+      return;
+    }
+
+    await dbRun(
+      `UPDATE employee_offboardings
+       SET resignation_letter_data = ?,
+           resignation_letter_filename = ?,
+           resignation_letter_received = 1,
+           updated_at = NOW()
+       WHERE id = ?`,
+      file_data,
+      filename,
+      id,
+    );
+
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error('PATCH /api/offboarding/:id/upload-resignation-letter error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/offboarding/:id/send-resignation-letter-sms (requireAuth)
+// ---------------------------------------------------------------------------
+router.post('/:id/send-resignation-letter-sms', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    const record = await dbGet(
+      'SELECT id, employee_name, employee_phone FROM employee_offboardings WHERE id = ?',
+      id,
+    );
+    if (!record) {
+      res.status(404).json({ error: '퇴사 기록을 찾을 수 없습니다.' });
+      return;
+    }
+    if (!record.employee_phone) {
+      res.status(400).json({ error: '직원 전화번호가 없습니다.' });
+      return;
+    }
+
+    const { token, sms_result } = await sendResignationLetterSms(
+      id,
+      record.employee_name,
+      record.employee_phone,
+    );
+
+    res.json({ ok: true, token, sms_result });
+  } catch (error: any) {
+    console.error('POST /api/offboarding/:id/send-resignation-letter-sms error:', error);
     res.status(500).json({ error: error.message });
   }
 });

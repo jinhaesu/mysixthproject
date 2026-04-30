@@ -36,7 +36,7 @@ import {
   TD,
   useToast,
 } from "@/components/ui";
-import { AlertTriangle, Users, Mail, RefreshCw, Trash2, Save, FileDown, Receipt, Download } from "lucide-react";
+import { AlertTriangle, Users, Mail, RefreshCw, Trash2, Save, FileDown, Receipt, Download, Paperclip, Send } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -136,6 +136,7 @@ export default function OffboardingPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingDetail, setSavingDetail] = useState(false);
   const [downloadingCsv, setDownloadingCsv] = useState(false);
+  const [sendingResignSms, setSendingResignSms] = useState(false);
 
   const [localDetail, setLocalDetail] = useState<any>(null);
 
@@ -336,6 +337,46 @@ export default function OffboardingPage() {
     } finally {
       setSavingRecipients(false);
     }
+  };
+
+  async function fileToBase64(file: File): Promise<string> {
+    return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file); });
+  }
+
+  async function uploadResignationLetter(id: number, dataUrl: string, filename: string) {
+    const token = localStorage.getItem('token');
+    const r = await fetch(`${API_URL}/api/offboarding/${id}/upload-resignation-letter`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ file_data: dataUrl, filename }),
+    });
+    if (!r.ok) throw new Error((await r.json()).error || 'HTTP ' + r.status);
+    return r.json();
+  }
+
+  const loadDetail = async (id: number) => {
+    try {
+      const data = await getOffboarding(id);
+      setDetail(data);
+      setLocalDetail({ ...data, ...(data.employee || {}) });
+    } catch (e: any) {
+      toast.error(e.message || '상세 정보를 불러올 수 없습니다.');
+    }
+  };
+
+  const handleSendResignSms = async () => {
+    if (!detailId) return;
+    if (!confirm('직원에게 사직서 작성 SMS를 발송할까요?')) return;
+    setSendingResignSms(true);
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch(`${API_URL}/api/offboarding/${detailId}/send-resignation-letter-sms`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error((await r.json()).error);
+      toast.success('직원에게 사직서 작성 링크 발송 완료');
+      await loadDetail(detailId);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSendingResignSms(false); }
   };
 
   const CHECKLIST_ITEMS = [
@@ -619,22 +660,71 @@ export default function OffboardingPage() {
             <div>
               <p className="text-[var(--text-3)] text-xs uppercase tracking-wider mb-2">체크리스트</p>
               <div className="space-y-1.5">
-                {CHECKLIST_ITEMS.map((ci) => (
-                  <Card key={ci.field} padding="sm" tone="default">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={localDetail[ci.field] === 1 || localDetail[ci.field] === true}
-                        onChange={() => handleChecklistToggle(ci.field)}
-                        className="w-4 h-4 accent-[var(--brand-500)]"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-[var(--text-1)]">{ci.label}</span>
-                        {ci.desc && <span className="text-xs text-[var(--text-3)] ml-2">{ci.desc}</span>}
+                {CHECKLIST_ITEMS.map((ci) => {
+                  if (ci.field === 'resignation_letter_received') {
+                    return (
+                      <div key={ci.field} className="space-y-2 p-3 rounded-[var(--r-md)] bg-[var(--bg-2)] border border-[var(--border-1)]">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={localDetail.resignation_letter_received === 1}
+                            onChange={() => handleChecklistToggle('resignation_letter_received')}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-[13px] font-medium text-[var(--text-1)]">사직서 수령</span>
+                          {localDetail.resignation_letter_filename && (
+                            <Badge tone="success" size="xs">{localDetail.resignation_letter_filename}</Badge>
+                          )}
+                          {localDetail.resignation_letter_submitted_at && (
+                            <Badge tone="info" size="xs">직원이 작성·제출함</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <label className="cursor-pointer">
+                            <input type="file" accept="image/*,.pdf" className="hidden"
+                              onChange={async (e) => {
+                                const f = e.target.files?.[0]; if (!f) return;
+                                try {
+                                  const dataUrl = await fileToBase64(f);
+                                  await uploadResignationLetter(detailId!, dataUrl, f.name);
+                                  toast.success('사직서 파일 업로드됨');
+                                  await loadDetail(detailId!);
+                                } catch (err: any) { toast.error(err.message || '업로드 실패'); }
+                              }} />
+                            <span className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-md border border-[var(--border-2)] text-[12px] hover:bg-[var(--bg-3)] cursor-pointer text-[var(--text-2)]">
+                              <Paperclip size={12}/> 파일 첨부
+                            </span>
+                          </label>
+                          <Button size="xs" variant="secondary" leadingIcon={<Send size={12}/>} loading={sendingResignSms} onClick={handleSendResignSms}>
+                            직원에게 작성 SMS
+                          </Button>
+                          {localDetail.resignation_letter_employee_reason && (
+                            <div className="text-[11.5px] text-[var(--text-3)] mt-1 w-full">
+                              <b>직원 작성 사유:</b> {localDetail.resignation_letter_employee_reason}
+                              {localDetail.resignation_letter_detail && <div className="text-[var(--text-2)] mt-0.5">{localDetail.resignation_letter_detail}</div>}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </label>
-                  </Card>
-                ))}
+                    );
+                  }
+                  return (
+                    <Card key={ci.field} padding="sm" tone="default">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={localDetail[ci.field] === 1 || localDetail[ci.field] === true}
+                          onChange={() => handleChecklistToggle(ci.field)}
+                          className="w-4 h-4 accent-[var(--brand-500)]"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-[var(--text-1)]">{ci.label}</span>
+                          {ci.desc && <span className="text-xs text-[var(--text-3)] ml-2">{ci.desc}</span>}
+                        </div>
+                      </label>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
 

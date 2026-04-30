@@ -13,10 +13,11 @@
  */
 
 import { Router, Response } from 'express';
-import { dbGet, dbAll, dbRun } from '../db';
+import { dbGet, dbAll, dbRun, getFrontendUrl } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendOnboardingNotification, OnboardingRecord } from '../services/onboardingEmail';
 import { buildOnboardingCSV, OnboardingRecord as OnboardingCSVRecord } from '../services/insuranceExport';
+import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
@@ -541,6 +542,121 @@ router.post('/:id/send-email', async (req: AuthRequest, res: Response) => {
     res.json({ ok: result.ok, sent_to: result.sent_to ?? recipients, mock: result.mock });
   } catch (error: any) {
     console.error('POST /api/onboarding/:id/send-email error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/onboarding/bulk-send-links
+// Body: { ids: number[] }
+// ---------------------------------------------------------------------------
+router.post('/bulk-send-links', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids } = req.body as { ids: number[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'ids must be a non-empty array' });
+      return;
+    }
+
+    let sent = 0;
+    const failed: { id: number; error: string }[] = [];
+
+    for (const id of ids) {
+      const emp = await dbGet(
+        'SELECT id, name, phone, token FROM regular_employees WHERE id = ? AND is_active = 1',
+        id,
+      );
+      if (!emp) {
+        failed.push({ id, error: '직원을 찾을 수 없습니다.' });
+        continue;
+      }
+      if (!emp.phone) {
+        failed.push({ id, error: '전화번호가 없습니다.' });
+        continue;
+      }
+      if (!emp.token) {
+        failed.push({ id, error: '토큰이 없습니다.' });
+        continue;
+      }
+
+      const url = getFrontendUrl(`/regular-contract?token=${emp.token}`);
+      const message = `[조인앤조인 출퇴근]\n${emp.name}님, 출퇴근 기록 링크입니다.\n매일 이 링크로 출퇴근을 기록해주세요.\n${url}`;
+      const result = await sendGeneralSms(emp.phone, message);
+
+      if (result.success) {
+        sent++;
+      } else {
+        failed.push({ id, error: result.error || '발송 실패' });
+      }
+    }
+
+    res.json({ ok: true, sent, failed });
+  } catch (error: any) {
+    console.error('POST /api/onboarding/bulk-send-links error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/onboarding/bulk-update
+// Body: { ids: number[], updates: { monthly_salary?, job_code?, ... } }
+// ---------------------------------------------------------------------------
+const BULK_UPDATE_ALLOWED_FIELDS = new Set([
+  'monthly_salary',
+  'job_code',
+  'business_registration_no',
+  'non_taxable_meal',
+  'non_taxable_vehicle',
+  'weekly_work_hours',
+  'employment_type',
+]);
+
+router.post('/bulk-update', async (req: AuthRequest, res: Response) => {
+  try {
+    const { ids, updates } = req.body as {
+      ids: number[];
+      updates: Record<string, any>;
+    };
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'ids must be a non-empty array' });
+      return;
+    }
+    if (!updates || typeof updates !== 'object') {
+      res.status(400).json({ error: 'updates object is required' });
+      return;
+    }
+
+    // Build SET clause from allowed fields only
+    const setClauses: string[] = [];
+    const updateParams: any[] = [];
+    for (const [key, val] of Object.entries(updates)) {
+      if (BULK_UPDATE_ALLOWED_FIELDS.has(key) && val !== undefined) {
+        setClauses.push(`${key} = ?`);
+        updateParams.push(val);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      res.status(400).json({ error: 'No valid fields to update' });
+      return;
+    }
+
+    setClauses.push('updated_at = NOW()');
+
+    let updated = 0;
+    for (const id of ids) {
+      const result = await dbRun(
+        `UPDATE regular_employees SET ${setClauses.join(', ')} WHERE id = ?`,
+        ...updateParams,
+        id,
+      );
+      updated += result.changes;
+    }
+
+    res.json({ ok: true, updated });
+  } catch (error: any) {
+    console.error('POST /api/onboarding/bulk-update error:', error);
     res.status(500).json({ error: error.message });
   }
 });

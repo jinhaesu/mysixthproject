@@ -12,7 +12,7 @@ import {
   getOffboardingRecipients,
   setOffboardingRecipients,
 } from "@/lib/api";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import {
   PageHeader,
   Stat,
@@ -118,16 +118,6 @@ function checklistCount(rec: OffboardingRecord): number {
 export default function OffboardingPage() {
   const toast = useToast();
   const [authorized, setAuthorized] = useState(false);
-  const verifyPassword = async (pw: string) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/regular/verify-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
 
   const [tab, setTab] = useState<TabId>("in_progress");
   const [items, setItems] = useState<OffboardingRecord[]>([]);
@@ -354,10 +344,9 @@ export default function OffboardingPage() {
 
   if (!authorized) {
     return (
-      <PasswordGate
+      <SessionPasswordGate
+        title="퇴사관리 접근"
         onVerified={() => setAuthorized(true)}
-        verifyPassword={verifyPassword}
-        title="퇴사관리 접근 비밀번호"
       />
     );
   }

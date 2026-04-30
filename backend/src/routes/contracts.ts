@@ -40,6 +40,10 @@ function buildRegularContractsQuery(whereClause: string): string {
       c.other_allowance,
       c.work_hours,
       c.department                        AS contract_department,
+      c.token                             AS token,
+      COALESCE(c.is_legacy_scan, 0)       AS is_legacy_scan,
+      COALESCE(c.legacy_filename, '')     AS legacy_filename,
+      COALESCE(c.scanned_file_data, '')   AS scanned_file_data,
       NULL::TEXT                          AS worker_type,
       cnt.contract_count
     FROM regular_employees re
@@ -83,6 +87,10 @@ function buildWorkerContractsQuery(whereClause: string): string {
       NULL::TEXT                          AS other_allowance,
       NULL::TEXT                          AS work_hours,
       NULL::TEXT                          AS contract_department,
+      NULL::TEXT                          AS token,
+      COALESCE(c.is_legacy_scan, 0)       AS is_legacy_scan,
+      COALESCE(c.legacy_filename, '')     AS legacy_filename,
+      COALESCE(c.scanned_file_data, '')   AS scanned_file_data,
       w.category                          AS worker_type,
       cnt.contract_count
     FROM workers w
@@ -128,6 +136,10 @@ function rowToItem(row: any) {
           other_allowance: row.other_allowance || null,
           work_hours: row.work_hours || null,
           department: row.contract_department || null,
+          token: row.token || null,
+          is_legacy_scan: row.is_legacy_scan ?? 0,
+          legacy_filename: row.legacy_filename ?? '',
+          scanned_file_data: row.scanned_file_data ?? '',
         }
       : null,
     contract_count: row.contract_count || 0,

@@ -8,7 +8,7 @@ import {
   getContractHistory,
   uploadLegacyContract,
 } from "@/lib/api";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import {
   PageHeader,
   Stat,
@@ -74,6 +74,7 @@ interface ContractItem {
     other_allowance?: string;
     work_hours?: string;
     department?: string;
+    token?: string;
     is_legacy_scan?: number;
     legacy_filename?: string;
     scanned_file_data?: string;
@@ -122,16 +123,6 @@ function ContractManageInner() {
   const toast = useToast();
 
   const [authorized, setAuthorized] = useState(false);
-  const verifyPassword = async (pw: string) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/regular/verify-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
 
   const [tab, setTab] = useState<TabId>(() => {
     const t = searchParams.get("tab");
@@ -282,10 +273,9 @@ function ContractManageInner() {
 
   if (!authorized) {
     return (
-      <PasswordGate
+      <SessionPasswordGate
+        title="근로계약서 관리 접근"
         onVerified={() => setAuthorized(true)}
-        verifyPassword={verifyPassword}
-        title="근로계약서 관리 접근 비밀번호"
       />
     );
   }
@@ -388,12 +378,28 @@ function ContractManageInner() {
                         <Button
                           variant="ghost"
                           size="xs"
-                          onClick={() => setViewModal({
-                            employee_name: item.employee_name,
-                            employee_phone: item.employee_phone,
-                            department: item.department,
-                            ...item.contract,
-                          })}
+                          onClick={() => {
+                            const c = item.contract;
+                            if (item.employee_type === "regular" && c?.token) {
+                              window.open(`/regular-contract?token=${c.token}`, "_blank");
+                            } else if (c?.is_legacy_scan === 1 && c.scanned_file_data) {
+                              const win = window.open();
+                              if (win) {
+                                if (c.scanned_file_data.startsWith("data:image")) {
+                                  win.document.write(`<img src="${c.scanned_file_data}" style="max-width:100%">`);
+                                } else {
+                                  win.location.href = c.scanned_file_data;
+                                }
+                              }
+                            } else {
+                              setViewModal({
+                                employee_name: item.employee_name,
+                                employee_phone: item.employee_phone,
+                                department: item.department,
+                                ...item.contract,
+                              });
+                            }
+                          }}
                         >
                           보기
                         </Button>

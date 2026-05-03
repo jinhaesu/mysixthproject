@@ -92,7 +92,64 @@ router.get('/:token/vacations', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/regular-public/:emp_token/get-or-create-contract
+// ── Onboarding info (입사자 추가 정보 수집) — operates on regular_employees only.
+// Distinct from contract signing flow which operates on regular_labor_contracts.
+// ───────────────────────────────────────────────────────────────────────────
+
+// Map of fields admin should manage vs employee fills via SMS link
+const EMPLOYEE_FIELDS = ['email','address','id_number','birth_date','bank_name','bank_account','bank_slip_data'] as const;
+const FOREIGN_FIELDS = ['visa_type','visa_expiry','foreign_id_card_data'] as const;
+
+router.get('/:emp_token/onboarding-info', async (req: Request, res: Response) => {
+  try {
+    const { emp_token } = req.params;
+    const emp = await dbGet(
+      `SELECT id, name, phone, hire_date, department, team, role,
+              email, address, id_number, birth_date, bank_name, bank_account, bank_slip_data,
+              nationality, visa_type, visa_expiry, foreign_id_card_data
+       FROM regular_employees WHERE token = ? AND is_active = 1`,
+      emp_token,
+    ) as any;
+    if (!emp) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+
+    const isForeign = emp.nationality === 'FOREIGN';
+    const required = [...EMPLOYEE_FIELDS, ...(isForeign ? FOREIGN_FIELDS : [])];
+    const missing = required.filter(f => {
+      const v = (emp as any)[f];
+      return v === null || v === undefined || String(v).trim() === '';
+    });
+    res.json({ ...emp, missing_fields: missing, complete: missing.length === 0 });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+router.post('/:emp_token/onboarding-info', async (req: Request, res: Response) => {
+  try {
+    const { emp_token } = req.params;
+    const emp = await dbGet('SELECT id FROM regular_employees WHERE token = ? AND is_active = 1', emp_token) as any;
+    if (!emp) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+
+    const allowed = [
+      'email','address','id_number','birth_date','bank_name','bank_account','bank_slip_data',
+      'nationality','visa_type','visa_expiry','foreign_id_card_data',
+    ];
+    const clauses: string[] = [];
+    const params: any[] = [];
+    for (const f of allowed) {
+      const v = (req.body || {})[f];
+      if (v !== undefined && String(v).trim() !== '') {
+        clauses.push(`${f} = ?`);
+        params.push(v);
+      }
+    }
+    if (clauses.length === 0) { res.status(400).json({ error: '입력된 정보가 없습니다.' }); return; }
+    clauses.push('updated_at = NOW()');
+    params.push(emp.id);
+    await dbRun(`UPDATE regular_employees SET ${clauses.join(', ')} WHERE id = ?`, ...params);
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// POST /api/regular-public/:emp_token/get-or-create-contract  (DEPRECATED but kept for compat)
 // Used by /r page's "정보 입력하러 가기" banner — accepts an employee token
 // (regular_employees.token) and returns a contract token (regular_labor_contracts.token).
 // If the employee has no contract row yet, creates an empty pending one.
@@ -145,6 +202,81 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
     res.json(contract);
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular-public/contract/:token/update-info
+// Update onboarding-related info fields WITHOUT requiring signature.
+// Allowed even on already-signed contracts. Used by /regular-contract?mode=onboarding-fix.
+router.post('/contract/:token/update-info', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const {
+      email, address, id_number, birth_date,
+      nationality, visa_type, visa_expiry,
+      bank_slip_data, foreign_id_card_data,
+      bank_name, bank_account,
+    } = req.body || {};
+
+    const contract = await dbGet('SELECT employee_id, phone FROM regular_labor_contracts WHERE token = ?', token) as any;
+    if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+
+    // Build dynamic UPDATE for regular_labor_contracts (only non-empty fields)
+    const cClauses: string[] = [];
+    const cParams: any[] = [];
+    const setIf = (col: string, val: any) => {
+      if (val !== undefined && val !== '') { cClauses.push(`${col} = ?`); cParams.push(val); }
+    };
+    setIf('email', email);
+    setIf('address', address);
+    setIf('id_number', id_number);
+    setIf('birth_date', birth_date);
+    setIf('nationality', nationality);
+    setIf('visa_type', visa_type);
+    setIf('visa_expiry', visa_expiry);
+    setIf('bank_slip_data', bank_slip_data);
+    setIf('foreign_id_card_data', foreign_id_card_data);
+    if (cClauses.length > 0) {
+      cParams.push(token);
+      await dbRun(`UPDATE regular_labor_contracts SET ${cClauses.join(', ')} WHERE token = ?`, ...cParams);
+    }
+
+    // Propagate to regular_employees (only if currently empty)
+    if (contract.employee_id) {
+      const eClauses: string[] = [];
+      const eParams: any[] = [];
+      const propagate = (col: string, val: any, kr: boolean = false) => {
+        if (val === undefined || val === '') return;
+        if (kr) {
+          eClauses.push(`${col} = CASE WHEN COALESCE(${col}, '') IN ('', 'KR') THEN ? ELSE ${col} END`);
+        } else {
+          eClauses.push(`${col} = CASE WHEN COALESCE(${col}, '') = '' THEN ? ELSE ${col} END`);
+        }
+        eParams.push(val);
+      };
+      propagate('email', email);
+      propagate('address', address);
+      propagate('id_number', id_number);
+      propagate('birth_date', birth_date);
+      propagate('nationality', nationality, true);
+      propagate('visa_type', visa_type);
+      propagate('visa_expiry', visa_expiry);
+      propagate('bank_slip_data', bank_slip_data);
+      propagate('foreign_id_card_data', foreign_id_card_data);
+      propagate('bank_name', bank_name);
+      propagate('bank_account', bank_account);
+
+      if (eClauses.length > 0) {
+        eClauses.push('updated_at = NOW()');
+        eParams.push(contract.employee_id);
+        await dbRun(`UPDATE regular_employees SET ${eClauses.join(', ')} WHERE id = ?`, ...eParams);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('POST /api/regular-public/contract/:token/update-info error:', error);
     res.status(500).json({ error: error.message });
   }
 });

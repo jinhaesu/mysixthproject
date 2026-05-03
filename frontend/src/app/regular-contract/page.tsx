@@ -302,9 +302,168 @@ function ConsentText({ name }: { name: string }) {
   );
 }
 
+// ── Info-only form (DEPRECATED — moved to /onboarding-info page) ──────
+function _UnusedOnboardingFixForm({ contract, token }: { contract: any; token: string }) {
+  const [email, setEmail] = useState(contract.email || "");
+  const [address, setAddress] = useState(contract.address || "");
+  const [idNumber, setIdNumber] = useState(contract.id_number || "");
+  const [birthDate, setBirthDate] = useState(contract.birth_date || "");
+  const [bankName, setBankName] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [nationality, setNationality] = useState<"KR" | "FOREIGN">((contract.nationality as any) || "KR");
+  const [visaType, setVisaType] = useState(contract.visa_type || "");
+  const [visaExpiry, setVisaExpiry] = useState(contract.visa_expiry || "");
+  const [bankSlipFile, setBankSlipFile] = useState<string>(contract.bank_slip_data || "");
+  const [foreignIdFile, setForeignIdFile] = useState<string>(contract.foreign_id_card_data || "");
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(file); });
+
+  const submit = async () => {
+    setSubmitting(true); setError("");
+    try {
+      const body: any = {};
+      if (email) body.email = email;
+      if (address) body.address = address;
+      if (idNumber) body.id_number = idNumber;
+      if (birthDate) body.birth_date = birthDate;
+      if (bankName) body.bank_name = bankName;
+      if (bankAccount) body.bank_account = bankAccount;
+      body.nationality = nationality;
+      if (nationality === "FOREIGN") {
+        if (visaType) body.visa_type = visaType;
+        if (visaExpiry) body.visa_expiry = visaExpiry;
+        if (foreignIdFile) body.foreign_id_card_data = foreignIdFile;
+      }
+      if (bankSlipFile) body.bank_slip_data = bankSlipFile;
+
+      const r = await fetch(`${API_URL}/api/regular-public/contract/${token}/update-info`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const b = await r.json();
+      if (!r.ok) throw new Error(b.error || 'HTTP ' + r.status);
+      setDone(true);
+    } catch (e: any) { setError(e.message); }
+    finally { setSubmitting(false); }
+  };
+
+  if (done) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-canvas)] flex items-center justify-center px-4">
+        <Card padding="lg" className="max-w-md w-full text-center">
+          <CheckCircle className="w-10 h-10 mx-auto mb-3 text-[var(--success-fg)]" />
+          <h1 className="text-[18px] font-semibold mb-2">제출 완료</h1>
+          <p className="text-[var(--text-3)] text-[13px]">입력하신 정보가 회사에 자동 전달되었습니다. 4대보험 신고에 활용됩니다.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-canvas)] py-8 px-4 fade-in">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <Card padding="none" tone="default" className="shadow-[var(--elev-2)] overflow-hidden surface-bevel">
+          <div className="border-b border-[var(--info-border)] bg-[var(--info-bg)] px-6 py-4">
+            <h1 className="text-[var(--fs-lg)] font-bold text-[var(--info-fg)]">추가 정보 입력</h1>
+            <p className="text-[var(--fs-caption)] text-[var(--text-2)] mt-1">
+              {contract.worker_name} 님, 4대보험 신고에 필요한 추가 정보만 입력해주세요. <b>이미 서명한 근로계약은 그대로 유지됩니다.</b>
+            </p>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            {error && <div className="bg-[var(--danger-bg)] text-[var(--danger-fg)] border border-[var(--danger-border)] rounded-md p-3 text-[12.5px]">{error}</div>}
+
+            <Field label="이메일 *" hint="회사 통지·증빙 발송용">
+              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@email.com" />
+            </Field>
+
+            <Field label="주소" hint="현 거주지">
+              <Input value={address} onChange={e => setAddress(e.target.value)} />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="주민등록번호">
+                <Input value={idNumber} onChange={e => setIdNumber(e.target.value)} placeholder="000000-0000000" />
+              </Field>
+              <Field label="생년월일">
+                <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="은행명">
+                <Input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="국민/신한/카카오 등" />
+              </Field>
+              <Field label="계좌번호">
+                <Input value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
+              </Field>
+            </div>
+
+            <Field label="통장사본 첨부 *" hint="급여 입금 확인용 (이미지/PDF)">
+              <div>
+                <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--border-2)] bg-[var(--bg-2)] hover:bg-[var(--bg-3)] text-[12.5px]">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={async e => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    setBankSlipFile(await fileToBase64(f));
+                  }} />
+                  파일 선택
+                </label>
+                {bankSlipFile && (
+                  <div className="mt-2 text-[11.5px] text-[var(--success-fg)]">✓ 파일 업로드됨 ({Math.round(bankSlipFile.length / 1024)} KB)</div>
+                )}
+              </div>
+            </Field>
+
+            <Field label="국적">
+              <SegmentedControl
+                value={nationality}
+                onChange={(v) => setNationality(v as "KR" | "FOREIGN")}
+                options={[{ value: "KR", label: "한국" }, { value: "FOREIGN", label: "외국인" }]}
+              />
+            </Field>
+
+            {nationality === "FOREIGN" && (
+              <div className="space-y-3 p-3 rounded-md bg-[var(--info-bg)] border border-[var(--info-border)]">
+                <Field label="비자 종류 *">
+                  <Input value={visaType} onChange={e => setVisaType(e.target.value)} placeholder="E-9, F-4, F-5 등" />
+                </Field>
+                <Field label="비자 만료일 *">
+                  <Input type="date" value={visaExpiry} onChange={e => setVisaExpiry(e.target.value)} />
+                </Field>
+                <Field label="외국인등록증 사본 *">
+                  <div>
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--border-2)] bg-[var(--bg-2)] hover:bg-[var(--bg-3)] text-[12.5px]">
+                      <input type="file" accept="image/*,.pdf" className="hidden" onChange={async e => {
+                        const f = e.target.files?.[0]; if (!f) return;
+                        setForeignIdFile(await fileToBase64(f));
+                      }} />
+                      파일 선택
+                    </label>
+                    {foreignIdFile && (
+                      <div className="mt-2 text-[11.5px] text-[var(--success-fg)]">✓ 파일 업로드됨 ({Math.round(foreignIdFile.length / 1024)} KB)</div>
+                    )}
+                  </div>
+                </Field>
+              </div>
+            )}
+
+            <Button variant="primary" size="lg" loading={submitting} onClick={submit} className="w-full">
+              제출
+            </Button>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function RegularContractContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
+  const mode = searchParams.get("mode") || "";  // "onboarding-fix" = info-only mode for already-signed contracts
 
   const [contract, setContract] = useState<any>(null);
   const [loading, setLoading] = useState(true);

@@ -284,7 +284,8 @@ function DetailModal({
     if (!confirm(`${detail.name} 님에게 정보 입력용 웹링크 SMS를 발송할까요?`)) return;
     setSendingLink(true);
     try {
-      await sendRegularLink(id);
+      const r = await bulkSendOnboardingLinks([id]);
+      if ((r.failed?.length ?? 0) > 0) throw new Error(r.failed[0]?.error || "SMS 발송 실패");
       toast.success(`${detail.name} 님에게 SMS 발송됨. 정보 입력 후 입사자관리에 자동 반영됩니다.`);
       onSaved();
     } catch (e: any) {
@@ -736,7 +737,8 @@ function ListTab({
     if (!confirm(`${item.name} 님에게 정보 입력용 웹링크 SMS를 발송할까요?`)) return;
     setSendingId(item.id);
     try {
-      await sendRegularLink(item.id);
+      const r = await bulkSendOnboardingLinks([item.id]);
+      if ((r.failed?.length ?? 0) > 0) throw new Error(r.failed[0]?.error || "SMS 발송 실패");
       toast.success(`${item.name} 님에게 SMS 발송됨. 정보 입력 후 입사자관리에 자동 반영됩니다.`);
       onListChanged?.();
     } catch (e: any) {

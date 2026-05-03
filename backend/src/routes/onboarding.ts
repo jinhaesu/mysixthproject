@@ -566,36 +566,18 @@ router.post('/bulk-send-links', async (req: AuthRequest, res: Response) => {
     for (const id of ids) {
       try {
         const emp = await dbGet(
-          'SELECT id, name, phone, hire_date FROM regular_employees WHERE id = ? AND is_active = 1',
+          'SELECT id, name, phone, token FROM regular_employees WHERE id = ? AND is_active = 1',
           id,
         );
         if (!emp) { failed.push({ id, error: '직원을 찾을 수 없습니다.' }); continue; }
         if (!emp.phone) { failed.push({ id, error: '전화번호가 없습니다.' }); continue; }
+        if (!emp.token) { failed.push({ id, error: '직원 토큰이 없습니다.' }); continue; }
 
-        // Find latest contract for this employee (any status). Prefer signed > pending.
-        let contract = await dbGet(
-          `SELECT token FROM regular_labor_contracts
-           WHERE employee_id = ?
-           ORDER BY (CASE status WHEN 'signed' THEN 0 ELSE 1 END), created_at DESC
-           LIMIT 1`,
-          id,
-        );
-
-        // If no contract exists, create an empty pending one so the employee can fill info.
-        if (!contract) {
-          const newToken = require('crypto').randomBytes(20).toString('hex');
-          const hire = emp.hire_date || '';
-          await dbRun(
-            `INSERT INTO regular_labor_contracts
-              (employee_id, phone, worker_name, contract_start, contract_end, address, signature_data, token, status, sms_sent, work_start_date)
-             VALUES (?, ?, ?, ?, '', '', '', ?, 'pending', 1, ?)`,
-            id, emp.phone, emp.name, hire, newToken, hire,
-          );
-          contract = { token: newToken };
-        }
-
-        const url = getFrontendUrl(`/regular-contract?token=${contract.token}`);
-        const message = `[조인앤조인 정보 입력]\n${emp.name}님, 입사 관련 추가 정보 입력이 필요합니다.\n아래 링크에서 이메일·통장사본·외국인 정보 등을 입력해주세요.\n${url}`;
+        // Send link to dedicated /onboarding-info page (uses regular_employees.token).
+        // This is SEPARATE from the formal contract signing flow at /regular-contract
+        // which is initiated from 근무자 DB by an admin entering salary/work conditions.
+        const url = getFrontendUrl(`/onboarding-info?token=${emp.token}`);
+        const message = `[조인앤조인 정보 입력]\n${emp.name}님, 4대보험 신고에 필요한 추가 정보(이메일·통장사본·외국인 정보 등) 입력 부탁드립니다.\n근로계약서와는 별개입니다.\n${url}`;
         const result = await sendGeneralSms(emp.phone, message);
 
         if (result.success) {

@@ -1019,22 +1019,45 @@ router.get('/employees/resigned', async (_req: AuthRequest, res: Response) => {
 // ===== Regular Labor Contracts =====
 
 // POST /api/regular/contracts/send - Send contract link to employee
+// 계약서는 매번 새 row를 INSERT (옛 계약서 영향 없음). 1년 단위 재계약·임금협상 등으로 한 직원이
+// 여러 계약서를 가질 수 있으며, 각 계약서는 독립적으로 보존됨.
 router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
   try {
-    const { employee_id, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place } = req.body;
+    const {
+      employee_id,
+      contract_start,    // 계약 시작일 (재계약 시 admin 입력 필수). 미입력 시 today 기본
+      contract_end,      // 계약 종료일. 미입력 시 contract_start + 1년
+      work_start_date,   // 입사일 (regular_employees.hire_date 와 일치해야 함; 첫 계약 후엔 변경 X)
+      department, position_title, annual_salary, base_pay, meal_allowance, other_allowance,
+      pay_day, work_hours, work_place,
+    } = req.body;
     const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ?', employee_id) as any;
     if (!employee) { res.status(404).json({ error: '직원을 찾을 수 없습니다.' }); return; }
 
     const token = require('uuid').v4();
     const today = getKSTDate();
-    const endYear = parseInt(today.slice(0, 4)) + 1;
-    const endDate = endYear + today.slice(4);
+    const cStart = (contract_start && /^\d{4}-\d{2}-\d{2}$/.test(contract_start)) ? contract_start : today;
+
+    const computedEnd = (() => {
+      if (contract_end && /^\d{4}-\d{2}-\d{2}$/.test(contract_end)) return contract_end;
+      // contract_start + 1년 - 1일 (만 1년 계약 = start ~ start+1년-1일)
+      const [y, m, d] = cStart.split('-').map(Number);
+      const next = new Date(Date.UTC(y + 1, m - 1, d));
+      next.setUTCDate(next.getUTCDate() - 1);
+      return next.toISOString().slice(0, 10);
+    })();
+    const cEnd = computedEnd;
+
+    // work_start_date 명시되지 않으면 직원의 hire_date 사용 (입사일 = 변경 X)
+    const wStart = (work_start_date && /^\d{4}-\d{2}-\d{2}$/.test(work_start_date))
+      ? work_start_date
+      : (employee.hire_date || cStart);
 
     await dbRun(
       `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      employee.id, employee.phone, employee.name, today, endDate, token,
-      work_start_date || '', department || employee.department || '', position_title || '사원',
+      employee.id, employee.phone, employee.name, cStart, cEnd, token,
+      wStart, department || employee.department || '', position_title || '사원',
       annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00', work_place || ''
     );
 

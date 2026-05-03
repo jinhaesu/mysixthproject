@@ -63,14 +63,15 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.3.0',
+    version: '2.4.0',
     features: {
       manualAttendance: true,
       onboarding: true,
       offboarding: true,
       contracts: true,
       payrollPhoneMatch: true,  // PR#44
-      tzAwareHoliday: true,      // PR#46+ — UTC-기반 day-of-week 계산
+      tzAwareHoliday: true,      // PR#46
+      contractDateExplicit: true, // PR#47 — admin 발송 시 contract_start/end 명시 입력
     },
   });
 });

@@ -149,44 +149,12 @@ router.post('/:emp_token/onboarding-info', async (req: Request, res: Response) =
   } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
-// POST /api/regular-public/:emp_token/get-or-create-contract  (DEPRECATED but kept for compat)
-// Used by /r page's "정보 입력하러 가기" banner — accepts an employee token
-// (regular_employees.token) and returns a contract token (regular_labor_contracts.token).
-// If the employee has no contract row yet, creates an empty pending one.
-router.post('/:emp_token/get-or-create-contract', async (req: Request, res: Response) => {
-  try {
-    const { emp_token } = req.params;
-    const emp = await dbGet(
-      'SELECT id, name, phone, hire_date FROM regular_employees WHERE token = ? AND is_active = 1',
-      emp_token,
-    ) as any;
-    if (!emp) { res.status(404).json({ error: '유효하지 않은 직원 토큰입니다.' }); return; }
-
-    // Find latest contract: prefer signed > pending, then most recent
-    let contract = await dbGet(
-      `SELECT token FROM regular_labor_contracts
-       WHERE employee_id = ?
-       ORDER BY (CASE status WHEN 'signed' THEN 0 ELSE 1 END), created_at DESC
-       LIMIT 1`,
-      emp.id,
-    ) as any;
-
-    if (!contract) {
-      const newToken = require('crypto').randomBytes(20).toString('hex');
-      const hire = emp.hire_date || '';
-      await dbRun(
-        `INSERT INTO regular_labor_contracts
-          (employee_id, phone, worker_name, contract_start, contract_end, address, signature_data, token, status, sms_sent, work_start_date)
-         VALUES (?, ?, ?, ?, '', '', '', ?, 'pending', 0, ?)`,
-        emp.id, emp.phone, emp.name, hire, newToken, hire,
-      );
-      contract = { token: newToken };
-    }
-
-    res.json({ contract_token: contract.token });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+// POST /api/regular-public/:emp_token/get-or-create-contract  — DEPRECATED.
+// 정보수집 흐름은 /api/regular-public/:emp_token/onboarding-info 로 분리됨.
+// 빈 계약서 자동 생성은 데이터 오염 우려로 차단. 근로계약서는 admin이 근무자 DB에서
+// 명시적으로 contract_start / contract_end 와 함께 발송해야 함.
+router.post('/:emp_token/get-or-create-contract', async (_req: Request, res: Response) => {
+  res.status(410).json({ error: '이 경로는 폐기되었습니다. /onboarding-info 페이지를 사용하세요.' });
 });
 
 // GET /api/regular-public/contract/:token - Get contract for signing

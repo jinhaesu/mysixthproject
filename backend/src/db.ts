@@ -873,11 +873,17 @@ const KOREAN_HOLIDAYS: Record<number, string[]> = {
 };
 
 export function isHolidayOrWeekend(dateStr: string): boolean {
-  const d = new Date(dateStr + 'T00:00:00+09:00');
-  const dow = d.getDay();
+  // Calendar date (YYYY-MM-DD) — compute day-of-week independent of system timezone.
+  // Without this, Railway (UTC) interprets `new Date('2026-04-06T00:00:00+09:00').getDay()`
+  // as 0 (Sunday) because KST midnight is UTC 15:00 of the previous day.
+  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return false;
+  const [, ys, ms, ds] = m;
+  const y = parseInt(ys, 10), mo = parseInt(ms, 10), d = parseInt(ds, 10);
+  const utc = new Date(Date.UTC(y, mo - 1, d));
+  const dow = utc.getUTCDay(); // 0=Sun..6=Sat, identical regardless of system TZ
   if (dow === 0 || dow === 6) return true; // Weekend
-  const year = d.getFullYear();
-  const holidays = KOREAN_HOLIDAYS[year] || [];
+  const holidays = KOREAN_HOLIDAYS[y] || [];
   return holidays.includes(dateStr);
 }
 

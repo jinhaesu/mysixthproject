@@ -42,16 +42,17 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-const TYPE_OPTIONS: { id: "all" | "regular" | "dispatch"; label: string }[] = [
+const TYPE_OPTIONS: { id: "all" | "regular" | "alba" | "dispatch"; label: string }[] = [
   { id: "all", label: "전체" },
   { id: "regular", label: "정규직" },
-  { id: "dispatch", label: "파견·알바" },
+  { id: "alba", label: "알바" },
+  { id: "dispatch", label: "파견" },
 ];
 
 type TabId = "latest" | "missing" | "history";
 
 interface ContractItem {
-  employee_type: "regular" | "dispatch";
+  employee_type: "regular" | "alba" | "dispatch";
   employee_id: number;
   employee_name: string;
   employee_phone: string;
@@ -129,7 +130,7 @@ function ContractManageInner() {
     if (t === "missing" || t === "history") return t;
     return "latest";
   });
-  const [typeFilter, setTypeFilter] = useState<"all" | "regular" | "dispatch">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "regular" | "alba" | "dispatch">("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -265,12 +266,12 @@ function ContractManageInner() {
   ];
 
   // KPI: latestTotal already includes all employees (with + without contract)
-  // KPI는 정규직만 대상 (파견·알바는 근로계약서 의무 대상이 아님)
-  const regularItems = latestItems.filter((i) => i.employee_type === "regular");
-  const regularTotal = regularItems.length;
-  const regularContracted = regularItems.filter((i) => i.contract != null).length;
-  const regularMissing = regularTotal - regularContracted;
-  const missingRatio = regularTotal > 0 ? Math.round((regularMissing / regularTotal) * 100) : 0;
+  // KPI는 정규직 + 알바 대상 (파견만 제외 — 파견은 인력 회사가 따로 계약)
+  const kpiItems = latestItems.filter((i) => i.employee_type !== "dispatch");
+  const kpiTotal = kpiItems.length;
+  const kpiContracted = kpiItems.filter((i) => i.contract != null).length;
+  const kpiMissing = kpiTotal - kpiContracted;
+  const missingRatio = kpiTotal > 0 ? Math.round((kpiMissing / kpiTotal) * 100) : 0;
 
   // Latest tab shows only rows WITH a contract
   const latestWithContract = latestItems.filter((i) => i.contract != null);
@@ -298,10 +299,10 @@ function ContractManageInner() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <Stat label="정규직 전체" value={String(regularTotal)} unit="명" tone="neutral" hint="파견·알바 제외" />
-        <Stat label="작성됨" value={String(regularContracted)} unit="명" tone="success" />
-        <Stat label="미작성" value={String(regularMissing)} unit="명" tone="warning" />
-        <Stat label="미작성 비율" value={String(missingRatio)} unit="%" tone={regularMissing > 0 ? "danger" : "success"} />
+        <Stat label="전체 인원" value={String(kpiTotal)} unit="명" tone="neutral" hint="파견 제외 (정규직 + 알바)" />
+        <Stat label="작성됨" value={String(kpiContracted)} unit="명" tone="success" />
+        <Stat label="미작성" value={String(kpiMissing)} unit="명" tone="warning" />
+        <Stat label="미작성 비율" value={String(missingRatio)} unit="%" tone={kpiMissing > 0 ? "danger" : "success"} />
       </div>
 
       <div className="mb-4">
@@ -357,8 +358,8 @@ function ContractManageInner() {
                   <TR key={`${item.employee_type}-${item.employee_id}`}>
                     <TD align="right" muted className="tabular">{idx + 1}</TD>
                     <TD>
-                      <Badge tone={item.employee_type === "regular" ? "brand" : "violet"} size="xs">
-                        {item.employee_type === "regular" ? "정규" : "파견"}
+                      <Badge tone={item.employee_type === "regular" ? "brand" : item.employee_type === "alba" ? "info" : "violet"} size="xs">
+                        {item.employee_type === "regular" ? "정규" : item.employee_type === "alba" ? "알바" : "파견"}
                       </Badge>
                     </TD>
                     <TD emphasis>{item.employee_name}</TD>
@@ -460,8 +461,8 @@ function ContractManageInner() {
                 <TR key={`${item.employee_type}-${item.employee_id}`}>
                   <TD align="right" muted className="tabular">{idx + 1}</TD>
                   <TD>
-                    <Badge tone={item.employee_type === "regular" ? "brand" : "violet"} size="xs">
-                      {item.employee_type === "regular" ? "정규" : "파견"}
+                    <Badge tone={item.employee_type === "regular" ? "brand" : item.employee_type === "alba" ? "info" : "violet"} size="xs">
+                      {item.employee_type === "regular" ? "정규" : item.employee_type === "alba" ? "알바" : "파견"}
                     </Badge>
                   </TD>
                   <TD emphasis>{item.employee_name}</TD>

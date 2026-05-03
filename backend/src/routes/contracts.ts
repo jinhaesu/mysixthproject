@@ -65,7 +65,7 @@ function buildRegularContractsQuery(whereClause: string): string {
 function buildWorkerContractsQuery(whereClause: string): string {
   return `
     SELECT
-      'dispatch'                          AS employee_type,
+      CASE WHEN w.category = '파견' THEN 'dispatch' ELSE 'alba' END AS employee_type,
       w.id                                AS employee_id,
       w.name_ko                           AS employee_name,
       w.phone                             AS employee_phone,
@@ -173,8 +173,11 @@ router.get('/latest', async (req: AuthRequest, res: Response) => {
     }
 
     if (type === 'all' || type === 'dispatch' || type === 'alba') {
+      let workerWhere = searchConditionWorker;
+      if (type === 'dispatch') workerWhere += " AND w.category = '파견'";
+      else if (type === 'alba') workerWhere += " AND w.category <> '파견'";
       const workerRows = await dbAll(
-        buildWorkerContractsQuery(searchConditionWorker) +
+        buildWorkerContractsQuery(workerWhere) +
           ' ORDER BY w.name_ko',
         ...searchParam,
       );
@@ -218,8 +221,11 @@ router.get('/missing', async (req: AuthRequest, res: Response) => {
     }
 
     if (type === 'all' || type === 'dispatch' || type === 'alba') {
+      let workerWhere = searchConditionWorker;
+      if (type === 'dispatch') workerWhere += " AND w.category = '파견'";
+      else if (type === 'alba') workerWhere += " AND w.category <> '파견'";
       const workerRows = await dbAll(
-        buildWorkerContractsQuery(searchConditionWorker) +
+        buildWorkerContractsQuery(workerWhere) +
           ' ORDER BY w.name_ko',
         ...searchParam,
       );
@@ -316,7 +322,7 @@ router.post('/upload-legacy', async (req: AuthRequest, res: Response) => {
       work_start_date,
       // notes: not stored in current schema (kept for forward compatibility)
     } = (req.body || {}) as {
-      employee_type?: 'regular' | 'dispatch';
+      employee_type?: 'regular' | 'dispatch' | 'alba';
       employee_id?: number;
       phone?: string;
       filename?: string;
@@ -327,8 +333,8 @@ router.post('/upload-legacy', async (req: AuthRequest, res: Response) => {
       notes?: string;
     };
 
-    if (employee_type !== 'regular' && employee_type !== 'dispatch') {
-      res.status(400).json({ error: "employee_type은 'regular' 또는 'dispatch' 여야 합니다." });
+    if (employee_type !== 'regular' && employee_type !== 'dispatch' && employee_type !== 'alba') {
+      res.status(400).json({ error: "employee_type은 'regular', 'alba', 'dispatch' 중 하나여야 합니다." });
       return;
     }
     if (!filename || typeof filename !== 'string') {

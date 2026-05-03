@@ -655,7 +655,7 @@ export async function getContractHistory(params: Record<string, string> = {}) {
 }
 
 export async function uploadLegacyContract(body: {
-  employee_type: 'regular' | 'dispatch';
+  employee_type: 'regular' | 'dispatch' | 'alba';
   employee_id?: number;
   phone?: string;
   filename: string;

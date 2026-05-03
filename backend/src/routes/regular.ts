@@ -101,17 +101,35 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// PUT /api/regular/employees/:id - Update employee
+// PUT /api/regular/employees/:id - Update employee (non-destructive: only updates fields explicitly provided)
 router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { phone: rawPhone, name, department, team, role, workplace_id, hire_date, bank_name, bank_account } = req.body;
-    const phone = normalizePhone(rawPhone);
+    const body = req.body || {};
+    const clauses: string[] = [];
+    const params: any[] = [];
 
-    await dbRun(`
-      UPDATE regular_employees SET phone = ?, name = ?, department = ?, team = ?, role = ?, workplace_id = ?, hire_date = ?, bank_name = ?, bank_account = ?
-      WHERE id = ?
-    `, phone, name, department || '', team || '', role || '', workplace_id || null, hire_date || '', bank_name || '', bank_account || '', id);
+    // For each updatable field, only include in UPDATE when the request explicitly sends it.
+    // This prevents accidental clearing of fields like hire_date when the form omits them.
+    if (body.phone !== undefined)         { clauses.push('phone = ?');         params.push(normalizePhone(body.phone)); }
+    if (body.name !== undefined)          { clauses.push('name = ?');          params.push(body.name); }
+    if (body.department !== undefined)    { clauses.push('department = ?');    params.push(body.department || ''); }
+    if (body.team !== undefined)          { clauses.push('team = ?');          params.push(body.team || ''); }
+    if (body.role !== undefined)          { clauses.push('role = ?');          params.push(body.role || ''); }
+    if (body.workplace_id !== undefined)  { clauses.push('workplace_id = ?');  params.push(body.workplace_id || null); }
+    if (body.hire_date !== undefined)     { clauses.push('hire_date = ?');     params.push(body.hire_date || ''); }
+    if (body.bank_name !== undefined)     { clauses.push('bank_name = ?');     params.push(body.bank_name || ''); }
+    if (body.bank_account !== undefined)  { clauses.push('bank_account = ?');  params.push(body.bank_account || ''); }
+
+    if (clauses.length === 0) {
+      const cur = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
+      res.json(cur);
+      return;
+    }
+
+    clauses.push('updated_at = NOW()');
+    params.push(id);
+    await dbRun(`UPDATE regular_employees SET ${clauses.join(', ')} WHERE id = ?`, ...params);
 
     const updated = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
     res.json(updated);

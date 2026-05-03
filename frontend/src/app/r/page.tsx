@@ -949,12 +949,21 @@ function RegularContent() {
                   <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-80 mt-0.5">먼저 입사 정보를 완성해주세요.</p>
                 </div>
               </div>
-              <a
-                href={`/regular-contract?token=${token}&mode=onboarding-fix`}
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular-public/${token}/get-or-create-contract`, { method: 'POST' });
+                    const b = await r.json();
+                    if (!r.ok) { alert(b.error || '계약서 링크 생성 실패'); return; }
+                    window.location.href = `/regular-contract?token=${b.contract_token}&mode=onboarding-fix`;
+                  } catch (e: any) {
+                    alert(e.message || '오류가 발생했습니다.');
+                  }
+                }}
                 className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-[var(--r-md)] bg-[var(--warning-fg)] text-white font-semibold text-[var(--fs-body)] transition-opacity hover:opacity-90"
               >
                 정보 입력하러 가기
-              </a>
+              </button>
               <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-70 text-center">
                 출퇴근은 정상적으로 사용할 수 있으나, 추가 정보 미완료 시 4대보험 가입이 지연될 수 있습니다.
               </p>

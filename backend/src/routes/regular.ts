@@ -1523,13 +1523,18 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       ORDER BY employee_name, date
     `, yearMonth) as any[];
 
-    // Group by employee, reclassify holiday/weekend hours as overtime
+    // Group by employee. Use phone as canonical key when available, fallback to name.
+    // This merges records that arrived under different name spellings for the same person
+    // (e.g., '파타' vs 'AHMAD AZHARUL FATA(파타)') so payroll totals match confirmed-list totals.
+    const norm = (p: string) => (p || '').replace(/[-\s]/g, '').trim();
+    const keyFor = (rec: any) => norm(rec.employee_phone) || rec.employee_name;
     const empMap = new Map<string, { employee_name: string; employee_phone: string; total_regular: number; total_overtime: number; total_night: number; work_days: number; holiday_days: number; holiday_hours: number }>();
     for (const rec of allRecords) {
-      if (!empMap.has(rec.employee_name)) {
-        empMap.set(rec.employee_name, { employee_name: rec.employee_name, employee_phone: rec.employee_phone, total_regular: 0, total_overtime: 0, total_night: 0, work_days: 0, holiday_days: 0, holiday_hours: 0 });
+      const key = keyFor(rec);
+      if (!empMap.has(key)) {
+        empMap.set(key, { employee_name: rec.employee_name, employee_phone: rec.employee_phone, total_regular: 0, total_overtime: 0, total_night: 0, work_days: 0, holiday_days: 0, holiday_hours: 0 });
       }
-      const emp = empMap.get(rec.employee_name)!;
+      const emp = empMap.get(key)!;
       emp.work_days++;
       const regH = parseFloat(rec.regular_hours) || 0;
       const otH = parseFloat(rec.overtime_hours) || 0;
@@ -1568,18 +1573,19 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       // Iterate each calendar day in the vacation that falls within the payroll month
       const vacStart = new Date(Math.max(new Date(vac.start_date).getTime(), new Date(monthStart).getTime()));
       const vacEnd = new Date(Math.min(new Date(vac.end_date).getTime(), new Date(monthEnd).getTime()));
+      const vacKey = norm(vac.employee_phone) || vac.employee_name;
       for (let d = new Date(vacStart); d <= vacEnd; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().slice(0, 10);
         // Skip weekends and holidays — vacation on those days doesn't need to count as worked
         if (isHolidayOrWeekend(dateStr)) continue;
-        // Skip dates that already have a confirmed attendance record
-        const alreadyCounted = allRecords.some((r: any) => r.employee_name === vac.employee_name && r.date === dateStr);
+        // Skip dates that already have a confirmed attendance record (match by phone if possible)
+        const alreadyCounted = allRecords.some((r: any) => keyFor(r) === vacKey && r.date === dateStr);
         if (alreadyCounted) continue;
         // Add 8 hours of regular work for this vacation day
-        if (!empMap.has(vac.employee_name)) {
-          empMap.set(vac.employee_name, { employee_name: vac.employee_name, employee_phone: vac.employee_phone, total_regular: 0, total_overtime: 0, total_night: 0, work_days: 0, holiday_days: 0, holiday_hours: 0 });
+        if (!empMap.has(vacKey)) {
+          empMap.set(vacKey, { employee_name: vac.employee_name, employee_phone: vac.employee_phone, total_regular: 0, total_overtime: 0, total_night: 0, work_days: 0, holiday_days: 0, holiday_hours: 0 });
         }
-        const empEntry = empMap.get(vac.employee_name)!;
+        const empEntry = empMap.get(vacKey)!;
         empEntry.total_regular += 8;
         empEntry.work_days++;
       }
@@ -1613,7 +1619,12 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     const results = [];
     const daysInMonth = lastDay;
     for (const sal of salaries) {
-      const att = confirmedWithVacation.find(c => c.employee_name === sal.name);
+      // Match by phone first (canonical), fallback to name. Handles confirmed_attendance
+      // records that arrived under different name spellings for the same employee.
+      const salPhone = norm(sal.phone);
+      const att = confirmedWithVacation.find(c =>
+        (salPhone && norm(c.employee_phone) === salPhone) || c.employee_name === sal.name
+      );
       const overtimeHours = att?.total_overtime || 0;
       const holidayHours = att?.holiday_hours || 0;
       const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;

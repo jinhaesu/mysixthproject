@@ -149,17 +149,28 @@ export default function RegularWorkersPage() {
       }
     } catch { toast.error("확인 중 오류가 발생했습니다."); }
   };
-  const [contractForm, setContractForm] = useState({
-    work_start_date: new Date().toLocaleDateString('sv-SE'),
-    department: '',
-    position_title: '사원',
-    annual_salary: '',
-    base_pay: '',
-    meal_allowance: '',
-    other_allowance: '',
-    pay_day: '10',
-    work_hours: '09:00~18:00',
-    work_place: '',
+  const [contractForm, setContractForm] = useState(() => {
+    const today = new Date().toLocaleDateString('sv-SE');
+    const oneYearLater = (() => {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() + 1);
+      d.setDate(d.getDate() - 1);
+      return d.toLocaleDateString('sv-SE');
+    })();
+    return {
+      contract_start: today,        // 계약 시작일 (재계약 시 명시)
+      contract_end: oneYearLater,   // 계약 종료일 (1년 단위 default)
+      work_start_date: today,       // 입사일 (직원 hire_date 기본값으로 모달 열릴 때 채움)
+      department: '',
+      position_title: '사원',
+      annual_salary: '',
+      base_pay: '',
+      meal_allowance: '',
+      other_allowance: '',
+      pay_day: '10',
+      work_hours: '09:00~18:00',
+      work_place: '',
+    };
   });
   const [workplaces, setWorkplaces] = useState<any[]>([]);
 
@@ -566,7 +577,16 @@ export default function RegularWorkersPage() {
                         <Button
                           variant="ghost"
                           size="xs"
-                          onClick={async () => { if (!(await verifyContractPassword())) return; setContractModal(emp); setContractForm({...contractForm, department: emp.department || ''}); }}
+                          onClick={async () => {
+                            if (!(await verifyContractPassword())) return;
+                            setContractModal(emp);
+                            setContractForm({
+                              ...contractForm,
+                              department: emp.department || '',
+                              // 입사일이 직원 정보에 있으면 work_start_date 기본값으로 사용
+                              work_start_date: emp.hire_date || contractForm.work_start_date,
+                            });
+                          }}
                           disabled={sendingContractId === emp.id}
                           leadingIcon={sendingContractId === emp.id ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
                           title="계약서 발송"
@@ -693,7 +713,28 @@ export default function RegularWorkersPage() {
             <h3 className="text-[var(--fs-h4)] font-semibold text-[var(--text-1)]">근로계약서 발송</h3>
             <p className="text-sm text-[var(--text-3)]">{contractModal.name} ({contractModal.phone})에게 근로계약서를 발송합니다.</p>
 
-            <Field label="근로 개시일">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="계약 시작일" hint="재계약 시 새 계약 시작일">
+                <Input type="date" value={contractForm.contract_start}
+                  onChange={e => {
+                    const newStart = e.target.value;
+                    // 계약 종료일도 같이 1년 + (-1일)로 자동 갱신 (admin이 임의 변경 가능)
+                    let newEnd = contractForm.contract_end;
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(newStart)) {
+                      const [y, m, d] = newStart.split('-').map(Number);
+                      const dt = new Date(y + 1, m - 1, d);
+                      dt.setDate(dt.getDate() - 1);
+                      newEnd = dt.toLocaleDateString('sv-SE');
+                    }
+                    setContractForm({ ...contractForm, contract_start: newStart, contract_end: newEnd });
+                  }} />
+              </Field>
+              <Field label="계약 종료일">
+                <Input type="date" value={contractForm.contract_end}
+                  onChange={e => setContractForm({...contractForm, contract_end: e.target.value})} />
+              </Field>
+            </div>
+            <Field label="입사일 (근로 개시일)" hint="첫 입사 시점. 재계약 후에도 변경되지 않음">
               <Input type="date" value={contractForm.work_start_date} onChange={e => setContractForm({...contractForm, work_start_date: e.target.value})} />
             </Field>
             <Field label="근무장소">

@@ -63,12 +63,13 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.1.0',
+    version: '2.2.0',
     features: {
       manualAttendance: true,
       onboarding: true,
       offboarding: true,
       contracts: true,
+      payrollPhoneMatch: true,  // 정규직 급여계산이 phone 기반 매칭 (PR#44+)
     },
   });
 });

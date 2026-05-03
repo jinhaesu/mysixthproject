@@ -265,8 +265,12 @@ function ContractManageInner() {
   ];
 
   // KPI: latestTotal already includes all employees (with + without contract)
-  const contractedCount = latestItems.filter((i) => i.contract != null).length;
-  const missingRatio = latestTotal > 0 ? Math.round((latestMissing / latestTotal) * 100) : 0;
+  // KPI는 정규직만 대상 (파견·알바는 근로계약서 의무 대상이 아님)
+  const regularItems = latestItems.filter((i) => i.employee_type === "regular");
+  const regularTotal = regularItems.length;
+  const regularContracted = regularItems.filter((i) => i.contract != null).length;
+  const regularMissing = regularTotal - regularContracted;
+  const missingRatio = regularTotal > 0 ? Math.round((regularMissing / regularTotal) * 100) : 0;
 
   // Latest tab shows only rows WITH a contract
   const latestWithContract = latestItems.filter((i) => i.contract != null);
@@ -294,10 +298,10 @@ function ContractManageInner() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <Stat label="전체 인원" value={String(latestTotal)} unit="명" tone="neutral" />
-        <Stat label="작성됨" value={String(contractedCount)} unit="명" tone="success" />
-        <Stat label="미작성" value={String(latestMissing)} unit="명" tone="warning" />
-        <Stat label="미작성 비율" value={String(missingRatio)} unit="%" tone={latestMissing > 0 ? "danger" : "success"} />
+        <Stat label="정규직 전체" value={String(regularTotal)} unit="명" tone="neutral" hint="파견·알바 제외" />
+        <Stat label="작성됨" value={String(regularContracted)} unit="명" tone="success" />
+        <Stat label="미작성" value={String(regularMissing)} unit="명" tone="warning" />
+        <Stat label="미작성 비율" value={String(missingRatio)} unit="%" tone={regularMissing > 0 ? "danger" : "success"} />
       </div>
 
       <div className="mb-4">
@@ -333,6 +337,7 @@ function ContractManageInner() {
           <Table>
             <THead>
               <TR>
+                <TH align="right">No.</TH>
                 <TH>구분</TH>
                 <TH>이름</TH>
                 <TH>연락처</TH>
@@ -345,11 +350,12 @@ function ContractManageInner() {
               </TR>
             </THead>
             <TBody>
-              {latestWithContract.map((item) => {
+              {latestWithContract.map((item, idx) => {
                 const c = item.contract;
                 const status = c?.status ?? "";
                 return (
                   <TR key={`${item.employee_type}-${item.employee_id}`}>
+                    <TD align="right" muted className="tabular">{idx + 1}</TD>
                     <TD>
                       <Badge tone={item.employee_type === "regular" ? "brand" : "violet"} size="xs">
                         {item.employee_type === "regular" ? "정규" : "파견"}
@@ -440,6 +446,7 @@ function ContractManageInner() {
           <Table>
             <THead>
               <TR>
+                <TH align="right">No.</TH>
                 <TH>구분</TH>
                 <TH>이름</TH>
                 <TH>연락처</TH>
@@ -449,8 +456,9 @@ function ContractManageInner() {
               </TR>
             </THead>
             <TBody>
-              {missingItems.map((item) => (
+              {missingItems.map((item, idx) => (
                 <TR key={`${item.employee_type}-${item.employee_id}`}>
+                  <TD align="right" muted className="tabular">{idx + 1}</TD>
                   <TD>
                     <Badge tone={item.employee_type === "regular" ? "brand" : "violet"} size="xs">
                       {item.employee_type === "regular" ? "정규" : "파견"}

@@ -125,7 +125,7 @@ router.get('/:emp_token/onboarding-info', async (req: Request, res: Response) =>
 router.post('/:emp_token/onboarding-info', async (req: Request, res: Response) => {
   try {
     const { emp_token } = req.params;
-    const emp = await dbGet('SELECT id FROM regular_employees WHERE token = ? AND is_active = 1', emp_token) as any;
+    const emp = await dbGet('SELECT id, name FROM regular_employees WHERE token = ? AND is_active = 1', emp_token) as any;
     if (!emp) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
 
     const allowed = [
@@ -144,9 +144,17 @@ router.post('/:emp_token/onboarding-info', async (req: Request, res: Response) =
     if (clauses.length === 0) { res.status(400).json({ error: '입력된 정보가 없습니다.' }); return; }
     clauses.push('updated_at = NOW()');
     params.push(emp.id);
+
+    // 진단용 로그 — 큰 첨부 파일에서 오류 발생 시 dump 가능하도록
+    const totalSize = params.reduce((s, p) => s + (typeof p === 'string' ? p.length : 0), 0);
+    console.log(`[onboarding-info] ${emp.name} (#${emp.id}) — fields=${clauses.length - 1}, total bytes=${totalSize}`);
+
     await dbRun(`UPDATE regular_employees SET ${clauses.join(', ')} WHERE id = ?`, ...params);
     res.json({ success: true });
-  } catch (error: any) { res.status(500).json({ error: error.message }); }
+  } catch (error: any) {
+    console.error('[onboarding-info] DB 오류:', error?.code, error?.message);
+    res.status(500).json({ error: error?.message || '저장 중 오류가 발생했습니다.' });
+  }
 });
 
 // POST /api/regular-public/:emp_token/get-or-create-contract  — DEPRECATED.

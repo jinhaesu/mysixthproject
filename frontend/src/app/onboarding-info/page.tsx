@@ -20,8 +20,14 @@ const FIELD_LABELS: Record<string, string> = {
   foreign_id_card_data: "외국인등록증 사본",
 };
 
+const MAX_FILE_BYTES = 8 * 1024 * 1024;  // 8MB — Base64 변환 시 +33%, 서버 limit 20MB 안에 여유
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((res, rej) => {
+    if (file.size > MAX_FILE_BYTES) {
+      rej(new Error(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 8MB 이하로 압축해주세요.`));
+      return;
+    }
     const r = new FileReader();
     r.onload = () => res(String(r.result));
     r.onerror = rej;
@@ -171,7 +177,8 @@ function Inner() {
                 <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--border-2)] bg-[var(--bg-2)] hover:bg-[var(--bg-3)] text-[12.5px]">
                   <input type="file" accept="image/*,.pdf" className="hidden" onChange={async e => {
                     const f = e.target.files?.[0]; if (!f) return;
-                    setBankSlip(await fileToBase64(f));
+                    try { setBankSlip(await fileToBase64(f)); }
+                    catch (err: any) { setError(err?.message || '파일 읽기 실패'); }
                   }} />
                   파일 선택
                 </label>
@@ -202,7 +209,8 @@ function Inner() {
                     <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--border-2)] bg-[var(--bg-2)] hover:bg-[var(--bg-3)] text-[12.5px]">
                       <input type="file" accept="image/*,.pdf" className="hidden" onChange={async e => {
                         const f = e.target.files?.[0]; if (!f) return;
-                        setForeignIdCard(await fileToBase64(f));
+                        try { setForeignIdCard(await fileToBase64(f)); }
+                        catch (err: any) { setError(err?.message || '파일 읽기 실패'); }
                       }} />
                       파일 선택
                     </label>

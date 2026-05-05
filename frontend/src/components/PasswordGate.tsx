@@ -25,7 +25,13 @@ export default function PasswordGate({ onVerified, verifyPassword, title = "접�
     setChecking(true);
     setError("");
     try {
-      const ok = await verifyPassword(pw);
+      // 외부 verifyPassword 가 hang 해도 15초 후 timeout
+      const ok = await Promise.race([
+        verifyPassword(pw),
+        new Promise<boolean>((_, reject) =>
+          setTimeout(() => reject(new Error("TIMEOUT")), 15000)
+        ),
+      ]);
       if (ok) {
         onVerified();
       } else {
@@ -33,8 +39,12 @@ export default function PasswordGate({ onVerified, verifyPassword, title = "접�
         setPw("");
         inputRef.current?.focus();
       }
-    } catch {
-      setError("확인 중 오류가 발생했습니다.");
+    } catch (err: any) {
+      if (err?.message === "TIMEOUT") {
+        setError("서버 응답이 지연되어 시간 초과되었습니다. 잠시 후 다시 시도해주세요.");
+      } else {
+        setError("확인 중 오류가 발생했습니다.");
+      }
     } finally {
       setChecking(false);
     }

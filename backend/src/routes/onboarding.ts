@@ -110,15 +110,29 @@ async function getEmailRecipients(): Promise<string[]> {
 // ---------------------------------------------------------------------------
 // Helper — enrich a single employee row with missing_fields + completion_pct
 // ---------------------------------------------------------------------------
+// 단일 직원 row 를 enrich. signed contract 존재 여부는 별도 쿼리로 (단건 조회용).
 async function enrichEmployee(emp: any): Promise<any> {
-  // Check if signed contract exists in regular_labor_contracts
   const signedRow = await dbGet(
     "SELECT id FROM regular_labor_contracts WHERE employee_id = ? AND status = 'signed' LIMIT 1",
     emp.id,
   );
   const hasSignedContract = !!signedRow;
+  return enrichEmployeeSync(emp, hasSignedContract);
+}
 
-  const missingFields = computeMissingFields(emp, hasSignedContract);
+// 동기 enrich — list 쿼리에서 has_signed_contract 가 이미 같이 SELECT되므로 N+1 제거 가능
+function enrichEmployeeSync(emp: any, hasSignedContract: boolean): any {
+  // 큰 Base64 필드는 list 쿼리에서 boolean으로 변환되어 옴.
+  // computeMissingFields 는 string 빈값 체크 — boolean 을 string 으로 proxy 변환.
+  const proxy = {
+    ...emp,
+    bank_slip_data: emp.has_bank_slip ? 'X' : '',
+    foreign_id_card_data: emp.has_foreign_id ? 'X' : '',
+    family_register_data: emp.has_family_register ? 'X' : '',
+    resident_register_data: emp.has_resident_register ? 'X' : '',
+    signed_contract_url: emp.has_signed_contract_url ? 'X' : '',
+  };
+  const missingFields = computeMissingFields(proxy, hasSignedContract);
 
   const totalFields =
     BASE_REQUIRED_FIELDS.length +
@@ -126,8 +140,22 @@ async function enrichEmployee(emp: any): Promise<any> {
   const completionPct =
     totalFields > 0 ? Math.round(((totalFields - missingFields.length) / totalFields) * 100) : 100;
 
+  // 응답 body 크기 줄이기: 큰 *_data 필드 제거, has_* boolean 만 노출
+  const {
+    bank_slip_data: _, foreign_id_card_data: __, family_register_data: ___,
+    resident_register_data: ____, signed_contract_url: _____,
+    has_bank_slip, has_foreign_id, has_family_register, has_resident_register, has_signed_contract_url,
+    ...slim
+  } = emp;
+  void _; void __; void ___; void ____; void _____;
+
   return {
-    ...emp,
+    ...slim,
+    has_bank_slip: !!has_bank_slip,
+    has_foreign_id: !!has_foreign_id,
+    has_family_register: !!has_family_register,
+    has_resident_register: !!has_resident_register,
+    has_signed_contract_url: !!has_signed_contract_url,
     missing_fields: missingFields,
     completion_pct: completionPct,
     has_signed_contract: hasSignedContract,
@@ -141,51 +169,62 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { status = 'all', search } = req.query as Record<string, string>;
 
-    let where = 'WHERE is_active = 1';
+    let where = 'WHERE re.is_active = 1';
     const params: any[] = [];
 
     if (status !== 'all') {
-      where += ' AND onboarding_status = ?';
+      where += ' AND re.onboarding_status = ?';
       params.push(status);
     }
     if (search) {
-      where += ' AND (name ILIKE ? OR phone ILIKE ?)';
+      where += ' AND (re.name ILIKE ? OR re.phone ILIKE ?)';
       params.push(`%${search}%`, `%${search}%`);
     }
 
+    // N+1 제거: has_signed_contract 를 list 쿼리에 같이 합쳐서 단일 쿼리로 처리.
+    // 큰 Base64 필드 (bank_slip_data, foreign_id_card_data 등)는 boolean has_* 로 변환해서
+    // 응답 body 크기를 수십 MB → 수백 KB 수준으로 축소.
     const rows = await dbAll(
-      `SELECT id, name, phone, email, address, department, team, role,
-              hire_date, is_active, resigned_at,
-              nationality, employment_type, id_number, birth_date,
-              bank_name, bank_account, bank_slip_data, foreign_id_card_data,
-              family_register_data, resident_register_data, signed_contract_url,
-              job_code, weekly_work_hours, monthly_salary, non_taxable_meal, non_taxable_vehicle,
-              business_registration_no, visa_type, visa_expiry,
-              onboarding_status, onboarding_email_sent, onboarding_email_sent_at
-       FROM regular_employees
+      `SELECT re.id, re.name, re.phone, re.email, re.address, re.department, re.team, re.role,
+              re.hire_date, re.is_active, re.resigned_at,
+              re.nationality, re.employment_type, re.id_number, re.birth_date,
+              re.bank_name, re.bank_account,
+              (re.bank_slip_data IS NOT NULL AND re.bank_slip_data <> '')                 AS has_bank_slip,
+              (re.foreign_id_card_data IS NOT NULL AND re.foreign_id_card_data <> '')     AS has_foreign_id,
+              (re.family_register_data IS NOT NULL AND re.family_register_data <> '')     AS has_family_register,
+              (re.resident_register_data IS NOT NULL AND re.resident_register_data <> '') AS has_resident_register,
+              (re.signed_contract_url IS NOT NULL AND re.signed_contract_url <> '')       AS has_signed_contract_url,
+              re.job_code, re.weekly_work_hours, re.monthly_salary,
+              re.non_taxable_meal, re.non_taxable_vehicle,
+              re.business_registration_no, re.visa_type, re.visa_expiry,
+              re.onboarding_status, re.onboarding_email_sent, re.onboarding_email_sent_at,
+              EXISTS(SELECT 1 FROM regular_labor_contracts rlc WHERE rlc.employee_id = re.id AND rlc.status = 'signed') AS has_signed_contract_row
+       FROM regular_employees re
        ${where}
        ORDER BY
-         CASE onboarding_status WHEN 'pending' THEN 0 WHEN 'ready' THEN 1 WHEN 'completed' THEN 2 ELSE 3 END,
-         hire_date DESC`,
+         CASE re.onboarding_status WHEN 'pending' THEN 0 WHEN 'ready' THEN 1 WHEN 'completed' THEN 2 ELSE 3 END,
+         re.hire_date DESC`,
       ...params,
     );
 
-    const enriched = await Promise.all(rows.map((r) => enrichEmployee(r)));
+    const enriched = rows.map((r) => enrichEmployeeSync(r, !!r.has_signed_contract_row));
 
-    // Totals across ALL active employees (not filtered)
-    const allRows = await dbAll(
-      "SELECT onboarding_status FROM regular_employees WHERE is_active = 1",
+    // 카운트 쿼리도 단일 aggregation 으로
+    const cnt = await dbGet(
+      `SELECT
+         COUNT(*)::int AS total,
+         SUM(CASE WHEN onboarding_status='pending'   THEN 1 ELSE 0 END)::int AS pending_count,
+         SUM(CASE WHEN onboarding_status='ready'     THEN 1 ELSE 0 END)::int AS ready_count,
+         SUM(CASE WHEN onboarding_status='completed' THEN 1 ELSE 0 END)::int AS completed_count
+       FROM regular_employees WHERE is_active = 1`
     );
-    const pendingCount = allRows.filter((r) => r.onboarding_status === 'pending').length;
-    const readyCount = allRows.filter((r) => r.onboarding_status === 'ready').length;
-    const completedCount = allRows.filter((r) => r.onboarding_status === 'completed').length;
 
     res.json({
       items: enriched,
-      total: allRows.length,
-      pending_count: pendingCount,
-      ready_count: readyCount,
-      completed_count: completedCount,
+      total: cnt?.total ?? 0,
+      pending_count: cnt?.pending_count ?? 0,
+      ready_count: cnt?.ready_count ?? 0,
+      completed_count: cnt?.completed_count ?? 0,
     });
   } catch (error: any) {
     console.error('GET /api/onboarding error:', error);

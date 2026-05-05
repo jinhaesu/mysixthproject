@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Calculator, Save } from "lucide-react";
 import { getSalarySettings, updateSalarySettings } from "@/lib/api";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { PageHeader, Card, Button, Input, SkeletonCard, useToast } from "@/components/ui";
 
 const fmt = new Intl.NumberFormat('ko-KR');
@@ -26,15 +26,6 @@ export default function SalaryManagePage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const verifyPassword = async (pw: string) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
 
   const handleSave = async (empId: number) => {
     setSaving(true);
@@ -49,7 +40,7 @@ export default function SalaryManagePage() {
 
   const filtered = data.filter(e => !search || e.name?.includes(search) || e.phone?.includes(search));
 
-  if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
+  if (!authorized) return <SessionPasswordGate title="기본급 관리 접근" onVerified={() => setAuthorized(true)} />;
 
   return (
     <div className="min-w-0 fade-in space-y-4">

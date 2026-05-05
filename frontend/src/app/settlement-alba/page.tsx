@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users } from "lucide-react";
 import { getConfirmedList, getWorkers } from "@/lib/api";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import ChartCard from "@/components/charts/ChartCard";
 import { SEMANTIC_COLORS } from "@/lib/chartColors";
@@ -154,16 +154,6 @@ export default function SettlementAlbaPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const verifyPassword = async (pw: string) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
-
   const calcEmp = (r: any, idx: number) => {
     const floor30 = (h: number) => Math.floor(h * 2) / 2;
     const otHours = floor30(r.overtime_hours);
@@ -199,7 +189,7 @@ export default function SettlementAlbaPage() {
     const a = document.createElement('a'); a.href = url; a.download = `알바정산_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
-  if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
+  if (!authorized) return <SessionPasswordGate title="알바(사업소득) 정산 접근" onVerified={() => setAuthorized(true)} />;
 
   return (
     <div className="min-w-0 space-y-4 fade-in">

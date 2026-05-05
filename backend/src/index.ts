@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.5.0',
+    version: '2.6.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -73,7 +73,8 @@ app.get('/api/health', (_req, res) => {
       payrollPhoneMatch: true,
       tzAwareHoliday: true,
       contractDateExplicit: true,
-      bodyLimit20mb: true,  // PR#48 — 통장사본 등 큰 파일 업로드 허용
+      bodyLimit20mb: true,
+      onboardingListSlim: true,  // PR#51 — 입사자 리스트 N+1 제거 + Base64 필드 boolean 변환
     },
   });
 });

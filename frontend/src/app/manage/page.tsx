@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getUploads, deleteUpload } from "@/lib/api";
 import type { Upload, AnalysisResult } from "@/types/attendance";
 import { Trash2, FileSpreadsheet, AlertTriangle, ChevronDown, ChevronUp, Database, RefreshCw, Tags } from "lucide-react";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import {
   PageHeader, Card, CardHeader, Section, Button, Badge, CenterSpinner,
   EmptyState, useToast,
@@ -18,15 +18,6 @@ export default function ManagePage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const verifyPassword = async (pw: string) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
 
   useEffect(() => {
     if (!authorized) return;
@@ -80,7 +71,7 @@ export default function ManagePage() {
     finally { setRecalcing(false); }
   };
 
-  if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
+  if (!authorized) return <SessionPasswordGate title="데이터 관리 접근" onVerified={() => setAuthorized(true)} />;
 
   return (
     <>

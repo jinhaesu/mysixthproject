@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users } from "lucide-react";
 import { getConfirmedList, getWorkers } from "@/lib/api";
-import PasswordGate from "@/components/PasswordGate";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import ChartCard from "@/components/charts/ChartCard";
 import { getColor } from "@/lib/chartColors";
@@ -157,16 +157,6 @@ export default function SettlementDispatchPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const verifyPassword = async (pw: string) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
-
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
 
   const calcEmp = (r: any, idx: number) => {
@@ -200,7 +190,7 @@ export default function SettlementDispatchPage() {
   const numKeys = ['work_days','regular_hours','overtime_hours','night_hours','weekly_holiday_hours','basePay','overtimePay','nightPay','whPay','grossPay','meal','net','np','hi','ia','ei','ltc','ins','fee','bv','vat','total'];
   numKeys.forEach(k => { totals[k] = rows.reduce((s: number, r: any) => s + (r[k] || 0), 0); });
 
-  if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
+  if (!authorized) return <SessionPasswordGate title="파견 정산 접근" onVerified={() => setAuthorized(true)} />;
 
   return (
     <div className="min-w-0 space-y-4 fade-in">

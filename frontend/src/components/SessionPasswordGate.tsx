@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Lock } from "lucide-react";
 
 const STORAGE_KEY = "secureGate_validUntil";
-const TTL_MS = 20 * 60 * 1000; // 20 minutes
+const TTL_MS = 30 * 60 * 1000; // 30 분 — 한 번 인증으로 모든 보안 메뉴 30분간 자유 접근
 
 function readValidUntil(): number {
   if (typeof window === "undefined") return 0;
@@ -129,7 +129,7 @@ export default function SessionPasswordGate({
             {title}
           </h2>
           <p className="text-[11.5px] text-[var(--text-3)] mt-1.5">
-            한 번 인증하면 20분간 잠긴 메뉴를 자유롭게 사용할 수 있습니다.
+            한 번 인증하면 <b>30분간</b> 모든 보안 메뉴를 자유롭게 사용할 수 있습니다.
           </p>
         </div>
         <input

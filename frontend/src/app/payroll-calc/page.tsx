@@ -4,8 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users } from "lucide-react";
 import { getPayrollCalc } from "@/lib/api";
-import PasswordGate from "@/components/PasswordGate";
-import { verifyAdminPassword } from "@/lib/verifyAdminPassword";
+import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import ChartCard, { TOOLTIP_STYLE } from "@/components/charts/ChartCard";
 import { getColor } from "@/lib/chartColors";
@@ -31,7 +30,6 @@ export default function PayrollCalcPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const verifyPassword = (pw: string) => verifyAdminPassword(pw);
 
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
 
@@ -68,7 +66,7 @@ export default function PayrollCalcPage() {
     const a = document.createElement('a'); a.href = url; a.download = `정규직급여_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
-  if (!authorized) return <PasswordGate onVerified={() => setAuthorized(true)} verifyPassword={verifyPassword} />;
+  if (!authorized) return <SessionPasswordGate title="급여 계산 접근" onVerified={() => setAuthorized(true)} />;
 
   return (
     <div className="min-w-0 fade-in space-y-4">

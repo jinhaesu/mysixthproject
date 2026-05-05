@@ -5,6 +5,7 @@ import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users } from "lucide-react";
 import { getPayrollCalc } from "@/lib/api";
 import PasswordGate from "@/components/PasswordGate";
+import { verifyAdminPassword } from "@/lib/verifyAdminPassword";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import ChartCard, { TOOLTIP_STYLE } from "@/components/charts/ChartCard";
 import { getColor } from "@/lib/chartColors";
@@ -30,15 +31,7 @@ export default function PayrollCalcPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const verifyPassword = async (pw: string) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/verify-password`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ password: pw }),
-    });
-    const body = await res.json();
-    return !!body.verified;
-  };
+  const verifyPassword = (pw: string) => verifyAdminPassword(pw);
 
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
 

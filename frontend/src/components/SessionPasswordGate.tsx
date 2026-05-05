@@ -63,6 +63,8 @@ export default function SessionPasswordGate({
     if (!pw.trim()) return;
     setChecking(true);
     setError("");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
@@ -74,9 +76,19 @@ export default function SessionPasswordGate({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ password: pw }),
+          signal: controller.signal,
         }
       );
-      const body = await res.json();
+      // 로그인 토큰 만료/누락 — AuthProvider 와 동일하게 자동 logout 처리
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          window.location.href = "/login";
+        }
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
       if (body.verified) {
         writeValidUntil(Date.now() + TTL_MS);
         setAuthorized(true);
@@ -86,9 +98,14 @@ export default function SessionPasswordGate({
         setPw("");
         inputRef.current?.focus();
       }
-    } catch {
-      setError("확인 중 오류가 발생했습니다.");
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        setError("서버 응답이 지연되어 시간 초과되었습니다. 잠시 후 다시 시도해주세요.");
+      } else {
+        setError("확인 중 오류가 발생했습니다.");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setChecking(false);
     }
   };

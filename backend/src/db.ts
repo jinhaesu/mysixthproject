@@ -12,6 +12,21 @@ function createPool() {
     process.exit(1);
   }
 
+  // Pool 옵션 강화 — 무거운 query hang 시 다른 요청들이 connection 못 받아 모든 메뉴가 멈추는 것 방지.
+  // statement_timeout: PostgreSQL 서버 측에서 30초 초과 query 자동 cancel (가장 강력한 방어).
+  // query_timeout: node-pg 클라이언트 측 timeout (네트워크/응답 지연 방어).
+  // connectionTimeoutMillis: Pool에서 connection 받지 못하면 10초 후 throw (영원히 대기 방지).
+  // idleTimeoutMillis: 30초간 idle 한 connection 회수.
+  // max: 20 — 동시 connection 한계 (default 10에서 상향).
+  const baseOpts = {
+    ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+    max: 20,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    query_timeout: 30_000,
+    statement_timeout: 30_000,
+  };
+
   try {
     const parsed = new URL(url);
     return new Pool({
@@ -20,13 +35,13 @@ function createPool() {
       host: parsed.hostname,
       port: parseInt(parsed.port) || 5432,
       database: parsed.pathname.slice(1) || 'postgres',
-      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+      ...baseOpts,
     });
   } catch {
     // Fallback to connection string
     return new Pool({
       connectionString: url,
-      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
+      ...baseOpts,
     });
   }
 }

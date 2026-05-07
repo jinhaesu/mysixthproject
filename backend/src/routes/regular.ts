@@ -1701,33 +1701,30 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const weekdayWorkDays = att ? att.work_days - (att.holiday_days || 0) : 0;
       const actualWorkDays = weekdayWorkDays;
 
-      // 입사월 여부 — 입사월은 'calendar-day 일할' 적용 + 결근 있으면 추가 차감.
+      // 입사월·퇴사월 여부 — 둘 중 하나라도 해당하면 '실제 평일 근무일 / 해당월 일수' 단순 일할.
+      // 사용자 정책: 콴(4/20 입~4/21 퇴, 1일 근무) → 1/30 일할 = 기본급의 1/30.
+      // 일반 직원은 결근 차감 모델 그대로.
       const hireMonth = hireDate ? hireDate.slice(0, 7) : '';
       const isFirstMonth = hireMonth === yearMonth;
+      const resignMonthStr = resignDate ? resignDate.slice(0, 7) : '';
+      const isResignMonth = resignMonthStr === yearMonth;
+      const isPartialMonth = isFirstMonth || isResignMonth;
+
       const hireDay = isFirstMonth ? parseInt(hireDate.slice(8, 10), 10) : 0;
       const workedCalDays = isFirstMonth ? Math.max(daysInMonth - hireDay + 1, 0) : 0;
 
-      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일 (모든 직원 동일 산정)
+      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일 (표시용 — 모든 직원 동일 산정)
       const absentDays = Math.max(elapsedScheduledDays - actualWorkDays, 0);
 
       // 기본급 일할 계산
       let basePay: number, mealAllowance: number, prorateRatio: number;
-      if (isFirstMonth) {
-        // 입사월: calendar 일할 × (마감 후 + 결근 있을 때만 추가 차감)
-        const calRatio = daysInMonth > 0 ? workedCalDays / daysInMonth : 1;
-        if (payrollClosed) {
-          // 마감 후: calendar 일할 × 결근 차감 (입사 후 평일 중 결근만큼 빠짐)
-          const absentRatio = totalScheduledDays > 0 ? Math.max((totalScheduledDays - absentDays) / totalScheduledDays, 0) : 1;
-          const finalRatio = calRatio * absentRatio;
-          prorateRatio = Math.round(finalRatio * 100);
-          basePay = Math.round(parseFloat(sal.base_pay) * finalRatio);
-          mealAllowance = Math.round(parseFloat(sal.meal_allowance) * finalRatio);
-        } else {
-          // 마감 전: calendar 일할만 (결근 차감은 마감 후 적용)
-          prorateRatio = Math.round(calRatio * 100);
-          basePay = Math.round(parseFloat(sal.base_pay) * calRatio);
-          mealAllowance = Math.round(parseFloat(sal.meal_allowance) * calRatio);
-        }
+      if (isPartialMonth) {
+        // 입사월 또는 퇴사월: 실제 평일 근무일 / 해당월 일수 단순 일할
+        // 결근 차감은 자동 반영됨 (분자 = actualWorkDays)
+        const ratio = daysInMonth > 0 ? Math.max(actualWorkDays / daysInMonth, 0) : 0;
+        prorateRatio = Math.round(ratio * 100);
+        basePay = Math.round(parseFloat(sal.base_pay) * ratio);
+        mealAllowance = Math.round(parseFloat(sal.meal_allowance) * ratio);
       } else if (payrollClosed) {
         // 일반 + 마감 후: 결근 차감
         const dailyRate = totalScheduledDays > 0 ? parseFloat(sal.base_pay) / totalScheduledDays : 0;

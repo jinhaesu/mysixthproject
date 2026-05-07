@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.9.0',
+    version: '2.10.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -77,7 +77,8 @@ app.get('/api/health', (_req, res) => {
       onboardingListSlim: true,
       poolHardened: true,
       onboardingSmartFields: true,
-      contractLatestSignedFirst: true,  // PR#55 — 최근 계약서 signed 우선
+      contractLatestSignedFirst: true,
+      payrollFirstMonthProrate: true,  // PR#56 — 입사월 calendar-day 일할 + 입사일 이전 records 제외
     },
   });
 });

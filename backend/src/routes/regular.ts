@@ -1546,13 +1546,29 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       ORDER BY employee_name, date
     `, yearMonth) as any[];
 
+    // 직원의 hire_date 맵 (phone-norm 기반) — confirmed_attendance 의 입사일 이전 records 제외용.
+    // 예: 4/15 입사자에게 4/8 records 가 있으면 actualWorkDays 부풀려져 결근 산정 왜곡됨.
+    const norm = (p: string) => (p || '').replace(/[-\s]/g, '').trim();
+    const hireMap = new Map<string, string>();
+    const empHireRows = await dbAll(`SELECT phone, name, hire_date FROM regular_employees WHERE is_active = 1 OR (resign_date != '' AND resign_date >= ?)`, `${yearMonth}-01`) as any[];
+    for (const r of empHireRows) {
+      if (!r.hire_date) continue;
+      const np = norm(r.phone);
+      if (np) hireMap.set(np, r.hire_date);
+      if (r.name) hireMap.set(`name:${r.name}`, r.hire_date);
+    }
+
     // Group by employee. Use phone as canonical key when available, fallback to name.
     // This merges records that arrived under different name spellings for the same person
     // (e.g., '파타' vs 'AHMAD AZHARUL FATA(파타)') so payroll totals match confirmed-list totals.
-    const norm = (p: string) => (p || '').replace(/[-\s]/g, '').trim();
     const keyFor = (rec: any) => norm(rec.employee_phone) || rec.employee_name;
     const empMap = new Map<string, { employee_name: string; employee_phone: string; total_regular: number; total_overtime: number; total_night: number; work_days: number; holiday_days: number; holiday_hours: number }>();
     for (const rec of allRecords) {
+      // 입사일 이전 records 는 카운트에서 제외 (출근 일수 부풀려짐 방지)
+      const np = norm(rec.employee_phone);
+      const empHire = (np && hireMap.get(np)) || hireMap.get(`name:${rec.employee_name}`);
+      if (empHire && rec.date < empHire) continue;
+
       const key = keyFor(rec);
       if (!empMap.has(key)) {
         empMap.set(key, { employee_name: rec.employee_name, employee_phone: rec.employee_phone, total_regular: 0, total_overtime: 0, total_night: 0, work_days: 0, holiday_days: 0, holiday_hours: 0 });
@@ -1685,12 +1701,28 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const weekdayWorkDays = att ? att.work_days - (att.holiday_days || 0) : 0;
       const actualWorkDays = weekdayWorkDays;
 
-      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일
-      const absentDays = Math.max(elapsedScheduledDays - actualWorkDays, 0);
+      // 입사월 여부 — 입사월은 결근 차감 대신 '입사일~월말 / 해당월 일수' 비율로 일할 적용.
+      // 한국 노무 관행: 월급제 직원이 월 도중 입사하면 calendar day 기준 일할.
+      const hireMonth = hireDate ? hireDate.slice(0, 7) : '';
+      const isFirstMonth = hireMonth === yearMonth;
+      const hireDay = isFirstMonth ? parseInt(hireDate.slice(8, 10), 10) : 0;
+      const workedCalDays = isFirstMonth ? Math.max(daysInMonth - hireDay + 1, 0) : 0;
 
-      // 기본급: 마감 후에만 결근 차감, 마감 전에는 전액
+      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일 (입사월은 0 처리)
+      const absentDays = isFirstMonth
+        ? 0
+        : Math.max(elapsedScheduledDays - actualWorkDays, 0);
+
+      // 기본급 일할 계산
       let basePay: number, mealAllowance: number, prorateRatio: number;
-      if (payrollClosed) {
+      if (isFirstMonth) {
+        // 입사월: calendar day 기준 일할 (예: 4/15 입사 → 16/30)
+        const ratio = daysInMonth > 0 ? workedCalDays / daysInMonth : 1;
+        prorateRatio = Math.round(ratio * 100);
+        basePay = Math.round(parseFloat(sal.base_pay) * ratio);
+        mealAllowance = Math.round(parseFloat(sal.meal_allowance) * ratio);
+      } else if (payrollClosed) {
+        // 일반 마감 후: 결근 차감
         const dailyRate = totalScheduledDays > 0 ? parseFloat(sal.base_pay) / totalScheduledDays : 0;
         const mealDailyRate = totalScheduledDays > 0 ? parseFloat(sal.meal_allowance) / totalScheduledDays : 0;
         prorateRatio = totalScheduledDays > 0 ? Math.round((1 - absentDays / totalScheduledDays) * 100) : 100;
@@ -1725,6 +1757,9 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         base_pay_full: parseFloat(sal.base_pay), base_pay: basePay,
         meal_allowance_full: parseFloat(sal.meal_allowance), meal_allowance: mealAllowance,
         prorate_ratio: prorateRatio,
+        is_first_month: isFirstMonth,
+        worked_calendar_days: workedCalDays,
+        days_in_month: daysInMonth,
         scheduled_work_days: totalScheduledDays, elapsed_scheduled_days: elapsedScheduledDays,
         actual_work_days: actualWorkDays, absent_days: absentDays,
         bonus: parseFloat(sal.bonus), position_allowance: parseFloat(sal.position_allowance),

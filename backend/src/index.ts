@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.7.0',
+    version: '2.8.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -75,7 +75,8 @@ app.get('/api/health', (_req, res) => {
       contractDateExplicit: true,
       bodyLimit20mb: true,
       onboardingListSlim: true,
-      poolHardened: true,  // PR#52 — DB pool 30s timeout + max 20 + idle 회수
+      poolHardened: true,
+      onboardingSmartFields: true,  // PR#53 — 보수총액 통합·외국인 한국문서 제외·회사 기본값
     },
   });
 });

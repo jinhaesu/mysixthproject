@@ -24,7 +24,8 @@ const router = Router();
 // ---------------------------------------------------------------------------
 // Required fields for onboarding completion
 // ---------------------------------------------------------------------------
-const BASE_REQUIRED_FIELDS = [
+// 한국인 + 외국인 모두 필요한 공통 필드
+const COMMON_REQUIRED_FIELDS = [
   'name',
   'phone',
   'email',
@@ -43,11 +44,13 @@ const BASE_REQUIRED_FIELDS = [
   'bank_name',
   'bank_account',
   'bank_slip_data',
-  'family_register_data',
-  'resident_register_data',
   'signed_contract_url',
 ] as const;
 
+// 한국인 전용 (외국인 발급 불가)
+const KOREAN_ONLY_FIELDS = ['family_register_data', 'resident_register_data'] as const;
+
+// 외국인 전용
 const FOREIGN_EXTRA_FIELDS = ['visa_type', 'visa_expiry', 'foreign_id_card_data'] as const;
 
 // Numeric fields where 0 means "missing"
@@ -56,23 +59,55 @@ const NUMERIC_FIELDS = new Set(['monthly_salary', 'weekly_work_hours']);
 // ---------------------------------------------------------------------------
 // Helper — compute missing fields for one employee row
 // hasSignedContract: true if regular_labor_contracts has a signed record
+// hasSalarySettings: true if regular_salary_settings 의 base_pay 등이 등록됨 → monthly_salary 충족으로 간주
+// companyDefaults: { job_code?, business_registration_no?, weekly_work_hours? } — 회사 기본값 fallback
 // ---------------------------------------------------------------------------
-function computeMissingFields(emp: any, hasSignedContract: boolean): string[] {
-  const fields: string[] = [...BASE_REQUIRED_FIELDS];
+function computeMissingFields(
+  emp: any,
+  hasSignedContract: boolean,
+  hasSalarySettings: boolean,
+  companyDefaults: { job_code?: string; business_registration_no?: string; weekly_work_hours?: number } = {},
+): string[] {
+  const fields: string[] = [...COMMON_REQUIRED_FIELDS];
   if (emp.nationality === 'FOREIGN') {
     fields.push(...FOREIGN_EXTRA_FIELDS);
+  } else {
+    // 한국인 (또는 미지정 default 'KR') 만 주민등록등본/가족관계증명서 검사
+    fields.push(...KOREAN_ONLY_FIELDS);
   }
 
   const missing: string[] = [];
   for (const field of fields) {
     const val = emp[field];
 
-    // signed_contract_url can be satisfied by a signed contract row
+    // signed_contract_url: 서명된 계약서 row 가 있으면 충족
     if (field === 'signed_contract_url') {
       if (hasSignedContract) continue;
       if (val && String(val).trim() !== '') continue;
       missing.push(field);
       continue;
+    }
+
+    // monthly_salary: regular_salary_settings 에 등록되어 있으면 충족
+    if (field === 'monthly_salary') {
+      if (hasSalarySettings) continue;
+      if (val && Number(val) > 0) continue;
+      missing.push(field);
+      continue;
+    }
+
+    // 회사 기본값 fallback 적용 필드
+    if (field === 'job_code' && (val === null || val === undefined || String(val).trim() === '')) {
+      if (companyDefaults.job_code) continue;
+      missing.push(field); continue;
+    }
+    if (field === 'business_registration_no' && (val === null || val === undefined || String(val).trim() === '')) {
+      if (companyDefaults.business_registration_no) continue;
+      missing.push(field); continue;
+    }
+    if (field === 'weekly_work_hours' && (!val || Number(val) === 0)) {
+      if (companyDefaults.weekly_work_hours && Number(companyDefaults.weekly_work_hours) > 0) continue;
+      missing.push(field); continue;
     }
 
     if (NUMERIC_FIELDS.has(field)) {
@@ -110,18 +145,35 @@ async function getEmailRecipients(): Promise<string[]> {
 // ---------------------------------------------------------------------------
 // Helper — enrich a single employee row with missing_fields + completion_pct
 // ---------------------------------------------------------------------------
-// 단일 직원 row 를 enrich. signed contract 존재 여부는 별도 쿼리로 (단건 조회용).
-async function enrichEmployee(emp: any): Promise<any> {
-  const signedRow = await dbGet(
-    "SELECT id FROM regular_labor_contracts WHERE employee_id = ? AND status = 'signed' LIMIT 1",
-    emp.id,
+// 회사 기본값 (admin_settings 에 JSON 저장)
+type CompanyDefaults = { job_code?: string; business_registration_no?: string; weekly_work_hours?: number };
+async function getCompanyDefaults(): Promise<CompanyDefaults> {
+  const row = await dbGet(
+    "SELECT value FROM admin_settings WHERE key = 'onboarding_company_defaults'",
   );
-  const hasSignedContract = !!signedRow;
-  return enrichEmployeeSync(emp, hasSignedContract);
+  if (!row) return {};
+  try { return JSON.parse(row.value) || {}; } catch { return {}; }
 }
 
-// 동기 enrich — list 쿼리에서 has_signed_contract 가 이미 같이 SELECT되므로 N+1 제거 가능
-function enrichEmployeeSync(emp: any, hasSignedContract: boolean): any {
+// 단일 직원 row 를 enrich. signed contract 존재 여부는 별도 쿼리로 (단건 조회용).
+async function enrichEmployee(emp: any): Promise<any> {
+  const [signedRow, salaryRow, defaults] = await Promise.all([
+    dbGet("SELECT id FROM regular_labor_contracts WHERE employee_id = ? AND status = 'signed' LIMIT 1", emp.id),
+    dbGet("SELECT base_pay, meal_allowance, position_allowance, other_allowance, bonus FROM regular_salary_settings WHERE employee_id = ?", emp.id),
+    getCompanyDefaults(),
+  ]);
+  const hasSignedContract = !!signedRow;
+  const hasSalarySettings = !!(salaryRow && (Number(salaryRow.base_pay) || 0) > 0);
+  return enrichEmployeeSync(emp, hasSignedContract, hasSalarySettings, defaults);
+}
+
+// 동기 enrich — list 쿼리에서 boolean 값들이 같이 SELECT되어 N+1 제거됨
+function enrichEmployeeSync(
+  emp: any,
+  hasSignedContract: boolean,
+  hasSalarySettings: boolean = false,
+  companyDefaults: CompanyDefaults = {},
+): any {
   // 큰 Base64 필드는 list 쿼리에서 boolean으로 변환되어 옴.
   // computeMissingFields 는 string 빈값 체크 — boolean 을 string 으로 proxy 변환.
   const proxy = {
@@ -132,11 +184,12 @@ function enrichEmployeeSync(emp: any, hasSignedContract: boolean): any {
     resident_register_data: emp.has_resident_register ? 'X' : '',
     signed_contract_url: emp.has_signed_contract_url ? 'X' : '',
   };
-  const missingFields = computeMissingFields(proxy, hasSignedContract);
+  const missingFields = computeMissingFields(proxy, hasSignedContract, hasSalarySettings, companyDefaults);
 
+  // 외국인은 한국인 전용 필드(주민등록등본/가족관계증명서) 검사 안함
   const totalFields =
-    BASE_REQUIRED_FIELDS.length +
-    (emp.nationality === 'FOREIGN' ? FOREIGN_EXTRA_FIELDS.length : 0);
+    COMMON_REQUIRED_FIELDS.length +
+    (emp.nationality === 'FOREIGN' ? FOREIGN_EXTRA_FIELDS.length : KOREAN_ONLY_FIELDS.length);
   const completionPct =
     totalFields > 0 ? Math.round(((totalFields - missingFields.length) / totalFields) * 100) : 100;
 
@@ -156,6 +209,7 @@ function enrichEmployeeSync(emp: any, hasSignedContract: boolean): any {
     has_family_register: !!has_family_register,
     has_resident_register: !!has_resident_register,
     has_signed_contract_url: !!has_signed_contract_url,
+    has_salary_settings: !!hasSalarySettings,
     missing_fields: missingFields,
     completion_pct: completionPct,
     has_signed_contract: hasSignedContract,
@@ -184,6 +238,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     // N+1 제거: has_signed_contract 를 list 쿼리에 같이 합쳐서 단일 쿼리로 처리.
     // 큰 Base64 필드 (bank_slip_data, foreign_id_card_data 등)는 boolean has_* 로 변환해서
     // 응답 body 크기를 수십 MB → 수백 KB 수준으로 축소.
+    // salary_settings(base_pay > 0) 도 LEFT JOIN으로 통합 → 별도 쿼리 없이 monthly_salary 충족 여부 판단
     const rows = await dbAll(
       `SELECT re.id, re.name, re.phone, re.email, re.address, re.department, re.team, re.role,
               re.hire_date, re.is_active, re.resigned_at,
@@ -198,7 +253,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
               re.non_taxable_meal, re.non_taxable_vehicle,
               re.business_registration_no, re.visa_type, re.visa_expiry,
               re.onboarding_status, re.onboarding_email_sent, re.onboarding_email_sent_at,
-              EXISTS(SELECT 1 FROM regular_labor_contracts rlc WHERE rlc.employee_id = re.id AND rlc.status = 'signed') AS has_signed_contract_row
+              EXISTS(SELECT 1 FROM regular_labor_contracts rlc WHERE rlc.employee_id = re.id AND rlc.status = 'signed') AS has_signed_contract_row,
+              COALESCE((SELECT (base_pay::numeric > 0) FROM regular_salary_settings WHERE employee_id = re.id LIMIT 1), false) AS has_salary_settings_row
        FROM regular_employees re
        ${where}
        ORDER BY
@@ -207,7 +263,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       ...params,
     );
 
-    const enriched = rows.map((r) => enrichEmployeeSync(r, !!r.has_signed_contract_row));
+    const defaults = await getCompanyDefaults();
+    const enriched = rows.map((r) => enrichEmployeeSync(r, !!r.has_signed_contract_row, !!r.has_salary_settings_row, defaults));
 
     // 카운트 쿼리도 단일 aggregation 으로
     const cnt = await dbGet(
@@ -317,6 +374,65 @@ router.put('/settings/email-recipients', async (req: AuthRequest, res: Response)
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// ---------------------------------------------------------------------------
+// 회사 기본값 (직종코드·사업장관리번호·소정근로시간) — 누락 검사 fallback + 일괄 적용
+// ---------------------------------------------------------------------------
+router.get('/settings/company-defaults', async (_req: AuthRequest, res: Response) => {
+  try { res.json(await getCompanyDefaults()); }
+  catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+router.put('/settings/company-defaults', async (req: AuthRequest, res: Response) => {
+  try {
+    const { job_code, business_registration_no, weekly_work_hours } = req.body || {};
+    const payload: CompanyDefaults = {};
+    if (typeof job_code === 'string') payload.job_code = job_code.trim();
+    if (typeof business_registration_no === 'string') payload.business_registration_no = business_registration_no.trim();
+    if (weekly_work_hours !== undefined && weekly_work_hours !== null && weekly_work_hours !== '') {
+      payload.weekly_work_hours = Number(weekly_work_hours);
+    }
+    await dbRun(
+      `INSERT INTO admin_settings (key, value, updated_at)
+       VALUES ('onboarding_company_defaults', ?, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      JSON.stringify(payload),
+    );
+    res.json(payload);
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// POST /api/onboarding/settings/company-defaults/apply-all
+// 회사 기본값을 비어있는 모든 직원에게 일괄 적용 (이미 값이 있는 직원은 건드리지 않음)
+router.post('/settings/company-defaults/apply-all', async (_req: AuthRequest, res: Response) => {
+  try {
+    const defaults = await getCompanyDefaults();
+    if (!defaults.job_code && !defaults.business_registration_no && !defaults.weekly_work_hours) {
+      res.status(400).json({ error: '회사 기본값이 설정되어 있지 않습니다.' });
+      return;
+    }
+    const clauses: string[] = [];
+    const params: any[] = [];
+    if (defaults.job_code) {
+      clauses.push("job_code = CASE WHEN COALESCE(job_code, '') = '' THEN ? ELSE job_code END");
+      params.push(defaults.job_code);
+    }
+    if (defaults.business_registration_no) {
+      clauses.push("business_registration_no = CASE WHEN COALESCE(business_registration_no, '') = '' THEN ? ELSE business_registration_no END");
+      params.push(defaults.business_registration_no);
+    }
+    if (defaults.weekly_work_hours) {
+      clauses.push("weekly_work_hours = CASE WHEN COALESCE(weekly_work_hours, 0) = 0 THEN ? ELSE weekly_work_hours END");
+      params.push(defaults.weekly_work_hours);
+    }
+    clauses.push('updated_at = NOW()');
+    const result = await dbRun(
+      `UPDATE regular_employees SET ${clauses.join(', ')} WHERE is_active = 1`,
+      ...params,
+    );
+    res.json({ success: true, updated: result.changes });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
 // ---------------------------------------------------------------------------
@@ -517,11 +633,13 @@ router.post('/:id/send-email', async (req: AuthRequest, res: Response) => {
     const { override = false } = req.body as { override?: boolean };
 
     if (!override) {
-      const signedRow = await dbGet(
-        "SELECT id FROM regular_labor_contracts WHERE employee_id = ? AND status = 'signed' LIMIT 1",
-        id,
-      );
-      const missingFields = computeMissingFields(emp, !!signedRow);
+      const [signedRow, salaryRow, defaults] = await Promise.all([
+        dbGet("SELECT id FROM regular_labor_contracts WHERE employee_id = ? AND status = 'signed' LIMIT 1", id),
+        dbGet("SELECT base_pay FROM regular_salary_settings WHERE employee_id = ?", id),
+        getCompanyDefaults(),
+      ]);
+      const hasSalarySettings = !!(salaryRow && (Number(salaryRow.base_pay) || 0) > 0);
+      const missingFields = computeMissingFields(emp, !!signedRow, hasSalarySettings, defaults);
       if (missingFields.length > 0) {
         res.status(400).json({
           error: `필수 정보가 누락되어 있습니다. 누락 항목: ${missingFields.join(', ')}`,

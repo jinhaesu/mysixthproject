@@ -772,6 +772,32 @@ export async function setOnboardingRecipients(emails: string[]) {
   });
 }
 
+// 회사 기본값 (직종코드·사업장관리번호·소정근로시간)
+export async function getOnboardingCompanyDefaults() {
+  return fetchAPI<{ job_code?: string; business_registration_no?: string; weekly_work_hours?: number }>(
+    '/api/onboarding/settings/company-defaults'
+  );
+}
+
+export async function setOnboardingCompanyDefaults(payload: {
+  job_code?: string;
+  business_registration_no?: string;
+  weekly_work_hours?: number;
+}) {
+  return fetchAPI<any>('/api/onboarding/settings/company-defaults', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function applyOnboardingCompanyDefaults() {
+  return fetchAPI<{ success: boolean; updated: number }>(
+    '/api/onboarding/settings/company-defaults/apply-all',
+    { method: 'POST' }
+  );
+}
+
 export async function bulkSendOnboardingLinks(ids: number[]) {
   return fetchAPI<any>('/api/onboarding/bulk-send-links', {
     method: 'POST',

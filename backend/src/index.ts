@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.12.0',
+    version: '2.13.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -80,7 +80,8 @@ app.get('/api/health', (_req, res) => {
       contractLatestSignedFirst: true,
       payrollFirstMonthProrate: true,
       payrollFirstMonthAbsentToo: true,
-      payrollPartialMonthSimple: true,  // 입사월·퇴사월 — actualWorkDays/daysInMonth 단순 일할
+      payrollPartialMonthSimple: true,
+      payrollPartialMonthCalRatio: true,  // 입사월·퇴사월 calRatio × workRatio (window 기반)
     },
   });
 });

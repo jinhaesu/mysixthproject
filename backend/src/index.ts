@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.6.0',
+    version: '2.7.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -74,7 +74,8 @@ app.get('/api/health', (_req, res) => {
       tzAwareHoliday: true,
       contractDateExplicit: true,
       bodyLimit20mb: true,
-      onboardingListSlim: true,  // PR#51 — 입사자 리스트 N+1 제거 + Base64 필드 boolean 변환
+      onboardingListSlim: true,
+      poolHardened: true,  // PR#52 — DB pool 30s timeout + max 20 + idle 회수
     },
   });
 });

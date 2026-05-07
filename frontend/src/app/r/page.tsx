@@ -935,18 +935,27 @@ function RegularContent() {
         {/* ── Onboarding info soft gate ──────────────────────────── */}
         {data && personalInfoDone && (data.status as string) !== "deactivated" && (() => {
           const d = data as any;
-          const missingEmail = !d.email;
-          const missingBankSlip = !d.bank_slip_data;
-          const missingForeign = d.nationality === "FOREIGN" && (!d.visa_type || !d.foreign_id_card_data);
-          const needsOnboarding = missingEmail || missingBankSlip || missingForeign;
-          if (!needsOnboarding) return null;
+          const missing: string[] = [];
+          if (!d.email) missing.push("이메일");
+          if (!d.bank_slip_data) missing.push("통장사본");
+          if (d.nationality === "FOREIGN") {
+            if (!d.visa_type) missing.push("비자종류");
+            if (!d.visa_expiry) missing.push("비자만료일");
+            if (!d.foreign_id_card_data) missing.push("외국인등록증 사본");
+          }
+          if (missing.length === 0) return null;
           return (
             <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-xl)] p-5 space-y-3">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-[var(--warning-fg)] shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold text-[var(--warning-fg)] text-[var(--fs-body)]">추가 정보가 필요합니다</p>
-                  <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-80 mt-0.5">먼저 입사 정보를 완성해주세요.</p>
+                  <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] opacity-80 mt-1 leading-relaxed">
+                    아래 항목을 입력해주세요:
+                  </p>
+                  <p className="text-[var(--fs-body)] text-[var(--warning-fg)] font-medium mt-1">
+                    {missing.join(" · ")}
+                  </p>
                 </div>
               </div>
               <a

@@ -50,7 +50,7 @@ function buildRegularContractsQuery(whereClause: string): string {
     LEFT JOIN LATERAL (
       SELECT * FROM regular_labor_contracts
       WHERE employee_id = re.id
-      ORDER BY created_at DESC
+      ORDER BY (CASE status WHEN 'signed' THEN 0 ELSE 1 END), created_at DESC
       LIMIT 1
     ) c ON true
     LEFT JOIN LATERAL (

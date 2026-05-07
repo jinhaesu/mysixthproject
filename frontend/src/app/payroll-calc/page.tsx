@@ -14,6 +14,8 @@ import {
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
+type SortKey = 'name' | 'department' | 'hire_date' | 'resign_date' | 'base_pay' | 'meal_allowance' | 'bonus' | 'actual_work_days' | 'absent_days' | 'overtime_hours' | 'holiday_hours' | 'gross_pay' | 'net_pay';
+
 export default function PayrollCalcPage() {
   const toast = useToast();
   const [authorized, setAuthorized] = useState(false);
@@ -21,6 +23,14 @@ export default function PayrollCalcPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [overtimeRate, setOvertimeRate] = useState(10030);
+  const [sortKey, setSortKey] = usePersistedState<SortKey>("pc_sortKey", "hire_date");
+  const [sortDir, setSortDir] = usePersistedState<"asc" | "desc">("pc_sortDir", "desc");
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === 'name' || key === 'department' ? "asc" : "desc"); }
+  };
+  const sortIcon = (key: SortKey) => sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : "";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,6 +75,20 @@ export default function PayrollCalcPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `정규직급여_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
   };
+
+  // 정렬 적용 — 기본 입사일 최근순. 컬럼 헤더 클릭으로 변경 가능
+  const sortedResults = [...results].sort((a: any, b: any) => {
+    const av = a?.[sortKey], bv = b?.[sortKey];
+    const dir = sortDir === "asc" ? 1 : -1;
+    // 빈 값은 항상 끝
+    const aEmpty = av === null || av === undefined || av === '';
+    const bEmpty = bv === null || bv === undefined || bv === '';
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+    return String(av).localeCompare(String(bv), 'ko') * dir;
+  });
 
   if (!authorized) return <SessionPasswordGate title="급여 계산 접근" onVerified={() => setAuthorized(true)} />;
 
@@ -165,13 +189,25 @@ export default function PayrollCalcPage() {
             <table className="w-full text-[10px]">
               <thead>
                 <tr className="bg-[var(--bg-canvas)] text-left whitespace-nowrap border-b border-[var(--border-1)]">
-                  {['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호'].map(h => (
-                    <th key={h} className="py-2 px-2 text-eyebrow">{h}</th>
-                  ))}
-                  {['기본급','식대','상여','직책수당','기타수당','출근/소정','결근','연장h','연장수당','휴일h','휴일수당'].map(h => (
-                    <th key={h} className="py-2 px-2 text-right text-eyebrow">{h}</th>
-                  ))}
-                  <th className="py-2 px-2 text-right font-bold text-[var(--success-fg)] text-eyebrow">지급액</th>
+                  <th className="py-2 px-2 text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('name')}>성명{sortIcon('name')}</th>
+                  <th className="py-2 px-2 text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('department')}>부서{sortIcon('department')}</th>
+                  <th className="py-2 px-2 text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('hire_date')}>입사일{sortIcon('hire_date')}</th>
+                  <th className="py-2 px-2 text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('resign_date')}>퇴사일{sortIcon('resign_date')}</th>
+                  <th className="py-2 px-2 text-eyebrow">은행</th>
+                  <th className="py-2 px-2 text-eyebrow">계좌번호</th>
+                  <th className="py-2 px-2 text-eyebrow">주민번호</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('base_pay')}>기본급{sortIcon('base_pay')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('meal_allowance')}>식대{sortIcon('meal_allowance')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('bonus')}>상여{sortIcon('bonus')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow">직책수당</th>
+                  <th className="py-2 px-2 text-right text-eyebrow">기타수당</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('actual_work_days')}>출근/소정{sortIcon('actual_work_days')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('absent_days')}>결근{sortIcon('absent_days')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('overtime_hours')}>연장h{sortIcon('overtime_hours')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow">연장수당</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('holiday_hours')}>휴일h{sortIcon('holiday_hours')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow">휴일수당</th>
+                  <th className="py-2 px-2 text-right font-bold text-[var(--success-fg)] text-eyebrow cursor-pointer select-none hover:text-[var(--brand-300)]" onClick={() => toggleSort('gross_pay')}>지급액{sortIcon('gross_pay')}</th>
                   <th className="py-2 px-2 text-right text-eyebrow">국민연금<br/><span className="text-[8px] text-[var(--text-4)]">4.5%</span></th>
                   <th className="py-2 px-2 text-right text-eyebrow">건강보험<br/><span className="text-[8px] text-[var(--text-4)]">3.545%</span></th>
                   <th className="py-2 px-2 text-right text-eyebrow">장기요양<br/><span className="text-[8px] text-[var(--text-4)]">12.81%</span></th>
@@ -179,11 +215,11 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right text-eyebrow">소득세</th>
                   <th className="py-2 px-2 text-right text-eyebrow">주민세</th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--danger-fg)] text-eyebrow">공제계</th>
-                  <th className="py-2 px-2 text-right font-bold text-[var(--brand-400)] text-eyebrow">실지급</th>
+                  <th className="py-2 px-2 text-right font-bold text-[var(--brand-400)] text-eyebrow cursor-pointer select-none hover:text-[var(--brand-300)]" onClick={() => toggleSort('net_pay')}>실지급{sortIcon('net_pay')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-1)]">
-                {results.map((r: any, i: number) => (
+                {sortedResults.map((r: any, i: number) => (
                   <tr key={i} className="hover:bg-[var(--bg-2)]/40 transition-colors whitespace-nowrap">
                     <td className="py-1.5 px-2 font-medium text-[var(--text-1)] sticky left-0 bg-[var(--bg-1)] z-10">{r.name}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)]">{r.department} {r.team}</td>

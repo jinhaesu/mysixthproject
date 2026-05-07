@@ -1701,35 +1701,42 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const weekdayWorkDays = att ? att.work_days - (att.holiday_days || 0) : 0;
       const actualWorkDays = weekdayWorkDays;
 
-      // 입사월 여부 — 입사월은 결근 차감 대신 '입사일~월말 / 해당월 일수' 비율로 일할 적용.
-      // 한국 노무 관행: 월급제 직원이 월 도중 입사하면 calendar day 기준 일할.
+      // 입사월 여부 — 입사월은 'calendar-day 일할' 적용 + 결근 있으면 추가 차감.
       const hireMonth = hireDate ? hireDate.slice(0, 7) : '';
       const isFirstMonth = hireMonth === yearMonth;
       const hireDay = isFirstMonth ? parseInt(hireDate.slice(8, 10), 10) : 0;
       const workedCalDays = isFirstMonth ? Math.max(daysInMonth - hireDay + 1, 0) : 0;
 
-      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일 (입사월은 0 처리)
-      const absentDays = isFirstMonth
-        ? 0
-        : Math.max(elapsedScheduledDays - actualWorkDays, 0);
+      // 결근일 = 오늘까지 경과 소정근로일 - 실제 근무일 (모든 직원 동일 산정)
+      const absentDays = Math.max(elapsedScheduledDays - actualWorkDays, 0);
 
       // 기본급 일할 계산
       let basePay: number, mealAllowance: number, prorateRatio: number;
       if (isFirstMonth) {
-        // 입사월: calendar day 기준 일할 (예: 4/15 입사 → 16/30)
-        const ratio = daysInMonth > 0 ? workedCalDays / daysInMonth : 1;
-        prorateRatio = Math.round(ratio * 100);
-        basePay = Math.round(parseFloat(sal.base_pay) * ratio);
-        mealAllowance = Math.round(parseFloat(sal.meal_allowance) * ratio);
+        // 입사월: calendar 일할 × (마감 후 + 결근 있을 때만 추가 차감)
+        const calRatio = daysInMonth > 0 ? workedCalDays / daysInMonth : 1;
+        if (payrollClosed) {
+          // 마감 후: calendar 일할 × 결근 차감 (입사 후 평일 중 결근만큼 빠짐)
+          const absentRatio = totalScheduledDays > 0 ? Math.max((totalScheduledDays - absentDays) / totalScheduledDays, 0) : 1;
+          const finalRatio = calRatio * absentRatio;
+          prorateRatio = Math.round(finalRatio * 100);
+          basePay = Math.round(parseFloat(sal.base_pay) * finalRatio);
+          mealAllowance = Math.round(parseFloat(sal.meal_allowance) * finalRatio);
+        } else {
+          // 마감 전: calendar 일할만 (결근 차감은 마감 후 적용)
+          prorateRatio = Math.round(calRatio * 100);
+          basePay = Math.round(parseFloat(sal.base_pay) * calRatio);
+          mealAllowance = Math.round(parseFloat(sal.meal_allowance) * calRatio);
+        }
       } else if (payrollClosed) {
-        // 일반 마감 후: 결근 차감
+        // 일반 + 마감 후: 결근 차감
         const dailyRate = totalScheduledDays > 0 ? parseFloat(sal.base_pay) / totalScheduledDays : 0;
         const mealDailyRate = totalScheduledDays > 0 ? parseFloat(sal.meal_allowance) / totalScheduledDays : 0;
         prorateRatio = totalScheduledDays > 0 ? Math.round((1 - absentDays / totalScheduledDays) * 100) : 100;
         basePay = Math.round(parseFloat(sal.base_pay) - dailyRate * absentDays);
         mealAllowance = Math.round(parseFloat(sal.meal_allowance) - mealDailyRate * absentDays);
       } else {
-        // 마감 전: 기본급 전액
+        // 일반 + 마감 전: 기본급 전액
         basePay = parseFloat(sal.base_pay);
         mealAllowance = parseFloat(sal.meal_allowance);
         prorateRatio = 100;

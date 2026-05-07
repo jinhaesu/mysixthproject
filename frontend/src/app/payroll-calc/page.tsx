@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users } from "lucide-react";
 import { getPayrollCalc } from "@/lib/api";
@@ -68,12 +69,43 @@ export default function PayrollCalcPage() {
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금','건강보험','장기요양','고용보험','소득세','주민세','공제계','실지급액'];
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name, r.bank_account, r.id_number, r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, (r.holiday_hours || 0).toFixed(1), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
-    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `정규직급여_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
+    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','실지급액'];
+    // 계좌번호·주민번호는 텍스트로 강제(엑셀 자동 숫자 변환·지수 표기 방지). 빈 칸은 빈 문자열로.
+    const TEXT_COLS = new Set([5, 6]);
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    rows.forEach((row: any[], ri: number) => {
+      TEXT_COLS.forEach(ci => {
+        const addr = XLSX.utils.encode_cell({ r: ri + 1, c: ci });
+        const cell = ws[addr];
+        if (cell) { cell.t = 's'; cell.v = row[ci]; cell.z = '@'; }
+      });
+    });
+
+    // 요율 기준 시트 — 4대보험·세금 산정 근거
+    const ratesSheet = XLSX.utils.aoa_to_sheet([
+      ['항목', '요율', '과세표준', '비고'],
+      ['국민연금', '4.5%', '기본급 + 식대', '근로자 부담분 (사업주 동일 4.5% 별도 부담)'],
+      ['건강보험', '3.545%', '기본급 + 식대', '근로자 부담분 (2024년 보수월액 기준)'],
+      ['장기요양보험', '12.81%', '건강보험료', '건강보험료 × 12.81% (근로자 부담분)'],
+      ['고용보험', '0.9%', '기본급 + 식대', '근로자 부담분 (실업급여 기여분)'],
+      ['소득세', '3%', '지급액 (기본급+식대+상여+수당+연장+휴일)', '간이세액 근사치 — 정확한 산정은 간이세액표 적용 필요'],
+      ['지방소득세(주민세)', '10%', '소득세', '소득세 × 10%'],
+      [],
+      ['※ 일할 계산 적용', '', '', ''],
+      ['입사월·퇴사월', 'calendar 일할 × 근무율', '입사일~퇴사일 window', '예) 4/1 입사·22일 평일 모두 근무 → 30/30 × 22/22 = 100%'],
+      ['일반월(마감 후)', '결근 차감', '월 소정근로일', '결근일 × (월급 / 소정근로일) 차감'],
+      ['일반월(마감 전)', '전액 지급', '-', '결근 차감은 마감 후 적용'],
+      [],
+      ['연장수당', '시급 × 시간 × 1.5배', '연장 근로시간', '50% 가산'],
+      ['휴일수당', '시급 × 시간 × 1.5배', '휴일 근로시간', '50% 가산'],
+    ]);
+    ratesSheet['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 36 }, { wch: 60 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '급여');
+    XLSX.utils.book_append_sheet(wb, ratesSheet, '요율 기준');
+    XLSX.writeFile(wb, `정규직급여_${yearMonth}.xlsx`);
   };
 
   // 정렬 적용 — 기본 입사일 최근순. 컬럼 헤더 클릭으로 변경 가능

@@ -38,6 +38,9 @@ import {
   sendRegularLink,
   bulkSendOnboardingLinks,
   bulkUpdateOnboarding,
+  getOnboardingCompanyDefaults,
+  setOnboardingCompanyDefaults,
+  applyOnboardingCompanyDefaults,
 } from "@/lib/api";
 import {
   Search,
@@ -1017,6 +1020,8 @@ export default function OnboardingPage() {
         description="정규직 입사자 정보 수집 현황 · 4대보험 취득신고 안내"
       />
 
+      <CompanyDefaultsCard />
+
       {/* Always-visible InfoBox */}
       <div className="mb-4 p-3 rounded-[var(--r-md)] bg-[var(--info-bg)] border border-[var(--info-border)] text-[12px] text-[var(--info-fg)]">
         <div className="font-medium mb-1">사용 방법</div>
@@ -1103,5 +1108,97 @@ export default function OnboardingPage() {
         onSaved={refreshList}
       />
     </>
+  );
+}
+
+// ── 회사 기본값 카드 ──────────────────────────────────────────────
+function CompanyDefaultsCard() {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ job_code: "", business_registration_no: "", weekly_work_hours: "" });
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    getOnboardingCompanyDefaults()
+      .then((d) => {
+        setForm({
+          job_code: d.job_code || "",
+          business_registration_no: d.business_registration_no || "",
+          weekly_work_hours: d.weekly_work_hours ? String(d.weekly_work_hours) : "",
+        });
+        setLoaded(true);
+        // 비어있으면 자동 펼침 (입력 유도)
+        if (!d.job_code && !d.business_registration_no && !d.weekly_work_hours) setOpen(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  const allEmpty = !form.job_code && !form.business_registration_no && !form.weekly_work_hours;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await setOnboardingCompanyDefaults({
+        job_code: form.job_code || undefined,
+        business_registration_no: form.business_registration_no || undefined,
+        weekly_work_hours: form.weekly_work_hours ? Number(form.weekly_work_hours) : undefined,
+      });
+      toast.success("회사 기본값이 저장되었습니다.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleApply = async () => {
+    if (!confirm("이 기본값을 비어있는 모든 직원에게 일괄 적용할까요? 이미 값이 있는 직원은 그대로 유지됩니다.")) return;
+    setApplying(true);
+    try {
+      const r = await applyOnboardingCompanyDefaults();
+      toast.success(`${r.updated}명에게 적용되었습니다.`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setApplying(false); }
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <div className={`mb-4 rounded-[var(--r-md)] border ${allEmpty ? 'border-[var(--warning-border)] bg-[var(--warning-bg)]' : 'border-[var(--border-1)] bg-[var(--bg-1)]'}`}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-[var(--text-1)]">회사 기본값</span>
+          <span className="text-[11.5px] text-[var(--text-3)]">직종코드·사업장관리번호·소정근로시간 — 일괄 적용 가능</span>
+          {allEmpty && <span className="text-[11px] text-[var(--warning-fg)] font-medium">⚠ 미설정</span>}
+        </div>
+        <span className="text-[var(--text-3)] text-[12px]">{open ? "접기 ▲" : "펼치기 ▼"}</span>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-[var(--border-1)] pt-3">
+          <p className="text-[11.5px] text-[var(--text-3)]">
+            직종코드·사업장관리번호·소정근로시간은 회사 전체 동일 값을 사용하는 게 일반적입니다.
+            여기에 한 번 입력하고 <b>일괄 적용</b>을 누르면 비어있는 모든 직원에게 자동 적용됩니다.
+            (이미 값이 있는 직원은 그대로 유지)
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Field label="직종코드" hint="고용·산재 신고용 6자리">
+              <Input value={form.job_code} onChange={(e) => setForm({ ...form, job_code: e.target.value })} />
+            </Field>
+            <Field label="사업장관리번호" hint="4대보험 신고용">
+              <Input value={form.business_registration_no} onChange={(e) => setForm({ ...form, business_registration_no: e.target.value })} />
+            </Field>
+            <Field label="소정근로시간 (주)" hint="기본 40">
+              <Input type="number" value={form.weekly_work_hours} onChange={(e) => setForm({ ...form, weekly_work_hours: e.target.value })} />
+            </Field>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="primary" loading={saving} onClick={handleSave}>저장</Button>
+            <Button size="sm" variant="secondary" loading={applying} onClick={handleApply}>비어있는 직원에 일괄 적용</Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

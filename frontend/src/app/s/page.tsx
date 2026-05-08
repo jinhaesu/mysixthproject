@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchSurveyPublic, submitClockIn, submitClockOut } from "@/lib/api";
 import { t } from "@/lib/translations";
@@ -72,8 +72,21 @@ function SurveyContent() {
   const [contractDone, setContractDone] = useState(false);
   const [contractAddress, setContractAddress] = useState("");
   const [contractSubmitting, setContractSubmitting] = useState(false);
-  const [signatureRef, setSignatureRef] = useState<HTMLCanvasElement | null>(null);
+  const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const signatureInitedRef = useRef(false);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  // 캔버스 흰색 초기화는 첫 마운트 시 한 번만. 이전: inline ref 콜백 안에서 fillRect 가
+  // 매 리렌더마다(예: setIsDrawing) 호출되어 그린 서명이 즉시 지워졌던 버그.
+  useEffect(() => {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas || signatureInitedRef.current) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    signatureInitedRef.current = true;
+  });
 
   const loadSurvey = useCallback(async () => {
     if (!token) {
@@ -185,11 +198,12 @@ function SurveyContent() {
   useEffect(() => { checkContract(); }, [checkContract]);
 
   const startDrawing = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!signatureRef) return;
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
     setIsDrawing(true);
-    const ctx = signatureRef.getContext('2d');
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = signatureRef.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const x = 'touches' in e ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
     const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
     ctx.beginPath();
@@ -197,10 +211,11 @@ function SurveyContent() {
   };
 
   const draw = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDrawing || !signatureRef) return;
-    const ctx = signatureRef.getContext('2d');
+    const canvas = signatureCanvasRef.current;
+    if (!isDrawing || !canvas) return;
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = signatureRef.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const x = 'touches' in e ? e.touches[0].clientX - rect.left : (e as React.MouseEvent).clientX - rect.left;
     const y = 'touches' in e ? e.touches[0].clientY - rect.top : (e as React.MouseEvent).clientY - rect.top;
     ctx.lineWidth = 2;
@@ -213,11 +228,12 @@ function SurveyContent() {
   const stopDrawing = () => setIsDrawing(false);
 
   const clearSignature = () => {
-    if (!signatureRef) return;
-    const ctx = signatureRef.getContext('2d');
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, signatureRef.width, signatureRef.height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
 
   const handleContractSubmit = async () => {
@@ -225,11 +241,12 @@ function SurveyContent() {
       alert('이름과 주소를 입력해주세요.');
       return;
     }
-    if (!signatureRef) return;
-    const signatureData = signatureRef.toDataURL();
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const signatureData = canvas.toDataURL();
     const blankCanvas = document.createElement('canvas');
-    blankCanvas.width = signatureRef.width;
-    blankCanvas.height = signatureRef.height;
+    blankCanvas.width = canvas.width;
+    blankCanvas.height = canvas.height;
     const blankCtx = blankCanvas.getContext('2d');
     if (blankCtx) { blankCtx.fillStyle = '#FFFFFF'; blankCtx.fillRect(0, 0, blankCanvas.width, blankCanvas.height); }
     if (signatureData === blankCanvas.toDataURL()) {
@@ -628,10 +645,7 @@ function SurveyContent() {
                 <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">서명 <span className="text-[var(--danger-fg)]">*</span></label>
                 <div className="border-2 border-[var(--border-2)] rounded-[var(--r-md)] overflow-hidden relative" style={{ touchAction: 'none' }}>
                   <canvas
-                    ref={(el) => {
-                      setSignatureRef(el);
-                      if (el) { const ctx = el.getContext('2d'); if (ctx) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, el.width, el.height); } }
-                    }}
+                    ref={signatureCanvasRef}
                     width={320}
                     height={150}
                     className="w-full cursor-crosshair bg-white"

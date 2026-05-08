@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.15.0',
+    version: '2.16.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -85,6 +85,7 @@ app.get('/api/health', (_req, res) => {
       payrollHolidayIncludeNight: true,   // 야간 근로자 토요일 근무 시 nightH 도 holiday_hours 에 합산
       payrollAdjustment: true,            // 기타(조정) 입력 — 과지급/미지급 정산
       payrollPaymentStatus: true,         // 지급 완료 상태 추적
+      nonBlockingDbInit: true,            // DB 마이그레이션 비동기 — 부팅 시 502 방지
     },
   });
 });
@@ -99,17 +100,23 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
 });
 
-// Initialize database and start server
+// Start server immediately — DB schema migrations run in background.
+// 이전: initializeDB() 가 30s 이상 걸리면 app.listen 까지 도달 못해 Railway 502.
+// 이제: 서버는 즉시 listen, 마이그레이션은 비동기로 best-effort 실행.
+// 테이블/컬럼 추가는 IF NOT EXISTS 라 매 부팅마다 안전하게 재실행됨.
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
 initializeDB()
   .then(() => {
+    console.log('Database migrations completed');
     startReminderService();
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
   })
   .catch((err) => {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
+    console.error('Database migration failed (server still running):', err);
+    // 서버는 계속 동작 — 기존 스키마로 운영 가능
+    startReminderService();
   });
 
 export default app;

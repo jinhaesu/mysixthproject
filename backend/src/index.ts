@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.16.0',
+    version: '2.17.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -86,6 +86,7 @@ app.get('/api/health', (_req, res) => {
       payrollAdjustment: true,            // 기타(조정) 입력 — 과지급/미지급 정산
       payrollPaymentStatus: true,         // 지급 완료 상태 추적
       nonBlockingDbInit: true,            // DB 마이그레이션 비동기 — 부팅 시 502 방지
+      employeeLoans: true,                // 직원 대출 관리 + 급여대장 자동 차감
     },
   });
 });

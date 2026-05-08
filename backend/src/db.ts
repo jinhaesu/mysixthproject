@@ -721,6 +721,34 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Payroll payment status (지급 완료) — 마감과 별개로 실제 지급이 완료된 시점 기록
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_payroll_payment (
+        id SERIAL PRIMARY KEY,
+        year_month TEXT NOT NULL UNIQUE,
+        paid_at TIMESTAMPTZ DEFAULT NOW(),
+        paid_by TEXT DEFAULT ''
+      )
+    `);
+  } catch {}
+
+  // Payroll adjustments (기타 — 과지급/미지급 정산용 직원별 조정 금액)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS regular_payroll_adjustments (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        year_month TEXT NOT NULL,
+        amount NUMERIC(12,0) DEFAULT 0,
+        memo TEXT DEFAULT '',
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(employee_id, year_month)
+      );
+      CREATE INDEX IF NOT EXISTS idx_regular_payroll_adj_ym ON regular_payroll_adjustments(year_month);
+    `);
+  } catch {}
+
   // Offboarding management
   try {
     await pool.query(`

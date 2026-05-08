@@ -628,6 +628,15 @@ export async function closePayroll(yearMonth: string) {
 export async function cancelPayrollClosing(yearMonth: string) {
   return fetchAPI<any>(`/api/regular/payroll-closing/${yearMonth}`, { method: 'DELETE' });
 }
+export async function savePayrollAdjustment(employeeId: number, yearMonth: string, amount: number, memo: string) {
+  return fetchAPI<any>(`/api/regular/payroll-adjustment`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee_id: employeeId, year_month: yearMonth, amount, memo }) });
+}
+export async function markPayrollPaid(yearMonth: string) {
+  return fetchAPI<any>(`/api/regular/payroll-payment/${yearMonth}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+}
+export async function unmarkPayrollPaid(yearMonth: string) {
+  return fetchAPI<any>(`/api/regular/payroll-payment/${yearMonth}`, { method: 'DELETE' });
+}
 
 export async function getSettlement(yearMonth: string, type: string) {
   return fetchAPI<any>(`/api/survey/settlement?year_month=${yearMonth}&type=${type}`);

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Download, Users } from "lucide-react";
-import { getPayrollCalc } from "@/lib/api";
+import { Calculator, Download, Users, Check } from "lucide-react";
+import { getPayrollCalc, savePayrollAdjustment, markPayrollPaid, unmarkPayrollPaid } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import ChartCard, { TOOLTIP_STYLE } from "@/components/charts/ChartCard";
@@ -15,7 +15,7 @@ import {
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
-type SortKey = 'name' | 'department' | 'hire_date' | 'resign_date' | 'base_pay' | 'meal_allowance' | 'bonus' | 'actual_work_days' | 'absent_days' | 'overtime_hours' | 'holiday_hours' | 'gross_pay' | 'net_pay';
+type SortKey = 'name' | 'department' | 'hire_date' | 'resign_date' | 'base_pay' | 'meal_allowance' | 'bonus' | 'actual_work_days' | 'absent_days' | 'overtime_hours' | 'holiday_hours' | 'gross_pay' | 'adjustment_amount' | 'net_pay';
 
 export default function PayrollCalcPage() {
   const toast = useToast();
@@ -44,6 +44,26 @@ export default function PayrollCalcPage() {
 
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
 
+  // 직원별 기타(조정) 로컬 상태 — 즉시 반응 + debounced 서버 저장
+  const [adjustments, setAdjustments] = useState<Record<number, number>>({});
+  useEffect(() => {
+    // 서버 데이터 로드 시 로컬 상태 초기화 (이미 편집중인 값 보존하지 않음 — 월 변경시 재초기화)
+    const init: Record<number, number> = {};
+    (data?.results || []).forEach((r: any) => { if (r.employee_id != null) init[r.employee_id] = r.adjustment_amount || 0; });
+    setAdjustments(init);
+  }, [data]);
+
+  const saveTimers = useRef<Record<number, any>>({});
+  const onAdjustmentChange = (employeeId: number, value: string) => {
+    const num = parseInt((value || '').replace(/[^\-0-9]/g, ''), 10) || 0;
+    setAdjustments(prev => ({ ...prev, [employeeId]: num }));
+    if (saveTimers.current[employeeId]) clearTimeout(saveTimers.current[employeeId]);
+    saveTimers.current[employeeId] = setTimeout(async () => {
+      try { await savePayrollAdjustment(employeeId, yearMonth, num, ''); }
+      catch (e: any) { toast.error(e.message); }
+    }, 600);
+  };
+
   const results = (data?.results || []).map((r: any) => {
     const otHours = floor30(r.overtime_hours || 0);
     const holHours = floor30(r.holiday_hours || 0);
@@ -62,17 +82,18 @@ export default function PayrollCalcPage() {
     const it = Math.round(gross * 0.03);
     const lt = Math.round(it * 0.1);
     const ded = np + hi + ltc + ei + it + lt;
-    const net = gross - ded;
-    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: gross, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: it, local_tax: lt, total_deductions: ded, net_pay: net };
+    const adj = adjustments[r.employee_id] ?? r.adjustment_amount ?? 0;
+    const net = gross - ded + adj;
+    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: gross, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: it, local_tax: lt, total_deductions: ded, adjustment_amount: adj, net_pay: net };
   });
 
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','실지급액'];
+    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','기타(±조정)','실지급액'];
     // 계좌번호·주민번호는 텍스트로 강제(엑셀 자동 숫자 변환·지수 표기 방지). 빈 칸은 빈 문자열로.
     const TEXT_COLS = new Set([5, 6]);
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.adjustment_amount || 0, r.net_pay]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
     rows.forEach((row: any[], ri: number) => {
       TEXT_COLS.forEach(ci => {
@@ -99,6 +120,9 @@ export default function PayrollCalcPage() {
       [],
       ['연장수당', '시급 × 시간 × 1.5배', '연장 근로시간', '50% 가산'],
       ['휴일수당', '시급 × 시간 × 1.5배', '휴일 근로시간', '50% 가산'],
+      [],
+      ['※ 기타(조정)', '', '', ''],
+      ['기타', '+/- 임의 금액', '실지급액에 가산', '과지급/미지급 정산용 — 4대보험·세금 영향 없음 (이미 과거에 과세 처리된 금액의 조정)'],
     ]);
     ratesSheet['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 36 }, { wch: 60 }];
 
@@ -124,6 +148,19 @@ export default function PayrollCalcPage() {
 
   if (!authorized) return <SessionPasswordGate title="급여 계산 접근" onVerified={() => setAuthorized(true)} />;
 
+  const isPaid = !!data?.is_paid;
+  const handleMarkPaid = async () => {
+    if (isPaid) {
+      if (!confirm('지급 완료 상태를 취소할까요?')) return;
+      try { await unmarkPayrollPaid(yearMonth); toast.success('지급 완료 취소됨'); load(); }
+      catch (e: any) { toast.error(e.message); }
+    } else {
+      if (!confirm(`${yearMonth} 급여를 지급 완료 처리할까요?\n(기록만 변경됩니다 — 실제 송금은 별도)`)) return;
+      try { await markPayrollPaid(yearMonth); toast.success('지급 완료 처리됨'); load(); }
+      catch (e: any) { toast.error(e.message); }
+    }
+  };
+
   return (
     <div className="min-w-0 fade-in space-y-4">
       <PageHeader
@@ -132,9 +169,19 @@ export default function PayrollCalcPage() {
         description="확정 근태 + 기본급 설정 기반 급여 자동 계산"
         actions={
           results.length > 0 ? (
-            <Button variant="secondary" size="sm" leadingIcon={<Download size={14} />} onClick={handleExcel}>
-              엑셀 다운로드
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={isPaid ? "ghost" : "primary"}
+                size="sm"
+                leadingIcon={<Check size={14} />}
+                onClick={handleMarkPaid}
+              >
+                {isPaid ? '지급 완료 취소' : '지급 완료'}
+              </Button>
+              <Button variant="secondary" size="sm" leadingIcon={<Download size={14} />} onClick={handleExcel}>
+                엑셀 다운로드
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -161,6 +208,14 @@ export default function PayrollCalcPage() {
               {data.is_closed ? '마감 완료' : '미마감'}
               {data.is_closed && data.closed_at && (
                 <span className="ml-1 text-[var(--text-3)]">({new Date(data.closed_at).toLocaleDateString('ko-KR')})</span>
+              )}
+            </Badge>
+          )}
+          {data && (
+            <Badge tone={isPaid ? 'success' : 'neutral'} dot>
+              {isPaid ? '지급 완료' : '지급 대기'}
+              {isPaid && data.paid_at && (
+                <span className="ml-1 text-[var(--text-3)]">({new Date(data.paid_at).toLocaleDateString('ko-KR')})</span>
               )}
             </Badge>
           )}
@@ -247,6 +302,7 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right text-eyebrow">소득세</th>
                   <th className="py-2 px-2 text-right text-eyebrow">주민세</th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--danger-fg)] text-eyebrow">공제계</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('adjustment_amount')}>기타{sortIcon('adjustment_amount')}<br/><span className="text-[8px] text-[var(--text-4)]">±조정</span></th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--brand-400)] text-eyebrow cursor-pointer select-none hover:text-[var(--brand-300)]" onClick={() => toggleSort('net_pay')}>실지급{sortIcon('net_pay')}</th>
                 </tr>
               </thead>
@@ -282,6 +338,17 @@ export default function PayrollCalcPage() {
                     <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.income_tax)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.local_tax)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--danger-fg)] font-medium">{fmt.format(r.total_deductions)}</td>
+                    <td className="py-1 px-1 text-right">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="w-20 px-1.5 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none"
+                        value={(adjustments[r.employee_id] ?? r.adjustment_amount ?? 0) === 0 ? '' : String(adjustments[r.employee_id] ?? r.adjustment_amount ?? 0)}
+                        onChange={(e) => onAdjustmentChange(r.employee_id, e.target.value)}
+                        placeholder="0"
+                        title="과지급(-) / 미지급(+) 조정 금액"
+                      />
+                    </td>
                     <td className="py-1.5 px-2 text-right tabular font-bold text-[var(--brand-400)]">{fmt.format(r.net_pay)}</td>
                   </tr>
                 ))}
@@ -302,6 +369,7 @@ export default function PayrollCalcPage() {
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('income_tax'))}</td>
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('local_tax'))}</td>
                   <td className="py-2 px-2 text-right tabular text-[var(--danger-fg)]">{fmt.format(sum('total_deductions'))}</td>
+                  <td className="py-2 px-2 text-right tabular">{fmt.format(sum('adjustment_amount'))}</td>
                   <td className="py-2 px-2 text-right tabular text-[var(--brand-400)]">{fmt.format(sum('net_pay'))}</td>
                 </tr>
               </tfoot>

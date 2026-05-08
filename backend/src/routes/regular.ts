@@ -1637,7 +1637,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
 
     // Get salary settings
     const salaries = await dbAll(`
-      SELECT re.name, re.phone, re.department, re.team, re.hire_date,
+      SELECT re.id as employee_id, re.name, re.phone, re.department, re.team, re.hire_date,
              COALESCE(re.resign_date, '') as resign_date,
              COALESCE(re.bank_name, '') as bank_name,
              COALESCE(re.bank_account, '') as bank_account,
@@ -1647,11 +1647,14 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
              COALESCE(ss.bonus, 0) as bonus,
              COALESCE(ss.position_allowance, 0) as position_allowance,
              COALESCE(ss.other_allowance, 0) as other_allowance,
-             COALESCE(ss.overtime_hourly_rate, 0) as overtime_hourly_rate
+             COALESCE(ss.overtime_hourly_rate, 0) as overtime_hourly_rate,
+             COALESCE(adj.amount, 0) as adjustment_amount,
+             COALESCE(adj.memo, '') as adjustment_memo
       FROM regular_employees re
       LEFT JOIN regular_salary_settings ss ON re.id = ss.employee_id
+      LEFT JOIN regular_payroll_adjustments adj ON re.id = adj.employee_id AND adj.year_month = ?
       WHERE re.is_active = 1 OR (re.resign_date != '' AND re.resign_date >= ?)
-    `, monthStart) as any[];
+    `, yearMonth, monthStart) as any[];
 
     // 마감 여부 먼저 확인 (마감 전이면 기본급 전액, 마감 후면 결근 차감)
     const closingCheck = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
@@ -1762,9 +1765,14 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const incomeTax = Math.round(grossPay * 0.03);  // 약 3% 근사
       const localTax = Math.round(incomeTax * 0.1);   // 지방세 10%
 
-      const netPay = grossPay - totalDeductions - incomeTax - localTax;
+      // 기타(조정) — 과지급/미지급 정산용 +/- 금액. 4대보험·세금 영향 없이 실지급액에만 가산.
+      const adjustmentAmount = parseFloat(sal.adjustment_amount) || 0;
+      const adjustmentMemo = sal.adjustment_memo || '';
+
+      const netPay = grossPay - totalDeductions - incomeTax - localTax + adjustmentAmount;
 
       results.push({
+        employee_id: sal.employee_id,
         name: sal.name, phone: sal.phone, department: sal.department, team: sal.team,
         hire_date: sal.hire_date || '', resign_date: resignDate,
         bank_name: sal.bank_name || '', bank_account: sal.bank_account || '', id_number: sal.id_number || '',
@@ -1793,6 +1801,8 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         income_tax: incomeTax,
         local_tax: localTax,
         total_deductions: totalDeductions + incomeTax + localTax,
+        adjustment_amount: adjustmentAmount,
+        adjustment_memo: adjustmentMemo,
         net_pay: netPay,
       });
     }
@@ -1800,8 +1810,16 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     // 마감 여부 확인
     const closing = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
     const isClosed = !!closing;
+    // 지급 완료 여부
+    const payment = await dbGet('SELECT * FROM regular_payroll_payment WHERE year_month = ?', yearMonth) as any;
+    const isPaid = !!payment;
 
-    res.json({ year_month: yearMonth, is_closed: isClosed, closed_at: closing?.closed_at || null, results });
+    res.json({
+      year_month: yearMonth,
+      is_closed: isClosed, closed_at: closing?.closed_at || null,
+      is_paid: isPaid, paid_at: payment?.paid_at || null, paid_by: payment?.paid_by || '',
+      results
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -1831,6 +1849,52 @@ router.post('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Respons
 router.delete('/payroll-closing/:yearMonth', async (req: AuthRequest, res: Response) => {
   try {
     await dbRun('DELETE FROM payroll_closing WHERE year_month = ?', req.params.yearMonth);
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// ===== Payroll Adjustments (기타 — 과지급/미지급 조정) =====
+
+// PUT /api/regular/payroll-adjustment - upsert 직원별 월별 조정 금액
+router.put('/payroll-adjustment', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_id, year_month, amount, memo } = req.body || {};
+    if (!employee_id || !year_month) { res.status(400).json({ error: 'employee_id, year_month 필수' }); return; }
+    const amt = parseInt(amount, 10) || 0;
+    if (amt === 0 && !(memo || '').trim()) {
+      // 0 + 빈 메모 = 삭제
+      await dbRun('DELETE FROM regular_payroll_adjustments WHERE employee_id = ? AND year_month = ?', employee_id, year_month);
+    } else {
+      await dbRun(
+        `INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT (employee_id, year_month) DO UPDATE SET amount = ?, memo = ?, updated_at = NOW()`,
+        employee_id, year_month, amt, memo || '', amt, memo || ''
+      );
+    }
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// ===== Payroll Payment (지급 완료) =====
+
+// POST /api/regular/payroll-payment/:yearMonth - 지급 완료 처리
+router.post('/payroll-payment/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    const { yearMonth } = req.params;
+    await dbRun(
+      `INSERT INTO regular_payroll_payment (year_month, paid_by) VALUES (?, ?)
+       ON CONFLICT (year_month) DO UPDATE SET paid_at = NOW(), paid_by = ?`,
+      yearMonth, req.body?.paid_by || '', req.body?.paid_by || ''
+    );
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// DELETE /api/regular/payroll-payment/:yearMonth - 지급 완료 취소
+router.delete('/payroll-payment/:yearMonth', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM regular_payroll_payment WHERE year_month = ?', req.params.yearMonth);
     res.json({ success: true });
   } catch (error: any) { res.status(500).json({ error: error.message }); }
 });

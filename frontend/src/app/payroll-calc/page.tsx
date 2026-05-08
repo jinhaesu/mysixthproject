@@ -24,6 +24,7 @@ export default function PayrollCalcPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [overtimeRate, setOvertimeRate] = useState(10030);
+  const [pendingRate, setPendingRate] = useState(10030);
   const [sortKey, setSortKey] = usePersistedState<SortKey>("pc_sortKey", "hire_date");
   const [sortDir, setSortDir] = usePersistedState<"asc" | "desc">("pc_sortDir", "desc");
 
@@ -83,17 +84,22 @@ export default function PayrollCalcPage() {
     const lt = Math.round(it * 0.1);
     const ded = np + hi + ltc + ei + it + lt;
     const adj = adjustments[r.employee_id] ?? r.adjustment_amount ?? 0;
-    const net = gross - ded + adj;
-    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: gross, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: it, local_tax: lt, total_deductions: ded, adjustment_amount: adj, net_pay: net };
+    // 기타(조정)은 지급액에 포함되어 소득세에도 영향. 4대보험 base 는 base+meal 이라 영향 없음.
+    const grossWithAdj = gross + adj;
+    const itAdj = Math.round(grossWithAdj * 0.03);
+    const ltAdj = Math.round(itAdj * 0.1);
+    const dedAdj = np + hi + ltc + ei + itAdj + ltAdj;
+    const net = grossWithAdj - dedAdj;
+    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: grossWithAdj, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: itAdj, local_tax: ltAdj, total_deductions: dedAdj, adjustment_amount: adj, net_pay: net };
   });
 
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','기타(±조정)','실지급액'];
+    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','기타(±조정)','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','실지급액'];
     // 계좌번호·주민번호는 텍스트로 강제(엑셀 자동 숫자 변환·지수 표기 방지). 빈 칸은 빈 문자열로.
     const TEXT_COLS = new Set([5, 6]);
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.adjustment_amount || 0, r.net_pay]);
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.adjustment_amount || 0, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
     rows.forEach((row: any[], ri: number) => {
       TEXT_COLS.forEach(ci => {
@@ -122,7 +128,7 @@ export default function PayrollCalcPage() {
       ['휴일수당', '시급 × 시간 × 1.5배', '휴일 근로시간', '50% 가산'],
       [],
       ['※ 기타(조정)', '', '', ''],
-      ['기타', '+/- 임의 금액', '실지급액에 가산', '과지급/미지급 정산용 — 4대보험·세금 영향 없음 (이미 과거에 과세 처리된 금액의 조정)'],
+      ['기타', '+/- 임의 금액', '지급액에 가산 (소득세 base 포함)', '과지급/미지급 정산용 — 4대보험 base(기본급+식대) 에는 영향 없음. 소득세는 지급액 기준이라 자동 반영'],
     ]);
     ratesSheet['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 36 }, { wch: 60 }];
 
@@ -192,13 +198,24 @@ export default function PayrollCalcPage() {
             <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
           </Field>
           <Field label="연장/휴일 시급 (원)">
-            <Input
-              type="number"
-              inputSize="sm"
-              value={overtimeRate}
-              onChange={e => setOvertimeRate(parseInt(e.target.value) || 0)}
-              className="w-28"
-            />
+            <div className="flex gap-1.5 items-center">
+              <Input
+                type="number"
+                inputSize="sm"
+                value={pendingRate}
+                onChange={e => setPendingRate(parseInt(e.target.value) || 0)}
+                onKeyDown={e => { if (e.key === 'Enter') setOvertimeRate(pendingRate); }}
+                className="w-28"
+              />
+              <Button
+                size="sm"
+                variant={pendingRate !== overtimeRate ? "primary" : "secondary"}
+                onClick={() => setOvertimeRate(pendingRate)}
+                disabled={pendingRate === overtimeRate}
+              >
+                적용
+              </Button>
+            </div>
           </Field>
           <div className="text-[var(--fs-caption)] text-[var(--text-3)] pb-1">
             × 1.5배 = <span className="tabular text-[var(--text-2)]">{fmt.format(Math.round(overtimeRate * 1.5))}</span>원/h
@@ -294,6 +311,7 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right text-eyebrow">연장수당</th>
                   <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('holiday_hours')}>휴일h{sortIcon('holiday_hours')}</th>
                   <th className="py-2 px-2 text-right text-eyebrow">휴일수당</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('adjustment_amount')}>기타{sortIcon('adjustment_amount')}<br/><span className="text-[8px] text-[var(--text-4)]">±조정</span></th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--success-fg)] text-eyebrow cursor-pointer select-none hover:text-[var(--brand-300)]" onClick={() => toggleSort('gross_pay')}>지급액{sortIcon('gross_pay')}</th>
                   <th className="py-2 px-2 text-right text-eyebrow">국민연금<br/><span className="text-[8px] text-[var(--text-4)]">4.5%</span></th>
                   <th className="py-2 px-2 text-right text-eyebrow">건강보험<br/><span className="text-[8px] text-[var(--text-4)]">3.545%</span></th>
@@ -302,7 +320,6 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right text-eyebrow">소득세</th>
                   <th className="py-2 px-2 text-right text-eyebrow">주민세</th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--danger-fg)] text-eyebrow">공제계</th>
-                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('adjustment_amount')}>기타{sortIcon('adjustment_amount')}<br/><span className="text-[8px] text-[var(--text-4)]">±조정</span></th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--brand-400)] text-eyebrow cursor-pointer select-none hover:text-[var(--brand-300)]" onClick={() => toggleSort('net_pay')}>실지급{sortIcon('net_pay')}</th>
                 </tr>
               </thead>
@@ -330,14 +347,6 @@ export default function PayrollCalcPage() {
                     <td className="py-1.5 px-2 text-right tabular text-[var(--warning-fg)]">{fmt.format(r.overtime_pay)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--danger-fg)]">{(r.holiday_hours || 0).toFixed(1)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--danger-fg)]">{fmt.format(r.holiday_pay)}</td>
-                    <td className="py-1.5 px-2 text-right tabular font-medium text-[var(--success-fg)]">{fmt.format(r.gross_pay)}</td>
-                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.national_pension)}</td>
-                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.health_insurance)}</td>
-                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.long_term_care)}</td>
-                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.employment_insurance)}</td>
-                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.income_tax)}</td>
-                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.local_tax)}</td>
-                    <td className="py-1.5 px-2 text-right tabular text-[var(--danger-fg)] font-medium">{fmt.format(r.total_deductions)}</td>
                     <td className="py-1 px-1 text-right">
                       <input
                         type="text"
@@ -346,9 +355,17 @@ export default function PayrollCalcPage() {
                         value={(adjustments[r.employee_id] ?? r.adjustment_amount ?? 0) === 0 ? '' : String(adjustments[r.employee_id] ?? r.adjustment_amount ?? 0)}
                         onChange={(e) => onAdjustmentChange(r.employee_id, e.target.value)}
                         placeholder="0"
-                        title="과지급(-) / 미지급(+) 조정 금액"
+                        title="과지급(-) / 미지급(+) 조정 금액 — 지급액에 가산되어 소득세에 반영"
                       />
                     </td>
+                    <td className="py-1.5 px-2 text-right tabular font-medium text-[var(--success-fg)]">{fmt.format(r.gross_pay)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.national_pension)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.health_insurance)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.long_term_care)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.employment_insurance)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.income_tax)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.local_tax)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--danger-fg)] font-medium">{fmt.format(r.total_deductions)}</td>
                     <td className="py-1.5 px-2 text-right tabular font-bold text-[var(--brand-400)]">{fmt.format(r.net_pay)}</td>
                   </tr>
                 ))}
@@ -361,6 +378,7 @@ export default function PayrollCalcPage() {
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('overtime_pay'))}</td>
                   <td className="py-2 px-2 text-right tabular">{sum('holiday_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('holiday_pay'))}</td>
+                  <td className="py-2 px-2 text-right tabular">{fmt.format(sum('adjustment_amount'))}</td>
                   <td className="py-2 px-2 text-right tabular text-[var(--success-fg)]">{fmt.format(sum('gross_pay'))}</td>
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('national_pension'))}</td>
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('health_insurance'))}</td>
@@ -369,7 +387,6 @@ export default function PayrollCalcPage() {
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('income_tax'))}</td>
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('local_tax'))}</td>
                   <td className="py-2 px-2 text-right tabular text-[var(--danger-fg)]">{fmt.format(sum('total_deductions'))}</td>
-                  <td className="py-2 px-2 text-right tabular">{fmt.format(sum('adjustment_amount'))}</td>
                   <td className="py-2 px-2 text-right tabular text-[var(--brand-400)]">{fmt.format(sum('net_pay'))}</td>
                 </tr>
               </tfoot>

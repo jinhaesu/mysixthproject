@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.13.0',
+    version: '2.14.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -82,6 +82,7 @@ app.get('/api/health', (_req, res) => {
       payrollFirstMonthAbsentToo: true,
       payrollPartialMonthSimple: true,
       payrollPartialMonthCalRatio: true,  // 입사월·퇴사월 calRatio × workRatio (window 기반)
+      payrollHolidayIncludeNight: true,   // 야간 근로자 토요일 근무 시 nightH 도 holiday_hours 에 합산
     },
   });
 });

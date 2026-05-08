@@ -1578,7 +1578,9 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const regH = parseFloat(rec.regular_hours) || 0;
       const otH = parseFloat(rec.overtime_hours) || 0;
       const nightH = parseFloat(rec.night_hours) || 0;
-      const totalH = regH + otH;
+      // 휴일 근무시간 = 그 날 실제로 일한 모든 시간(주간+야간). 야간 근로자가 토요일에 출근하면
+      // recalc 시 regularH=0, overtimeH=0, nightH=8 형태로 기록되므로 nightH 도 합산해야 한다.
+      const totalH = regH + otH + nightH;
 
       if (isHolidayOrWeekend(rec.date)) {
         // 휴일/주말 근무 시간은 holiday_hours에만 누적 (overtime과 별개로 계산)

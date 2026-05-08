@@ -1660,6 +1660,15 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     const closingCheck = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
     const payrollClosed = !!closingCheck;
 
+    // 활성 대출 — 직원별로 묶어서 해당 월 차감액 계산용
+    const activeLoans = await dbAll(`SELECT * FROM employee_loans WHERE status = 'active'`) as any[];
+    const loansByEmployee = new Map<number, any[]>();
+    for (const l of activeLoans) {
+      const arr = loansByEmployee.get(l.employee_id) || [];
+      arr.push(l);
+      loansByEmployee.set(l.employee_id, arr);
+    }
+
     const results = [];
     const daysInMonth = lastDay;
     for (const sal of salaries) {
@@ -1769,7 +1778,19 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const adjustmentAmount = parseFloat(sal.adjustment_amount) || 0;
       const adjustmentMemo = sal.adjustment_memo || '';
 
-      const netPay = grossPay - totalDeductions - incomeTax - localTax + adjustmentAmount;
+      // 대출 상환 — 활성 대출들 중 해당 월에 차감되는 금액 합산
+      const empLoans = loansByEmployee.get(sal.employee_id) || [];
+      let loanRepayment = 0;
+      const loanBreakdown: any[] = [];
+      for (const l of empLoans) {
+        const ded = computeLoanDeduction(l, yearMonth);
+        if (ded > 0) {
+          loanRepayment += ded;
+          loanBreakdown.push({ id: l.id, amount: ded, method: l.repayment_method, memo: l.memo });
+        }
+      }
+
+      const netPay = grossPay - totalDeductions - incomeTax - localTax + adjustmentAmount - loanRepayment;
 
       results.push({
         employee_id: sal.employee_id,
@@ -1803,6 +1824,8 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         total_deductions: totalDeductions + incomeTax + localTax,
         adjustment_amount: adjustmentAmount,
         adjustment_memo: adjustmentMemo,
+        loan_repayment: loanRepayment,
+        loan_breakdown: loanBreakdown,
         net_pay: netPay,
       });
     }
@@ -1899,4 +1922,134 @@ router.delete('/payroll-payment/:yearMonth', async (req: AuthRequest, res: Respo
   } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
+// ===== Employee Loans (직원 대출 관리) =====
+
+// 한 직원의 한 월(YYYY-MM)에 대해 차감해야 할 대출 상환 금액 계산.
+// monthly: start_month 부터 매월 monthly_amount, 누적이 amount 초과하기 전 마지막 달은 잔액만큼만 차감.
+// lump_sum: lump_sum_date 가 속한 월에 전액 차감.
+function computeLoanDeduction(loan: any, yearMonth: string): number {
+  if (loan.status !== 'active') return 0;
+  const amount = parseFloat(loan.amount) || 0;
+  if (amount <= 0) return 0;
+
+  if (loan.repayment_method === 'monthly') {
+    const start = (loan.start_month || '').slice(0, 7);
+    const monthly = parseFloat(loan.monthly_amount) || 0;
+    if (!start || monthly <= 0) return 0;
+    if (yearMonth < start) return 0;
+
+    // 시작월 부터 yearMonth 까지 경과 개월수 (1-indexed)
+    const [sy, sm] = start.split('-').map(Number);
+    const [cy, cm] = yearMonth.split('-').map(Number);
+    const monthsElapsed = (cy - sy) * 12 + (cm - sm) + 1;
+    if (monthsElapsed <= 0) return 0;
+
+    const cumulativeBefore = (monthsElapsed - 1) * monthly;
+    if (cumulativeBefore >= amount) return 0;  // 이미 다 갚음
+    const remaining = amount - cumulativeBefore;
+    return Math.min(monthly, remaining);
+  }
+
+  if (loan.repayment_method === 'lump_sum') {
+    const target = (loan.lump_sum_date || '').slice(0, 7);
+    if (!target) return 0;
+    return target === yearMonth ? amount : 0;
+  }
+
+  return 0;
+}
+
+// GET /api/regular/loans - 전체 대출 목록 (직원 정보 포함)
+router.get('/loans', async (_req: AuthRequest, res: Response) => {
+  try {
+    const loans = await dbAll(`
+      SELECT l.*, re.name as employee_name, re.department, re.team, re.phone
+      FROM employee_loans l
+      JOIN regular_employees re ON l.employee_id = re.id
+      ORDER BY l.status ASC, l.executed_date DESC, l.id DESC
+    `) as any[];
+    res.json(loans || []);
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// POST /api/regular/loans - 대출 등록
+router.post('/loans', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_id, amount, executed_date, repayment_method, monthly_amount, start_month, lump_sum_date, memo } = req.body || {};
+    if (!employee_id || !amount || !executed_date || !repayment_method) {
+      res.status(400).json({ error: 'employee_id, amount, executed_date, repayment_method 필수' }); return;
+    }
+    if (repayment_method === 'monthly' && (!monthly_amount || !start_month)) {
+      res.status(400).json({ error: '월별 상환은 monthly_amount, start_month 필수' }); return;
+    }
+    if (repayment_method === 'lump_sum' && !lump_sum_date) {
+      res.status(400).json({ error: '일괄 상환은 lump_sum_date 필수' }); return;
+    }
+    const result = await dbRun(
+      `INSERT INTO employee_loans (employee_id, amount, executed_date, repayment_method, monthly_amount, start_month, lump_sum_date, memo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      employee_id, amount, executed_date, repayment_method,
+      repayment_method === 'monthly' ? (monthly_amount || 0) : 0,
+      repayment_method === 'monthly' ? (start_month || '') : '',
+      repayment_method === 'lump_sum' ? (lump_sum_date || '') : '',
+      memo || ''
+    );
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// PUT /api/regular/loans/:id - 대출 수정
+router.put('/loans/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { amount, executed_date, repayment_method, monthly_amount, start_month, lump_sum_date, status, memo } = req.body || {};
+    await dbRun(
+      `UPDATE employee_loans SET
+        amount = ?, executed_date = ?, repayment_method = ?,
+        monthly_amount = ?, start_month = ?, lump_sum_date = ?,
+        status = ?, memo = ?, updated_at = NOW()
+       WHERE id = ?`,
+      amount || 0, executed_date || '', repayment_method || 'monthly',
+      monthly_amount || 0, start_month || '', lump_sum_date || '',
+      status || 'active', memo || '', req.params.id
+    );
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// DELETE /api/regular/loans/:id - 대출 삭제
+router.delete('/loans/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM employee_loans WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// GET /api/regular/loans/employee-search?q=... - 직원 검색 (대출 등록용)
+router.get('/loans/employee-search', async (req: AuthRequest, res: Response) => {
+  try {
+    const q = (req.query.q as string || '').trim();
+    let employees;
+    if (q) {
+      const like = `%${q}%`;
+      employees = await dbAll(`
+        SELECT id, name, department, team, phone
+        FROM regular_employees
+        WHERE is_active = 1 AND (name ILIKE ? OR phone ILIKE ?)
+        ORDER BY name ASC
+        LIMIT 30
+      `, like, like) as any[];
+    } else {
+      employees = await dbAll(`
+        SELECT id, name, department, team, phone
+        FROM regular_employees
+        WHERE is_active = 1
+        ORDER BY name ASC
+        LIMIT 200
+      `) as any[];
+    }
+    res.json(employees || []);
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+export { computeLoanDeduction };
 export default router;

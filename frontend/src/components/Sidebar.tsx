@@ -27,6 +27,7 @@ import {
   Sparkles,
   FileSignature,
   UserMinus,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -87,6 +88,7 @@ const groups: NavGroup[] = [
 
 const bottomItems: NavItem[] = [
   { href: "/org-chart", label: "조직도", icon: Network },
+  { href: "/loan-management", label: "직원 대출 관리", icon: Wallet },
   { href: "/onboarding", label: "입사자 관리", icon: UserCheck },
   { href: "/contract-manage", label: "근로계약서 관리", icon: FileSignature },
   { href: "/offboarding", label: "퇴사관리", icon: UserMinus },

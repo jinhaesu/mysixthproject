@@ -749,6 +749,31 @@ export async function initializeDB(): Promise<void> {
     `);
   } catch {}
 
+  // Employee loans (직원 대출 관리)
+  // repayment_method: 'monthly' (월별 분할) | 'lump_sum' (지정일 일괄)
+  // monthly: start_month 부터 매월 monthly_amount 차감 — 누적 금액이 amount 도달 시 자동 종료
+  // lump_sum: lump_sum_date 가 속한 월에 amount 전액 차감
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employee_loans (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER NOT NULL REFERENCES regular_employees(id) ON DELETE CASCADE,
+        amount NUMERIC(12,0) NOT NULL,
+        executed_date TEXT NOT NULL,
+        repayment_method TEXT NOT NULL,
+        monthly_amount NUMERIC(12,0) DEFAULT 0,
+        start_month TEXT DEFAULT '',
+        lump_sum_date TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        memo TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_employee_loans_employee ON employee_loans(employee_id);
+      CREATE INDEX IF NOT EXISTS idx_employee_loans_status ON employee_loans(status);
+    `);
+  } catch {}
+
   // Offboarding management
   try {
     await pool.query(`

@@ -15,7 +15,7 @@ import {
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
-type SortKey = 'name' | 'department' | 'hire_date' | 'resign_date' | 'base_pay' | 'meal_allowance' | 'bonus' | 'actual_work_days' | 'absent_days' | 'overtime_hours' | 'holiday_hours' | 'gross_pay' | 'adjustment_amount' | 'net_pay';
+type SortKey = 'name' | 'department' | 'hire_date' | 'resign_date' | 'base_pay' | 'meal_allowance' | 'bonus' | 'actual_work_days' | 'absent_days' | 'overtime_hours' | 'holiday_hours' | 'gross_pay' | 'adjustment_amount' | 'loan_repayment' | 'net_pay';
 
 export default function PayrollCalcPage() {
   const toast = useToast();
@@ -89,17 +89,18 @@ export default function PayrollCalcPage() {
     const itAdj = Math.round(grossWithAdj * 0.03);
     const ltAdj = Math.round(itAdj * 0.1);
     const dedAdj = np + hi + ltc + ei + itAdj + ltAdj;
-    const net = grossWithAdj - dedAdj;
-    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: grossWithAdj, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: itAdj, local_tax: ltAdj, total_deductions: dedAdj, adjustment_amount: adj, net_pay: net };
+    const loanRep = Number(r.loan_repayment) || 0;
+    const net = grossWithAdj - dedAdj - loanRep;
+    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: grossWithAdj, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: itAdj, local_tax: ltAdj, total_deductions: dedAdj, adjustment_amount: adj, loan_repayment: loanRep, net_pay: net };
   });
 
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','기타(±조정)','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','실지급액'];
+    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','기타(±조정)','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','대출상환','실지급액'];
     // 계좌번호·주민번호는 텍스트로 강제(엑셀 자동 숫자 변환·지수 표기 방지). 빈 칸은 빈 문자열로.
     const TEXT_COLS = new Set([5, 6]);
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.adjustment_amount || 0, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.net_pay]);
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.adjustment_amount || 0, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.loan_repayment || 0, r.net_pay]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
     rows.forEach((row: any[], ri: number) => {
       TEXT_COLS.forEach(ci => {
@@ -129,6 +130,10 @@ export default function PayrollCalcPage() {
       [],
       ['※ 기타(조정)', '', '', ''],
       ['기타', '+/- 임의 금액', '지급액에 가산 (소득세 base 포함)', '과지급/미지급 정산용 — 4대보험 base(기본급+식대) 에는 영향 없음. 소득세는 지급액 기준이라 자동 반영'],
+      [],
+      ['※ 대출상환', '', '', ''],
+      ['월별 상환', '월 차감액', '실지급액에서 차감', '직원 대출 관리 메뉴에서 등록한 활성 대출의 월별 분할 금액. 누적 상환액이 대출 원금에 도달하면 자동 종료'],
+      ['일괄 상환', '대출 전액', '실지급액에서 차감', '지정일이 속한 월에만 차감'],
     ]);
     ratesSheet['!cols'] = [{ wch: 22 }, { wch: 24 }, { wch: 36 }, { wch: 60 }];
 
@@ -320,6 +325,7 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right text-eyebrow">소득세</th>
                   <th className="py-2 px-2 text-right text-eyebrow">주민세</th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--danger-fg)] text-eyebrow">공제계</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('loan_repayment')}>대출상환{sortIcon('loan_repayment')}</th>
                   <th className="py-2 px-2 text-right font-bold text-[var(--brand-400)] text-eyebrow cursor-pointer select-none hover:text-[var(--brand-300)]" onClick={() => toggleSort('net_pay')}>실지급{sortIcon('net_pay')}</th>
                 </tr>
               </thead>
@@ -366,6 +372,9 @@ export default function PayrollCalcPage() {
                     <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.income_tax)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--text-3)]">{fmt.format(r.local_tax)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--danger-fg)] font-medium">{fmt.format(r.total_deductions)}</td>
+                    <td className="py-1.5 px-2 text-right tabular text-[var(--warning-fg)]">
+                      {(r.loan_repayment || 0) > 0 ? `-${fmt.format(r.loan_repayment)}` : <span className="text-[var(--text-4)]">-</span>}
+                    </td>
                     <td className="py-1.5 px-2 text-right tabular font-bold text-[var(--brand-400)]">{fmt.format(r.net_pay)}</td>
                   </tr>
                 ))}
@@ -387,6 +396,7 @@ export default function PayrollCalcPage() {
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('income_tax'))}</td>
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('local_tax'))}</td>
                   <td className="py-2 px-2 text-right tabular text-[var(--danger-fg)]">{fmt.format(sum('total_deductions'))}</td>
+                  <td className="py-2 px-2 text-right tabular text-[var(--warning-fg)]">{sum('loan_repayment') > 0 ? `-${fmt.format(sum('loan_repayment'))}` : '-'}</td>
                   <td className="py-2 px-2 text-right tabular text-[var(--brand-400)]">{fmt.format(sum('net_pay'))}</td>
                 </tr>
               </tfoot>

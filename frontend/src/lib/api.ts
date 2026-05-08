@@ -637,6 +637,22 @@ export async function markPayrollPaid(yearMonth: string) {
 export async function unmarkPayrollPaid(yearMonth: string) {
   return fetchAPI<any>(`/api/regular/payroll-payment/${yearMonth}`, { method: 'DELETE' });
 }
+// Employee loans
+export async function listEmployeeLoans() {
+  return fetchAPI<any[]>(`/api/regular/loans`);
+}
+export async function searchLoanEmployees(q: string) {
+  return fetchAPI<any[]>(`/api/regular/loans/employee-search?q=${encodeURIComponent(q)}`);
+}
+export async function createEmployeeLoan(data: any) {
+  return fetchAPI<any>(`/api/regular/loans`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function updateEmployeeLoan(id: number, data: any) {
+  return fetchAPI<any>(`/api/regular/loans/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+}
+export async function deleteEmployeeLoan(id: number) {
+  return fetchAPI<any>(`/api/regular/loans/${id}`, { method: 'DELETE' });
+}
 
 export async function getSettlement(yearMonth: string, type: string) {
   return fetchAPI<any>(`/api/survey/settlement?year_month=${yearMonth}&type=${type}`);

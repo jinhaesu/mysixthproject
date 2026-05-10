@@ -915,6 +915,24 @@ export async function initializeDB(): Promise<void> {
     console.error('Payroll 2026-04 backfill error:', err);
   }
 
+  // ===== 2026-04 마지막 1명 — PASCUA TEOSALYN =====
+  try {
+    const MIGRATION_ID_LAST = 'payroll-2026-04-last-1';
+    const checkLast = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [MIGRATION_ID_LAST]);
+    if (checkLast.rowCount === 0) {
+      const r = await pool.query(`
+        INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+        VALUES (128, '2026-04', 1963636, '4월 v2 마감본 정밀 보정 (마지막)')
+        ON CONFLICT (employee_id, year_month)
+        DO UPDATE SET amount = EXCLUDED.amount, memo = EXCLUDED.memo, updated_at = NOW()
+      `);
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1)', [MIGRATION_ID_LAST]);
+      console.log(`Applied last correction for 2026-04: ${r.rowCount}`);
+    }
+  } catch (err) {
+    console.error('Payroll last correction error:', err);
+  }
+
   // ===== 2026-04 최종 보정 — 119명 재검증 후 발견된 추가 10명 =====
   try {
     const MIGRATION_ID_FINAL = 'payroll-2026-04-final-10';

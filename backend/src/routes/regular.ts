@@ -1680,7 +1680,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       );
       const overtimeHours = att?.total_overtime || 0;
       const holidayHours = att?.holiday_hours || 0;
-      const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10030;
+      const hourlyRate = parseFloat(sal.overtime_hourly_rate) || 10320;
       const overtimePay = Math.round(overtimeHours * hourlyRate * 1.5);
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
 

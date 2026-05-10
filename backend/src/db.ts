@@ -915,6 +915,41 @@ export async function initializeDB(): Promise<void> {
     console.error('Payroll 2026-04 backfill error:', err);
   }
 
+  // ===== 2026-04 최종 보정 — 119명 재검증 후 발견된 추가 10명 =====
+  try {
+    const MIGRATION_ID_FINAL = 'payroll-2026-04-final-10';
+    const checkFinal = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [MIGRATION_ID_FINAL]);
+    if (checkFinal.rowCount === 0) {
+      const FINAL_TARGETS: Array<[number, number, string]> = [
+        [31, 152220, 'ADI BAYU LISTIA(아디)E-9'],
+        [2, 209091, '권선희'],
+        [166, 1124040, 'ADISAPUTRA ANDIKA(안디카)e-9'],
+        [13, 2316813, 'HUYNH CAM DAN 깜전F-6'],
+        [26, 2512080, 'AzisSukronOktavian(아지스)E-9'],
+        [42, 2600640, 'BAIDLOWI AHMAD(아마드)E-9'],
+        [41, 2809620, 'EDO DWI AGUNG(에도)E-9'],
+        [9, 654545, '김영숙'],
+        [50, 914546, '정은화'],
+        [28, 100000, '임규식'],
+      ];
+      let applied = 0;
+      for (const [empId, amount, label] of FINAL_TARGETS) {
+        const r = await pool.query(`
+          INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+          VALUES ($1, '2026-04', $2, '4월 v2 마감본 정밀 보정 (최종)')
+          ON CONFLICT (employee_id, year_month)
+          DO UPDATE SET amount = EXCLUDED.amount, memo = EXCLUDED.memo, updated_at = NOW()
+        `, [empId, amount]);
+        if (r.rowCount && r.rowCount > 0) applied++;
+        else console.log(`  [skip] ${label} (id=${empId})`);
+      }
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1)', [MIGRATION_ID_FINAL]);
+      console.log(`Applied final correction for 2026-04: ${applied}/${FINAL_TARGETS.length}`);
+    }
+  } catch (err) {
+    console.error('Payroll final correction error:', err);
+  }
+
   // ===== 2026-04 정밀 보정 v2 — 119명 전체 검증(verify_all_payroll) 기반 60명 추가 보정 =====
   // 21명 1차 보정 후에도 v2 와 다른 60명을 추가로 강제 UPDATE.
   // 주요 원인: 시스템 base 가 v2 보다 작음 (work_days 부족으로 결근 차감 효과)

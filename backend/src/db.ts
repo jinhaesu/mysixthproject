@@ -875,6 +875,46 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS legacy_filename TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS scanned_file_data TEXT DEFAULT ''"); } catch {}
 
+  // ===== One-time data backfill — 2026-04 마감본(v2 엑셀) 기준 기타(±조정) 적용 =====
+  // 사용자 요청: 4월 v2 엑셀(실제 지급된 마감본) 기준으로 시스템 지급액을 일치시킴.
+  // schema_migrations 로 idempotent 보장 — 두 번째 부팅부터는 스킵.
+  // 이미 사용자가 UI 로 다른 값으로 변경한 row 는 ON CONFLICT DO NOTHING 으로 보존.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id TEXT PRIMARY KEY,
+        applied_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    const MIGRATION_ID = 'payroll-2026-04-v2-backfill';
+    const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [MIGRATION_ID]);
+    if (check.rowCount === 0) {
+      // 4월 v2 엑셀에서 발견된 4건의 수동 조정 (bonus/other_allowance 의 비표준 값)
+      // 시스템 base+meal+ot+hol 산출값과 v2 지급액의 차이를 '기타(±조정)' 으로 등록.
+      const TARGETS: Array<[string, number, string]> = [
+        ['%NGUYEN HONG PHONG%', -455320, '4월 마감본 기준 (bonus -655,320 + other +200,000)'],
+        ['%TOMI AGUS%',          701760, '4월 마감본 기준 (other +701,760)'],
+        ['%BOONKET%',           -500000, '4월 마감본 기준 (other -500,000)'],
+        ['%ARID HAMZAH%',       -500000, '4월 마감본 기준 (other -500,000)'],
+      ];
+      let inserted = 0;
+      for (const [pattern, amount, memo] of TARGETS) {
+        const r = await pool.query(`
+          INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+          SELECT id, '2026-04', $2, $3
+          FROM regular_employees
+          WHERE name ILIKE $1
+          ON CONFLICT (employee_id, year_month) DO NOTHING
+        `, [pattern, amount, memo]);
+        inserted += r.rowCount || 0;
+      }
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1)', [MIGRATION_ID]);
+      console.log(`Applied one-time payroll backfill for 2026-04: ${inserted} adjustments inserted`);
+    }
+  } catch (err) {
+    console.error('Payroll 2026-04 backfill error:', err);
+  }
+
   console.log('Database initialized successfully');
 }
 

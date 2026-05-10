@@ -915,6 +915,93 @@ export async function initializeDB(): Promise<void> {
     console.error('Payroll 2026-04 backfill error:', err);
   }
 
+  // ===== 2026-04 정밀 보정 v2 — 119명 전체 검증(verify_all_payroll) 기반 60명 추가 보정 =====
+  // 21명 1차 보정 후에도 v2 와 다른 60명을 추가로 강제 UPDATE.
+  // 주요 원인: 시스템 base 가 v2 보다 작음 (work_days 부족으로 결근 차감 효과)
+  try {
+    const MIGRATION_ID_FULL = 'payroll-2026-04-full-correction-60';
+    const checkFull = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [MIGRATION_ID_FULL]);
+    if (checkFull.rowCount === 0) {
+      const FULL_TARGETS: Array<[number, number, string]> = [
+        [164, 441240, 'FATA AHMAD AZHAR-UL(파타)'],
+        [7, 104546, '이영화'],
+        [6, 294120, '맹홍화'],
+        [3, 104546, '윤서연'],
+        [20, 106818, '이수진'],
+        [104, -356040, '최석란'],
+        [29, 242556, '임준혁'],
+        [97, 262350, '김태완'],
+        [69, 2038200, 'LKHAGVASHARAV DAIRIMAA 디마 D-10'],
+        [43, 2523240, 'ARBIMANYU YUDHA(유다)E-9'],
+        [17, 2879280, 'TRAN VINH KHANH(칸)E-9'],
+        [22, 1842120, 'VO MINH PHU 푸 E-9'],
+        [32, 2759760, 'AjiFachriWismo(아지)E-9'],
+        [16, 2177520, 'TRAN CAMLOAN(로안)F-6'],
+        [49, 2236975, 'NAM ELENA RUSLANOVNA 옐레나 F-4'],
+        [33, 2120760, 'NURJAMAN MUHAMMAD RIPAN 리빤 E-9'],
+        [81, 2941200, 'HOUR SOPHOS 소포아 E-7 (행정)'],
+        [30, 2082060, 'NURCAHYO ARI(아리)E-9'],
+        [5, 2118180, 'PIAO JINGLAN(박경란)'],
+        [27, 2905580, 'LuongVanSon(반선)E-9'],
+        [18, 2832840, 'NGUYEN PHU LAM(람)E-9'],
+        [94, 1963636, 'TRUONG THI HONG THA-NH(홍탄) F-6'],
+        [80, 2600640, 'IRAWAN BUNGA FRISKA 붕아E-9'],
+        [44, 2164620, 'PUTRI TIARA WIDYA(티아라)E-9'],
+        [47, 2086625, 'TRAN THI NHUNG(늉)'],
+        [45, 2674620, 'SUBHAN(수반)E-9'],
+        [15, 2984220, 'ZakariyaRizki(리츠키)E-9'],
+        [190, 2657400, '황금빛'],
+        [107, 3224763, 'TRAN VAN THI 반티 E-9'],
+        [46, 2484540, 'DWI VIRDA ANDRIYANTI AGUSTIN(퓌)E-9'],
+        [70, 2523240, 'FITRIANINGSIH LIA 리아 E-9'],
+        [111, 2782360, 'VU THI LAN 서희 E-7'],
+        [83, 2038200, 'SURYANTO 수리안토 E-9'],
+        [85, 2804433, 'WIBOWO ANDI 앤디E-9'],
+        [112, 2786400, 'JULIANTO AHMAD 줄리안토'],
+        [74, 2959233, 'MAI XUAN HOANG 마이쑨황E-9'],
+        [25, 2705580, 'SaputroDeni(데니)E-9'],
+        [89, 2528180, 'CHE HONGMEI 차홍매 F-4'],
+        [71, 2997933, 'RIKI SETYOKO 리키E-9'],
+        [19, 2678040, 'DANG VAN QUYET(꾸엣) E=9'],
+        [92, 1181818, 'THOMPSON 톰슨 F-6'],
+        [21, 2917980, 'LE THU TRANG(레티투짱) E-9'],
+        [120, 2941200, 'VU VAN UOC 윽 E-9'],
+        [134, 2567100, 'CHAN SOPEAK 수피아 E-7 (행정)'],
+        [137, 2481960, 'SROY PHEARA 페아라 E-7 (행정)'],
+        [106, 3005700, 'NGUYEN CONG HOAN 호안 E-9'],
+        [48, 1993500, 'BASUKI IWAN(이완)E-9'],
+        [67, 2262660, 'HOANG XUAN VIET(비엣)E-9'],
+        [136, 2373600, 'ZIN MIN OO 진민우 E-7 (행정)'],
+        [144, 2432913, 'UZAIN M KHAVID 우제인 E-9'],
+        [184, 679940, 'NGUYEN KIM XIEU(김시우)F-6'],
+        [170, 961500, 'KRISTIYADI(크리스티 야디)e-9'],
+        [174, 961500, 'WAHYUDI RIFUT(리풋)e-9'],
+        [114, 2690940, 'NGUYEN THITHU 티투 E-9'],
+        [143, 2680593, 'DAU KHAC LINH 린 E-9'],
+        [154, 1798260, '수빈(HO THI BICH) F-5'],
+        [96, 2964420, 'NGUYEN THI HUYEN 휴엔 E-9'],
+        [135, 2621280, 'PASACHHE SHANKAR 샨카 F-2(행정)'],
+        [162, 1085340, 'SAPUTRA IQBAL HARDJA(하르자)e-9'],
+        [200, 2482184, '신아름누리'],
+      ];
+      let applied = 0;
+      for (const [empId, amount, label] of FULL_TARGETS) {
+        const r = await pool.query(`
+          INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+          VALUES ($1, '2026-04', $2, '4월 v2 마감본 정밀 보정 (전체)')
+          ON CONFLICT (employee_id, year_month)
+          DO UPDATE SET amount = EXCLUDED.amount, memo = EXCLUDED.memo, updated_at = NOW()
+        `, [empId, amount]);
+        if (r.rowCount && r.rowCount > 0) applied++;
+        else console.log(`  [skip] ${label} (id=${empId})`);
+      }
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1)', [MIGRATION_ID_FULL]);
+      console.log(`Applied full correction for 2026-04: ${applied}/${FULL_TARGETS.length}`);
+    }
+  } catch (err) {
+    console.error('Payroll full correction error:', err);
+  }
+
   // ===== 2026-04 정밀 보정 — 진단 스크립트 (diagnose_payroll_v3) 기반 직원별 정확한 기타 값 강제 적용 =====
   // 이전 backfill 들이 prorate(calRatio × workRatio) 와 attendance 데이터의 실제 차이를 충분히 흡수하지 못했음.
   // 현장 실제 지급액(v2 엑셀)과 시스템 frontend(rate=10320) 출력 차이를 직접 계산해서 employee_id 단위로 강제 UPDATE.

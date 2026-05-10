@@ -915,6 +915,76 @@ export async function initializeDB(): Promise<void> {
     console.error('Payroll 2026-04 backfill error:', err);
   }
 
+  // ===== 2026-04 v2 마감본 보정 backfill — 공백 문제 등으로 매칭 실패한 2건 재시도 =====
+  try {
+    const MIGRATION_ID_V2_FIX = 'payroll-2026-04-v2-backfill-fix';
+    const checkFix = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [MIGRATION_ID_V2_FIX]);
+    if (checkFix.rowCount === 0) {
+      // 21개 전체를 다시 ILIKE 매칭. ON CONFLICT DO NOTHING 이라 이미 적용된 entry 는 보존.
+      // 각 패턴의 매칭 결과 로그 → 어떤 게 누락됐는지 식별.
+      const FIX_TARGETS: Array<{ patterns: string[]; amount: number; label: string }> = [
+        { patterns: ['%NGUYEN HONG PHONG%'],          amount: -331480,  label: 'NGUYEN HONG PHONG' },
+        { patterns: ['%KYAW ZIN WIN%', '%조진윈%'],   amount: 1274520,  label: 'KYAW ZIN WIN' },
+        { patterns: ['%TO NO %', '%TO NO%', '%토노%'], amount: 1274520, label: 'TO NO' },
+        { patterns: ['%NGUYENTHEQUAN%', '%THEQUAN%'], amount: 51840,   label: 'NGUYENTHEQUAN' },
+        { patterns: ['%김종성%'],                      amount: 1266443, label: '김종성' },
+        { patterns: ['%박상천%'],                      amount: 270000,  label: '박상천' },
+        { patterns: ['%실비아%'],                      amount: 722400,  label: '실비아' },
+        { patterns: ['%YE YINT AUNG%', '%예인엉%'],    amount: 1150680, label: 'YE YINT AUNG' },
+        { patterns: ['%MASROA%', '%마쓰로이%'],        amount: 1166160, label: 'MASROA' },
+        { patterns: ['%KHAN SAJIAD%', '%사자드%'],     amount: 758520,  label: 'KHAN SAJIAD' },
+        { patterns: ['%TOMI AGUS%'],                   amount: 1620240, label: 'TOMI AGUS' },
+        { patterns: ['%MUKOKO%'],                      amount: 910740,  label: 'MUKOKO' },
+        { patterns: ['%HARYANTO%'],                    amount: 1166160, label: 'HARYANTO' },
+        { patterns: ['%HIDAYAT DIAN%', '%디안%'],      amount: 1032000, label: 'HIDAYAT DIAN' },
+        { patterns: ['%TRAN VAN TAN%', '%반단%'],      amount: 1274520, label: 'TRAN VAN TAN' },
+        { patterns: ['%KARTINI%', '%파우즈%'],         amount: 448920,  label: 'KARTINI' },
+        { patterns: ['%PUTRA RISKO%', '%리스코%'],     amount: 448920,  label: 'PUTRA RISKO' },
+        { patterns: ['%SETIAWAN MOHAMMAD%', '%모하마드%'], amount: 121260, label: 'SETIAWAN MOHAMMAD' },
+        { patterns: ['%LUU VAN DAT%'],                 amount: 352080,  label: 'LUU VAN DAT' },
+        { patterns: ['%TRUONG VAN HAI%', '%반하이%'],  amount: 448920,  label: 'TRUONG VAN HAI' },
+        { patterns: ['%ARIS SETYAWAN%', '%아리스%'],   amount: 686280,  label: 'ARIS SETYAWAN' },
+      ];
+      const unmatched: string[] = [];
+      const inserted: string[] = [];
+      for (const t of FIX_TARGETS) {
+        let matched = false;
+        for (const p of t.patterns) {
+          const r = await pool.query(`
+            INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+            SELECT id, '2026-04', $2, '4월 v2 마감본 종합 (보정)'
+            FROM regular_employees
+            WHERE name ILIKE $1
+            ON CONFLICT (employee_id, year_month) DO NOTHING
+          `, [p, t.amount]);
+          if (r.rowCount && r.rowCount > 0) {
+            inserted.push(`${t.label}(${p})`);
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          // 이미 backfill 됐는지 확인 (UPDATE 케이스 인지)
+          const exists = await pool.query(`
+            SELECT 1 FROM regular_payroll_adjustments rpa
+            JOIN regular_employees re ON rpa.employee_id = re.id
+            WHERE rpa.year_month = '2026-04' AND (${t.patterns.map((_, i) => `re.name ILIKE $${i + 1}`).join(' OR ')})
+          `, t.patterns);
+          if (exists.rowCount && exists.rowCount > 0) {
+            // 기존 등록된 것 — OK (이미 처리됨)
+          } else {
+            unmatched.push(t.label);
+          }
+        }
+      }
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1)', [MIGRATION_ID_V2_FIX]);
+      console.log(`v2 backfill fix: inserted=${inserted.length}, unmatched=${unmatched.length}`);
+      if (unmatched.length > 0) console.log(`  Unmatched names: ${unmatched.join(', ')}`);
+    }
+  } catch (err) {
+    console.error('Payroll v2 backfill fix error:', err);
+  }
+
   // ===== 2026-04 v2 마감본 종합 backfill (rate 10320 기준 차이 흡수) =====
   // v2 의 휴일수당/연장수당이 hol_h × rate × 1.5 와 무관한 수동 fixed amount 인 경우 다수.
   // (예: 야간 근무자 주말 출근 보너스 fixed 1,274,520 등) — 시스템 frontend(rate=10320) 기준

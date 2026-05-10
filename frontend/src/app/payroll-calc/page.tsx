@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Download, Users, Check } from "lucide-react";
+import { Calculator, Download, Users, Check, Upload } from "lucide-react";
 import { getPayrollCalc, savePayrollAdjustment, markPayrollPaid, unmarkPayrollPaid } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
@@ -157,6 +157,91 @@ export default function PayrollCalcPage() {
     return String(av).localeCompare(String(bv), 'ko') * dir;
   });
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [reconciling, setReconciling] = useState(false);
+
+  // v2 엑셀(또는 외부 마감본)의 '지급액' 칼럼 기준으로 시스템 지급액과 차이를 비교해서
+  // 차이만큼을 '기타(±조정)' 으로 일괄 적용. 이름·계좌번호 매칭. 미매칭 행은 보고서로 표시.
+  const handleReconcileFromExcel = async (file: File) => {
+    setReconciling(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+      if (aoa.length < 2) throw new Error('엑셀에 데이터가 없습니다');
+      const headers = (aoa[0] || []).map((h: any) => String(h || '').trim());
+      const idx = (name: string) => headers.findIndex(h => h === name);
+      const nameIdx = idx('성명');
+      const acctIdx = idx('계좌번호');
+      const grossIdx = idx('지급액');
+      if (nameIdx < 0 || grossIdx < 0) throw new Error("'성명' 또는 '지급액' 칼럼을 찾을 수 없습니다");
+
+      const norm = (s: any) => String(s ?? '').replace(/[-\s]/g, '').trim();
+      const excelByName = new Map<string, { name: string; account: string; gross: number }>();
+      const excelByAccount = new Map<string, { name: string; account: string; gross: number }>();
+      for (let i = 1; i < aoa.length; i++) {
+        const row = aoa[i] || [];
+        const nm = String(row[nameIdx] || '').trim();
+        const acc = norm(row[acctIdx]);
+        const gross = Number(row[grossIdx]) || 0;
+        if (!nm) continue;
+        const entry = { name: nm, account: acc, gross };
+        excelByName.set(nm, entry);
+        if (acc) excelByAccount.set(acc, entry);
+      }
+
+      const matched: any[] = [];
+      const unmatched: any[] = [];
+      for (const r of results) {
+        const sysName: string = r.name || '';
+        const sysAcct = norm(r.bank_account);
+        let hit = excelByName.get(sysName);
+        if (!hit) {
+          for (const [k, v] of excelByName) {
+            if (k.includes(sysName) || sysName.includes(k.split(/\s|\(/)[0])) { hit = v; break; }
+          }
+        }
+        if (!hit && sysAcct) hit = excelByAccount.get(sysAcct);
+        if (!hit) { unmatched.push(sysName); continue; }
+        const currentGross = Number(r.gross_pay) || 0;
+        const targetGross = hit.gross;
+        const diff = targetGross - currentGross;
+        const currentAdj = adjustments[r.employee_id] ?? (Number(r.adjustment_amount) || 0);
+        const newAdj = currentAdj + diff;  // 시스템 지급액에 diff 추가하면 target 됨
+        if (Math.abs(diff) >= 1) {
+          matched.push({ employee_id: r.employee_id, name: sysName, current: currentGross, target: targetGross, diff, currentAdj, newAdj });
+        }
+      }
+
+      const totalChanges = matched.length;
+      if (totalChanges === 0 && unmatched.length === 0) {
+        toast.success('모든 행이 이미 일치합니다');
+        return;
+      }
+
+      const lines = matched.slice(0, 10).map(m =>
+        `${m.name}: ${fmt.format(m.current)} → ${fmt.format(m.target)} (diff ${m.diff >= 0 ? '+' : ''}${fmt.format(m.diff)})`
+      ).join('\n');
+      const more = matched.length > 10 ? `\n... 외 ${matched.length - 10}명` : '';
+      const unmatchedNote = unmatched.length > 0 ? `\n\n⚠ 미매칭 ${unmatched.length}명: ${unmatched.slice(0, 5).join(', ')}${unmatched.length > 5 ? '...' : ''}` : '';
+      if (!confirm(`${totalChanges}명의 기타 조정을 일괄 적용합니다.\n\n${lines}${more}${unmatchedNote}\n\n진행할까요?`)) return;
+
+      let ok = 0, fail = 0;
+      for (const m of matched) {
+        try { await savePayrollAdjustment(m.employee_id, yearMonth, Math.round(m.newAdj), '엑셀 기준 자동 조정'); ok++; }
+        catch { fail++; }
+      }
+      toast.success(`적용 완료: 성공 ${ok}건${fail ? ` / 실패 ${fail}건` : ''}`);
+      load();
+    } catch (e: any) {
+      toast.error(e.message || '엑셀 처리 실패');
+    } finally {
+      setReconciling(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   if (!authorized) return <SessionPasswordGate title="급여 계산 접근" onVerified={() => setAuthorized(true)} />;
 
   const isPaid = !!data?.is_paid;
@@ -181,6 +266,23 @@ export default function PayrollCalcPage() {
         actions={
           results.length > 0 ? (
             <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReconcileFromExcel(f); }}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                leadingIcon={<Upload size={14} />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={reconciling}
+                title="외부 엑셀의 지급액과 시스템 지급액 차이만큼 기타(조정)에 일괄 입력"
+              >
+                {reconciling ? '처리중...' : '엑셀 기준 자동 맞춤'}
+              </Button>
               <Button
                 variant={isPaid ? "ghost" : "primary"}
                 size="sm"

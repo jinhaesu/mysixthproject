@@ -915,6 +915,56 @@ export async function initializeDB(): Promise<void> {
     console.error('Payroll 2026-04 backfill error:', err);
   }
 
+  // ===== 2026-04 정밀 보정 — 진단 스크립트 (diagnose_payroll_v3) 기반 직원별 정확한 기타 값 강제 적용 =====
+  // 이전 backfill 들이 prorate(calRatio × workRatio) 와 attendance 데이터의 실제 차이를 충분히 흡수하지 못했음.
+  // 현장 실제 지급액(v2 엑셀)과 시스템 frontend(rate=10320) 출력 차이를 직접 계산해서 employee_id 단위로 강제 UPDATE.
+  // 사용자 수동 변경분도 포함해 ALL 강제 갱신 (사용자가 명시적으로 'v2 와 맞춰달라'고 요청).
+  try {
+    const MIGRATION_ID_PRECISE = 'payroll-2026-04-precise-correction';
+    const checkPrecise = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [MIGRATION_ID_PRECISE]);
+    if (checkPrecise.rowCount === 0) {
+      // [employee_id, correct_amount, label] - diagnose_payroll_v3 출력 기반
+      const PRECISE_TARGETS: Array<[number, number, string]> = [
+        [4,   1266443, '김종성'],
+        [73,  2835251, 'MASROA 마쓰로이'],
+        [75,  2579831, 'MUKOKO GRAP FATAKI'],
+        [76,    37800, '박상천'],
+        [78,  3041793, 'TRAN VAN TAN'],
+        [86,  2917953, 'YE YINT AUNG'],
+        [88,  3041793, 'KYAW ZIN WIN'],
+        [90,  3041793, 'TO NO'],
+        [91,  3425869, 'TOMI AGUS'],
+        [93,  2933433, 'HARYANTO'],
+        [113, 1761091, 'ARID HAMZAH'],
+        [119, 1432156, 'NGUYEN HONG PHONG'],
+        [126, 2078431, 'BOONKET'],
+        [129, 2525793, 'KHAN SAJIAD'],
+        [138, 2701091, 'HIDAYAT DIAN'],
+        [145, 1454280, 'ARIS SETYAWAN'],
+        [168, 1418160, 'PUTRA RISKO'],
+        [173, 1418160, 'KARTINI'],
+        [180,  792080, 'LUU VAN DAT'],
+        [181,  888920, 'TRUONG VAN HAI'],
+        [182,  716060, 'SETIAWAN MOHAMMAD'],
+      ];
+      let applied = 0;
+      for (const [empId, amount, label] of PRECISE_TARGETS) {
+        const r = await pool.query(`
+          INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+          VALUES ($1, '2026-04', $2, '4월 v2 마감본 정밀 보정')
+          ON CONFLICT (employee_id, year_month)
+          DO UPDATE SET amount = EXCLUDED.amount, memo = EXCLUDED.memo, updated_at = NOW()
+        `, [empId, amount]);
+        if (r.rowCount && r.rowCount > 0) applied++;
+        else console.log(`  [skip] ${label} (id=${empId})`);
+      }
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1)', [MIGRATION_ID_PRECISE]);
+      console.log(`Applied precise correction for 2026-04: ${applied}/${PRECISE_TARGETS.length}`);
+    }
+  } catch (err) {
+    console.error('Payroll precise correction error:', err);
+  }
+
   // ===== 2026-04 v2 마감본 보정 backfill — 공백 문제 등으로 매칭 실패한 2건 재시도 =====
   try {
     const MIGRATION_ID_V2_FIX = 'payroll-2026-04-v2-backfill-fix';

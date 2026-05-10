@@ -23,8 +23,8 @@ export default function PayrollCalcPage() {
   const [yearMonth, setYearMonth] = usePersistedState("pc_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [overtimeRate, setOvertimeRate] = useState(10030);
-  const [pendingRate, setPendingRate] = useState(10030);
+  const [overtimeRate, setOvertimeRate] = useState(10320);  // 2026 한국 최저임금
+  const [pendingRate, setPendingRate] = useState(10320);
   const [sortKey, setSortKey] = usePersistedState<SortKey>("pc_sortKey", "hire_date");
   const [sortDir, setSortDir] = usePersistedState<"asc" | "desc">("pc_sortDir", "desc");
 

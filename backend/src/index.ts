@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.18.0',
+    version: '2.19.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -88,6 +88,8 @@ app.get('/api/health', (_req, res) => {
       nonBlockingDbInit: true,            // DB 마이그레이션 비동기 — 부팅 시 502 방지
       employeeLoans: true,                // 직원 대출 관리 + 급여대장 자동 차감
       payroll202604Backfill: true,        // 4월 v2 엑셀 마감본 1회성 기타 조정 backfill
+      minWage2026: true,                  // 연장/휴일 시급 기본값 10,320 (2026 최저임금)
+      payroll202604V2Backfill: true,      // 4월 v2 마감본 종합 backfill (21명)
     },
   });
 });

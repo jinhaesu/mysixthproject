@@ -915,6 +915,59 @@ export async function initializeDB(): Promise<void> {
     console.error('Payroll 2026-04 backfill error:', err);
   }
 
+  // ===== 2026-04 v2 마감본 종합 backfill (rate 10320 기준 차이 흡수) =====
+  // v2 의 휴일수당/연장수당이 hol_h × rate × 1.5 와 무관한 수동 fixed amount 인 경우 다수.
+  // (예: 야간 근무자 주말 출근 보너스 fixed 1,274,520 등) — 시스템 frontend(rate=10320) 기준
+  // 지급액과 v2 지급액 차이를 기타(±조정) 으로 일괄 적용.
+  // 기존 4월 backfill 적용된 row(메모 '4월%') 은 새 amount 로 UPDATE, 그 외는 INSERT.
+  // 사용자가 UI 에서 수동 변경한 row(메모 다름) 는 보존.
+  try {
+    const MIGRATION_ID_V2 = 'payroll-2026-04-v2-comprehensive-backfill';
+    const check2 = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [MIGRATION_ID_V2]);
+    if (check2.rowCount === 0) {
+      const TARGETS_V2: Array<[string, number]> = [
+        ['%NGUYEN HONG PHONG%',     -331480],
+        ['%KYAW ZIN WIN%',         1274520],
+        ['% TO NO %',              1274520],
+        ['%NGUYENTHEQUAN%',          51840],
+        ['%김종성%',               1266443],
+        ['%박상천%',                270000],
+        ['%실비아%',                722400],
+        ['%YE YINT AUNG%',         1150680],
+        ['%MASROA%',               1166160],
+        ['%KHAN SAJIAD%',           758520],
+        ['%TOMI AGUS%',            1620240],
+        ['%MUKOKO GRAP FATAKI%',    910740],
+        ['%HARYANTO DARMAWANTRI%', 1166160],
+        ['%HIDAYAT DIAN%',         1032000],
+        ['%TRAN VAN TAN%',         1274520],
+        ['%KARTINI FIKRI FAUZI%',   448920],
+        ['%PUTRA RISKO%',           448920],
+        ['%SETIAWAN MOHAMMAD%',     121260],
+        ['%LUU VAN DAT%',           352080],
+        ['%TRUONG VAN HAI%',        448920],
+        ['%ARIS SETYAWAN%',         686280],
+      ];
+      let processed = 0;
+      for (const [pattern, amount] of TARGETS_V2) {
+        const r = await pool.query(`
+          INSERT INTO regular_payroll_adjustments (employee_id, year_month, amount, memo)
+          SELECT id, '2026-04', $2, '4월 v2 마감본 종합 (자동 매칭)'
+          FROM regular_employees
+          WHERE name ILIKE $1
+          ON CONFLICT (employee_id, year_month)
+          DO UPDATE SET amount = EXCLUDED.amount, memo = EXCLUDED.memo, updated_at = NOW()
+          WHERE regular_payroll_adjustments.memo LIKE '4월%'
+        `, [pattern, amount]);
+        if (r.rowCount && r.rowCount > 0) processed++;
+      }
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1)', [MIGRATION_ID_V2]);
+      console.log(`Applied v2 comprehensive backfill for 2026-04: ${processed}/${TARGETS_V2.length} patterns matched`);
+    }
+  } catch (err) {
+    console.error('Payroll v2 comprehensive backfill error:', err);
+  }
+
   console.log('Database initialized successfully');
 }
 

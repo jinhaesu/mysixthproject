@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.21.6',
+    version: '2.21.7',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -100,6 +100,7 @@ app.get('/api/health', (_req, res) => {
       poolErrorHandler: true,             // pool.on('error') + uncaughtException 핸들러 — Node crash 방지
       initRetry: true,                    // initializeDB 트랜지언트 EDBHANDLEREXITED 재시도
       queryRetry: true,                    // dbGet/dbAll/dbRun 모두 EDBHANDLEREXITED 자동 재시도
+      sessionPooler: true,                 // Transaction 풀러 stuck 으로 Session 풀러(:5432)로 복귀
     },
   });
 });

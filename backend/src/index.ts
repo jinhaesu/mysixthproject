@@ -69,7 +69,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.23.4',
+    version: '2.23.5',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -109,6 +109,7 @@ app.get('/api/health', (_req, res) => {
       blobColumnsExcluded: true,           // list 쿼리에서 Base64 blob 컬럼 제외 (TOAST 555MB → 100KB)
       gzipCompression: true,               // Express compression — JSON 응답 50~70% 압축
       listColumnsTrimmed: true,            // employees list 핵심 컬럼만 (40+ → 18, 페이로드 60% 감소)
+      reminderServiceBlobFix: true,        // reminderService 백그라운드 SELECT * 제거 (employee_offboardings TOAST detoasting 방지)
     },
   });
 });

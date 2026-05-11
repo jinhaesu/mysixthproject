@@ -59,7 +59,7 @@ async function checkAndSendSafetyNotices() {
     if (workers.length === 0) return;
 
     // Get the first active safety notice
-    const notice = await dbGet('SELECT * FROM safety_notices WHERE is_active = 1 ORDER BY id LIMIT 1');
+    const notice = await dbGet('SELECT id, content FROM safety_notices WHERE is_active = 1 ORDER BY id LIMIT 1');
     if (!notice) return;
 
     console.log(`[SafetyNotice] Sending to ${workers.length} workers for ${tomorrowStr}`);
@@ -88,7 +88,7 @@ async function checkAndSendReports() {
     const currentTime = `${String(kstHours).padStart(2, '0')}:${String(kstMinutes).padStart(2, '0')}`;
 
     // Match within 10-minute window
-    const schedules = await dbAll('SELECT * FROM report_schedules WHERE is_active = 1');
+    const schedules = await dbAll('SELECT id, time, repeat_days, last_sent_at, phones FROM report_schedules WHERE is_active = 1');
 
     for (const schedule of schedules) {
       const [schedH, schedM] = schedule.time.split(':').map(Number);
@@ -163,8 +163,10 @@ async function checkAndSendScheduledSurveys() {
 
 async function checkAndSendScheduledMessages() {
   try {
+    // 명시적 컬럼 — sm.* 회피 (혹시 모를 blob/TEXT bloat 방지)
     const pending = await dbAll(`
-      SELECT sm.*, sn.content as notice_content
+      SELECT sm.id, sm.notice_id, sm.phones, sm.scheduled_at, sm.status,
+             sn.content as notice_content
       FROM scheduled_messages sm
       LEFT JOIN safety_notices sn ON sm.notice_id = sn.id
       WHERE sm.status = 'scheduled' AND sm.scheduled_at <= NOW()
@@ -191,7 +193,7 @@ async function checkAndSendRegularReports() {
     const kstMinutes = now.getUTCMinutes();
     const currentTime = `${String(kstHours).padStart(2, '0')}:${String(kstMinutes).padStart(2, '0')}`;
 
-    const schedules = await dbAll('SELECT * FROM regular_report_schedules WHERE is_active = 1');
+    const schedules = await dbAll('SELECT id, time, repeat_days, last_sent_at, phones FROM regular_report_schedules WHERE is_active = 1');
 
     for (const schedule of schedules as any[]) {
       const [schedH, schedM] = schedule.time.split(':').map(Number);
@@ -299,7 +301,7 @@ async function checkAndUpdateVacationBalances() {
       }
 
       const balance = await dbGet(
-        'SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?',
+        'SELECT id, total_days FROM regular_vacation_balances WHERE employee_id = ? AND year = ?',
         emp.id, currentYear
       ) as any;
 
@@ -486,8 +488,12 @@ async function checkAndSendOffboardingReminders(): Promise<void> {
     }
 
     // Find in_progress records where D-3 to D-0 and not yet reminded today
+    // 명시적 컬럼 — resignation_letter_data 등 BYTEA blob 제외 (TOAST detoasting 방지)
     const pending = await dbAll(`
-      SELECT *,
+      SELECT id, employee_name, department, resign_date, loss_date, reason_code, status,
+        resignation_letter_received, assets_returned, pension_reported, health_insurance_reported,
+        employment_insurance_reported, industrial_accident_reported, severance_paid,
+        annual_leave_settled, income_tax_reported, last_reminder_sent_at,
         (14 - EXTRACT(DAY FROM (NOW() - resign_date::date))::int) AS days_to_loss_deadline
       FROM employee_offboardings
       WHERE status = 'in_progress'

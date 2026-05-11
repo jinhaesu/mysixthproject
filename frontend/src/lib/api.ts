@@ -15,14 +15,31 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// 모든 API 호출에 45초 hard timeout. 무한 대기 방지 (이전: 브라우저 기본).
+const DEFAULT_TIMEOUT_MS = 45_000;
+
 async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      ...getAuthHeaders(),
-      ...options?.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      signal: options?.signal || controller.signal,
+      headers: {
+        ...getAuthHeaders(),
+        ...options?.headers,
+      },
+    });
+  } catch (e: any) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      throw new Error('서버 응답이 지연되어 시간 초과되었습니다. 잠시 후 다시 시도해주세요.');
+    }
+    throw e;
+  }
+  clearTimeout(timeoutId);
 
   if (res.status === 401) {
     if (typeof window !== 'undefined') {

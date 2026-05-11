@@ -13,18 +13,20 @@ function createPool() {
   }
 
   // Pool 옵션 — 응급 보수 설정.
-  // Web 서버 (PROCESS_TYPE=web): max:8 min:2, statement 8s — 사용자 요청 빠르게 처리.
+  // Web 서버 (PROCESS_TYPE=web): max:8 min:2, statement 10s — 사용자 요청 빠르게 처리.
   // Worker (PROCESS_TYPE=worker): max:4 min:1, statement 60s — 8개 background timer 동시 실행 가능하게.
   // 두 프로세스 별도 DB pool → worker stuck 이 web 사용자 요청 막지 않음.
+  // connectionTimeoutMillis 30s: Supabase Compute cold start + Supavisor 지연 대응.
+  //   이전 8s 는 cold start 시 fail. 30s 면 cold start 통과 가능.
   const isWorker = process.env.PROCESS_TYPE === 'worker';
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
     max: isWorker ? 4 : 8,
     min: isWorker ? 1 : 2,
     idleTimeoutMillis: 60_000,
-    connectionTimeoutMillis: 8_000,
-    query_timeout: isWorker ? 60_000 : 10_000,
-    statement_timeout: isWorker ? 60_000 : 8_000,
+    connectionTimeoutMillis: 30_000,    // 8s → 30s (cold start 대응)
+    query_timeout: isWorker ? 60_000 : 12_000,    // web 10s → 12s (여유)
+    statement_timeout: isWorker ? 60_000 : 10_000, // web 8s → 10s
     keepAlive: true,
     keepAliveInitialDelayMillis: 5_000,
     application_name: isWorker ? 'mysixthproject-worker' : 'mysixthproject-web',

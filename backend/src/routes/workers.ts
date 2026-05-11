@@ -4,7 +4,22 @@ import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/workers - List with search/pagination
+// GET /api/workers/lite — 경량 (subquery 없음, 정산 페이지 등 대량 로드용)
+router.get('/lite', async (_req: AuthRequest, res: Response) => {
+  try {
+    const workers = await dbAll(`
+      SELECT id, phone, name_ko, name_en, bank_name, bank_account, id_number,
+             category, department, workplace,
+             COALESCE(hourly_rate, 0) as hourly_rate
+      FROM workers ORDER BY name_ko ASC
+    `);
+    res.json({ workers });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/workers - List with search/pagination (LATERAL joins for speed)
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { search, category, page = '1', limit = '50' } = req.query as Record<string, string>;
@@ -21,25 +36,50 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       params.push(category);
     }
 
-    const countResult = await dbGet(`SELECT COUNT(*) as total FROM workers ${where}`, ...params);
-    const total = countResult.total;
     const pageNum = parseInt(page);
     const limitNum = Math.min(parseInt(limit), 500);
     const offset = (pageNum - 1) * limitNum;
 
     const today = getKSTDate();
+    // LATERAL joins (1 pass) 로 이전 4개 correlated subquery 대체.
+    // labor_contracts 3개 subquery 통합 (id, start, end 한 번에).
     const workers = await dbAll(`
       SELECT w.*,
-        (SELECT lc.id FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_id,
-        (SELECT lc.contract_start FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_start,
-        (SELECT lc.contract_end FROM labor_contracts lc WHERE lc.phone = w.phone AND lc.contract_end >= '${today}' ORDER BY lc.created_at DESC LIMIT 1) as contract_end,
-        (SELECT MAX(sr.date) FROM survey_requests sr JOIN survey_responses resp ON sr.id = resp.request_id WHERE sr.phone = w.phone AND resp.clock_in_time IS NOT NULL) as last_clock_in_date
-      FROM workers w ${where} ORDER BY last_clock_in_date DESC NULLS LAST, w.name_ko ASC LIMIT ? OFFSET ?
+             c.contract_id, c.contract_start, c.contract_end,
+             s.last_clock_in_date
+      FROM workers w
+      LEFT JOIN LATERAL (
+        SELECT id as contract_id, contract_start, contract_end
+        FROM labor_contracts
+        WHERE phone = w.phone AND contract_end >= '${today}'
+        ORDER BY created_at DESC LIMIT 1
+      ) c ON true
+      LEFT JOIN LATERAL (
+        SELECT MAX(sr.date) as last_clock_in_date
+        FROM survey_requests sr
+        JOIN survey_responses resp ON sr.id = resp.request_id
+        WHERE sr.phone = w.phone AND resp.clock_in_time IS NOT NULL
+      ) s ON true
+      ${where}
+      ORDER BY s.last_clock_in_date DESC NULLS LAST, w.name_ko ASC
+      LIMIT ? OFFSET ?
     `, ...params, limitNum, offset);
+
+    // limit 이 충분히 크면 COUNT 생략 (pagination 의미 없음)
+    let total = (workers as any[]).length;
+    let totalPages = 1;
+    if (limitNum < 200) {
+      const countResult = await dbGet(`SELECT COUNT(*) as total FROM workers ${where}`, ...params);
+      total = countResult.total;
+      totalPages = Math.ceil(total / limitNum);
+    } else if ((workers as any[]).length === limitNum) {
+      // 가득 찼으면 추가 페이지 있을 수도 — 보수적으로 추정
+      total = limitNum;
+    }
 
     res.json({
       workers,
-      pagination: { total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum) },
+      pagination: { total, page: pageNum, limit: limitNum, totalPages },
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -107,6 +147,30 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// PUT /api/workers/:id/hourly-rate — 시급만 부분 update
+router.put('/:id/hourly-rate', async (req: AuthRequest, res: Response) => {
+  try {
+    const rate = parseInt(req.body?.hourly_rate, 10) || 0;
+    await dbRun('UPDATE workers SET hourly_rate = ?, updated_at = NOW() WHERE id = ?', rate, req.params.id);
+    res.json({ success: true });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
+});
+
+// POST /api/workers/bulk-hourly-rate?category=알바|파견 — 카테고리별 일괄 시급
+router.post('/bulk-hourly-rate', async (req: AuthRequest, res: Response) => {
+  try {
+    const rate = parseInt(req.body?.hourly_rate, 10) || 0;
+    const category = (req.body?.category || '').trim();
+    if (rate <= 0) { res.status(400).json({ error: 'hourly_rate 필수' }); return; }
+    if (!category) { res.status(400).json({ error: 'category 필수' }); return; }
+    // category 는 '알바' 또는 '파견' — DB 의 category 칼럼은 '사업소득 파견에서 물류' 같은 형태일 수 있음.
+    // 따라서 부분 일치 (LIKE) 로 매칭.
+    const like = `%${category}%`;
+    const r = await dbRun('UPDATE workers SET hourly_rate = ?, updated_at = NOW() WHERE category LIKE ?', rate, like);
+    res.json({ success: true, updated: r.changes });
+  } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
 // DELETE /api/workers/:id

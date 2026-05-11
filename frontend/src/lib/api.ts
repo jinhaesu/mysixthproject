@@ -397,6 +397,9 @@ export async function getAttendanceLiveDashboard(date: string) {
 }
 
 // ===== Workers =====
+export async function getWorkersLite() {
+  return fetchAPI<any>('/api/workers/lite');
+}
 export async function getWorkers(params: Record<string, string> = {}) {
   const query = new URLSearchParams(params).toString();
   return fetchAPI<any>(`/api/workers?${query}`);
@@ -424,6 +427,22 @@ export async function updateWorker(id: number, data: any) {
 
 export async function deleteWorker(id: number) {
   return fetchAPI<any>(`/api/workers/${id}`, { method: 'DELETE' });
+}
+
+export async function updateWorkerHourlyRate(id: number, hourly_rate: number) {
+  return fetchAPI<any>(`/api/workers/${id}/hourly-rate`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hourly_rate }),
+  });
+}
+
+export async function bulkWorkerHourlyRate(category: string, hourly_rate: number) {
+  return fetchAPI<any>(`/api/workers/bulk-hourly-rate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category, hourly_rate }),
+  });
 }
 
 export async function importWorkers() {

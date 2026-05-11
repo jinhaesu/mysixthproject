@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users } from "lucide-react";
-import { getConfirmedList, getWorkers } from "@/lib/api";
+import { getConfirmedList, getWorkersLite, updateWorkerHourlyRate, bulkWorkerHourlyRate } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import ChartCard from "@/components/charts/ChartCard";
@@ -51,12 +51,15 @@ export default function SettlementDispatchPage() {
   const [feeRate, setFeeRate] = useState(10);
   const [checkedEmps, setCheckedEmps] = useState<Set<number>>(new Set());
   const [mealDeductions, setMealDeductions] = useState<Record<number, number>>({});
+  // 직원별 시급(로컬) — workerByIdentity 매칭으로 worker.hourly_rate 초기화
+  const [rates, setRates] = useState<Record<number, number>>({});
+  const rateTimers = useRef<Record<number, any>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [workersResp, confList] = await Promise.all([
-        getWorkers({ limit: '10000' }).catch(() => ({ workers: [] })),
+        getWorkersLite().catch(() => ({ workers: [] })),
         getConfirmedList(yearMonth, ''),
       ]);
       const workersList = (workersResp as any).workers || (workersResp as any) || [];
@@ -90,6 +93,11 @@ export default function SettlementDispatchPage() {
             empMap.set(identity, {
               name: r.employee_name,
               phone: r.employee_phone || '',
+              worker_id: worker.id || null,
+              department: worker.department || '',
+              workplace: worker.workplace || '',
+              category: worker.category || '',
+              hourly_rate: parseInt(worker.hourly_rate) || 0,
               bank_name: worker.bank_name || '',
               bank_account: worker.bank_account || '',
               id_number: worker.id_number || '',
@@ -149,25 +157,31 @@ export default function SettlementDispatchPage() {
       setData({ results });
       setCheckedEmps(new Set(results.map((_: any, i: number) => i)));
       const meals: Record<number, number> = {};
-      results.forEach((_, i) => { meals[i] = 0; });
+      const initRates: Record<number, number> = {};
+      results.forEach((r: any, i: number) => {
+        meals[i] = 0;
+        initRates[i] = r.hourly_rate > 0 ? r.hourly_rate : hourlyRate;
+      });
       setMealDeductions(meals);
+      setRates(initRates);
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
-  }, [yearMonth]);
+  }, [yearMonth, hourlyRate]);
 
   useEffect(() => { load(); }, [load]);
 
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
 
   const calcEmp = (r: any, idx: number) => {
+    const rate = rates[idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate);
     const otHours = floor30(r.overtime_hours);
     const holHours = floor30(r.holiday_pay_hours || 0);
     const nightHours = floor30(r.night_hours || 0);
-    const basePay = Math.round(r.regular_hours * hourlyRate);
-    const overtimePay = Math.round(otHours * hourlyRate * 1.5);
-    const holidayPay = Math.round(holHours * hourlyRate * 1.5);
-    const nightPay = Math.round(nightHours * hourlyRate * 1.5);
-    const whPay = Math.round(r.weekly_holiday_hours * hourlyRate);
+    const basePay = Math.round(r.regular_hours * rate);
+    const overtimePay = Math.round(otHours * rate * 1.5);
+    const holidayPay = Math.round(holHours * rate * 1.5);
+    const nightPay = Math.round(nightHours * rate * 1.5);
+    const whPay = Math.round(r.weekly_holiday_hours * rate);
     const grossPay = basePay + overtimePay + holidayPay + nightPay + whPay;
     const meal = mealDeductions[idx] || 0;
     const net = grossPay - meal;
@@ -181,7 +195,27 @@ export default function SettlementDispatchPage() {
     const fee = checkedEmps.has(idx) ? Math.round(sub * feeRate / 100) : 0;
     const bv = sub + fee;
     const vat = Math.round(bv * 0.1);
-    return { basePay, overtimePay, nightPay, whPay, grossPay, meal, net, np, hi, ia, ei, ltc, ins, fee, bv, vat, total: bv + vat };
+    return { rate, basePay, overtimePay, nightPay, whPay, grossPay, meal, net, np, hi, ia, ei, ltc, ins, fee, bv, vat, total: bv + vat };
+  };
+
+  const onRateChange = (idx: number, workerId: number | null, value: string) => {
+    const num = parseInt((value || '').replace(/[^0-9]/g, ''), 10) || 0;
+    setRates(prev => ({ ...prev, [idx]: num }));
+    if (!workerId) return;
+    if (rateTimers.current[idx]) clearTimeout(rateTimers.current[idx]);
+    rateTimers.current[idx] = setTimeout(async () => {
+      try { await updateWorkerHourlyRate(workerId, num); }
+      catch (e: any) { toast.error(e.message); }
+    }, 600);
+  };
+
+  const handleBulkApply = async () => {
+    if (!confirm(`파견 카테고리 전체 시급을 ${krFmt.format(hourlyRate)}원으로 일괄 적용합니다. 진행할까요?`)) return;
+    try {
+      const r = await bulkWorkerHourlyRate('파견', hourlyRate);
+      toast.success(`${r.updated || 0}명 일괄 적용 완료`);
+      load();
+    } catch (e: any) { toast.error(e.message); }
   };
 
   const results = data?.results || [];
@@ -205,8 +239,8 @@ export default function SettlementDispatchPage() {
               size="sm"
               leadingIcon={<Download size={14} />}
               onClick={() => {
-                const header = ['이름','근무일','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','국민연금','건강보험','산재보험','고용보험','장기요양','보험계','수수료','VAT','최종액'];
-                const csvRows = rows.map((r: any) => [r.name,r.work_days,r.regular_hours,r.overtime_hours,r.night_hours||0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.np,r.hi,r.ia,r.ei,r.ltc,r.ins,r.fee,r.vat,r.total]);
+                const header = ['이름','소속','시급','근무일','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','국민연금','건강보험','산재보험','고용보험','장기요양','보험계','수수료','VAT','최종액'];
+                const csvRows = rows.map((r: any) => [r.name,r.department||r.workplace||'',r.rate||0,r.work_days,r.regular_hours,r.overtime_hours,r.night_hours||0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.np,r.hi,r.ia,r.ei,r.ltc,r.ins,r.fee,r.vat,r.total]);
                 const csv = [header,...csvRows].map(r => r.join(',')).join('\n');
                 const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
                 const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`파견정산_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -222,8 +256,11 @@ export default function SettlementDispatchPage() {
         <Field label="연월">
           <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
         </Field>
-        <Field label="시간당 급여">
-          <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" />
+        <Field label="시급 일괄 설정 (원)">
+          <div className="flex gap-1.5 items-center">
+            <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" />
+            <Button size="sm" variant="secondary" onClick={handleBulkApply} title="파견 카테고리 전체 직원 시급 일괄 변경 (DB 저장)">전체 적용</Button>
+          </div>
         </Field>
         <Field label="파견수수료 (%)">
           <Input type="number" inputSize="sm" step="0.1" value={feeRate} onChange={e => setFeeRate(parseFloat(e.target.value) || 0)} className="w-20" />
@@ -277,6 +314,8 @@ export default function SettlementDispatchPage() {
                 <TR>
                   <TH className="w-8">수수료</TH>
                   <TH>이름</TH>
+                  <TH>소속</TH>
+                  <TH numeric className="w-16">시급<br/><span className="text-[8px] text-[var(--text-4)]">편집</span></TH>
                   <TH numeric>일</TH>
                   <TH numeric>기본h</TH>
                   <TH numeric>연장h</TH>
@@ -299,7 +338,7 @@ export default function SettlementDispatchPage() {
                   <TH numeric>최종액</TH>
                 </TR>
                 <TR>
-                  <TH colSpan={12}></TH>
+                  <TH colSpan={14}></TH>
                   <TH numeric className="text-[9px] text-[var(--text-4)]">직접입력</TH>
                   <TH numeric className="text-[9px] text-[var(--text-4)]">4.75%</TH>
                   <TH numeric className="text-[9px] text-[var(--text-4)]">3.595%</TH>
@@ -318,6 +357,16 @@ export default function SettlementDispatchPage() {
                         className="rounded border-[var(--border-1)]" />
                     </TD>
                     <TD emphasis className="whitespace-nowrap">{r.name}</TD>
+                    <TD muted className="text-[10px] whitespace-nowrap" title={`${r.department || ''} ${r.workplace || ''}`.trim() || '-'}>{r.department || r.workplace || '-'}</TD>
+                    <TD className="p-0.5">
+                      <input
+                        type="number"
+                        className="w-16 px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none"
+                        value={rates[r.idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate)}
+                        onChange={e => onRateChange(r.idx, r.worker_id, e.target.value)}
+                        title="이 직원의 시급 — 자동저장 (worker DB 매칭된 경우)"
+                      />
+                    </TD>
                     <TD numeric>{r.work_days}</TD>
                     <TD numeric>{r.regular_hours}</TD>
                     <TD numeric className="text-[var(--warning-fg)]">{r.overtime_hours}</TD>
@@ -346,7 +395,7 @@ export default function SettlementDispatchPage() {
               </TBody>
               <tfoot>
                 <TR className="bg-[var(--info-bg)] border-t-2 border-[var(--info-border)] font-bold text-[10px]">
-                  <TD className="text-[var(--info-fg)]" colSpan={2}>합계 ({rows.length}명)</TD>
+                  <TD className="text-[var(--info-fg)]" colSpan={4}>합계 ({rows.length}명)</TD>
                   <TD numeric>{totals.work_days}</TD>
                   <TD numeric>{(totals.regular_hours || 0).toFixed(1)}</TD>
                   <TD numeric>{(totals.overtime_hours || 0).toFixed(1)}</TD>

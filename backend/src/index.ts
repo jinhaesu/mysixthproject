@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.20.0',
+    version: '2.21.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -91,6 +91,9 @@ app.get('/api/health', (_req, res) => {
       minWage2026: true,                  // 연장/휴일 시급 기본값 10,320 (2026 최저임금)
       payroll202604V2Backfill: true,      // 4월 v2 마감본 종합 backfill (21명)
       perEmployeeHourlyRate: true,        // 직원별 시급 편집 (테이블 내 inline + 전체 적용)
+      workerHourlyRate: true,             // 알바·파견 직원별 시급 (workers.hourly_rate)
+      poolTuning: true,                   // max=8, keepAlive — Supabase ECHECKOUTTIMEOUT 방지
+      workersLite: true,                  // /api/workers/lite — subquery 없는 빠른 목록
     },
   });
 });

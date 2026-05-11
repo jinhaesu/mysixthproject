@@ -165,7 +165,7 @@ export default function SettlementAlbaPage() {
     finally { setLoading(false); }
   }, [yearMonth, hourlyRate]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (authorized) load(); }, [load, authorized]);
 
   const calcEmp = (r: any, idx: number) => {
     const floor30 = (h: number) => Math.floor(h * 2) / 2;

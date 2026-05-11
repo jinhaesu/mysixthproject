@@ -24,7 +24,7 @@ export default function SalaryManagePage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (authorized) load(); }, [load, authorized]);
 
 
   const handleSave = async (empId: number) => {

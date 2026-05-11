@@ -13,20 +13,19 @@ function createPool() {
   }
 
   // Pool 옵션 — Supabase Session 모드 pooler (port 5432) 용.
-  // Transaction 모드 (6543) 에서 ECHECKOUTTIMEOUT 만성 발생 → Session 모드로 복귀.
-  // Session 모드는 각 connection 이 1 backend 점유. max 너무 크면 Supabase 한계 초과.
-  // Pro 플랜 기준 안전 영역: max ~10.
-  // keepAlive: TCP 끊김 방지 + EDBHANDLEREXITED 빈도 감소.
-  // idleTimeoutMillis: 30s — Supavisor 가 idle backend cleanup 하기 전에 우리가 release.
+  // dead-checkout 레이스 방지:
+  //   idleTimeoutMillis 10s: Supavisor cleanup(~60s) 전 우리가 먼저 close → stale socket 보유 시간 최소화
+  //   keepAliveInitialDelayMillis 3s: TCP keepalive 가 zombie socket 빠르게 검출
+  //   Pro 플랜 기준 max ~10.
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
     max: 10,
-    idleTimeoutMillis: 30_000,
+    idleTimeoutMillis: 10_000,         // 30s → 10s
     connectionTimeoutMillis: 10_000,
     query_timeout: 30_000,
     statement_timeout: 30_000,         // Session 모드는 startup option 사용 가능
     keepAlive: true,
-    keepAliveInitialDelayMillis: 10_000,
+    keepAliveInitialDelayMillis: 3_000, // 10s → 3s
     application_name: 'mysixthproject-backend',
   };
 
@@ -69,24 +68,29 @@ function pg$(sql: string): string {
 
 // Supavisor 가 idle 백엔드 정리 시 클라이언트는 EDBHANDLEREXITED / connection closed 받음.
 // 이건 정상 동작이지만 그 순간 진행 중인 쿼리는 한 번 실패. 따라서 재시도해서 사용자에게는 투명하게.
+// dead-checkout 레이스: pool 의 stale idle client 가 checkout 되면 첫 쿼리에서 fail.
+// 만약 10개 slot 다 stale 이면 retry 마다 다른 dead client 받을 수 있음 → 3회 시도 + backoff 길게.
 const RETRYABLE = (e: any) => {
   if (!e) return false;
   const m = String(e.message || '');
   return m.includes('EDBHANDLEREXITED') ||
          m.includes('Connection terminated') ||
          m.includes('connection closed') ||
+         m.includes('connection terminated unexpectedly') ||
          m.includes('ECONNRESET') ||
          m.includes('ETIMEDOUT') ||
-         e.code === '57P01' || e.code === '08006' || e.code === '08003';
+         m.includes('read ECONNRESET') ||
+         m.includes('Client has encountered a connection error') ||
+         e.code === '57P01' || e.code === '08006' || e.code === '08003' || e.code === 'ECONNRESET';
 };
-async function queryWithRetry(sql: string, params: any[], attempts = 2): Promise<any> {
+async function queryWithRetry(sql: string, params: any[], attempts = 3): Promise<any> {
   let last: any;
   for (let i = 1; i <= attempts; i++) {
     try { return await pool.query(sql, params); }
     catch (e: any) {
       last = e;
       if (i < attempts && RETRYABLE(e)) {
-        await new Promise(r => setTimeout(r, 200 * i));
+        await new Promise(r => setTimeout(r, 300 * i));
         continue;
       }
       throw e;

@@ -25,11 +25,11 @@ export default function PasswordGate({ onVerified, verifyPassword, title = "접�
     setChecking(true);
     setError("");
     try {
-      // 외부 verifyPassword 가 hang 해도 15초 후 timeout
+      // 외부 verifyPassword 가 hang 해도 45초 후 timeout
       const ok = await Promise.race([
         verifyPassword(pw),
         new Promise<boolean>((_, reject) =>
-          setTimeout(() => reject(new Error("TIMEOUT")), 15000)
+          setTimeout(() => reject(new Error("TIMEOUT")), 45000)
         ),
       ]);
       if (ok) {

@@ -69,7 +69,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.23.5',
+    version: '2.23.6',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -110,6 +110,7 @@ app.get('/api/health', (_req, res) => {
       gzipCompression: true,               // Express compression — JSON 응답 50~70% 압축
       listColumnsTrimmed: true,            // employees list 핵심 컬럼만 (40+ → 18, 페이로드 60% 감소)
       reminderServiceBlobFix: true,        // reminderService 백그라운드 SELECT * 제거 (employee_offboardings TOAST detoasting 방지)
+      deadCheckoutFix: true,               // Supavisor stale socket: idle 10s, keepAlive 3s, retry 3회, heartbeat 30s
     },
   });
 });
@@ -152,12 +153,13 @@ process.on('uncaughtException', (err: Error) => {
   console.error('[uncaughtException]', err.message);
 });
 
-// DB Heartbeat — Supabase auto-pause/cold-start 방지.
-// 첫 쿼리가 cold 일 때 30초 가까이 걸리는 현상 → 매 90초마다 가벼운 ping 으로 워밍 유지.
+// DB Heartbeat — Supabase auto-pause/cold-start 방지 + Supavisor idle backend cleanup 방지.
+// 30초마다 ping → 모든 pool slot 이 idleTimeoutMillis(10s) 도달하기 전 활성화.
+// (이전 90s 는 Supavisor cleanup race 와 충돌)
 setInterval(async () => {
   try { await dbGet('SELECT 1'); }
   catch (e: any) { console.error('DB heartbeat error:', e.message); }
-}, 90_000);
+}, 30_000);
 
 // Graceful shutdown — Railway redeploy 시 connection 정상 종료해서
 // Supabase pooler 측 stale connection 누적 방지.

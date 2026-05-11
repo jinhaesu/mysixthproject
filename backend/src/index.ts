@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { initializeDB, pool, dbGet } from './db';
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
@@ -25,6 +26,10 @@ import { startReminderService } from './services/reminderService';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// gzip 압축 — JSON 응답을 50~70% 줄여 네트워크 전송 시간 단축.
+// threshold 1KB 이상 응답에만 적용 (작은 응답은 압축 오버헤드가 더 큼).
+app.use(compression({ threshold: 1024 }));
 
 // Middleware - CORS
 app.use(cors({
@@ -64,7 +69,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.22.2',
+    version: '2.23.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -102,6 +107,8 @@ app.get('/api/health', (_req, res) => {
       queryRetry: true,                    // dbGet/dbAll/dbRun 모두 EDBHANDLEREXITED 자동 재시도
       sessionPooler: true,                 // Transaction 풀러 stuck 으로 Session 풀러(:5432)로 복귀
       blobColumnsExcluded: true,           // list 쿼리에서 Base64 blob 컬럼 제외 (TOAST 555MB → 100KB)
+      gzipCompression: true,               // Express compression — JSON 응답 50~70% 압축
+      listColumnsTrimmed: true,            // employees list 핵심 컬럼만 (40+ → 18, 페이로드 60% 감소)
     },
   });
 });

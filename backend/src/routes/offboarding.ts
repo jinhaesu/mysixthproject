@@ -207,8 +207,17 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
 
     const rows = await dbAll(
-      `SELECT eo.*,
-         CASE
+      // eo.* 는 resignation_letter_data 등 blob 포함 → 1행당 수 MB 디토스트.
+      // list 에서는 has_resignation_letter boolean 만 노출.
+      `SELECT eo.id, eo.employee_type, eo.employee_ref_id, eo.employee_name, eo.employee_phone,
+              eo.department, eo.hire_date, eo.resign_date, eo.loss_date, eo.reason_code, eo.reason_detail,
+              eo.status, eo.resignation_letter_received, eo.assets_returned,
+              eo.pension_reported, eo.health_insurance_reported, eo.employment_insurance_reported,
+              eo.created_at, eo.updated_at, eo.last_reminder_sent_at,
+              eo.resignation_letter_filename, eo.resignation_letter_token, eo.resignation_letter_sms_sent,
+              eo.resignation_letter_sms_sent_at, eo.resignation_letter_submitted_at,
+              eo.resignation_letter_employee_reason, eo.resignation_letter_detail,
+              CASE
            WHEN eo.hire_date IS NULL OR eo.hire_date = ''
            THEN COALESCE(re.hire_date, '')
            ELSE eo.hire_date
@@ -361,13 +370,29 @@ router.get('/export/insurance.csv', async (req: AuthRequest, res: Response) => {
       }
       const placeholders = idList.map(() => '?').join(',');
       rows = await dbAll(
-        `SELECT * FROM employee_offboardings WHERE id IN (${placeholders})`,
+        // blob (resignation_letter_data) 제외 — CSV export 에는 불필요.
+        `SELECT id, employee_type, employee_ref_id, employee_name, employee_phone,
+                department, hire_date, resign_date, loss_date, reason_code, reason_detail,
+                status, resignation_letter_received, assets_returned,
+                pension_reported, health_insurance_reported, employment_insurance_reported,
+                created_at, updated_at,
+                resignation_letter_filename, resignation_letter_token, resignation_letter_sms_sent,
+                resignation_letter_sms_sent_at, resignation_letter_submitted_at,
+                resignation_letter_employee_reason, resignation_letter_detail
+         FROM employee_offboardings WHERE id IN (${placeholders})`,
         ...idList,
       );
     } else {
-      // Default: all in_progress records
       rows = await dbAll(
-        "SELECT * FROM employee_offboardings WHERE status = 'in_progress' ORDER BY resign_date DESC",
+        `SELECT id, employee_type, employee_ref_id, employee_name, employee_phone,
+                department, hire_date, resign_date, loss_date, reason_code, reason_detail,
+                status, resignation_letter_received, assets_returned,
+                pension_reported, health_insurance_reported, employment_insurance_reported,
+                created_at, updated_at,
+                resignation_letter_filename, resignation_letter_token, resignation_letter_sms_sent,
+                resignation_letter_sms_sent_at, resignation_letter_submitted_at,
+                resignation_letter_employee_reason, resignation_letter_detail
+         FROM employee_offboardings WHERE status = 'in_progress' ORDER BY resign_date DESC`,
       );
     }
 

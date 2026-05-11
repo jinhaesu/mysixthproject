@@ -476,13 +476,23 @@ router.get('/export/insurance.csv', async (req: AuthRequest, res: Response) => {
       }
       const placeholders = idList.map(() => '?').join(',');
       rows = await dbAll(
-        `SELECT * FROM regular_employees WHERE is_active = 1 AND id IN (${placeholders})`,
+        // blob 컬럼 제외 — CSV export 에는 불필요. SELECT * 면 1행당 5MB+ TOAST 디토스팅.
+        `SELECT id, phone, name, name_en, department, team, role, hire_date,
+                bank_name, bank_account, id_number, birth_date, email, address,
+                nationality, visa_type, visa_expiry,
+                business_registration_no, monthly_salary, non_taxable_meal, non_taxable_vehicle,
+                job_code, weekly_work_hours, employment_type, onboarding_status
+         FROM regular_employees WHERE is_active = 1 AND id IN (${placeholders})`,
         ...idList,
       );
     } else {
-      // Default: all 'ready' (정보 완료, 미발송) records
       rows = await dbAll(
-        "SELECT * FROM regular_employees WHERE is_active = 1 AND onboarding_status = 'ready' ORDER BY hire_date DESC",
+        `SELECT id, phone, name, name_en, department, team, role, hire_date,
+                bank_name, bank_account, id_number, birth_date, email, address,
+                nationality, visa_type, visa_expiry,
+                business_registration_no, monthly_salary, non_taxable_meal, non_taxable_vehicle,
+                job_code, weekly_work_hours, employment_type, onboarding_status
+         FROM regular_employees WHERE is_active = 1 AND onboarding_status = 'ready' ORDER BY hire_date DESC`,
       );
     }
 
@@ -505,6 +515,8 @@ router.get('/export/insurance.csv', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id as string, 10);
+    // detail 화면용 — blob 컬럼 포함 (입사 정보 확인 화면에서 문서 표시).
+    // 1행만 가져오므로 LIST 처럼 누적되지 않지만, 5MB+ 전송으로 사용자에게 1~3초 지연됨.
     const emp = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
     if (!emp) {
       res.status(404).json({ error: '직원을 찾을 수 없습니다.' });
@@ -534,7 +546,15 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.get('/:id/export.csv', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    const emp = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
+    const emp = await dbGet(
+      `SELECT id, phone, name, name_en, department, team, role, hire_date,
+              bank_name, bank_account, id_number, birth_date, email, address,
+              nationality, visa_type, visa_expiry,
+              business_registration_no, monthly_salary, non_taxable_meal, non_taxable_vehicle,
+              job_code, weekly_work_hours, employment_type, onboarding_status
+       FROM regular_employees WHERE id = ?`,
+      id
+    );
     if (!emp) {
       res.status(404).json({ error: '직원을 찾을 수 없습니다.' });
       return;

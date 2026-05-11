@@ -4,7 +4,10 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
-import { initializeDB, pool, dbGet } from './db';
+// Web 서버 — PROCESS_TYPE=web 으로 db.ts pool 분기 (max:8 min:2 statement:8s).
+// reminderService 는 별도 worker 프로세스(start:worker)가 담당.
+process.env.PROCESS_TYPE = process.env.PROCESS_TYPE || 'web';
+import { initializeDB, pool } from './db';
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import attendanceRoutes from './routes/attendance';
@@ -22,7 +25,7 @@ import offboardingRoutes from './routes/offboarding';
 import offboardingPublicRoutes from './routes/offboardingPublic';
 import onboardingRoutes from './routes/onboarding';
 import { requireAuth } from './middleware/auth';
-import { startReminderService } from './services/reminderService';
+// reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -69,7 +72,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.23.7',
+    version: '2.24.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -112,6 +115,7 @@ app.get('/api/health', (_req, res) => {
       reminderServiceBlobFix: true,        // reminderService 백그라운드 SELECT * 제거 (employee_offboardings TOAST detoasting 방지)
       deadCheckoutFix: true,               // Supavisor stale socket: idle 10s, keepAlive 3s, retry 3회, heartbeat 30s
       emergencyPoolStabilization: true,    // reminderService/heartbeat 비활성화, pool min:2, statement_timeout 8s
+      workerProcessSplit: true,            // Web/Worker 프로세스 분리 — 별도 Railway 서비스로 reminderService 운영
     },
   });
 });
@@ -142,10 +146,8 @@ initializeDB()
     console.error('Database migration failed (server still running):', err);
   });
 
-// reminderService 일시 비활성화 — Query read timeout 으로 pool 고갈 시키는 원인.
-// 사용자 요청이 우선. 추후 별도 worker 프로세스 분리 후 재활성화.
-// startReminderService();
-void startReminderService;
+// reminderService 는 worker 프로세스 (npm run start:worker) 가 담당.
+// Web 서버는 사용자 요청만 처리.
 
 // Last-resort: 어떤 비동기에서 uncaught 발생해도 프로세스 죽이지 않고 로그만 남김.
 // (Pool 에러는 별도로 db.ts 에서 처리하지만, fetch/timer 등 어디서든 보호.)
@@ -156,9 +158,7 @@ process.on('uncaughtException', (err: Error) => {
   console.error('[uncaughtException]', err.message);
 });
 
-// DB Heartbeat — 일시 비활성화. 현재 Supabase pool 이 불안정해 heartbeat 가
-// 오히려 pool 을 churn 시켜 사용자 요청을 막음. min:2 로 자체 warm-up.
-void dbGet;
+// DB Heartbeat — web 서버는 사용 안 함. min:2 로 pool 자체 warm.
 
 // Graceful shutdown — Railway redeploy 시 connection 정상 종료해서
 // Supabase pooler 측 stale connection 누적 방지.

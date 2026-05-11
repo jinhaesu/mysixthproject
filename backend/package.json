@@ -5,8 +5,10 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
+    "dev:worker": "PROCESS_TYPE=worker nodemon --exec ts-node src/worker.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "PROCESS_TYPE=web node dist/index.js",
+    "start:worker": "PROCESS_TYPE=worker node dist/worker.js"
   },
   "keywords": [],
   "author": "",

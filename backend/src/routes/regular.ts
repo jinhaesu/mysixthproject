@@ -19,24 +19,17 @@ const EMP_COLS_NO_BLOB = `
   business_registration_no, monthly_salary, non_taxable_meal, non_taxable_vehicle,
   job_code, weekly_work_hours, employment_type,
   onboarding_status, onboarding_completed_at, onboarding_email_sent, onboarding_email_sent_at,
-  signed_contract_url,
-  (bank_slip_data IS NOT NULL AND bank_slip_data != '') as has_bank_slip,
-  (foreign_id_card_data IS NOT NULL AND foreign_id_card_data != '') as has_foreign_id_card,
-  (family_register_data IS NOT NULL AND family_register_data != '') as has_family_register,
-  (resident_register_data IS NOT NULL AND resident_register_data != '') as has_resident_register
+  signed_contract_url
 `;
 
-// LIST 전용 — 표 출력에 필요한 핵심 컬럼만. 페이로드 60% 감소.
+// LIST 전용 — 표 출력 핵심 컬럼만. has_* boolean 제거 (col != '' 체크가 TOAST 디토스팅 유발 → 쿼리 14초+).
+// 문서 존재 여부 필요한 화면은 별도 detail/document-status 엔드포인트 호출.
 const EMP_COLS_LIST = `
   id, phone, name, department, team, role, workplace_id,
   is_active, hire_date, resign_date, resigned_at,
   bank_name, bank_account, id_number,
   nationality, visa_expiry,
-  employment_type, onboarding_status,
-  (bank_slip_data IS NOT NULL AND bank_slip_data != '') as has_bank_slip,
-  (foreign_id_card_data IS NOT NULL AND foreign_id_card_data != '') as has_foreign_id_card,
-  (family_register_data IS NOT NULL AND family_register_data != '') as has_family_register,
-  (resident_register_data IS NOT NULL AND resident_register_data != '') as has_resident_register
+  employment_type, onboarding_status
 `;
 
 // ===== Employees CRUD =====
@@ -72,7 +65,7 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
     const limitNum = Math.min(parseInt(limit), 500);
     const offset = (pageNum - 1) * limitNum;
 
-    // List 핵심 컬럼만. 표 화면에 안 보이는 birth_date/email/address 등은 detail 엔드포인트에서 조회.
+    // List 핵심 컬럼만. has_* 디토스팅 제거 (TOAST 555MB 컬럼의 != '' 체크가 14초+ 걸림).
     const employees = await dbAll(`
       SELECT
         re.id, re.phone, re.name, re.department, re.team, re.role, re.workplace_id,
@@ -80,10 +73,6 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
         re.bank_name, re.bank_account, re.id_number,
         re.nationality, re.visa_expiry,
         re.employment_type, re.onboarding_status,
-        (re.bank_slip_data IS NOT NULL AND re.bank_slip_data != '') as has_bank_slip,
-        (re.foreign_id_card_data IS NOT NULL AND re.foreign_id_card_data != '') as has_foreign_id_card,
-        (re.family_register_data IS NOT NULL AND re.family_register_data != '') as has_family_register,
-        (re.resident_register_data IS NOT NULL AND re.resident_register_data != '') as has_resident_register,
         sw.name as workplace_name
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
@@ -1134,10 +1123,6 @@ router.get('/contracts', async (_req: AuthRequest, res: Response) => {
              rlc.visa_type, rlc.visa_expiry,
              COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(rlc.legacy_filename, '') as legacy_filename,
-             (rlc.signature_data IS NOT NULL AND rlc.signature_data != '') as has_signature,
-             (rlc.scanned_file_data IS NOT NULL AND rlc.scanned_file_data != '') as has_scanned_file,
-             (rlc.bank_slip_data IS NOT NULL AND rlc.bank_slip_data != '') as has_bank_slip,
-             (rlc.foreign_id_card_data IS NOT NULL AND rlc.foreign_id_card_data != '') as has_foreign_id_card,
              re.department, re.team
       FROM regular_labor_contracts rlc
       JOIN regular_employees re ON rlc.employee_id = re.id

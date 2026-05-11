@@ -12,19 +12,20 @@ function createPool() {
     process.exit(1);
   }
 
-  // Pool 옵션 강화 — 무거운 query hang 시 다른 요청들이 connection 못 받아 모든 메뉴가 멈추는 것 방지.
-  // statement_timeout: PostgreSQL 서버 측에서 30초 초과 query 자동 cancel (가장 강력한 방어).
-  // query_timeout: node-pg 클라이언트 측 timeout (네트워크/응답 지연 방어).
-  // connectionTimeoutMillis: Pool에서 connection 받지 못하면 10초 후 throw (영원히 대기 방지).
-  // idleTimeoutMillis: 30초간 idle 한 connection 회수.
-  // max: 20 — 동시 connection 한계 (default 10에서 상향).
+  // Pool 옵션 — Supabase Session 모드 pooler 에 맞춰 조정.
+  // 이전 max=20 은 Supabase 무료/Pro 동시 백엔드 제한(15-20)을 초과해 ECHECKOUTTIMEOUT 유발.
+  // max=8 + keepAlive 로 cold-start 비용 회피 + 안정적 multiplexing.
+  // statement_timeout: PG 서버측 자동 cancel. query_timeout: 클라이언트측.
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-    max: 20,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
+    max: 8,                          // Supabase 제한 안전권
+    idleTimeoutMillis: 60_000,       // 60s — 너무 빨리 close 하면 cold-start 비용 큼
+    connectionTimeoutMillis: 8_000,
     query_timeout: 30_000,
     statement_timeout: 30_000,
+    keepAlive: true,                 // TCP keepalive — 네트워크 사일런트 끊김 방지
+    keepAliveInitialDelayMillis: 10_000,
+    application_name: 'mysixthproject-backend',
   };
 
   try {
@@ -877,6 +878,14 @@ export async function initializeDB(): Promise<void> {
 
   // schema_migrations — 일회성 데이터 backfill 추적용 (재실행 방지)
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
+
+  // workers — 개별 시급 (알바·파견 정산용)
+  try { await pool.query('ALTER TABLE workers ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0'); } catch {}
+
+  // 성능 보강 인덱스 — workers 페이지 LATERAL join 속도 개선
+  try { await pool.query('CREATE INDEX IF NOT EXISTS idx_labor_contracts_phone_end ON labor_contracts(phone, contract_end DESC)'); } catch {}
+  try { await pool.query('CREATE INDEX IF NOT EXISTS idx_survey_responses_clockin ON survey_responses(request_id) WHERE clock_in_time IS NOT NULL'); } catch {}
+  try { await pool.query('CREATE INDEX IF NOT EXISTS idx_workers_category ON workers(category)'); } catch {}
 
   console.log('Database initialized successfully');
 }

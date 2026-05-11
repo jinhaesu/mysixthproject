@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users } from "lucide-react";
-import { getConfirmedList, getWorkers } from "@/lib/api";
+import { getConfirmedList, getWorkersLite, updateWorkerHourlyRate, bulkWorkerHourlyRate } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import ChartCard from "@/components/charts/ChartCard";
@@ -49,12 +49,15 @@ export default function SettlementAlbaPage() {
   const [loading, setLoading] = useState(false);
   const [hourlyRate, setHourlyRate] = useState(11000);
   const [mealDeductions, setMealDeductions] = useState<Record<number, number>>({});
+  // 직원별 시급(로컬) — workerByIdentity 매칭으로 worker.hourly_rate 초기화. 편집 시 600ms debounce 자동저장.
+  const [rates, setRates] = useState<Record<number, number>>({});
+  const rateTimers = useRef<Record<number, any>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [workersResp, confList] = await Promise.all([
-        getWorkers({ limit: '10000' }).catch(() => ({ workers: [] })),
+        getWorkersLite().catch(() => ({ workers: [] })),
         getConfirmedList(yearMonth, ''),
       ]);
       const workersList = (workersResp as any).workers || (workersResp as any) || [];
@@ -88,6 +91,11 @@ export default function SettlementAlbaPage() {
             empMap.set(identity, {
               name: r.employee_name,
               phone: r.employee_phone || '',
+              worker_id: worker.id || null,
+              department: worker.department || '',
+              workplace: worker.workplace || '',
+              category: worker.category || '',
+              hourly_rate: parseInt(worker.hourly_rate) || 0,
               bank_name: worker.bank_name || '',
               bank_account: worker.bank_account || '',
               id_number: worker.id_number || '',
@@ -146,31 +154,57 @@ export default function SettlementAlbaPage() {
       results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setData({ results });
       const meals: Record<number, number> = {};
-      results.forEach((_, i) => { meals[i] = 0; });
+      const initRates: Record<number, number> = {};
+      results.forEach((r: any, i: number) => {
+        meals[i] = 0;
+        initRates[i] = r.hourly_rate > 0 ? r.hourly_rate : hourlyRate;
+      });
       setMealDeductions(meals);
+      setRates(initRates);
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
-  }, [yearMonth]);
+  }, [yearMonth, hourlyRate]);
 
   useEffect(() => { load(); }, [load]);
 
   const calcEmp = (r: any, idx: number) => {
     const floor30 = (h: number) => Math.floor(h * 2) / 2;
+    const rate = rates[idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate);
     const otHours = floor30(r.overtime_hours);
     const holHours = floor30(r.holiday_pay_hours || 0);
     const nightHours = floor30(r.night_hours || 0);
-    const basePay = Math.round(r.regular_hours * hourlyRate);
-    const overtimePay = Math.round(otHours * hourlyRate * 1.5);
-    const holidayPay = Math.round(holHours * hourlyRate * 1.5);
-    const nightPay = Math.round(nightHours * hourlyRate * 1.5);
-    const whPay = Math.round(r.weekly_holiday_hours * hourlyRate);
+    const basePay = Math.round(r.regular_hours * rate);
+    const overtimePay = Math.round(otHours * rate * 1.5);
+    const holidayPay = Math.round(holHours * rate * 1.5);
+    const nightPay = Math.round(nightHours * rate * 1.5);
+    const whPay = Math.round(r.weekly_holiday_hours * rate);
     const grossPay = basePay + overtimePay + holidayPay + nightPay + whPay;
     const meal = mealDeductions[idx] || 0;
     const netBeforeTax = grossPay - meal;
     const incomeTax = Math.round(netBeforeTax * 0.033);
     const localTax = Math.round(netBeforeTax * 0.0033);
     const netPay = netBeforeTax - incomeTax - localTax;
-    return { basePay, overtimePay, nightPay, whPay, grossPay, meal, netBeforeTax, incomeTax, localTax, netPay };
+    return { rate, basePay, overtimePay, nightPay, whPay, grossPay, meal, netBeforeTax, incomeTax, localTax, netPay };
+  };
+
+  const onRateChange = (idx: number, workerId: number | null, value: string) => {
+    const num = parseInt((value || '').replace(/[^0-9]/g, ''), 10) || 0;
+    setRates(prev => ({ ...prev, [idx]: num }));
+    if (!workerId) return;  // 워커 DB 매칭 안된 경우 저장 안 함
+    if (rateTimers.current[idx]) clearTimeout(rateTimers.current[idx]);
+    rateTimers.current[idx] = setTimeout(async () => {
+      try { await updateWorkerHourlyRate(workerId, num); }
+      catch (e: any) { toast.error(e.message); }
+    }, 600);
+  };
+
+  const handleBulkApply = async () => {
+    if (!confirm(`알바(사업소득) 카테고리 전체 시급을 ${fmt.format(hourlyRate)}원으로 일괄 적용합니다. 진행할까요?`)) return;
+    try {
+      const r = await bulkWorkerHourlyRate('알바', hourlyRate);
+      toast.success(`${r.updated || 0}명 일괄 적용 완료`);
+      load();
+    } catch (e: any) { toast.error(e.message); }
   };
 
   const results = data?.results || [];
@@ -181,8 +215,8 @@ export default function SettlementAlbaPage() {
   });
 
   const handleExcel = () => {
-    const header = ['이름','연락처','은행','계좌번호','근무일','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','소득세(3.3%)','지방세(0.33%)','실지급'];
-    const csvRows = rows.map((r: any) => [r.name,r.phone,r.bank_name,r.bank_account,r.work_days,r.regular_hours,r.overtime_hours,r.night_hours || 0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.incomeTax,r.localTax,r.netPay]);
+    const header = ['이름','소속','연락처','은행','계좌번호','근무일','시급','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','소득세(3.3%)','지방세(0.33%)','실지급'];
+    const csvRows = rows.map((r: any) => [r.name,r.department || r.workplace || '',r.phone,r.bank_name,r.bank_account,r.work_days,r.rate || 0,r.regular_hours,r.overtime_hours,r.night_hours || 0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.incomeTax,r.localTax,r.netPay]);
     const csv = [header, ...csvRows].map(r => r.join(',')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -210,9 +244,13 @@ export default function SettlementAlbaPage() {
         <Field label="연월">
           <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
         </Field>
-        <Field label="시간당 급여">
-          <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" />
+        <Field label="시급 일괄 설정 (원)">
+          <div className="flex gap-1.5 items-center">
+            <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" />
+            <Button size="sm" variant="secondary" onClick={handleBulkApply} title="알바 카테고리 전체 직원 시급을 일괄 변경 (DB 저장)">전체 적용</Button>
+          </div>
         </Field>
+        <div className="text-[var(--fs-caption)] text-[var(--text-3)] pb-1">개별 시급은 표 안에서 직접 편집 (자동 저장)</div>
       </Toolbar>
 
       {rows.length > 0 && (
@@ -253,10 +291,12 @@ export default function SettlementAlbaPage() {
             <Table className="text-[10px] table-fixed">
               <colgroup>
                 <col className="w-[70px]" />
+                <col className="w-[80px]" />
                 <col className="w-[55px]" />
                 <col className="w-[90px]" />
                 <col className="w-[80px]" />
                 <col className="w-[28px]" />
+                <col className="w-[55px]" />
                 <col className="w-[38px]" />
                 <col className="w-[38px]" />
                 <col className="w-[38px]" />
@@ -274,10 +314,12 @@ export default function SettlementAlbaPage() {
               <THead>
                 <TR>
                   <TH>이름</TH>
+                  <TH>소속</TH>
                   <TH>은행</TH>
                   <TH>계좌번호</TH>
                   <TH>주민번호</TH>
                   <TH numeric>일</TH>
+                  <TH numeric>시급<br/><span className="text-[8px] text-[var(--text-4)]">편집</span></TH>
                   <TH numeric>기본h</TH>
                   <TH numeric>연장h</TH>
                   <TH numeric>야간h</TH>
@@ -297,10 +339,20 @@ export default function SettlementAlbaPage() {
                 {rows.map((r: any) => (
                   <TR key={r.idx}>
                     <TD emphasis className="truncate">{r.name}</TD>
+                    <TD muted className="truncate" title={`${r.department || ''} ${r.workplace || ''}`.trim() || '-'}>{r.department || r.workplace || '-'}</TD>
                     <TD muted className="truncate">{r.bank_name || '-'}</TD>
                     <TD muted className="font-mono text-[9px] truncate">{r.bank_account || '-'}</TD>
                     <TD muted className="font-mono text-[9px] truncate">{r.id_number || '-'}</TD>
                     <TD numeric>{r.work_days}</TD>
+                    <TD className="p-0.5">
+                      <input
+                        type="number"
+                        className="w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none"
+                        value={rates[r.idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate)}
+                        onChange={e => onRateChange(r.idx, r.worker_id, e.target.value)}
+                        title="이 직원의 시급 — 자동저장 (worker_id 매칭된 경우만)"
+                      />
+                    </TD>
                     <TD numeric>{r.regular_hours}</TD>
                     <TD numeric className="text-[var(--warning-fg)]">{r.overtime_hours}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{(r.night_hours || 0).toFixed(1)}</TD>
@@ -322,8 +374,9 @@ export default function SettlementAlbaPage() {
               </TBody>
               <tfoot>
                 <TR className="bg-[var(--warning-bg)] border-t-2 border-[var(--warning-border)] font-bold text-[10px]">
-                  <TD colSpan={4} className="text-[var(--text-2)]">합계 ({rows.length}명)</TD>
+                  <TD colSpan={5} className="text-[var(--text-2)]">합계 ({rows.length}명)</TD>
                   <TD numeric>{totals.work_days}</TD>
+                  <TD numeric className="text-[var(--text-4)]">-</TD>
                   <TD numeric>{(totals.regular_hours || 0).toFixed(1)}</TD>
                   <TD numeric>{(totals.overtime_hours || 0).toFixed(1)}</TD>
                   <TD numeric>{(totals.night_hours || 0).toFixed(1)}</TD>

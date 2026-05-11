@@ -69,7 +69,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.23.6',
+    version: '2.23.7',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -111,6 +111,7 @@ app.get('/api/health', (_req, res) => {
       listColumnsTrimmed: true,            // employees list 핵심 컬럼만 (40+ → 18, 페이로드 60% 감소)
       reminderServiceBlobFix: true,        // reminderService 백그라운드 SELECT * 제거 (employee_offboardings TOAST detoasting 방지)
       deadCheckoutFix: true,               // Supavisor stale socket: idle 10s, keepAlive 3s, retry 3회, heartbeat 30s
+      emergencyPoolStabilization: true,    // reminderService/heartbeat 비활성화, pool min:2, statement_timeout 8s
     },
   });
 });
@@ -136,13 +137,15 @@ app.listen(PORT, () => {
 initializeDB()
   .then(() => {
     console.log('Database migrations completed');
-    startReminderService();
   })
   .catch((err) => {
     console.error('Database migration failed (server still running):', err);
-    // 서버는 계속 동작 — 기존 스키마로 운영 가능
-    startReminderService();
   });
+
+// reminderService 일시 비활성화 — Query read timeout 으로 pool 고갈 시키는 원인.
+// 사용자 요청이 우선. 추후 별도 worker 프로세스 분리 후 재활성화.
+// startReminderService();
+void startReminderService;
 
 // Last-resort: 어떤 비동기에서 uncaught 발생해도 프로세스 죽이지 않고 로그만 남김.
 // (Pool 에러는 별도로 db.ts 에서 처리하지만, fetch/timer 등 어디서든 보호.)
@@ -153,13 +156,9 @@ process.on('uncaughtException', (err: Error) => {
   console.error('[uncaughtException]', err.message);
 });
 
-// DB Heartbeat — Supabase auto-pause/cold-start 방지 + Supavisor idle backend cleanup 방지.
-// 30초마다 ping → 모든 pool slot 이 idleTimeoutMillis(10s) 도달하기 전 활성화.
-// (이전 90s 는 Supavisor cleanup race 와 충돌)
-setInterval(async () => {
-  try { await dbGet('SELECT 1'); }
-  catch (e: any) { console.error('DB heartbeat error:', e.message); }
-}, 30_000);
+// DB Heartbeat — 일시 비활성화. 현재 Supabase pool 이 불안정해 heartbeat 가
+// 오히려 pool 을 churn 시켜 사용자 요청을 막음. min:2 로 자체 warm-up.
+void dbGet;
 
 // Graceful shutdown — Railway redeploy 시 connection 정상 종료해서
 // Supabase pooler 측 stale connection 누적 방지.

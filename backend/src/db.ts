@@ -12,20 +12,20 @@ function createPool() {
     process.exit(1);
   }
 
-  // Pool 옵션 — Supabase Session 모드 pooler (port 5432) 용.
-  // dead-checkout 레이스 방지:
-  //   idleTimeoutMillis 10s: Supavisor cleanup(~60s) 전 우리가 먼저 close → stale socket 보유 시간 최소화
-  //   keepAliveInitialDelayMillis 3s: TCP keepalive 가 zombie socket 빠르게 검출
-  //   Pro 플랜 기준 max ~10.
+  // Pool 옵션 — 응급 보수 설정.
+  // Supabase pooler 가 불안정해 churn 방지가 최우선. min 으로 2개 항상 유지.
+  // statement_timeout 8s: 백엔드 routes 의 모든 쿼리는 8초 안에 끝나야 함. 더 걸리면 fail-fast.
+  // 그래야 stuck 쿼리가 pool 을 점유 안 함.
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-    max: 10,
-    idleTimeoutMillis: 10_000,         // 30s → 10s
-    connectionTimeoutMillis: 10_000,
-    query_timeout: 30_000,
-    statement_timeout: 30_000,         // Session 모드는 startup option 사용 가능
+    max: 8,
+    min: 2,                            // 항상 2개 warm
+    idleTimeoutMillis: 60_000,         // 1분 유지 — churn 방지
+    connectionTimeoutMillis: 8_000,
+    query_timeout: 10_000,             // 클라이언트 측 10초 안에 결과 없으면 cancel
+    statement_timeout: 8_000,          // 서버 측 8초 안에 끝나야 — stuck 쿼리 fail-fast
     keepAlive: true,
-    keepAliveInitialDelayMillis: 3_000, // 10s → 3s
+    keepAliveInitialDelayMillis: 5_000,
     application_name: 'mysixthproject-backend',
   };
 

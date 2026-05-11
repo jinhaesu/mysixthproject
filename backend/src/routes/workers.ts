@@ -41,20 +41,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const offset = (pageNum - 1) * limitNum;
 
     const today = getKSTDate();
-    // CTE 로 last_clock_in_date 일괄 pre-aggregate — LATERAL per-row 보다 훨씬 빠름.
-    // 이전: workers 200명 × survey_responses 대규모 스캔 → 8s timeout 초과
-    // 지금: 한 번에 phone→MAX(date) 계산 → workers 와 hash join
+    // 단순화: last_clock_in_date 제거 (survey_responses 스캔이 너무 무거워 timeout).
+    // 필요하면 /api/workers/:id/last-clockin 별도 lazy endpoint 로 분리 가능.
     const workers = await dbAll(`
-      WITH last_clockins AS (
-        SELECT sr.phone, MAX(sr.date) as last_clock_in_date
-        FROM survey_requests sr
-        JOIN survey_responses resp ON sr.id = resp.request_id
-        WHERE resp.clock_in_time IS NOT NULL
-        GROUP BY sr.phone
-      )
       SELECT w.*,
-             c.contract_id, c.contract_start, c.contract_end,
-             lc.last_clock_in_date
+             c.contract_id, c.contract_start, c.contract_end
       FROM workers w
       LEFT JOIN LATERAL (
         SELECT id as contract_id, contract_start, contract_end
@@ -62,9 +53,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         WHERE phone = w.phone AND contract_end >= '${today}'
         ORDER BY created_at DESC LIMIT 1
       ) c ON true
-      LEFT JOIN last_clockins lc ON lc.phone = w.phone
       ${where}
-      ORDER BY lc.last_clock_in_date DESC NULLS LAST, w.name_ko ASC
+      ORDER BY w.name_ko ASC
       LIMIT ? OFFSET ?
     `, ...params, limitNum, offset);
 

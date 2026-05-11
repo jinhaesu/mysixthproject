@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.19.6',
+    version: '2.20.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -90,6 +90,7 @@ app.get('/api/health', (_req, res) => {
       payroll202604Backfill: true,        // 4월 v2 엑셀 마감본 1회성 기타 조정 backfill
       minWage2026: true,                  // 연장/휴일 시급 기본값 10,320 (2026 최저임금)
       payroll202604V2Backfill: true,      // 4월 v2 마감본 종합 backfill (21명)
+      perEmployeeHourlyRate: true,        // 직원별 시급 편집 (테이블 내 inline + 전체 적용)
     },
   });
 });

@@ -1534,6 +1534,48 @@ router.put('/salary-settings/:employeeId', async (req: AuthRequest, res: Respons
   }
 });
 
+// PUT /api/regular/salary-settings/:employeeId/hourly-rate — 시급만 부분 update
+router.put('/salary-settings/:employeeId/hourly-rate', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employeeId } = req.params;
+    const { overtime_hourly_rate } = req.body || {};
+    const rate = parseInt(overtime_hourly_rate, 10) || 0;
+    const existing = await dbGet('SELECT id FROM regular_salary_settings WHERE employee_id = ?', employeeId) as any;
+    if (existing) {
+      await dbRun('UPDATE regular_salary_settings SET overtime_hourly_rate = ?, updated_at = NOW() WHERE employee_id = ?', rate, employeeId);
+    } else {
+      await dbRun('INSERT INTO regular_salary_settings (employee_id, overtime_hourly_rate) VALUES (?, ?)', employeeId, rate);
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/salary-settings/bulk-hourly-rate — 일괄 시급 적용 (전체 활성 직원)
+router.post('/salary-settings/bulk-hourly-rate', async (req: AuthRequest, res: Response) => {
+  try {
+    const { overtime_hourly_rate } = req.body || {};
+    const rate = parseInt(overtime_hourly_rate, 10) || 0;
+    if (rate <= 0) { res.status(400).json({ error: 'overtime_hourly_rate 필수' }); return; }
+    // 활성 직원 + 활성 + 4월 등 최근 퇴사자 대상
+    const emps = await dbAll(`SELECT id FROM regular_employees WHERE is_active = 1`) as any[];
+    let updated = 0;
+    for (const e of emps) {
+      const existing = await dbGet('SELECT id FROM regular_salary_settings WHERE employee_id = ?', e.id) as any;
+      if (existing) {
+        await dbRun('UPDATE regular_salary_settings SET overtime_hourly_rate = ?, updated_at = NOW() WHERE employee_id = ?', rate, e.id);
+      } else {
+        await dbRun('INSERT INTO regular_salary_settings (employee_id, overtime_hourly_rate) VALUES (?, ?)', e.id, rate);
+      }
+      updated++;
+    }
+    res.json({ success: true, updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/regular/payroll-calc - Calculate payroll based on confirmed attendance + salary settings
 router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
   try {

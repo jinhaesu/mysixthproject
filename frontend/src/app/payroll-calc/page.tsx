@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { usePersistedState } from "@/lib/usePersistedState";
 import { Calculator, Download, Users, Check } from "lucide-react";
-import { getPayrollCalc, savePayrollAdjustment, markPayrollPaid, unmarkPayrollPaid } from "@/lib/api";
+import { getPayrollCalc, savePayrollAdjustment, markPayrollPaid, unmarkPayrollPaid, updateHourlyRate, bulkSetHourlyRate } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import ChartCard, { TOOLTIP_STYLE } from "@/components/charts/ChartCard";
@@ -15,7 +15,7 @@ import {
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
-type SortKey = 'name' | 'department' | 'hire_date' | 'resign_date' | 'base_pay' | 'meal_allowance' | 'bonus' | 'actual_work_days' | 'absent_days' | 'overtime_hours' | 'holiday_hours' | 'gross_pay' | 'adjustment_amount' | 'loan_repayment' | 'net_pay';
+type SortKey = 'name' | 'department' | 'hire_date' | 'resign_date' | 'base_pay' | 'meal_allowance' | 'bonus' | 'actual_work_days' | 'absent_days' | 'overtime_hours' | 'holiday_hours' | 'gross_pay' | 'adjustment_amount' | 'loan_repayment' | 'overtime_hourly_rate' | 'net_pay';
 
 export default function PayrollCalcPage() {
   const toast = useToast();
@@ -47,11 +47,20 @@ export default function PayrollCalcPage() {
 
   // 직원별 기타(조정) 로컬 상태 — 즉시 반응 + debounced 서버 저장
   const [adjustments, setAdjustments] = useState<Record<number, number>>({});
+  // 직원별 시급 로컬 상태 (DB 의 overtime_hourly_rate 기반)
+  const [hourlyRates, setHourlyRates] = useState<Record<number, number>>({});
   useEffect(() => {
     // 서버 데이터 로드 시 로컬 상태 초기화 (이미 편집중인 값 보존하지 않음 — 월 변경시 재초기화)
-    const init: Record<number, number> = {};
-    (data?.results || []).forEach((r: any) => { if (r.employee_id != null) init[r.employee_id] = r.adjustment_amount || 0; });
-    setAdjustments(init);
+    const initAdj: Record<number, number> = {};
+    const initRate: Record<number, number> = {};
+    (data?.results || []).forEach((r: any) => {
+      if (r.employee_id != null) {
+        initAdj[r.employee_id] = r.adjustment_amount || 0;
+        initRate[r.employee_id] = Math.round(parseFloat(r.overtime_hourly_rate) || 0) || 10320;
+      }
+    });
+    setAdjustments(initAdj);
+    setHourlyRates(initRate);
   }, [data]);
 
   const saveTimers = useRef<Record<number, any>>({});
@@ -65,13 +74,36 @@ export default function PayrollCalcPage() {
     }, 600);
   };
 
+  const rateTimers = useRef<Record<number, any>>({});
+  const onHourlyRateChange = (employeeId: number, value: string) => {
+    const num = parseInt((value || '').replace(/[^0-9]/g, ''), 10) || 0;
+    setHourlyRates(prev => ({ ...prev, [employeeId]: num }));
+    if (rateTimers.current[employeeId]) clearTimeout(rateTimers.current[employeeId]);
+    rateTimers.current[employeeId] = setTimeout(async () => {
+      try { await updateHourlyRate(employeeId, num); }
+      catch (e: any) { toast.error(e.message); }
+    }, 600);
+  };
+
+  const handleApplyBulkRate = async () => {
+    if (!confirm(`전체 활성 직원의 시급을 ${fmt.format(pendingRate)}원으로 일괄 설정합니다. 진행할까요?`)) return;
+    try {
+      await bulkSetHourlyRate(pendingRate);
+      toast.success(`전체 시급 ${fmt.format(pendingRate)}원 적용 완료`);
+      setOvertimeRate(pendingRate);
+      load();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
   const results = (data?.results || []).map((r: any) => {
     const otHours = floor30(r.overtime_hours || 0);
     const holHours = floor30(r.holiday_hours || 0);
     const nightHours = floor30(r.night_hours || 0);
-    const otPay = Math.round(otHours * overtimeRate * 1.5);
-    const holPay = Math.round(holHours * overtimeRate * 1.5);
-    const nightPay = Math.round(nightHours * overtimeRate * 1.5);
+    // 직원별 시급 — 로컬 편집값 우선, 없으면 DB 값, 그것도 없으면 최저임금 10320
+    const rate = hourlyRates[r.employee_id] ?? (Math.round(parseFloat(r.overtime_hourly_rate) || 0) || 10320);
+    const otPay = Math.round(otHours * rate * 1.5);
+    const holPay = Math.round(holHours * rate * 1.5);
+    const nightPay = Math.round(nightHours * rate * 1.5);
     const basePay = r.base_pay || 0;
     const mealAllow = r.meal_allowance || 0;
     const gross = basePay + mealAllow + (r.bonus || 0) + (r.position_allowance || 0) + (r.other_allowance || 0) + otPay + holPay + nightPay;
@@ -91,16 +123,16 @@ export default function PayrollCalcPage() {
     const dedAdj = np + hi + ltc + ei + itAdj + ltAdj;
     const loanRep = Number(r.loan_repayment) || 0;
     const net = grossWithAdj - dedAdj - loanRep;
-    return { ...r, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: grossWithAdj, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: itAdj, local_tax: ltAdj, total_deductions: dedAdj, adjustment_amount: adj, loan_repayment: loanRep, net_pay: net };
+    return { ...r, overtime_hourly_rate: rate, overtime_pay: otPay, holiday_pay: holPay, night_pay: nightPay, gross_pay: grossWithAdj, national_pension: np, health_insurance: hi, long_term_care: ltc, employment_insurance: ei, income_tax: itAdj, local_tax: ltAdj, total_deductions: dedAdj, adjustment_amount: adj, loan_repayment: loanRep, net_pay: net };
   });
 
   const sum = (key: string) => results.reduce((s: number, r: any) => s + (r[key] || 0), 0);
 
   const handleExcel = () => {
-    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','연장h','연장수당','휴일h','휴일수당','기타(±조정)','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','대출상환','실지급액'];
+    const header = ['성명','부서','입사일','퇴사일','은행','계좌번호','주민번호','기본급','일할%','식대','상여','직책수당','기타수당','근무일','시급','연장h','연장수당','휴일h','휴일수당','기타(±조정)','지급액','국민연금(4.5%)','건강보험(3.545%)','장기요양(건보×12.81%)','고용보험(0.9%)','소득세(지급액×3%)','주민세(소득세×10%)','공제계','대출상환','실지급액'];
     // 계좌번호·주민번호는 텍스트로 강제(엑셀 자동 숫자 변환·지수 표기 방지). 빈 칸은 빈 문자열로.
     const TEXT_COLS = new Set([5, 6]);
-    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.adjustment_amount || 0, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.loan_repayment || 0, r.net_pay]);
+    const rows = results.map((r: any) => [r.name, `${r.department} ${r.team}`, r.hire_date || '', r.resign_date || '', r.bank_name || '', String(r.bank_account ?? ''), String(r.id_number ?? ''), r.base_pay, r.prorate_ratio || 100, r.meal_allowance, r.bonus, r.position_allowance, r.other_allowance, r.work_days, r.overtime_hourly_rate || 10320, r.overtime_hours, r.overtime_pay, Number((r.holiday_hours || 0).toFixed(1)), r.holiday_pay, r.adjustment_amount || 0, r.gross_pay, r.national_pension, r.health_insurance, r.long_term_care, r.employment_insurance, r.income_tax, r.local_tax, r.total_deductions, r.loan_repayment || 0, r.net_pay]);
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
     rows.forEach((row: any[], ri: number) => {
       TEXT_COLS.forEach(ci => {
@@ -202,28 +234,27 @@ export default function PayrollCalcPage() {
           <Field label="연월">
             <Input type="month" inputSize="sm" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="w-40" />
           </Field>
-          <Field label="연장/휴일 시급 (원)">
+          <Field label="시급 일괄 설정 (원)">
             <div className="flex gap-1.5 items-center">
               <Input
                 type="number"
                 inputSize="sm"
                 value={pendingRate}
                 onChange={e => setPendingRate(parseInt(e.target.value) || 0)}
-                onKeyDown={e => { if (e.key === 'Enter') setOvertimeRate(pendingRate); }}
                 className="w-28"
               />
               <Button
                 size="sm"
-                variant={pendingRate !== overtimeRate ? "primary" : "secondary"}
-                onClick={() => setOvertimeRate(pendingRate)}
-                disabled={pendingRate === overtimeRate}
+                variant="secondary"
+                onClick={handleApplyBulkRate}
+                title="전체 활성 직원의 시급을 이 값으로 일괄 변경 (DB 저장). 개별 직원은 표 안에서 별도 편집 가능."
               >
-                적용
+                전체 적용
               </Button>
             </div>
           </Field>
           <div className="text-[var(--fs-caption)] text-[var(--text-3)] pb-1">
-            × 1.5배 = <span className="tabular text-[var(--text-2)]">{fmt.format(Math.round(overtimeRate * 1.5))}</span>원/h
+            × 1.5배 = <span className="tabular text-[var(--text-2)]">{fmt.format(Math.round(pendingRate * 1.5))}</span>원/h · 직원별 시급은 표 안에서 직접 편집
           </div>
           {data && (
             <Badge tone={data.is_closed ? 'success' : 'warning'} dot>
@@ -312,6 +343,7 @@ export default function PayrollCalcPage() {
                   <th className="py-2 px-2 text-right text-eyebrow">기타수당</th>
                   <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('actual_work_days')}>출근/소정{sortIcon('actual_work_days')}</th>
                   <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('absent_days')}>결근{sortIcon('absent_days')}</th>
+                  <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('overtime_hourly_rate')}>시급{sortIcon('overtime_hourly_rate')}<br/><span className="text-[8px] text-[var(--text-4)]">±편집</span></th>
                   <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('overtime_hours')}>연장h{sortIcon('overtime_hours')}</th>
                   <th className="py-2 px-2 text-right text-eyebrow">연장수당</th>
                   <th className="py-2 px-2 text-right text-eyebrow cursor-pointer select-none hover:text-[var(--brand-400)]" onClick={() => toggleSort('holiday_hours')}>휴일h{sortIcon('holiday_hours')}</th>
@@ -349,6 +381,15 @@ export default function PayrollCalcPage() {
                     <td className="py-1.5 px-2 text-right tabular">{fmt.format(r.other_allowance || 0)}</td>
                     <td className="py-1.5 px-2 text-right tabular">{r.actual_work_days ?? r.work_days}<span className="text-[var(--text-4)]">/{r.scheduled_work_days ?? '-'}</span></td>
                     <td className="py-1.5 px-2 text-right tabular">{(r.absent_days || 0) > 0 ? <span className="text-[var(--danger-fg)] font-medium">{r.absent_days}</span> : <span className="text-[var(--text-4)]">0</span>}</td>
+                    <td className="py-1 px-1 text-right">
+                      <input
+                        type="number"
+                        className="w-16 px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none"
+                        value={hourlyRates[r.employee_id] ?? r.overtime_hourly_rate ?? 10320}
+                        onChange={(e) => onHourlyRateChange(r.employee_id, e.target.value)}
+                        title="이 직원의 시급 — 변경 시 자동저장(600ms debounce)"
+                      />
+                    </td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--warning-fg)]">{(r.overtime_hours || 0).toFixed(1)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--warning-fg)]">{fmt.format(r.overtime_pay)}</td>
                     <td className="py-1.5 px-2 text-right tabular text-[var(--danger-fg)]">{(r.holiday_hours || 0).toFixed(1)}</td>
@@ -383,6 +424,7 @@ export default function PayrollCalcPage() {
                 <tr className="bg-[var(--brand-500)]/10 border-t-2 border-[var(--brand-500)]/30 font-bold text-[10px]">
                   <td className="py-2 px-2 text-[var(--brand-400)]" colSpan={13}>합계 ({results.length}명)</td>
                   <td className="py-2 px-2 text-right tabular">{sum('absent_days')}</td>
+                  <td className="py-2 px-2 text-right tabular text-[var(--text-4)]">-</td>
                   <td className="py-2 px-2 text-right tabular">{sum('overtime_hours').toFixed(1)}</td>
                   <td className="py-2 px-2 text-right tabular">{fmt.format(sum('overtime_pay'))}</td>
                   <td className="py-2 px-2 text-right tabular">{sum('holiday_hours').toFixed(1)}</td>

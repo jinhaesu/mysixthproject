@@ -616,6 +616,12 @@ export async function getSalarySettings() {
 export async function updateSalarySettings(employeeId: number, data: any) {
   return fetchAPI<any>(`/api/regular/salary-settings/${employeeId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
+export async function updateHourlyRate(employeeId: number, overtime_hourly_rate: number) {
+  return fetchAPI<any>(`/api/regular/salary-settings/${employeeId}/hourly-rate`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ overtime_hourly_rate }) });
+}
+export async function bulkSetHourlyRate(overtime_hourly_rate: number) {
+  return fetchAPI<any>(`/api/regular/salary-settings/bulk-hourly-rate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ overtime_hourly_rate }) });
+}
 export async function getPayrollCalc(yearMonth: string) {
   return fetchAPI<any>(`/api/regular/payroll-calc?year_month=${yearMonth}`);
 }

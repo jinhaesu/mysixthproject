@@ -110,6 +110,7 @@ export default function RegularWorkersPage() {
     totalPages: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [search, setSearch] = usePersistedState("rw_search", "");
   const [filterDept, setFilterDept] = usePersistedState("rw_filterDept", "");
   const [filterTeam, setFilterTeam] = usePersistedState("rw_filterTeam", "");
@@ -267,8 +268,12 @@ export default function RegularWorkersPage() {
         const list = data.employees || data || [];
         setPagination({ total: list.length, page: 1, limit: 50, totalPages: 1 });
       }
-    } catch {
-      // silent
+      setLoadError("");
+    } catch (e: any) {
+      // 이전: silent — 사용자에게 'empty' 처럼 보였음. 이제 에러 노출.
+      const msg = e?.message || "직원 목록 조회 실패";
+      setLoadError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -472,7 +477,8 @@ export default function RegularWorkersPage() {
         if (employees.length === 0) {
           return (
             <EmptyState
-              title={search ? `"${search}" 검색 결과가 없습니다.` : '등록된 정규직 직원이 없습니다.'}
+              title={loadError ? `조회 실패: ${loadError}` : (search ? `"${search}" 검색 결과가 없습니다.` : '등록된 정규직 직원이 없습니다.')}
+              description={loadError ? '잠시 후 다시 시도하거나 새로고침해보세요.' : undefined}
             />
           );
         }

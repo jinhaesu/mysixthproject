@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.21.5',
+    version: '2.21.6',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -99,6 +99,7 @@ app.get('/api/health', (_req, res) => {
       dbHeartbeat: true,                  // 90s 마다 SELECT 1 — Supabase auto-pause 방지
       poolErrorHandler: true,             // pool.on('error') + uncaughtException 핸들러 — Node crash 방지
       initRetry: true,                    // initializeDB 트랜지언트 EDBHANDLEREXITED 재시도
+      queryRetry: true,                    // dbGet/dbAll/dbRun 모두 EDBHANDLEREXITED 자동 재시도
     },
   });
 });

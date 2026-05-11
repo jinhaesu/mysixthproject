@@ -62,11 +62,39 @@ function pg$(sql: string): string {
   return sql.replace(/\?/g, () => `$${++i}`);
 }
 
+// Supavisor 가 idle 백엔드 정리 시 클라이언트는 EDBHANDLEREXITED / connection closed 받음.
+// 이건 정상 동작이지만 그 순간 진행 중인 쿼리는 한 번 실패. 따라서 재시도해서 사용자에게는 투명하게.
+const RETRYABLE = (e: any) => {
+  if (!e) return false;
+  const m = String(e.message || '');
+  return m.includes('EDBHANDLEREXITED') ||
+         m.includes('Connection terminated') ||
+         m.includes('connection closed') ||
+         m.includes('ECONNRESET') ||
+         m.includes('ETIMEDOUT') ||
+         e.code === '57P01' || e.code === '08006' || e.code === '08003';
+};
+async function queryWithRetry(sql: string, params: any[], attempts = 2): Promise<any> {
+  let last: any;
+  for (let i = 1; i <= attempts; i++) {
+    try { return await pool.query(sql, params); }
+    catch (e: any) {
+      last = e;
+      if (i < attempts && RETRYABLE(e)) {
+        await new Promise(r => setTimeout(r, 200 * i));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw last;
+}
+
 /**
  * Query single row (like db.prepare(sql).get(...params))
  */
 export async function dbGet(sql: string, ...params: any[]): Promise<any> {
-  const result = await pool.query(pg$(sql), params);
+  const result = await queryWithRetry(pg$(sql), params);
   return result.rows[0] || undefined;
 }
 
@@ -74,7 +102,7 @@ export async function dbGet(sql: string, ...params: any[]): Promise<any> {
  * Query all rows (like db.prepare(sql).all(...params))
  */
 export async function dbAll(sql: string, ...params: any[]): Promise<any[]> {
-  const result = await pool.query(pg$(sql), params);
+  const result = await queryWithRetry(pg$(sql), params);
   return result.rows;
 }
 
@@ -88,7 +116,7 @@ export async function dbRun(sql: string, ...params: any[]): Promise<{ lastInsert
   if (isInsert && !pgSql.toUpperCase().includes('RETURNING')) {
     pgSql += ' RETURNING id';
   }
-  const result = await pool.query(pgSql, params);
+  const result = await queryWithRetry(pgSql, params);
   return {
     lastInsertRowid: result.rows[0]?.id ?? 0,
     changes: result.rowCount ?? 0,

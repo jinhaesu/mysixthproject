@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import { initializeDB } from './db';
+import { initializeDB, pool } from './db';
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import attendanceRoutes from './routes/attendance';
@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.21.1',
+    version: '2.21.2',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -126,5 +126,16 @@ initializeDB()
     // 서버는 계속 동작 — 기존 스키마로 운영 가능
     startReminderService();
   });
+
+// Graceful shutdown — Railway redeploy 시 connection 정상 종료해서
+// Supabase pooler 측 stale connection 누적 방지.
+const shutdown = async (signal: string) => {
+  console.log(`Received ${signal}, closing pool...`);
+  try { await pool.end(); console.log('Pool closed'); }
+  catch (e) { console.error('Pool close error:', e); }
+  process.exit(0);
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default app;

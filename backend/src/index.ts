@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.21.4',
+    version: '2.21.5',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -97,6 +97,8 @@ app.get('/api/health', (_req, res) => {
       migrationGuard: true,               // 매 부팅마다 ALTER 재실행 방지 (schema_migrations 게이트)
       gracefulShutdown: true,             // SIGTERM 시 pool.end() — Supabase 누적 방지
       dbHeartbeat: true,                  // 90s 마다 SELECT 1 — Supabase auto-pause 방지
+      poolErrorHandler: true,             // pool.on('error') + uncaughtException 핸들러 — Node crash 방지
+      initRetry: true,                    // initializeDB 트랜지언트 EDBHANDLEREXITED 재시도
     },
   });
 });
@@ -129,6 +131,15 @@ initializeDB()
     // 서버는 계속 동작 — 기존 스키마로 운영 가능
     startReminderService();
   });
+
+// Last-resort: 어떤 비동기에서 uncaught 발생해도 프로세스 죽이지 않고 로그만 남김.
+// (Pool 에러는 별도로 db.ts 에서 처리하지만, fetch/timer 등 어디서든 보호.)
+process.on('unhandledRejection', (reason: any) => {
+  console.error('[unhandledRejection]', reason?.message || reason);
+});
+process.on('uncaughtException', (err: Error) => {
+  console.error('[uncaughtException]', err.message);
+});
 
 // DB Heartbeat — Supabase auto-pause/cold-start 방지.
 // 첫 쿼리가 cold 일 때 30초 가까이 걸리는 현상 → 매 90초마다 가벼운 ping 으로 워밍 유지.

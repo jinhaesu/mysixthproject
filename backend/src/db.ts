@@ -46,6 +46,14 @@ function createPool() {
 
 const pool = createPool();
 
+// CRITICAL: pool.on('error') 가 없으면 idle client 에서 발생하는 error event 가
+// Node 의 unhandled 'error' event 로 전파되어 프로세스가 죽음.
+// Supavisor 의 EDBHANDLEREXITED (Transaction 모드 idle backend 정리) 같은 일시적
+// 에러도 unhandled 되면 앱 전체 crash → Railway 재배포 루프 야기.
+pool.on('error', (err: Error) => {
+  console.error('[Pool] Idle client error (recovered):', err.message);
+});
+
 /**
  * Convert SQLite-style ? placeholders to PostgreSQL $1, $2, ... format
  */
@@ -148,9 +156,23 @@ export async function dbTransaction<T>(fn: (tx: TxClient) => Promise<T>): Promis
  * NEVER drops, truncates, or deletes existing data.
  * All schema changes are additive only - safe to run on every server start.
  */
+async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 3, delayMs = 2000): Promise<T> {
+  let lastErr: any;
+  for (let i = 1; i <= attempts; i++) {
+    try { return await fn(); }
+    catch (e: any) {
+      lastErr = e;
+      console.error(`[${label}] attempt ${i}/${attempts} failed: ${e.message}`);
+      if (i < attempts) await new Promise(r => setTimeout(r, delayMs * i));
+    }
+  }
+  throw lastErr;
+}
+
 export async function initializeDB(): Promise<void> {
-  // Verify connection first
-  const connTest = await pool.query('SELECT current_database(), current_user');
+  // Verify connection first — retry transient Supavisor EDBHANDLEREXITED 에러
+  const connTest = await withRetry('initializeDB:connect',
+    () => pool.query('SELECT current_database(), current_user'));
   console.log(`DB connected: database=${connTest.rows[0].current_database}, user=${connTest.rows[0].current_user}`);
 
   // 마이그레이션 가드 — 매 부팅마다 수십 개 ALTER TABLE 이 실행되면 ACCESS EXCLUSIVE 락 경합으로

@@ -153,6 +153,18 @@ export async function initializeDB(): Promise<void> {
   const connTest = await pool.query('SELECT current_database(), current_user');
   console.log(`DB connected: database=${connTest.rows[0].current_database}, user=${connTest.rows[0].current_user}`);
 
+  // 마이그레이션 가드 — 매 부팅마다 수십 개 ALTER TABLE 이 실행되면 ACCESS EXCLUSIVE 락 경합으로
+  // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
+  // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
+  try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
+  const SCHEMA_VERSION = 'schema-v2.21.2';
+  const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
+  if (check.rowCount && check.rowCount > 0) {
+    console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
+    return;
+  }
+  console.log(`Running schema migration ${SCHEMA_VERSION}...`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS uploads (
       id TEXT PRIMARY KEY,
@@ -873,9 +885,6 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS legacy_filename TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS scanned_file_data TEXT DEFAULT ''"); } catch {}
 
-  // schema_migrations — 일회성 데이터 backfill 추적용 (재실행 방지)
-  try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-
   // workers — 개별 시급 (알바·파견 정산용)
   try { await pool.query('ALTER TABLE workers ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0'); } catch {}
 
@@ -884,6 +893,8 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query('CREATE INDEX IF NOT EXISTS idx_survey_responses_clockin ON survey_responses(request_id) WHERE clock_in_time IS NOT NULL'); } catch {}
   try { await pool.query('CREATE INDEX IF NOT EXISTS idx_workers_category ON workers(category)'); } catch {}
 
+  // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
+  try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}
   console.log('Database initialized successfully');
 }
 

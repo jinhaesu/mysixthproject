@@ -40,7 +40,8 @@ export default function PayrollCalcPage() {
     finally { setLoading(false); }
   }, [yearMonth]);
 
-  useEffect(() => { load(); }, [load]);
+  // 비밀번호 인증 후에만 데이터 로드 — 그 전에 호출하면 verify-password 와 동시 발사되어 pool 고갈.
+  useEffect(() => { if (authorized) load(); }, [load, authorized]);
 
 
   const floor30 = (h: number) => Math.floor(h * 2) / 2;

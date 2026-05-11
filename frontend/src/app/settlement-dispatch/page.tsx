@@ -168,7 +168,7 @@ export default function SettlementDispatchPage() {
     finally { setLoading(false); }
   }, [yearMonth, hourlyRate]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (authorized) load(); }, [load, authorized]);
 
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
 

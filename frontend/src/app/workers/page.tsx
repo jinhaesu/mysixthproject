@@ -145,6 +145,7 @@ export default function WorkersPage() {
     } catch { toast.error("확인 중 오류가 발생했습니다."); }
   };
 
+  const [loadError, setLoadError] = useState<string>("");
   const loadWorkers = useCallback(async () => {
     setLoading(true);
     try {
@@ -158,12 +159,16 @@ export default function WorkersPage() {
       const data = await getWorkers(params);
       setWorkers(data.workers);
       setPagination(data.pagination);
-    } catch {
-      // handle error silently
+      setLoadError("");
+    } catch (e: any) {
+      // 이전: silent — 사용자에게 '데이터 없음' 처럼 보임. 이제 명시 표시.
+      const msg = e?.message || "근무자 조회 실패";
+      setLoadError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, [page, search, category]);
+  }, [page, search, category, toast]);
 
   useEffect(() => {
     loadWorkers();

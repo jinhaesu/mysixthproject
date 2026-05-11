@@ -13,15 +13,15 @@ function createPool() {
   }
 
   // Pool 옵션 — 응급 보수 설정.
-  // Web (PROCESS_TYPE=web): max:5 — Supabase Supavisor ECHECKOUTTIMEOUT 회피.
-  // Worker (PROCESS_TYPE=worker): max:2 — background 만.
-  // 합계 7. Supabase Session pooler backend 한계 안에 안전.
-  // 이전 max:8+4=12 → ECHECKOUTTIMEOUT 발생.
+  // Web (PROCESS_TYPE=web): max:6 min:4 — 4개 항상 warm 으로 동시 요청 cold start 회피.
+  //   페이지 로드 시 3-5 동시 요청이 흔함. min:2 면 3번째부터 cold conn 대기 (15s+).
+  // Worker (PROCESS_TYPE=worker): max:2 min:1 — background 만.
+  // 합계 8. PG max 60 (Supabase Pro) 내 안전.
   const isWorker = process.env.PROCESS_TYPE === 'worker';
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-    max: isWorker ? 2 : 5,
-    min: isWorker ? 1 : 1,
+    max: isWorker ? 2 : 6,
+    min: isWorker ? 1 : 4,            // web min 2→4 (warm pool 확대)
     idleTimeoutMillis: 60_000,
     connectionTimeoutMillis: 30_000,
     query_timeout: isWorker ? 60_000 : 12_000,

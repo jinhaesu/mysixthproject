@@ -23,4 +23,6 @@ RUN mkdir -p /app/uploads
 ENV NODE_ENV=production
 EXPOSE 4000
 
-CMD ["node", "dist/index.js"]
+# PROCESS_TYPE=worker 면 worker.js, 아니면 index.js (default web)
+# Railway 의 Start Command 설정에 의존하지 않고 환경변수로 분기.
+CMD if [ "$PROCESS_TYPE" = "worker" ]; then node dist/worker.js; else node dist/index.js; fi

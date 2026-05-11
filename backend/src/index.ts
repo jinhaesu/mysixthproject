@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import { initializeDB, pool } from './db';
+import { initializeDB, pool, dbGet } from './db';
 import authRoutes from './routes/auth';
 import uploadRoutes from './routes/upload';
 import attendanceRoutes from './routes/attendance';
@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.21.3',
+    version: '2.21.4',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -96,6 +96,7 @@ app.get('/api/health', (_req, res) => {
       workersLite: true,                  // /api/workers/lite — subquery 없는 빠른 목록
       migrationGuard: true,               // 매 부팅마다 ALTER 재실행 방지 (schema_migrations 게이트)
       gracefulShutdown: true,             // SIGTERM 시 pool.end() — Supabase 누적 방지
+      dbHeartbeat: true,                  // 90s 마다 SELECT 1 — Supabase auto-pause 방지
     },
   });
 });
@@ -128,6 +129,13 @@ initializeDB()
     // 서버는 계속 동작 — 기존 스키마로 운영 가능
     startReminderService();
   });
+
+// DB Heartbeat — Supabase auto-pause/cold-start 방지.
+// 첫 쿼리가 cold 일 때 30초 가까이 걸리는 현상 → 매 90초마다 가벼운 ping 으로 워밍 유지.
+setInterval(async () => {
+  try { await dbGet('SELECT 1'); }
+  catch (e: any) { console.error('DB heartbeat error:', e.message); }
+}, 90_000);
 
 // Graceful shutdown — Railway redeploy 시 connection 정상 종료해서
 // Supabase pooler 측 stale connection 누적 방지.

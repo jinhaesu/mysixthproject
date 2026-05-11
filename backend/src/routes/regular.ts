@@ -39,8 +39,25 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
     const limitNum = Math.min(parseInt(limit), 500);
     const offset = (pageNum - 1) * limitNum;
 
+    // 명시적 칼럼 — bank_slip_data/foreign_id_card_data/family_register_data/resident_register_data
+    // 등 Base64 blob 컬럼은 list 에 불필요. TOAST 555MB 끌어오면서 모든 쿼리 timeout 발생.
+    // 대신 EXISTS 형태의 boolean 으로 보유 여부만 전달.
     const employees = await dbAll(`
-      SELECT re.*, sw.name as workplace_name
+      SELECT re.id, re.phone, re.name, re.token, re.department, re.team, re.role, re.workplace_id,
+             re.is_active, re.created_at, re.updated_at,
+             re.hire_date, re.resign_date, re.resigned_at,
+             re.bank_name, re.bank_account, re.id_number, re.name_en,
+             re.personal_info_completed,
+             re.birth_date, re.email, re.address, re.nationality, re.visa_type, re.visa_expiry,
+             re.business_registration_no, re.monthly_salary, re.non_taxable_meal, re.non_taxable_vehicle,
+             re.job_code, re.weekly_work_hours, re.employment_type,
+             re.onboarding_status, re.onboarding_completed_at, re.onboarding_email_sent, re.onboarding_email_sent_at,
+             (re.bank_slip_data != '') as has_bank_slip,
+             (re.foreign_id_card_data != '') as has_foreign_id_card,
+             (re.family_register_data != '') as has_family_register,
+             (re.resident_register_data != '') as has_resident_register,
+             re.signed_contract_url,
+             sw.name as workplace_name
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
       ${where}
@@ -1004,7 +1021,10 @@ router.put('/employees/:id/resign', async (req: AuthRequest, res: Response) => {
 router.get('/employees/resigned', async (_req: AuthRequest, res: Response) => {
   try {
     const employees = await dbAll(`
-      SELECT re.*, sw.name as workplace_name
+      SELECT re.id, re.phone, re.name, re.department, re.team, re.role, re.workplace_id,
+             re.is_active, re.hire_date, re.resign_date, re.resigned_at,
+             re.bank_name, re.bank_account, re.id_number,
+             re.onboarding_status, sw.name as workplace_name
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
       WHERE re.is_active = 0 AND re.resign_date IS NOT NULL AND re.resign_date != ''

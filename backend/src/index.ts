@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.21.7',
+    version: '2.22.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -101,6 +101,7 @@ app.get('/api/health', (_req, res) => {
       initRetry: true,                    // initializeDB 트랜지언트 EDBHANDLEREXITED 재시도
       queryRetry: true,                    // dbGet/dbAll/dbRun 모두 EDBHANDLEREXITED 자동 재시도
       sessionPooler: true,                 // Transaction 풀러 stuck 으로 Session 풀러(:5432)로 복귀
+      blobColumnsExcluded: true,           // list 쿼리에서 Base64 blob 컬럼 제외 (TOAST 555MB → 100KB)
     },
   });
 });

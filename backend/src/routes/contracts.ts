@@ -32,7 +32,8 @@ function buildRegularContractsQuery(whereClause: string): string {
       c.contract_end,
       c.status                            AS contract_status,
       c.created_at                        AS contract_created_at,
-      c.signature_data,
+      c.has_signature                     AS has_signature,
+      c.has_scanned_file                  AS has_scanned_file,
       c.position_title,
       c.annual_salary,
       c.base_pay,
@@ -41,14 +42,22 @@ function buildRegularContractsQuery(whereClause: string): string {
       c.work_hours,
       c.department                        AS contract_department,
       c.token                             AS token,
-      COALESCE(c.is_legacy_scan, 0)       AS is_legacy_scan,
-      COALESCE(c.legacy_filename, '')     AS legacy_filename,
-      COALESCE(c.scanned_file_data, '')   AS scanned_file_data,
+      c.is_legacy_scan,
+      c.legacy_filename,
       NULL::TEXT                          AS worker_type,
       cnt.contract_count
     FROM regular_employees re
     LEFT JOIN LATERAL (
-      SELECT * FROM regular_labor_contracts
+      -- blob 컬럼(signature_data, scanned_file_data, bank_slip_data, foreign_id_card_data)은
+      -- 1행당 수 MB 이므로 list 에서 제외. legacy_filename / has_* 만 노출.
+      SELECT id, contract_start, contract_end, sms_sent, created_at, status,
+             position_title, annual_salary, base_pay, meal_allowance, other_allowance,
+             work_hours, department, token,
+             COALESCE(is_legacy_scan, 0) as is_legacy_scan,
+             COALESCE(legacy_filename, '') as legacy_filename,
+             (signature_data IS NOT NULL AND signature_data != '') as has_signature,
+             (scanned_file_data IS NOT NULL AND scanned_file_data != '') as has_scanned_file
+      FROM regular_labor_contracts
       WHERE employee_id = re.id
       ORDER BY (CASE status WHEN 'signed' THEN 0 ELSE 1 END), created_at DESC
       LIMIT 1
@@ -79,7 +88,8 @@ function buildWorkerContractsQuery(whereClause: string): string {
       c.contract_end,
       c.sms_sent                          AS contract_status,
       c.created_at                        AS contract_created_at,
-      c.signature_data,
+      c.has_signature                     AS has_signature,
+      c.has_scanned_file                  AS has_scanned_file,
       NULL::TEXT                          AS position_title,
       NULL::TEXT                          AS annual_salary,
       NULL::TEXT                          AS base_pay,
@@ -88,14 +98,18 @@ function buildWorkerContractsQuery(whereClause: string): string {
       NULL::TEXT                          AS work_hours,
       NULL::TEXT                          AS contract_department,
       NULL::TEXT                          AS token,
-      COALESCE(c.is_legacy_scan, 0)       AS is_legacy_scan,
-      COALESCE(c.legacy_filename, '')     AS legacy_filename,
-      COALESCE(c.scanned_file_data, '')   AS scanned_file_data,
+      c.is_legacy_scan,
+      c.legacy_filename,
       w.category                          AS worker_type,
       cnt.contract_count
     FROM workers w
     LEFT JOIN LATERAL (
-      SELECT * FROM labor_contracts
+      SELECT id, contract_start, contract_end, sms_sent, created_at,
+             COALESCE(is_legacy_scan, 0) as is_legacy_scan,
+             COALESCE(legacy_filename, '') as legacy_filename,
+             (signature_data IS NOT NULL AND signature_data != '') as has_signature,
+             (scanned_file_data IS NOT NULL AND scanned_file_data != '') as has_scanned_file
+      FROM labor_contracts
       WHERE phone = w.phone
       ORDER BY created_at DESC
       LIMIT 1
@@ -128,7 +142,10 @@ function rowToItem(row: any) {
           contract_end: row.contract_end,
           status: row.contract_status,
           created_at: row.contract_created_at,
-          signature_data: row.signature_data || null,
+          // list 에서는 signature 존재 여부만 노출, 실제 데이터는 detail 엔드포인트에서 조회.
+          signature_data: row.has_signature ? 'present' : null,
+          has_signature: row.has_signature || false,
+          has_scanned_file: row.has_scanned_file || false,
           position_title: row.position_title || null,
           annual_salary: row.annual_salary || null,
           base_pay: row.base_pay || null,
@@ -139,7 +156,7 @@ function rowToItem(row: any) {
           token: row.token || null,
           is_legacy_scan: row.is_legacy_scan ?? 0,
           legacy_filename: row.legacy_filename ?? '',
-          scanned_file_data: row.scanned_file_data ?? '',
+          scanned_file_data: row.has_scanned_file ? 'present' : '',
         }
       : null,
     contract_count: row.contract_count || 0,

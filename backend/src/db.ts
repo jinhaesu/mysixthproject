@@ -12,16 +12,21 @@ function createPool() {
     process.exit(1);
   }
 
-  // Pool 옵션 — Supabase Transaction 모드 pooler (port 6543) 호환.
-  // keepAlive 제거 — Railway 재배포 시 stale TCP 가 Supabase 측에 누적되어 신규 connection 거부됨.
-  // idleTimeoutMillis 짧게 — backend session 빨리 반환.
-  // statement_timeout 미설정 — Transaction 모드는 startup option 거부.
+  // Pool 옵션 — Supabase Session 모드 pooler (port 5432) 용.
+  // Transaction 모드 (6543) 에서 ECHECKOUTTIMEOUT 만성 발생 → Session 모드로 복귀.
+  // Session 모드는 각 connection 이 1 backend 점유. max 너무 크면 Supabase 한계 초과.
+  // Pro 플랜 기준 안전 영역: max ~10.
+  // keepAlive: TCP 끊김 방지 + EDBHANDLEREXITED 빈도 감소.
+  // idleTimeoutMillis: 30s — Supavisor 가 idle backend cleanup 하기 전에 우리가 release.
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-    max: 5,
-    idleTimeoutMillis: 5_000,
+    max: 10,
+    idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
     query_timeout: 30_000,
+    statement_timeout: 30_000,         // Session 모드는 startup option 사용 가능
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     application_name: 'mysixthproject-backend',
   };
 

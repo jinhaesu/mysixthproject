@@ -13,20 +13,21 @@ function createPool() {
   }
 
   // Pool 옵션 — 응급 보수 설정.
-  // Supabase pooler 가 불안정해 churn 방지가 최우선. min 으로 2개 항상 유지.
-  // statement_timeout 8s: 백엔드 routes 의 모든 쿼리는 8초 안에 끝나야 함. 더 걸리면 fail-fast.
-  // 그래야 stuck 쿼리가 pool 을 점유 안 함.
+  // Web 서버 (PROCESS_TYPE=web): max:8 min:2, statement 8s — 사용자 요청 빠르게 처리.
+  // Worker (PROCESS_TYPE=worker): max:2 min:1, statement 60s — 백그라운드 작업 여유롭게.
+  // 두 프로세스 별도 DB pool → worker stuck 이 web 사용자 요청 막지 않음.
+  const isWorker = process.env.PROCESS_TYPE === 'worker';
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-    max: 8,
-    min: 2,                            // 항상 2개 warm
-    idleTimeoutMillis: 60_000,         // 1분 유지 — churn 방지
+    max: isWorker ? 2 : 8,
+    min: isWorker ? 1 : 2,
+    idleTimeoutMillis: 60_000,
     connectionTimeoutMillis: 8_000,
-    query_timeout: 10_000,             // 클라이언트 측 10초 안에 결과 없으면 cancel
-    statement_timeout: 8_000,          // 서버 측 8초 안에 끝나야 — stuck 쿼리 fail-fast
+    query_timeout: isWorker ? 60_000 : 10_000,
+    statement_timeout: isWorker ? 60_000 : 8_000,
     keepAlive: true,
     keepAliveInitialDelayMillis: 5_000,
-    application_name: 'mysixthproject-backend',
+    application_name: isWorker ? 'mysixthproject-worker' : 'mysixthproject-web',
   };
 
   try {

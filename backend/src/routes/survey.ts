@@ -1319,10 +1319,17 @@ router.post('/fix-long-shifts', async (_req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/survey/contracts - List all contracts
+// GET /api/survey/contracts - List all contracts (blob 컬럼 제외)
 router.get('/contracts', async (_req: AuthRequest, res: Response) => {
   try {
-    const contracts = await dbAll('SELECT * FROM labor_contracts ORDER BY created_at DESC');
+    const contracts = await dbAll(`
+      SELECT id, phone, name, contract_start, contract_end, sms_sent, created_at,
+             COALESCE(is_legacy_scan, 0) as is_legacy_scan,
+             COALESCE(legacy_filename, '') as legacy_filename,
+             (signature_data IS NOT NULL AND signature_data != '') as has_signature,
+             (scanned_file_data IS NOT NULL AND scanned_file_data != '') as has_scanned_file
+      FROM labor_contracts ORDER BY created_at DESC
+    `);
     res.json(contracts);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

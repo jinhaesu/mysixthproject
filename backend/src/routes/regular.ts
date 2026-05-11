@@ -6,7 +6,7 @@ import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
-// regular_employees 의 Base64 blob 컬럼을 제외한 컬럼 목록.
+// regular_employees 의 Base64 blob 컬럼을 제외한 컬럼 목록 (detail 용).
 // 555MB TOAST 의 대부분이 이들 컬럼 → SELECT * 가 1행당 수 MB 전송 → 모든 쿼리 timeout.
 // 문서 보기가 필요한 화면에서는 GET /employees/:id/documents 로 별도 조회.
 const EMP_COLS_NO_BLOB = `
@@ -20,6 +20,19 @@ const EMP_COLS_NO_BLOB = `
   job_code, weekly_work_hours, employment_type,
   onboarding_status, onboarding_completed_at, onboarding_email_sent, onboarding_email_sent_at,
   signed_contract_url,
+  (bank_slip_data IS NOT NULL AND bank_slip_data != '') as has_bank_slip,
+  (foreign_id_card_data IS NOT NULL AND foreign_id_card_data != '') as has_foreign_id_card,
+  (family_register_data IS NOT NULL AND family_register_data != '') as has_family_register,
+  (resident_register_data IS NOT NULL AND resident_register_data != '') as has_resident_register
+`;
+
+// LIST 전용 — 표 출력에 필요한 핵심 컬럼만. 페이로드 60% 감소.
+const EMP_COLS_LIST = `
+  id, phone, name, department, team, role, workplace_id,
+  is_active, hire_date, resign_date, resigned_at,
+  bank_name, bank_account, id_number,
+  nationality, visa_expiry,
+  employment_type, onboarding_status,
   (bank_slip_data IS NOT NULL AND bank_slip_data != '') as has_bank_slip,
   (foreign_id_card_data IS NOT NULL AND foreign_id_card_data != '') as has_foreign_id_card,
   (family_register_data IS NOT NULL AND family_register_data != '') as has_family_register,
@@ -59,25 +72,19 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
     const limitNum = Math.min(parseInt(limit), 500);
     const offset = (pageNum - 1) * limitNum;
 
-    // 명시적 칼럼 — bank_slip_data/foreign_id_card_data/family_register_data/resident_register_data
-    // 등 Base64 blob 컬럼은 list 에 불필요. TOAST 555MB 끌어오면서 모든 쿼리 timeout 발생.
-    // 대신 EXISTS 형태의 boolean 으로 보유 여부만 전달.
+    // List 핵심 컬럼만. 표 화면에 안 보이는 birth_date/email/address 등은 detail 엔드포인트에서 조회.
     const employees = await dbAll(`
-      SELECT re.id, re.phone, re.name, re.token, re.department, re.team, re.role, re.workplace_id,
-             re.is_active, re.created_at, re.updated_at,
-             re.hire_date, re.resign_date, re.resigned_at,
-             re.bank_name, re.bank_account, re.id_number, re.name_en,
-             re.personal_info_completed,
-             re.birth_date, re.email, re.address, re.nationality, re.visa_type, re.visa_expiry,
-             re.business_registration_no, re.monthly_salary, re.non_taxable_meal, re.non_taxable_vehicle,
-             re.job_code, re.weekly_work_hours, re.employment_type,
-             re.onboarding_status, re.onboarding_completed_at, re.onboarding_email_sent, re.onboarding_email_sent_at,
-             (re.bank_slip_data != '') as has_bank_slip,
-             (re.foreign_id_card_data != '') as has_foreign_id_card,
-             (re.family_register_data != '') as has_family_register,
-             (re.resident_register_data != '') as has_resident_register,
-             re.signed_contract_url,
-             sw.name as workplace_name
+      SELECT
+        re.id, re.phone, re.name, re.department, re.team, re.role, re.workplace_id,
+        re.is_active, re.hire_date, re.resign_date, re.resigned_at,
+        re.bank_name, re.bank_account, re.id_number,
+        re.nationality, re.visa_expiry,
+        re.employment_type, re.onboarding_status,
+        (re.bank_slip_data IS NOT NULL AND re.bank_slip_data != '') as has_bank_slip,
+        (re.foreign_id_card_data IS NOT NULL AND re.foreign_id_card_data != '') as has_foreign_id_card,
+        (re.family_register_data IS NOT NULL AND re.family_register_data != '') as has_family_register,
+        (re.resident_register_data IS NOT NULL AND re.resident_register_data != '') as has_resident_register,
+        sw.name as workplace_name
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
       ${where}

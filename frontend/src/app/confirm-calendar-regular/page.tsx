@@ -63,7 +63,7 @@ interface DayEntry {
 const DEPT_OPTIONS = ["전체", "물류", "생산2층", "생산3층"];
 const EMPLOYEE_TYPE = "정규직";
 
-const CACHE_TTL = 3 * 60 * 60 * 1000;
+const CACHE_TTL = 60 * 1000; // 1 분 — 이전 3 시간은 stale 데이터 보존 위험.
 const _summaryCache: Record<string, { data: any; time: number }> = {};
 const _confirmedCache: Record<string, { data: any[]; time: number }> = {};
 const _cacheVersion: { v: string } = { v: '' };
@@ -201,8 +201,13 @@ export default function ConfirmCalendarRegularPage() {
         ) {
           const raw = await getAttendanceSummaryRegular(year, month);
           const employees: Employee[] = raw?.employees || [];
-          _summaryCache[sKey] = { data: employees, time: Date.now() };
-          summary = _summaryCache[sKey];
+          // 빈 응답은 캐시 안 함 — 일시 장애 시 stale empty 유지 방지.
+          if (employees.length > 0) {
+            _summaryCache[sKey] = { data: employees, time: Date.now() };
+            summary = _summaryCache[sKey];
+          } else {
+            summary = { data: employees, time: Date.now() };
+          }
         }
         setSummaryData(summary.data);
 
@@ -218,6 +223,7 @@ export default function ConfirmCalendarRegularPage() {
             (r: any) =>
               r.type === "정규직" || r.employee_type === "정규직"
           );
+          // 빈 응답이라도 정상 상태일 수 있으니 캐시는 한다 — 단 TTL 짧음.
           _confirmedCache[cKey] = { data: filtered, time: Date.now() };
           confirmed = _confirmedCache[cKey];
         }
@@ -239,6 +245,9 @@ export default function ConfirmCalendarRegularPage() {
           setVacationMap(vmap);
         } catch {}
       } catch (e: any) {
+        // 에러 시 캐시 무효화 — 다음 시도에서 stale empty/old 데이터 안 쓰도록.
+        delete _summaryCache[`reg-${year}-${month}`];
+        delete _confirmedCache[`reg-confirmed-${yearMonth}`];
         toast.error(e.message || "데이터를 불러오는데 실패했습니다.");
       } finally {
         setLoading(false);

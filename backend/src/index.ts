@@ -64,7 +64,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.21.2',
+    version: '2.21.3',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -94,6 +94,8 @@ app.get('/api/health', (_req, res) => {
       workerHourlyRate: true,             // 알바·파견 직원별 시급 (workers.hourly_rate)
       poolTuning: true,                   // max=8, keepAlive — Supabase ECHECKOUTTIMEOUT 방지
       workersLite: true,                  // /api/workers/lite — subquery 없는 빠른 목록
+      migrationGuard: true,               // 매 부팅마다 ALTER 재실행 방지 (schema_migrations 게이트)
+      gracefulShutdown: true,             // SIGTERM 시 pool.end() — Supabase 누적 방지
     },
   });
 });

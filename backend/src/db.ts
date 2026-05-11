@@ -12,19 +12,19 @@ function createPool() {
     process.exit(1);
   }
 
-  // Pool 옵션 — Supabase Session 모드 pooler 에 맞춰 조정.
-  // 이전 max=20 은 Supabase 무료/Pro 동시 백엔드 제한(15-20)을 초과해 ECHECKOUTTIMEOUT 유발.
-  // max=8 + keepAlive 로 cold-start 비용 회피 + 안정적 multiplexing.
-  // statement_timeout: PG 서버측 자동 cancel. query_timeout: 클라이언트측.
+  // Pool 옵션 — Supabase Transaction 모드 pooler (port 6543) 와 호환되는 설정.
+  // Session 모드는 max>10 이면 ECHECKOUTTIMEOUT 발생, Transaction 모드는 multiplex 가능.
+  // statement_timeout 은 Transaction 모드에서 startup option 으로 보내면 거부되므로
+  // 제거하고 query_timeout(클라이언트측) 만 사용.
+  // idleTimeoutMillis 짧게 — Transaction 모드 backend session 빨리 반환.
   const baseOpts = {
     ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-    max: 8,                          // Supabase 제한 안전권
-    idleTimeoutMillis: 60_000,       // 60s — 너무 빨리 close 하면 cold-start 비용 큼
+    max: 10,
+    idleTimeoutMillis: 10_000,       // 10s — Transaction 모드에서 빨리 반환
     connectionTimeoutMillis: 8_000,
     query_timeout: 30_000,
-    statement_timeout: 30_000,
-    keepAlive: true,                 // TCP keepalive — 네트워크 사일런트 끊김 방지
-    keepAliveInitialDelayMillis: 10_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 5_000,
     application_name: 'mysixthproject-backend',
   };
 

@@ -287,7 +287,15 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
       }
 
       const contracts = await dbAll(
-        'SELECT * FROM regular_labor_contracts WHERE employee_id = ? ORDER BY created_at DESC',
+        `SELECT id, employee_id, phone, name, contract_start, contract_end, status, sms_sent,
+                token, created_at, updated_at, work_start_date,
+                position_title, annual_salary, base_pay, meal_allowance, other_allowance,
+                pay_day, work_hours, work_place, department, email, nationality, visa_type, visa_expiry,
+                COALESCE(is_legacy_scan, 0) as is_legacy_scan,
+                COALESCE(legacy_filename, '') as legacy_filename,
+                (signature_data IS NOT NULL AND signature_data != '') as has_signature,
+                (scanned_file_data IS NOT NULL AND scanned_file_data != '') as has_scanned_file
+         FROM regular_labor_contracts WHERE employee_id = ? ORDER BY created_at DESC`,
         empId,
       );
 
@@ -310,7 +318,12 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
       }
 
       const contracts = await dbAll(
-        'SELECT * FROM labor_contracts WHERE phone = ? ORDER BY created_at DESC',
+        `SELECT id, phone, name, contract_start, contract_end, sms_sent, created_at,
+                COALESCE(is_legacy_scan, 0) as is_legacy_scan,
+                COALESCE(legacy_filename, '') as legacy_filename,
+                (signature_data IS NOT NULL AND signature_data != '') as has_signature,
+                (scanned_file_data IS NOT NULL AND scanned_file_data != '') as has_scanned_file
+         FROM labor_contracts WHERE phone = ? ORDER BY created_at DESC`,
         normalizedPhone,
       );
 

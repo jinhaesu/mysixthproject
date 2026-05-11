@@ -13,9 +13,9 @@ async function main() {
            SUBSTRING(query, 1, 80) as q
     FROM pg_stat_activity
     WHERE datname = current_database() AND pid <> pg_backend_pid()
-      AND state = 'active' AND query_start < NOW() - INTERVAL '60 seconds'
+      AND state = 'active' AND query_start < NOW() - INTERVAL '20 seconds'
   `);
-  console.log(`Found ${r.rowCount} stuck queries (>60s):`);
+  console.log(`Found ${r.rowCount} stuck queries (>20s):`);
   for (const row of r.rows) {
     console.log(`  pid=${row.pid} age=${row.age}s  ${row.q}`);
     try {
@@ -28,7 +28,7 @@ async function main() {
   const r2 = await pool.query(`
     SELECT pid FROM pg_stat_activity
     WHERE datname = current_database() AND pid <> pg_backend_pid()
-      AND state = 'active' AND query_start < NOW() - INTERVAL '60 seconds'
+      AND state = 'active' AND query_start < NOW() - INTERVAL '20 seconds'
   `);
   console.log(`\nStill stuck after cancel: ${r2.rowCount}. Terminating...`);
   for (const row of r2.rows) {

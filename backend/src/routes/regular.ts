@@ -6,6 +6,26 @@ import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
+// regular_employees 의 Base64 blob 컬럼을 제외한 컬럼 목록.
+// 555MB TOAST 의 대부분이 이들 컬럼 → SELECT * 가 1행당 수 MB 전송 → 모든 쿼리 timeout.
+// 문서 보기가 필요한 화면에서는 GET /employees/:id/documents 로 별도 조회.
+const EMP_COLS_NO_BLOB = `
+  id, phone, name, token, department, team, role, workplace_id,
+  is_active, created_at, updated_at,
+  hire_date, resign_date, resigned_at,
+  bank_name, bank_account, id_number, name_en,
+  personal_info_completed,
+  birth_date, email, address, nationality, visa_type, visa_expiry,
+  business_registration_no, monthly_salary, non_taxable_meal, non_taxable_vehicle,
+  job_code, weekly_work_hours, employment_type,
+  onboarding_status, onboarding_completed_at, onboarding_email_sent, onboarding_email_sent_at,
+  signed_contract_url,
+  (bank_slip_data IS NOT NULL AND bank_slip_data != '') as has_bank_slip,
+  (foreign_id_card_data IS NOT NULL AND foreign_id_card_data != '') as has_foreign_id_card,
+  (family_register_data IS NOT NULL AND family_register_data != '') as has_family_register,
+  (resident_register_data IS NOT NULL AND resident_register_data != '') as has_resident_register
+`;
+
 // ===== Employees CRUD =====
 
 // GET /api/regular/employees - List with filters
@@ -102,7 +122,7 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
         'INSERT INTO regular_employees (phone, name, token, department, team, role, workplace_id, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         phone, name, token, dept, tm, rl, wpId, hire_date || ''
       );
-      const created = await dbGet('SELECT * FROM regular_employees WHERE id = ?', result.lastInsertRowid);
+      const created = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ?`, result.lastInsertRowid);
       res.status(201).json(created);
     } catch (insertErr: any) {
       // Unique constraint violation — record exists, just update it
@@ -110,7 +130,7 @@ router.post('/employees', async (req: AuthRequest, res: Response) => {
         'UPDATE regular_employees SET name = ?, token = ?, department = ?, team = ?, role = ?, workplace_id = ?, hire_date = ?, is_active = 1, updated_at = NOW() WHERE phone = ?',
         name, token, dept, tm, rl, wpId, hire_date || '', phone
       );
-      const updated = await dbGet('SELECT * FROM regular_employees WHERE phone = ?', phone);
+      const updated = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE phone = ?`, phone);
       res.status(201).json(updated);
     }
   } catch (error: any) {
@@ -139,7 +159,7 @@ router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
     if (body.bank_account !== undefined)  { clauses.push('bank_account = ?');  params.push(body.bank_account || ''); }
 
     if (clauses.length === 0) {
-      const cur = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
+      const cur = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ?`, id);
       res.json(cur);
       return;
     }
@@ -148,7 +168,7 @@ router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
     params.push(id);
     await dbRun(`UPDATE regular_employees SET ${clauses.join(', ')} WHERE id = ?`, ...params);
 
-    const updated = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
+    const updated = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ?`, id);
     res.json(updated);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -173,7 +193,7 @@ router.post('/employees/:id/send-link', async (req: AuthRequest, res: Response) 
   try {
     const { id } = req.params;
 
-    const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ? AND is_active = 1', id) as any;
+    const employee = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ? AND is_active = 1`, id) as any;
     if (!employee) {
       res.status(404).json({ error: '직원을 찾을 수 없습니다.' });
       return;
@@ -204,7 +224,7 @@ router.post('/employees/send-link-batch', async (req: AuthRequest, res: Response
     const errors: string[] = [];
 
     for (const id of ids) {
-      const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ? AND is_active = 1', id) as any;
+      const employee = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ? AND is_active = 1`, id) as any;
       if (!employee) continue;
 
       const url = getRegularUrl(employee.token);
@@ -1051,7 +1071,7 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
       department, position_title, annual_salary, base_pay, meal_allowance, other_allowance,
       pay_day, work_hours, work_place,
     } = req.body;
-    const employee = await dbGet('SELECT * FROM regular_employees WHERE id = ?', employee_id) as any;
+    const employee = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ?`, employee_id) as any;
     if (!employee) { res.status(404).json({ error: '직원을 찾을 수 없습니다.' }); return; }
 
     const token = require('uuid').v4();

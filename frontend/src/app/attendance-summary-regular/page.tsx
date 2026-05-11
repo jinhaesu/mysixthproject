@@ -32,7 +32,7 @@ function isFullLeaveType(t?: string): boolean {
 }
 
 const _cache: Record<string, { data: any; time: number }> = {};
-const CACHE_TTL = 3 * 60 * 60 * 1000;
+const CACHE_TTL = 60 * 1000; // 1 분 — stale 위험 축소
 
 export default function AttendanceSummaryRegularPage() {
   const [year, setYear] = usePersistedState("asr_year", new Date().getFullYear());

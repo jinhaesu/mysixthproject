@@ -64,7 +64,7 @@ interface DayEntry {
 
 const DEPT_OPTIONS = ["전체", "물류", "생산2층", "생산3층"];
 
-const CACHE_TTL = 3 * 60 * 60 * 1000;
+const CACHE_TTL = 60 * 1000; // 1 분 — stale 위험 축소
 const _summaryCache: Record<string, { data: any; time: number }> = {};
 const _confirmedCache: Record<string, { data: any[]; time: number }> = {};
 

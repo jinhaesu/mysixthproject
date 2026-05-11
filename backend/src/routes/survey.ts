@@ -1325,9 +1325,7 @@ router.get('/contracts', async (_req: AuthRequest, res: Response) => {
     const contracts = await dbAll(`
       SELECT id, phone, name, contract_start, contract_end, sms_sent, created_at,
              COALESCE(is_legacy_scan, 0) as is_legacy_scan,
-             COALESCE(legacy_filename, '') as legacy_filename,
-             (signature_data IS NOT NULL AND signature_data != '') as has_signature,
-             (scanned_file_data IS NOT NULL AND scanned_file_data != '') as has_scanned_file
+             COALESCE(legacy_filename, '') as legacy_filename
       FROM labor_contracts ORDER BY created_at DESC
     `);
     res.json(contracts);

@@ -1094,8 +1094,24 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
 // GET /api/regular/contracts - List all contracts
 router.get('/contracts', async (_req: AuthRequest, res: Response) => {
   try {
+    // regular_labor_contracts 는 505MB(signature_data, scanned_file_data, bank_slip_data,
+    // foreign_id_card_data 등 Base64 blob). list 에서는 has_* boolean 만 노출하고
+    // 실제 데이터는 detail 엔드포인트(/contracts/:id)에서 조회.
     const contracts = await dbAll(`
-      SELECT rlc.*, re.department, re.team
+      SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.name,
+             rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
+             rlc.sms_sent, rlc.created_at, rlc.updated_at, rlc.work_start_date,
+             rlc.position_title, rlc.annual_salary, rlc.base_pay, rlc.meal_allowance,
+             rlc.other_allowance, rlc.pay_day, rlc.work_hours, rlc.work_place,
+             rlc.department as contract_department, rlc.email, rlc.nationality,
+             rlc.visa_type, rlc.visa_expiry,
+             COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
+             COALESCE(rlc.legacy_filename, '') as legacy_filename,
+             (rlc.signature_data IS NOT NULL AND rlc.signature_data != '') as has_signature,
+             (rlc.scanned_file_data IS NOT NULL AND rlc.scanned_file_data != '') as has_scanned_file,
+             (rlc.bank_slip_data IS NOT NULL AND rlc.bank_slip_data != '') as has_bank_slip,
+             (rlc.foreign_id_card_data IS NOT NULL AND rlc.foreign_id_card_data != '') as has_foreign_id_card,
+             re.department, re.team
       FROM regular_labor_contracts rlc
       JOIN regular_employees re ON rlc.employee_id = re.id
       ORDER BY rlc.created_at DESC

@@ -5,6 +5,20 @@ import { sendGeneralSms } from '../services/smsService';
 
 const router = Router();
 
+// regular_employees 의 Base64 blob 컬럼 제외 — SELECT * 가 TOAST 디토스팅 유발해 stuck.
+const EMP_COLS = `
+  id, phone, name, token, department, team, role, workplace_id,
+  is_active, created_at, updated_at,
+  hire_date, resign_date, resigned_at,
+  bank_name, bank_account, id_number, name_en,
+  personal_info_completed,
+  birth_date, email, address, nationality, visa_type, visa_expiry,
+  business_registration_no, monthly_salary, non_taxable_meal, non_taxable_vehicle,
+  job_code, weekly_work_hours, employment_type,
+  onboarding_status, onboarding_completed_at, onboarding_email_sent, onboarding_email_sent_at,
+  signed_contract_url
+`;
+
 // In-memory OTP store: key = token, value = { code, phone, expiresAt }
 const otpStore = new Map<string, { code: string; phone: string; expiresAt: number }>();
 
@@ -32,7 +46,7 @@ router.post('/:token/vacation', async (req: Request, res: Response) => {
       return;
     }
 
-    const employee = await dbGet('SELECT * FROM regular_employees WHERE token = ? AND is_active = 1', token) as any;
+    const employee = await dbGet(`SELECT ${EMP_COLS} FROM regular_employees WHERE token = ? AND is_active = 1`, token) as any;
     if (!employee) {
       res.status(403).json({ error: '접근 권한이 없습니다.' });
       return;
@@ -76,7 +90,7 @@ router.post('/:token/vacation', async (req: Request, res: Response) => {
 router.get('/:token/vacations', async (req: Request, res: Response) => {
   try {
     const token = req.params.token as string;
-    const employee = await dbGet('SELECT * FROM regular_employees WHERE token = ? AND is_active = 1', token) as any;
+    const employee = await dbGet(`SELECT ${EMP_COLS} FROM regular_employees WHERE token = ? AND is_active = 1`, token) as any;
     if (!employee) { res.status(403).json({ error: '접근 권한이 없습니다.' }); return; }
 
     const year = new Date().getFullYear();
@@ -170,7 +184,16 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
     const contract = await dbGet(`
-      SELECT rlc.*, re.department, re.team, re.role
+      SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.name,
+             rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
+             rlc.sms_sent, rlc.created_at, rlc.updated_at, rlc.work_start_date,
+             rlc.position_title, rlc.annual_salary, rlc.base_pay, rlc.meal_allowance,
+             rlc.other_allowance, rlc.pay_day, rlc.work_hours, rlc.work_place,
+             rlc.department as contract_department, rlc.email, rlc.nationality,
+             rlc.visa_type, rlc.visa_expiry,
+             COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
+             COALESCE(rlc.legacy_filename, '') as legacy_filename,
+             re.department, re.team, re.role
       FROM regular_labor_contracts rlc
       JOIN regular_employees re ON rlc.employee_id = re.id
       WHERE rlc.token = ?
@@ -268,7 +291,15 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
     } = req.body;
     if (!address || !signature_data) { res.status(400).json({ error: '주소와 서명은 필수입니다.' }); return; }
 
-    const contract = await dbGet('SELECT * FROM regular_labor_contracts WHERE token = ?', token) as any;
+    const contract = await dbGet(
+      `SELECT id, employee_id, phone, name, contract_start, contract_end, status, token,
+              sms_sent, created_at, updated_at, work_start_date,
+              position_title, annual_salary, base_pay, meal_allowance, other_allowance,
+              pay_day, work_hours, work_place, department, email, nationality,
+              visa_type, visa_expiry
+       FROM regular_labor_contracts WHERE token = ?`,
+      token
+    ) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
     if (contract.status === 'signed') { res.status(400).json({ error: '이미 서명된 계약서입니다.' }); return; }
 
@@ -342,7 +373,7 @@ router.post('/:token/personal-info', async (req: Request, res: Response) => {
       return;
     }
 
-    const employee = await dbGet('SELECT * FROM regular_employees WHERE token = ? AND is_active = 1', token) as any;
+    const employee = await dbGet(`SELECT ${EMP_COLS} FROM regular_employees WHERE token = ? AND is_active = 1`, token) as any;
     if (!employee) { res.status(403).json({ error: '접근 권한이 없습니다.' }); return; }
 
     await dbRun(
@@ -362,7 +393,16 @@ router.get('/:token', async (req: Request, res: Response) => {
     const { token } = req.params;
 
     const employee = await dbGet(`
-      SELECT re.*, sw.name as workplace_name, sw.address as workplace_address,
+      SELECT re.id, re.phone, re.name, re.token, re.department, re.team, re.role, re.workplace_id,
+             re.is_active, re.created_at, re.updated_at,
+             re.hire_date, re.resign_date, re.resigned_at,
+             re.bank_name, re.bank_account, re.id_number, re.name_en,
+             re.personal_info_completed,
+             re.birth_date, re.email, re.address, re.nationality, re.visa_type, re.visa_expiry,
+             re.business_registration_no, re.monthly_salary, re.non_taxable_meal, re.non_taxable_vehicle,
+             re.job_code, re.weekly_work_hours, re.employment_type,
+             re.onboarding_status, re.onboarding_completed_at, re.onboarding_email_sent, re.onboarding_email_sent_at,
+             re.signed_contract_url, sw.name as workplace_name, sw.address as workplace_address,
              sw.latitude, sw.longitude, sw.radius_meters
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
@@ -486,7 +526,16 @@ router.post('/:token/send-otp', async (req: Request, res: Response) => {
     }
 
     const employee = await dbGet(`
-      SELECT re.* FROM regular_employees re WHERE re.token = ? AND re.is_active = 1
+      SELECT re.id, re.phone, re.name, re.token, re.department, re.team, re.role, re.workplace_id,
+             re.is_active, re.created_at, re.updated_at,
+             re.hire_date, re.resign_date, re.resigned_at,
+             re.bank_name, re.bank_account, re.id_number, re.name_en,
+             re.personal_info_completed,
+             re.birth_date, re.email, re.address, re.nationality, re.visa_type, re.visa_expiry,
+             re.business_registration_no, re.monthly_salary, re.non_taxable_meal, re.non_taxable_vehicle,
+             re.job_code, re.weekly_work_hours, re.employment_type,
+             re.onboarding_status, re.onboarding_completed_at, re.onboarding_email_sent, re.onboarding_email_sent_at,
+             re.signed_contract_url FROM regular_employees re WHERE re.token = ? AND re.is_active = 1
     `, token) as any;
 
     if (!employee) {
@@ -566,7 +615,16 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
     const { latitude, longitude, agreement_accepted, agreement_accepted_at, phone_verified } = req.body;
 
     const employee = await dbGet(`
-      SELECT re.*, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters, sw.name as workplace_name
+      SELECT re.id, re.phone, re.name, re.token, re.department, re.team, re.role, re.workplace_id,
+             re.is_active, re.created_at, re.updated_at,
+             re.hire_date, re.resign_date, re.resigned_at,
+             re.bank_name, re.bank_account, re.id_number, re.name_en,
+             re.personal_info_completed,
+             re.birth_date, re.email, re.address, re.nationality, re.visa_type, re.visa_expiry,
+             re.business_registration_no, re.monthly_salary, re.non_taxable_meal, re.non_taxable_vehicle,
+             re.job_code, re.weekly_work_hours, re.employment_type,
+             re.onboarding_status, re.onboarding_completed_at, re.onboarding_email_sent, re.onboarding_email_sent_at,
+             re.signed_contract_url, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters, sw.name as workplace_name
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
       WHERE re.token = ? AND re.is_active = 1
@@ -653,7 +711,16 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     const { latitude, longitude } = req.body;
 
     const employee = await dbGet(`
-      SELECT re.*, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters, sw.name as workplace_name
+      SELECT re.id, re.phone, re.name, re.token, re.department, re.team, re.role, re.workplace_id,
+             re.is_active, re.created_at, re.updated_at,
+             re.hire_date, re.resign_date, re.resigned_at,
+             re.bank_name, re.bank_account, re.id_number, re.name_en,
+             re.personal_info_completed,
+             re.birth_date, re.email, re.address, re.nationality, re.visa_type, re.visa_expiry,
+             re.business_registration_no, re.monthly_salary, re.non_taxable_meal, re.non_taxable_vehicle,
+             re.job_code, re.weekly_work_hours, re.employment_type,
+             re.onboarding_status, re.onboarding_completed_at, re.onboarding_email_sent, re.onboarding_email_sent_at,
+             re.signed_contract_url, sw.latitude as wp_lat, sw.longitude as wp_lng, sw.radius_meters, sw.name as workplace_name
       FROM regular_employees re
       LEFT JOIN survey_workplaces sw ON re.workplace_id = sw.id
       WHERE re.token = ? AND re.is_active = 1

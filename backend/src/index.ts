@@ -69,7 +69,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.23.2',
+    version: '2.23.3',
     features: {
       manualAttendance: true,
       onboarding: true,

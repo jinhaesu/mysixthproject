@@ -64,7 +64,7 @@ export default function SessionPasswordGate({
     setChecking(true);
     setError("");
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(

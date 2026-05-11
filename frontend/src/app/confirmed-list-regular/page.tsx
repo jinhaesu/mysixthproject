@@ -84,7 +84,7 @@ function calcFromTimes(clockIn: string, clockOut: string, date: string) {
 }
 
 const _cache: Record<string, { data: any; vac: any; time: number }> = {};
-const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_TTL = 60 * 1000; // 1分 — 이전 10分 stale empty 캐시로 빈 데이터 고착 사례 다수
 
 export default function ConfirmedListRegularPage() {
   const [yearMonth, setYearMonth] = usePersistedState(
@@ -124,7 +124,8 @@ export default function ConfirmedListRegularPage() {
   const load = useCallback(async () => {
     const cacheKey = `clr-${yearMonth}`;
     const cached = _cache[cacheKey];
-    if (cached && Date.now() - cached.time < CACHE_TTL) {
+    // 비어있는 데이터는 캐시 미사용 — 오류 후 stale empty 방지
+    if (cached && cached.data?.length > 0 && Date.now() - cached.time < CACHE_TTL) {
       setData(cached.data);
       setVacationMap(cached.vac);
       return;
@@ -145,14 +146,18 @@ export default function ConfirmedListRegularPage() {
           }
         }
         setVacationMap(map);
-        _cache[cacheKey] = { data: d || [], vac: map, time: Date.now() };
+        // 빈 응답은 캐시하지 않음
+        if ((d || []).length > 0) {
+          _cache[cacheKey] = { data: d || [], vac: map, time: Date.now() };
+        }
       } catch {}
     } catch (e: any) {
+      delete _cache[cacheKey]; // 오류 시 캐시 무효화
       toast.error(e.message || "데이터를 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
     }
-  }, [yearMonth]);
+  }, [yearMonth, toast]);
 
   useEffect(() => {
     load();

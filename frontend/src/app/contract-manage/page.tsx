@@ -9,6 +9,7 @@ import {
   uploadLegacyContract,
 } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
+import { FilePreview } from "@/components/FilePreview";
 import {
   PageHeader,
   Stat,
@@ -582,34 +583,12 @@ function ContractManageInner() {
             )}
 
             {viewModal.is_legacy_scan === 1 && viewModal.scanned_file_data && (
-              <div>
-                <p className="text-xs text-[var(--text-3)] mb-1.5">첨부 파일</p>
-                {viewModal.scanned_file_data.startsWith("data:image") ? (
-                  <div className="border border-[var(--border-1)] rounded-[var(--r-md)] overflow-hidden bg-white">
-                    <img src={viewModal.scanned_file_data} alt="계약서 스캔" className="w-full object-contain max-h-[480px]" />
-                  </div>
-                ) : viewModal.scanned_file_data.startsWith("data:application/pdf") ? (
-                  <a
-                    href={viewModal.scanned_file_data}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--r-md)] border border-[var(--border-1)] bg-[var(--bg-1)] text-[12.5px] text-[var(--brand-400)] hover:bg-[var(--bg-2)]"
-                  >
-                    <FileText size={14} />
-                    PDF 열기
-                  </a>
-                ) : (
-                  <a
-                    href={viewModal.scanned_file_data}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--r-md)] border border-[var(--border-1)] bg-[var(--bg-1)] text-[12.5px] text-[var(--brand-400)] hover:bg-[var(--bg-2)]"
-                  >
-                    <FileText size={14} />
-                    파일 열기
-                  </a>
-                )}
-              </div>
+              <FilePreview
+                label="계약서 스캔본"
+                data={viewModal.scanned_file_data}
+                filenamePrefix={`계약서_${viewModal.employee_name || ''}`}
+                maxHeight={480}
+              />
             )}
 
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -636,12 +615,12 @@ function ContractManageInner() {
             </div>
 
             {viewModal.signature_data && (
-              <div>
-                <p className="text-xs text-[var(--text-3)] mb-1.5">서명</p>
-                <div className="border border-[var(--border-1)] rounded-[var(--r-md)] overflow-hidden bg-white">
-                  <img src={viewModal.signature_data} alt="서명" className="w-full object-contain max-h-48" />
-                </div>
-              </div>
+              <FilePreview
+                label="서명"
+                data={viewModal.signature_data}
+                filenamePrefix={`서명_${viewModal.employee_name || ''}`}
+                maxHeight={192}
+              />
             )}
 
             <div className="border border-[var(--border-1)] rounded-[var(--r-md)] overflow-hidden">

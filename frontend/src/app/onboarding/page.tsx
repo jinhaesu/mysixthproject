@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
+import { FilePreview } from "@/components/FilePreview";
 import {
   PageHeader,
   Card,
@@ -159,23 +160,26 @@ function FileUploadCell({
   fieldKey,
   value,
   onChange,
+  personName,
 }: {
   label: string;
   fieldKey: string;
   value: string | null | undefined;
   onChange: (key: string, val: string) => void;
+  personName?: string;
 }) {
+  const filenamePrefix = personName ? `${label}_${personName}` : label;
   return (
     <div className="space-y-2">
       <p className="text-[var(--fs-caption)] font-medium text-[var(--text-2)]">{label}</p>
       {value ? (
-        <div className="space-y-1">
-          <img src={value} alt={label} style={{ maxHeight: 200 }} className="rounded-[var(--r-md)] border border-[var(--border-1)]" />
+        <>
+          <FilePreview label={label} data={value} filenamePrefix={filenamePrefix} maxHeight={200} />
           <label className="inline-block cursor-pointer">
-            <span className="text-[var(--fs-caption)] text-[var(--brand-400)] underline">교체</span>
+            <span className="text-[var(--fs-caption)] text-[var(--brand-400)] underline">파일 교체</span>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf"
               className="hidden"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
@@ -185,17 +189,17 @@ function FileUploadCell({
               }}
             />
           </label>
-        </div>
+        </>
       ) : (
         <label
           className="flex flex-col items-center justify-center gap-2 p-4 rounded-[var(--r-lg)] border-2 border-dashed border-[var(--border-2)] bg-grid cursor-pointer hover:border-[var(--brand-400)] transition-colors"
           style={{ minHeight: 80 }}
         >
           <FileText className="w-5 h-5 text-[var(--text-4)]" />
-          <span className="text-[var(--fs-caption)] text-[var(--text-4)]">파일 첨부 (클릭 또는 드래그)</span>
+          <span className="text-[var(--fs-caption)] text-[var(--text-4)]">파일 첨부 (이미지 또는 PDF)</span>
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             className="hidden"
             onChange={async (e) => {
               const file = e.target.files?.[0];
@@ -582,6 +586,7 @@ function DetailModal({
                 fieldKey="bank_slip_data"
                 value={form.bank_slip_data}
                 onChange={set}
+                personName={detail?.name}
               />
               {/* 한국인만: 주민등록등본/가족관계증명서. 외국인은 발급 불가 → 숨김 */}
               {form.nationality !== "FOREIGN" && (
@@ -591,12 +596,14 @@ function DetailModal({
                     fieldKey="resident_register_data"
                     value={form.resident_register_data}
                     onChange={set}
+                    personName={detail?.name}
                   />
                   <FileUploadCell
                     label="가족관계증명서"
                     fieldKey="family_register_data"
                     value={form.family_register_data}
                     onChange={set}
+                    personName={detail?.name}
                   />
                 </>
               )}
@@ -606,6 +613,7 @@ function DetailModal({
                   fieldKey="foreign_id_card_data"
                   value={form.foreign_id_card_data}
                   onChange={set}
+                  personName={detail?.name}
                 />
               )}
               <Field label="서명 계약서 URL">

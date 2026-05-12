@@ -188,7 +188,7 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
     const contract = await dbGet(`
       SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.worker_name as name,
              rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
-             rlc.sms_sent, rlc.created_at, rlc.updated_at, rlc.work_start_date,
+             rlc.sms_sent, rlc.created_at, rlc.created_at as updated_at, rlc.work_start_date,
              rlc.position_title, rlc.annual_salary, rlc.base_pay, rlc.meal_allowance,
              rlc.other_allowance, rlc.pay_day, rlc.work_hours, rlc.work_place,
              rlc.department as contract_department, rlc.email, rlc.nationality,

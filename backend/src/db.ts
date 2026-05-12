@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.21.2';
+  const SCHEMA_VERSION = 'schema-v2.24.1';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -948,6 +948,9 @@ export async function initializeDB(): Promise<void> {
 
   // workers — 개별 시급 (알바·파견 정산용)
   try { await pool.query('ALTER TABLE workers ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0'); } catch {}
+
+  // regular_labor_contracts.updated_at — 보기 SELECT 에 필요. 미존재 시 추가.
+  try { await pool.query('ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()'); } catch {}
 
   // 성능 보강 인덱스 — workers 페이지 LATERAL join 속도 개선
   try { await pool.query('CREATE INDEX IF NOT EXISTS idx_labor_contracts_phone_end ON labor_contracts(phone, contract_end DESC)'); } catch {}

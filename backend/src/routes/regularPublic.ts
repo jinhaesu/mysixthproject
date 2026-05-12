@@ -183,6 +183,8 @@ router.post('/:emp_token/get-or-create-contract', async (_req: Request, res: Res
 router.get('/contract/:token', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
+    // LEFT JOIN — 직원이 hard-delete 되거나 employee_id 가 0/null 이어도 계약서 자체는 조회 가능.
+    // 이전 INNER JOIN 은 직원 삭제 시 not found 로 처리되어 '보기' 실패.
     const contract = await dbGet(`
       SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.name,
              rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
@@ -193,9 +195,11 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
              rlc.visa_type, rlc.visa_expiry,
              COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(rlc.legacy_filename, '') as legacy_filename,
-             re.department, re.team, re.role
+             COALESCE(re.department, '') as department,
+             COALESCE(re.team, '') as team,
+             COALESCE(re.role, '') as role
       FROM regular_labor_contracts rlc
-      JOIN regular_employees re ON rlc.employee_id = re.id
+      LEFT JOIN regular_employees re ON rlc.employee_id = re.id
       WHERE rlc.token = ?
     `, token) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }

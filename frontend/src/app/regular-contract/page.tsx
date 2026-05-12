@@ -489,7 +489,14 @@ function RegularContractContent() {
   useEffect(() => {
     if (!token) { setError("유효하지 않은 링크입니다."); setLoading(false); return; }
     fetch(`${API_URL}/api/regular-public/contract/${token}`)
-      .then(r => { if (!r.ok) throw new Error("계약서를 찾을 수 없습니다."); return r.json(); })
+      .then(async r => {
+        if (!r.ok) {
+          // 백엔드의 실제 에러 메시지 노출 (이전: 일괄 '계약서를 찾을 수 없습니다.' 덮어쓰기)
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || `계약서를 찾을 수 없습니다. (HTTP ${r.status})`);
+        }
+        return r.json();
+      })
       .then(d => setContract(d))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

@@ -153,6 +153,8 @@ router.put('/employees/:id', async (req: AuthRequest, res: Response) => {
     if (body.hire_date !== undefined)     { clauses.push('hire_date = ?');     params.push(body.hire_date || ''); }
     if (body.bank_name !== undefined)     { clauses.push('bank_name = ?');     params.push(body.bank_name || ''); }
     if (body.bank_account !== undefined)  { clauses.push('bank_account = ?');  params.push(body.bank_account || ''); }
+    if (body.id_number !== undefined)     { clauses.push('id_number = ?');     params.push(body.id_number || ''); }
+    if (body.birth_date !== undefined)    { clauses.push('birth_date = ?');    params.push(body.birth_date || ''); }
 
     if (clauses.length === 0) {
       const cur = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ?`, id);

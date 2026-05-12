@@ -29,6 +29,11 @@ import {
   UserMinus,
 } from "lucide-react";
 import { Card, Badge, Button, Input, Select, Field, EmptyState, PageHeader, SkeletonCard, useToast, Modal, Textarea } from "@/components/ui";
+import {
+  formatResidentNumber, validateResidentNumber,
+  formatBankAccount, validateBankAccount,
+  BANKS,
+} from "@/lib/koreanValidation";
 
 const REASON_CODES_OB = [
   { code: "11", label: "11 - 개인사정으로 인한 자진퇴사", hint: "실업급여 X" },
@@ -78,6 +83,7 @@ const emptyForm = {
   workplace_id: null as number | null,
   bank_name: "",
   bank_account: "",
+  id_number: "",
 };
 
 // ── Helpers for resigned section ──────────────────────────────────
@@ -325,6 +331,7 @@ export default function RegularWorkersPage() {
       workplace_id: emp.workplace_id,
       bank_name: emp.bank_name || "",
       bank_account: emp.bank_account || "",
+      id_number: emp.id_number || "",
     });
     setShowModal(true);
     loadAttendanceHistory(emp.name, historyMonth);
@@ -334,6 +341,15 @@ export default function RegularWorkersPage() {
     if (!form.name.trim() || !form.phone.trim()) {
       toast.info("이름과 전화번호는 필수입니다.");
       return;
+    }
+    // 입력한 경우에만 양식 검증 (빈 값은 OK).
+    if (form.id_number) {
+      const r = validateResidentNumber(form.id_number);
+      if (!r.valid) { toast.error(`주민등록번호: ${r.error}`); return; }
+    }
+    if (form.bank_account) {
+      const r = validateBankAccount(form.bank_account, form.bank_name);
+      if (!r.valid) { toast.error(`계좌번호: ${r.error}`); return; }
     }
     setSaving(true);
     try {
@@ -840,12 +856,39 @@ export default function RegularWorkersPage() {
               </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="은행">
-                  <Input type="text" value={form.bank_name} onChange={(e) => updateForm("bank_name", e.target.value)} placeholder="국민은행" />
+                  <Select value={form.bank_name} onChange={(e) => updateForm("bank_name", e.target.value)}>
+                    <option value="">선택</option>
+                    {BANKS.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
+                  </Select>
                 </Field>
-                <Field label="계좌번호">
-                  <Input type="text" value={form.bank_account} onChange={(e) => updateForm("bank_account", e.target.value)} placeholder="000-00-000000" />
+                <Field label="계좌번호" hint={(() => {
+                  if (!form.bank_account) return undefined;
+                  const r = validateBankAccount(form.bank_account, form.bank_name);
+                  return r.valid ? '✓ 유효' : r.error;
+                })()}>
+                  <Input
+                    type="text"
+                    value={form.bank_account}
+                    onChange={(e) => updateForm("bank_account", formatBankAccount(e.target.value))}
+                    placeholder="숫자와 하이픈만"
+                    inputMode="numeric"
+                  />
                 </Field>
               </div>
+              <Field label="주민등록번호" hint={(() => {
+                if (!form.id_number) return undefined;
+                const r = validateResidentNumber(form.id_number);
+                return r.valid ? '✓ 유효' : r.error;
+              })()}>
+                <Input
+                  type="text"
+                  value={form.id_number}
+                  onChange={(e) => updateForm("id_number", formatResidentNumber(e.target.value))}
+                  placeholder="000000-0000000"
+                  inputMode="numeric"
+                  maxLength={14}
+                />
+              </Field>
             </div>
 
             {/* Attendance History */}

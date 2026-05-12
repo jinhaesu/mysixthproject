@@ -107,10 +107,41 @@ function labelFields(fields: string[]): string {
 
 type OnboardingTab = "pending" | "ready" | "completed" | "all" | "settings";
 
+// 이미지 경량화: 긴 변을 1600px 로 리사이즈 + JPEG 80% 압축.
+// 핸드폰 사진(3~6MB)이 ~300~500KB Base64 가 되어 조회 빠름.
+// PDF/문서 파일은 원본 그대로 (이미지가 아닐 때).
 async function fileToBase64(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
   return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1600;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          const ratio = Math.min(MAX / width, MAX / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(String(r.result)); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => resolve(String(r.result));
+      img.src = String(r.result);
+    };
     r.onerror = reject;
     r.readAsDataURL(file);
   });
@@ -507,7 +538,17 @@ function DetailModal({
           {/* 급여 */}
           <Section title="급여">
             <div className="grid grid-cols-1 gap-3">
-              <Field label="월 급여">
+              <Field
+                label="월 급여"
+                hint={(() => {
+                  const basePay = Number(detail?.salary_settings_base_pay || 0);
+                  const total = Number(detail?.salary_settings_total || 0);
+                  if (basePay > 0) {
+                    return `기본급 관리 자동 매칭: 기본급 ${basePay.toLocaleString('ko-KR')}원 + 합산 ${total.toLocaleString('ko-KR')}원`;
+                  }
+                  return "기본급 관리에 등록되지 않음 — 직접 입력하거나 급여관리 메뉴에서 설정";
+                })()}
+              >
                 <Input inputSize="sm" type="number" value={form.monthly_salary} onChange={(e) => set("monthly_salary", e.target.value)} placeholder="0" />
               </Field>
               <Field label="비과세 식대">
@@ -542,18 +583,23 @@ function DetailModal({
                 value={form.bank_slip_data}
                 onChange={set}
               />
-              <FileUploadCell
-                label="주민등록등본"
-                fieldKey="resident_register_data"
-                value={form.resident_register_data}
-                onChange={set}
-              />
-              <FileUploadCell
-                label="가족관계증명서"
-                fieldKey="family_register_data"
-                value={form.family_register_data}
-                onChange={set}
-              />
+              {/* 한국인만: 주민등록등본/가족관계증명서. 외국인은 발급 불가 → 숨김 */}
+              {form.nationality !== "FOREIGN" && (
+                <>
+                  <FileUploadCell
+                    label="주민등록등본"
+                    fieldKey="resident_register_data"
+                    value={form.resident_register_data}
+                    onChange={set}
+                  />
+                  <FileUploadCell
+                    label="가족관계증명서"
+                    fieldKey="family_register_data"
+                    value={form.family_register_data}
+                    onChange={set}
+                  />
+                </>
+              )}
               {form.nationality === "FOREIGN" && (
                 <FileUploadCell
                   label="외국인등록증"

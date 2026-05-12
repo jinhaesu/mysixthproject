@@ -515,8 +515,7 @@ router.get('/export/insurance.csv', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    // detail 화면용 — blob 컬럼 포함 (입사 정보 확인 화면에서 문서 표시).
-    // 1행만 가져오므로 LIST 처럼 누적되지 않지만, 5MB+ 전송으로 사용자에게 1~3초 지연됨.
+    // detail — blob 포함 (1행이므로 안전). list 와 달리 admin 첨부 확인용.
     const emp = await dbGet('SELECT * FROM regular_employees WHERE id = ?', id);
     if (!emp) {
       res.status(404).json({ error: '직원을 찾을 수 없습니다.' });
@@ -532,8 +531,35 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       id,
     );
 
+    // 급여 자동 매칭 — regular_salary_settings 의 base_pay 가 입사자의 monthly_salary 로 fallback.
+    // monthly_salary 가 비어있고 salary_settings 에 base_pay 있으면 그 값 노출 (display only).
+    const salaryRow = await dbGet(
+      'SELECT base_pay, meal_allowance, position_allowance, other_allowance, bonus FROM regular_salary_settings WHERE employee_id = ?',
+      id,
+    ) as any;
+    const basePay = salaryRow ? Number(salaryRow.base_pay || 0) : 0;
+    const mealAllowance = salaryRow ? Number(salaryRow.meal_allowance || 0) : 0;
+    const otherAllowance = salaryRow ? Number(salaryRow.other_allowance || 0) : 0;
+    const positionAllowance = salaryRow ? Number(salaryRow.position_allowance || 0) : 0;
+    const computedSalary = basePay + mealAllowance + otherAllowance + positionAllowance;
+
     const enriched = await enrichEmployee(emp);
-    res.json({ ...enriched, latest_contract: latestContract || null });
+
+    // enrichEmployee 가 blob 을 strip 함. detail 응답엔 blob 다시 포함.
+    res.json({
+      ...enriched,
+      // monthly_salary 가 0/빈 값이면 salary_settings 의 합산으로 자동 표시.
+      monthly_salary: Number(emp.monthly_salary || 0) > 0 ? emp.monthly_salary : (computedSalary > 0 ? computedSalary : ''),
+      salary_settings_base_pay: basePay,
+      salary_settings_total: computedSalary,
+      // blob 필드를 그대로 노출 (admin 이 첨부 확인용)
+      bank_slip_data: emp.bank_slip_data || '',
+      foreign_id_card_data: emp.foreign_id_card_data || '',
+      family_register_data: emp.family_register_data || '',
+      resident_register_data: emp.resident_register_data || '',
+      signed_contract_url: emp.signed_contract_url || '',
+      latest_contract: latestContract || null,
+    });
   } catch (error: any) {
     console.error('GET /api/onboarding/:id error:', error);
     res.status(500).json({ error: error.message });

@@ -27,14 +27,42 @@ const FIELD_LABELS: Record<string, string> = {
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;  // 8MB — Base64 변환 시 +33%, 서버 limit 20MB 안에 여유
 
+// 이미지면 자동 리사이즈(1600px) + JPEG 80% — Base64 크기 1/5~1/10 로 감소.
 function fileToBase64(file: File): Promise<string> {
+  if (file.size > MAX_FILE_BYTES && !file.type.startsWith('image/')) {
+    return Promise.reject(new Error(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 8MB 이하로 압축해주세요.`));
+  }
+  if (!file.type.startsWith('image/')) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+  }
   return new Promise((res, rej) => {
-    if (file.size > MAX_FILE_BYTES) {
-      rej(new Error(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 8MB 이하로 압축해주세요.`));
-      return;
-    }
     const r = new FileReader();
-    r.onload = () => res(String(r.result));
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1600;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          const ratio = Math.min(MAX / width, MAX / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { res(String(r.result)); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        res(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => res(String(r.result));
+      img.src = String(r.result);
+    };
     r.onerror = rej;
     r.readAsDataURL(file);
   });

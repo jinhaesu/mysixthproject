@@ -185,19 +185,29 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
     const { token } = req.params;
     // LEFT JOIN — 직원이 hard-delete 되거나 employee_id 가 0/null 이어도 계약서 자체는 조회 가능.
     // 이전 INNER JOIN 은 직원 삭제 시 not found 로 처리되어 '보기' 실패.
+    // detail 조회 — 서명/통장사본/외국인등록증 등 BLOB 포함 (1행이므로 안전).
+    // worker_name 은 frontend 가 contract.worker_name 으로 사용하므로 그대로 유지 + name alias 둘 다 노출.
     const contract = await dbGet(`
-      SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.worker_name as name,
+      SELECT rlc.id, rlc.employee_id, rlc.phone,
+             rlc.worker_name, rlc.worker_name as name,
              rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
              rlc.sms_sent, rlc.created_at, rlc.created_at as updated_at, rlc.work_start_date,
              rlc.position_title, rlc.annual_salary, rlc.base_pay, rlc.meal_allowance,
              rlc.other_allowance, rlc.pay_day, rlc.work_hours, rlc.work_place,
              rlc.department as contract_department, rlc.email, rlc.nationality,
              rlc.visa_type, rlc.visa_expiry,
+             rlc.address, rlc.birth_date, rlc.id_number,
+             rlc.signature_data, rlc.consent_signature_data, rlc.consent_signed,
+             COALESCE(rlc.bank_slip_data, '') as bank_slip_data,
+             COALESCE(rlc.foreign_id_card_data, '') as foreign_id_card_data,
              COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(rlc.legacy_filename, '') as legacy_filename,
+             COALESCE(rlc.scanned_file_data, '') as scanned_file_data,
              COALESCE(re.department, '') as department,
              COALESCE(re.team, '') as team,
-             COALESCE(re.role, '') as role
+             COALESCE(re.role, '') as role,
+             COALESCE(re.bank_name, '') as bank_name,
+             COALESCE(re.bank_account, '') as bank_account
       FROM regular_labor_contracts rlc
       LEFT JOIN regular_employees re ON rlc.employee_id = re.id
       WHERE rlc.token = ?

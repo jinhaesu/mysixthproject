@@ -1116,7 +1116,7 @@ router.get('/contracts', async (_req: AuthRequest, res: Response) => {
     // foreign_id_card_data 등 Base64 blob). list 에서는 has_* boolean 만 노출하고
     // 실제 데이터는 detail 엔드포인트(/contracts/:id)에서 조회.
     const contracts = await dbAll(`
-      SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.name,
+      SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.worker_name as name,
              rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
              rlc.sms_sent, rlc.created_at, rlc.updated_at, rlc.work_start_date,
              rlc.position_title, rlc.annual_salary, rlc.base_pay, rlc.meal_allowance,
@@ -1125,9 +1125,10 @@ router.get('/contracts', async (_req: AuthRequest, res: Response) => {
              rlc.visa_type, rlc.visa_expiry,
              COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(rlc.legacy_filename, '') as legacy_filename,
-             re.department, re.team
+             COALESCE(re.department, '') as department,
+             COALESCE(re.team, '') as team
       FROM regular_labor_contracts rlc
-      JOIN regular_employees re ON rlc.employee_id = re.id
+      LEFT JOIN regular_employees re ON rlc.employee_id = re.id
       ORDER BY rlc.created_at DESC
     `);
     res.json(contracts);

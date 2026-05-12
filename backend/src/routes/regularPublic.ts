@@ -186,7 +186,7 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
     // LEFT JOIN — 직원이 hard-delete 되거나 employee_id 가 0/null 이어도 계약서 자체는 조회 가능.
     // 이전 INNER JOIN 은 직원 삭제 시 not found 로 처리되어 '보기' 실패.
     const contract = await dbGet(`
-      SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.name,
+      SELECT rlc.id, rlc.employee_id, rlc.phone, rlc.worker_name as name,
              rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
              rlc.sms_sent, rlc.created_at, rlc.updated_at, rlc.work_start_date,
              rlc.position_title, rlc.annual_salary, rlc.base_pay, rlc.meal_allowance,

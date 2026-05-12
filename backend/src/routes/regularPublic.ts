@@ -198,8 +198,9 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
              rlc.visa_type, rlc.visa_expiry,
              rlc.address, rlc.birth_date, rlc.id_number,
              rlc.signature_data, rlc.consent_signature_data, rlc.consent_signed,
-             COALESCE(rlc.bank_slip_data, '') as bank_slip_data,
-             COALESCE(rlc.foreign_id_card_data, '') as foreign_id_card_data,
+             -- 계약서에 첨부 안 됐어도 직원 마스터(regular_employees)에 있으면 fallback
+             COALESCE(NULLIF(rlc.bank_slip_data, ''), re.bank_slip_data, '') as bank_slip_data,
+             COALESCE(NULLIF(rlc.foreign_id_card_data, ''), re.foreign_id_card_data, '') as foreign_id_card_data,
              COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(rlc.legacy_filename, '') as legacy_filename,
              COALESCE(rlc.scanned_file_data, '') as scanned_file_data,

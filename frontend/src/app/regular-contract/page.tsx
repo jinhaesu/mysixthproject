@@ -638,6 +638,47 @@ function RegularContractContent() {
                 </div>
               </div>
 
+              {/* 첨부 서류 — 통장사본 / 외국인등록증 */}
+              {(contract.bank_slip_data || contract.foreign_id_card_data) && (
+                <div className="border-t border-[var(--border-1)] pt-4 space-y-3">
+                  <p className="font-bold text-[var(--text-2)] text-[var(--fs-body)]">첨부 서류</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {contract.bank_slip_data && (
+                      <div className="bg-[var(--bg-0)] rounded-[var(--r-md)] p-3 border border-[var(--border-2)]">
+                        <p className="text-[var(--fs-caption)] text-[var(--text-3)] mb-2">통장사본</p>
+                        {contract.bank_slip_data.startsWith('data:image') ? (
+                          <a href={contract.bank_slip_data} target="_blank" rel="noopener noreferrer">
+                            <img src={contract.bank_slip_data} alt="통장사본"
+                                 className="max-h-48 w-full object-contain rounded border bg-white" />
+                          </a>
+                        ) : (
+                          <a href={contract.bank_slip_data} target="_blank" rel="noopener noreferrer"
+                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-[var(--brand-400)] underline">
+                            파일 열기 (PDF)
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {contract.foreign_id_card_data && (
+                      <div className="bg-[var(--bg-0)] rounded-[var(--r-md)] p-3 border border-[var(--border-2)]">
+                        <p className="text-[var(--fs-caption)] text-[var(--text-3)] mb-2">외국인등록증</p>
+                        {contract.foreign_id_card_data.startsWith('data:image') ? (
+                          <a href={contract.foreign_id_card_data} target="_blank" rel="noopener noreferrer">
+                            <img src={contract.foreign_id_card_data} alt="외국인등록증"
+                                 className="max-h-48 w-full object-contain rounded border bg-white" />
+                          </a>
+                        ) : (
+                          <a href={contract.foreign_id_card_data} target="_blank" rel="noopener noreferrer"
+                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-[var(--brand-400)] underline">
+                            파일 열기 (PDF)
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <p className="text-center text-[var(--fs-caption)] text-[var(--text-4)] pt-2">
                 본 계약서는 전자적으로 작성되었으며 법적 효력을 가집니다.
               </p>

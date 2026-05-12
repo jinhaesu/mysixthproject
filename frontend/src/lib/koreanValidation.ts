@@ -45,19 +45,14 @@ export function validateResidentNumber(input: string): { valid: boolean; error?:
   if (mm < 1 || mm > 12) return { valid: false, error: '월 부분이 잘못되었습니다.' };
   if (dd < 1 || dd > 31) return { valid: false, error: '일 부분이 잘못되었습니다.' };
 
-  // 뒤 첫자리: 성별 코드 (1-4 내국인, 5-8 외국인, 9-0 1900년대 이전)
+  // 7번째: 성별 코드 — 1~8 모두 허용 (내국인 1-4, 외국인 5-8)
+  // 9, 0 은 1800년대 출생 (실무상 거의 없음) 도 일단 허용.
   const sex = parseInt(d.charAt(6));
   if (sex < 0 || sex > 9) return { valid: false, error: '성별 코드가 잘못되었습니다.' };
 
-  // 체크섬 검증
-  const weights = [2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5];
-  let sum = 0;
-  for (let i = 0; i < 12; i++) sum += parseInt(d.charAt(i)) * weights[i];
-  let check = 11 - (sum % 11);
-  if (check >= 10) check -= 10;
-  if (check !== parseInt(d.charAt(12))) {
-    return { valid: false, error: '주민등록번호 체크 자리가 일치하지 않습니다.' };
-  }
+  // 체크자리 검증 제거 — 2020-10 이후 정부가 위변조 방지 위해 체크자리 랜덤화.
+  // 신규 발급 주민번호는 옛 공식으로 계산해도 일치 안 함. 외국인등록번호도 동일.
+  // 형식(13자리)+생년월일+성별코드 까지만 검사하고 통과.
 
   return { valid: true };
 }

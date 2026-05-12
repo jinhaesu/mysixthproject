@@ -3,7 +3,12 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, AlertCircle } from "lucide-react";
-import { Card, Button, Field, Input, SegmentedControl } from "@/components/ui";
+import { Card, Button, Field, Input, Select, SegmentedControl } from "@/components/ui";
+import {
+  formatResidentNumber, validateResidentNumber,
+  formatBankAccount, validateBankAccount,
+  BANKS,
+} from "@/lib/koreanValidation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -76,6 +81,17 @@ function Inner() {
   }, [token]);
 
   const submit = async () => {
+    // 한국인이면 주민번호 검증 (외국인이면 외국인등록번호라 별도 검증).
+    if (nationality === "KR" && idNumber) {
+      const r = validateResidentNumber(idNumber);
+      if (!r.valid) { setError(`주민등록번호: ${r.error}`); return; }
+    }
+    // 계좌번호 — 은행과 함께 자리수 검증.
+    if (bankAccount) {
+      const r = validateBankAccount(bankAccount, bankName);
+      if (!r.valid) { setError(`계좌번호: ${r.error}`); return; }
+    }
+
     setSubmitting(true); setError("");
     try {
       const body: any = { nationality };
@@ -155,8 +171,18 @@ function Inner() {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="주민등록번호">
-                <Input value={idNumber} onChange={e => setIdNumber(e.target.value)} placeholder="000000-0000000" />
+              <Field label="주민등록번호" hint={(() => {
+                if (!idNumber) return undefined;
+                const r = validateResidentNumber(idNumber);
+                return r.valid ? '✓ 유효' : r.error;
+              })()}>
+                <Input
+                  value={idNumber}
+                  onChange={e => setIdNumber(formatResidentNumber(e.target.value))}
+                  placeholder="000000-0000000"
+                  inputMode="numeric"
+                  maxLength={14}
+                />
               </Field>
               <Field label="생년월일">
                 <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
@@ -165,10 +191,24 @@ function Inner() {
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="은행명">
-                <Input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="국민/신한/카카오 등" />
+                <Select value={bankName} onChange={e => setBankName(e.target.value)}>
+                  <option value="">선택</option>
+                  {BANKS.map(b => (
+                    <option key={b.code} value={b.name}>{b.name}</option>
+                  ))}
+                </Select>
               </Field>
-              <Field label="계좌번호">
-                <Input value={bankAccount} onChange={e => setBankAccount(e.target.value)} />
+              <Field label="계좌번호" hint={(() => {
+                if (!bankAccount) return undefined;
+                const r = validateBankAccount(bankAccount, bankName);
+                return r.valid ? '✓ 유효' : r.error;
+              })()}>
+                <Input
+                  value={bankAccount}
+                  onChange={e => setBankAccount(formatBankAccount(e.target.value))}
+                  placeholder="숫자와 하이픈만"
+                  inputMode="numeric"
+                />
               </Field>
             </div>
 

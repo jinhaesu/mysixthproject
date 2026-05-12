@@ -4,6 +4,11 @@ import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { fetchSurveyPublic, submitClockIn, submitClockOut } from "@/lib/api";
 import { t } from "@/lib/translations";
+import {
+  formatResidentNumber, validateResidentNumber,
+  formatBankAccount, validateBankAccount,
+  formatPhone, validatePhone,
+} from "@/lib/koreanValidation";
 import type { SurveyPublicData } from "@/types/survey";
 import {
   MapPin,
@@ -278,6 +283,13 @@ function SurveyContent() {
       alert(t(lang, 'allFieldsRequired'));
       return;
     }
+    // 양식 검증 — 주민번호/계좌/비상연락처
+    const rId = validateResidentNumber(idNumber);
+    if (!rId.valid) { alert(`주민등록번호: ${rId.error}`); return; }
+    const rAcc = validateBankAccount(bankAccount, bankName);
+    if (!rAcc.valid) { alert(`계좌번호: ${rAcc.error}`); return; }
+    const rEmerg = validatePhone(emergencyContact);
+    if (!rEmerg.valid) { alert(`비상연락처: ${rEmerg.error}`); return; }
     setSubmitting(true);
     try {
       await submitClockIn(token, {
@@ -756,11 +768,19 @@ function SurveyContent() {
               <input
                 type="text"
                 value={bankAccount}
-                onChange={(e) => setBankAccount(e.target.value)}
+                onChange={(e) => setBankAccount(formatBankAccount(e.target.value))}
                 placeholder={t(lang, 'bankAccountPlaceholder')}
                 className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)] tabular"
                 inputMode="numeric"
               />
+              {bankAccount && (() => {
+                const r = validateBankAccount(bankAccount, bankName);
+                return (
+                  <p className={`mt-1 text-[11px] ${r.valid ? 'text-[var(--success-fg)]' : 'text-[var(--danger-fg)]'}`}>
+                    {r.valid ? '✓ 유효' : r.error}
+                  </p>
+                );
+              })()}
             </div>
 
             {/* ID Number */}
@@ -771,11 +791,20 @@ function SurveyContent() {
               <input
                 type="password"
                 value={idNumber}
-                onChange={(e) => setIdNumber(e.target.value)}
+                onChange={(e) => setIdNumber(formatResidentNumber(e.target.value))}
                 placeholder={t(lang, 'idNumberPlaceholder')}
                 className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)]"
                 inputMode="numeric"
+                maxLength={14}
               />
+              {idNumber && (() => {
+                const r = validateResidentNumber(idNumber);
+                return (
+                  <p className={`mt-1 text-[11px] ${r.valid ? 'text-[var(--success-fg)]' : 'text-[var(--danger-fg)]'}`}>
+                    {r.valid ? '✓ 유효' : r.error}
+                  </p>
+                );
+              })()}
             </div>
 
             {/* Emergency Contact */}
@@ -786,8 +815,9 @@ function SurveyContent() {
               <input
                 type="tel"
                 value={emergencyContact}
-                onChange={(e) => setEmergencyContact(e.target.value)}
+                onChange={(e) => setEmergencyContact(formatPhone(e.target.value))}
                 placeholder="010-0000-0000"
+                maxLength={13}
                 className="w-full px-3 py-2.5 bg-[var(--bg-2)] border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:border-[var(--brand-500)] tabular"
               />
             </div>

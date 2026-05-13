@@ -666,6 +666,47 @@ const PATCHABLE_FIELDS = new Set([
   'retirement_income_tax',
 ]);
 
+// NUMERIC 컬럼 — '' 가 들어오면 PostgreSQL invalid input 에러로 UPDATE 전체 실패.
+// 메모만 수정해도 다른 필드가 같이 전송되므로 한 필드만 빈 문자열이어도 전체 저장 실패.
+const NUMERIC_FIELDS = new Set([
+  'severance_final',
+  'annual_leave_remaining',
+  'annual_leave_pay_final',
+  'retirement_income_tax',
+]);
+
+const INTEGER_FIELDS = new Set([
+  'resignation_letter_received',
+  'assets_returned',
+  'pension_reported',
+  'health_insurance_reported',
+  'employment_insurance_reported',
+  'industrial_accident_reported',
+  'severance_paid',
+  'annual_leave_settled',
+  'income_tax_reported',
+]);
+
+function coerceFieldValue(key: string, val: any): any {
+  if (NUMERIC_FIELDS.has(key)) {
+    if (val === '' || val === null || val === undefined) return null;
+    if (typeof val === 'string') {
+      const n = Number(val);
+      return Number.isFinite(n) ? n : null;
+    }
+    return Number.isFinite(val) ? val : null;
+  }
+  if (INTEGER_FIELDS.has(key)) {
+    if (val === '' || val === null || val === undefined) return 0;
+    if (typeof val === 'boolean') return val ? 1 : 0;
+    const n = typeof val === 'string' ? Number(val) : val;
+    return Number.isFinite(n) ? (n ? 1 : 0) : 0;
+  }
+  // TEXT 컬럼: null/undefined 는 빈 문자열로 (DB DEFAULT '')
+  if (val === null || val === undefined) return '';
+  return val;
+}
+
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id as string, 10);
@@ -681,7 +722,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     for (const [key, val] of Object.entries(req.body)) {
       if (PATCHABLE_FIELDS.has(key)) {
         setClauses.push(`${key} = ?`);
-        params.push(val);
+        params.push(coerceFieldValue(key, val));
       }
     }
 

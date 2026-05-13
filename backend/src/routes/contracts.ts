@@ -8,6 +8,25 @@ import { Router, Response } from 'express';
 import crypto from 'crypto';
 import { dbGet, dbAll, dbRun, normalizePhone } from '../db';
 import { AuthRequest } from '../middleware/auth';
+import { uploadBase64, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
+
+/**
+ * legacy 스캔 파일 base64 → Storage 분기.
+ * @param table 'regular_labor_contracts' | 'labor_contracts'
+ * @param refKey row 식별 키 (insert 전이므로 placeholder)
+ */
+async function ingestScannedFile(scope: string, refId: number | string, base64: string): Promise<{ data: string; path: string }> {
+  if (isStorageEnabled() && shouldUseStorage(base64)) {
+    try {
+      const { path } = await uploadBase64(`${scope}/${refId}/scanned`, base64);
+      return { data: '', path };
+    } catch (e: any) {
+      console.error(`[Storage] scan upload failed (${scope}/${refId}):`, e.message);
+      return { data: base64, path: '' };
+    }
+  }
+  return { data: base64, path: '' };
+}
 
 const router = Router();
 
@@ -391,12 +410,19 @@ router.post('/upload-legacy', async (req: AuthRequest, res: Response) => {
 
       const token = crypto.randomBytes(16).toString('hex');
 
-      const result = await dbRun(
+      // INSERT 없이 row id 부터 확보 → Storage path 결정 후 INSERT.
+      // sequence advance 로 id 만 받기:
+      const idRow = await dbGet("SELECT nextval(pg_get_serial_sequence('regular_labor_contracts', 'id')) AS id") as any;
+      const newId = Number(idRow.id);
+      const blob = await ingestScannedFile('contracts', newId, file_data);
+
+      await dbRun(
         `INSERT INTO regular_labor_contracts (
-          employee_id, phone, worker_name, contract_start, contract_end,
+          id, employee_id, phone, worker_name, contract_start, contract_end,
           address, signature_data, token, status, sms_sent,
-          work_start_date, is_legacy_scan, legacy_filename, scanned_file_data
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          work_start_date, is_legacy_scan, legacy_filename, scanned_file_data, scanned_file_path
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        newId,
         empId,
         employee.phone,
         employee.name,
@@ -410,14 +436,15 @@ router.post('/upload-legacy', async (req: AuthRequest, res: Response) => {
         wStart,
         1,
         filename,
-        file_data,
+        blob.data,
+        blob.path,
       );
 
-      res.json({ ok: true, contract_id: result.lastInsertRowid });
+      res.json({ ok: true, contract_id: newId });
       return;
     }
 
-    // dispatch
+    // dispatch / alba
     if (!phone) {
       res.status(400).json({ error: '파견·알바의 경우 phone이 필요합니다.' });
       return;
@@ -432,6 +459,7 @@ router.post('/upload-legacy', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // labor_contracts (알바·파견) 는 데이터량 적음 — 우선 base64 유지. 필요 시 별도 마이그레이션.
     const result = await dbRun(
       `INSERT INTO labor_contracts (
         phone, worker_name, worker_type, contract_start, contract_end,

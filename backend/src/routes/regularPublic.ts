@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, getBusinessDate, normalizePhone, getFrontendUrl } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
+import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
 
 const router = Router();
 
@@ -21,6 +22,59 @@ const EMP_COLS = `
 
 // In-memory OTP store: key = token, value = { code, phone, expiresAt }
 const otpStore = new Map<string, { code: string; phone: string; expiresAt: number }>();
+
+/**
+ * 첨부파일 업로드 처리 — base64 입력을 Storage 로 옮길지 base64 로 둘지 판단.
+ *
+ * @param scope 'employees' | 'contracts' — Storage 폴더 prefix
+ * @param refId DB row id
+ * @param field 'bank_slip' | 'foreign_id_card' | 'scanned_file' 등
+ * @param value 입력된 base64 data URL (또는 undefined)
+ * @returns { data, path } — UPDATE 절에 그대로 쓸 두 컬럼 값.
+ *          value 가 undefined 면 null/null 반환 (caller 가 skip 판단).
+ */
+async function ingestBlob(
+  scope: 'employees' | 'contracts' | 'offboardings',
+  refId: number,
+  field: string,
+  value: string | undefined,
+): Promise<{ data: string; path: string } | null> {
+  if (value === undefined) return null;
+  if (value === '') return { data: '', path: '' };   // 명시적 clear
+  // Storage 가 enabled 이고 첨부파일이 충분히 크면 → Storage 로
+  if (isStorageEnabled() && shouldUseStorage(value)) {
+    try {
+      const { path } = await uploadBase64(`${scope}/${refId}/${field}`, value);
+      return { data: '', path };
+    } catch (e: any) {
+      console.error(`[Storage] upload failed (${scope}/${refId}/${field}):`, e.message);
+      // fallback — base64 로 DB 에 저장 (legacy 동작 유지)
+      return { data: value, path: '' };
+    }
+  }
+  // Storage 미설정 또는 작은 파일 → DB 에 base64 유지
+  return { data: value, path: '' };
+}
+
+/**
+ * SELECT 결과의 *_path 컬럼이 있으면 signed URL 로 변환해서 *_data 자리에 대입.
+ * 프론트엔드는 *_data 필드 한 곳만 보면 됨 (URL or base64).
+ */
+async function expandBlobUrls<T extends Record<string, any>>(row: T, fields: { data: string; path: string }[]): Promise<T> {
+  if (!row) return row;
+  for (const { data, path } of fields) {
+    const p = row[path];
+    if (p && typeof p === 'string') {
+      try {
+        const url = await getSignedUrl(p);
+        if (url) (row as any)[data] = url;
+      } catch (e: any) {
+        console.error(`[Storage] signed URL failed (${p}):`, e.message);
+      }
+    }
+  }
+  return row;
+}
 
 // GET /api/regular-public/_health - Deploy/version verification (no auth)
 // Returns current server time, business date, calendar date to verify 07:00 boundary is active.
@@ -142,26 +196,39 @@ router.post('/:emp_token/onboarding-info', async (req: Request, res: Response) =
     const emp = await dbGet('SELECT id, name FROM regular_employees WHERE token = ? AND is_active = 1', emp_token) as any;
     if (!emp) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
 
-    const allowed = [
-      'email','address','id_number','birth_date','bank_name','bank_account','bank_slip_data',
-      'nationality','visa_type','visa_expiry','foreign_id_card_data',
+    const body = req.body || {};
+    // 일반 필드 (text)
+    const textFields = ['email','address','id_number','birth_date','bank_name','bank_account','nationality','visa_type','visa_expiry'];
+    // blob 필드 (Storage 분기)
+    const blobFields: { name: string; field: string }[] = [
+      { name: 'bank_slip_data',       field: 'bank_slip' },
+      { name: 'foreign_id_card_data', field: 'foreign_id_card' },
     ];
+
     const clauses: string[] = [];
     const params: any[] = [];
-    for (const f of allowed) {
-      const v = (req.body || {})[f];
+
+    for (const f of textFields) {
+      const v = body[f];
       if (v !== undefined && String(v).trim() !== '') {
         clauses.push(`${f} = ?`);
         params.push(v);
       }
     }
+    for (const { name, field } of blobFields) {
+      const v = body[name];
+      const result = await ingestBlob('employees', emp.id, field, v);
+      if (result) {
+        clauses.push(`${name} = ?`, `${field}_path = ?`);
+        params.push(result.data, result.path);
+      }
+    }
+
     if (clauses.length === 0) { res.status(400).json({ error: '입력된 정보가 없습니다.' }); return; }
     clauses.push('updated_at = NOW()');
     params.push(emp.id);
 
-    // 진단용 로그 — 큰 첨부 파일에서 오류 발생 시 dump 가능하도록
-    const totalSize = params.reduce((s, p) => s + (typeof p === 'string' ? p.length : 0), 0);
-    console.log(`[onboarding-info] ${emp.name} (#${emp.id}) — fields=${clauses.length - 1}, total bytes=${totalSize}`);
+    console.log(`[onboarding-info] ${emp.name} (#${emp.id}) — fields=${clauses.length - 1}`);
 
     await dbRun(`UPDATE regular_employees SET ${clauses.join(', ')} WHERE id = ?`, ...params);
     res.json({ success: true });
@@ -198,12 +265,15 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
              rlc.visa_type, rlc.visa_expiry,
              rlc.address, rlc.birth_date, rlc.id_number,
              rlc.signature_data, rlc.consent_signature_data, rlc.consent_signed,
-             -- 계약서에 첨부 안 됐어도 직원 마스터(regular_employees)에 있으면 fallback
+             -- 첨부파일: contract 우선, 없으면 employee 로 fallback. data + path 둘 다 가져옴.
              COALESCE(NULLIF(rlc.bank_slip_data, ''), re.bank_slip_data, '') as bank_slip_data,
+             COALESCE(NULLIF(rlc.bank_slip_path, ''), re.bank_slip_path, '') as bank_slip_path,
              COALESCE(NULLIF(rlc.foreign_id_card_data, ''), re.foreign_id_card_data, '') as foreign_id_card_data,
+             COALESCE(NULLIF(rlc.foreign_id_card_path, ''), re.foreign_id_card_path, '') as foreign_id_card_path,
              COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(rlc.legacy_filename, '') as legacy_filename,
              COALESCE(rlc.scanned_file_data, '') as scanned_file_data,
+             COALESCE(rlc.scanned_file_path, '') as scanned_file_path,
              COALESCE(re.department, '') as department,
              COALESCE(re.team, '') as team,
              COALESCE(re.role, '') as role,
@@ -214,6 +284,12 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
       WHERE rlc.token = ?
     `, token) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    // Storage path 가 있는 필드 → signed URL 로 *_data 자리에 덮어쓰기
+    await expandBlobUrls(contract, [
+      { data: 'bank_slip_data',       path: 'bank_slip_path' },
+      { data: 'foreign_id_card_data', path: 'foreign_id_card_path' },
+      { data: 'scanned_file_data',    path: 'scanned_file_path' },
+    ]);
     res.json(contract);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -233,7 +309,7 @@ router.post('/contract/:token/update-info', async (req: Request, res: Response) 
       bank_name, bank_account,
     } = req.body || {};
 
-    const contract = await dbGet('SELECT employee_id, phone FROM regular_labor_contracts WHERE token = ?', token) as any;
+    const contract = await dbGet('SELECT id, employee_id, phone FROM regular_labor_contracts WHERE token = ?', token) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
 
     // Build dynamic UPDATE for regular_labor_contracts (only non-empty fields)
@@ -249,8 +325,17 @@ router.post('/contract/:token/update-info', async (req: Request, res: Response) 
     setIf('nationality', nationality);
     setIf('visa_type', visa_type);
     setIf('visa_expiry', visa_expiry);
-    setIf('bank_slip_data', bank_slip_data);
-    setIf('foreign_id_card_data', foreign_id_card_data);
+    // blob → Storage 분기
+    for (const [name, field, val] of [
+      ['bank_slip_data',       'bank_slip',       bank_slip_data],
+      ['foreign_id_card_data', 'foreign_id_card', foreign_id_card_data],
+    ] as const) {
+      const result = await ingestBlob('contracts', contract.id, field, val);
+      if (result && (result.data !== '' || result.path !== '')) {
+        cClauses.push(`${name} = ?`, `${field}_path = ?`);
+        cParams.push(result.data, result.path);
+      }
+    }
     if (cClauses.length > 0) {
       cParams.push(token);
       await dbRun(`UPDATE regular_labor_contracts SET ${cClauses.join(', ')} WHERE token = ?`, ...cParams);
@@ -276,10 +361,22 @@ router.post('/contract/:token/update-info', async (req: Request, res: Response) 
       propagate('nationality', nationality, true);
       propagate('visa_type', visa_type);
       propagate('visa_expiry', visa_expiry);
-      propagate('bank_slip_data', bank_slip_data);
-      propagate('foreign_id_card_data', foreign_id_card_data);
       propagate('bank_name', bank_name);
       propagate('bank_account', bank_account);
+
+      // blob propagation — Storage 분기. 비어있는 경우만 채움 (덮어쓰기 방지).
+      for (const [name, field, val] of [
+        ['bank_slip_data',       'bank_slip',       bank_slip_data],
+        ['foreign_id_card_data', 'foreign_id_card', foreign_id_card_data],
+      ] as const) {
+        const result = await ingestBlob('employees', contract.employee_id, field, val);
+        if (result && (result.data !== '' || result.path !== '')) {
+          eClauses.push(`${name} = CASE WHEN COALESCE(${name}, '') = '' AND COALESCE(${field}_path, '') = '' THEN ? ELSE ${name} END`);
+          eParams.push(result.data);
+          eClauses.push(`${field}_path = CASE WHEN COALESCE(${name}, '') = '' AND COALESCE(${field}_path, '') = '' THEN ? ELSE ${field}_path END`);
+          eParams.push(result.path);
+        }
+      }
 
       if (eClauses.length > 0) {
         eClauses.push('updated_at = NOW()');
@@ -331,8 +428,17 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
     if (nationality !== undefined)       { contractUpdateClauses.push('nationality = ?');       contractParams.push(nationality); }
     if (visa_type !== undefined)         { contractUpdateClauses.push('visa_type = ?');         contractParams.push(visa_type); }
     if (visa_expiry !== undefined)       { contractUpdateClauses.push('visa_expiry = ?');       contractParams.push(visa_expiry); }
-    if (bank_slip_data !== undefined)    { contractUpdateClauses.push('bank_slip_data = ?');    contractParams.push(bank_slip_data); }
-    if (foreign_id_card_data !== undefined) { contractUpdateClauses.push('foreign_id_card_data = ?'); contractParams.push(foreign_id_card_data); }
+    // blob → Storage 분기
+    for (const [name, field, val] of [
+      ['bank_slip_data',       'bank_slip',       bank_slip_data],
+      ['foreign_id_card_data', 'foreign_id_card', foreign_id_card_data],
+    ] as const) {
+      const result = await ingestBlob('contracts', contract.id, field, val);
+      if (result) {
+        contractUpdateClauses.push(`${name} = ?`, `${field}_path = ?`);
+        contractParams.push(result.data, result.path);
+      }
+    }
     contractParams.push(token);
 
     await dbRun(
@@ -350,8 +456,20 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
       if (nationality)          { empUpdateClauses.push('nationality = CASE WHEN COALESCE(nationality, \'\') IN (\'\', \'KR\') THEN ? ELSE nationality END'); empParams.push(nationality); }
       if (visa_type)            { empUpdateClauses.push('visa_type = CASE WHEN COALESCE(visa_type, \'\') = \'\' THEN ? ELSE visa_type END');        empParams.push(visa_type); }
       if (visa_expiry)          { empUpdateClauses.push('visa_expiry = CASE WHEN COALESCE(visa_expiry, \'\') = \'\' THEN ? ELSE visa_expiry END');  empParams.push(visa_expiry); }
-      if (bank_slip_data)       { empUpdateClauses.push('bank_slip_data = CASE WHEN COALESCE(bank_slip_data, \'\') = \'\' THEN ? ELSE bank_slip_data END'); empParams.push(bank_slip_data); }
-      if (foreign_id_card_data) { empUpdateClauses.push('foreign_id_card_data = CASE WHEN COALESCE(foreign_id_card_data, \'\') = \'\' THEN ? ELSE foreign_id_card_data END'); empParams.push(foreign_id_card_data); }
+      // blob propagation — Storage 분기. 비어있는 경우만 채움.
+      for (const [name, field, val] of [
+        ['bank_slip_data',       'bank_slip',       bank_slip_data],
+        ['foreign_id_card_data', 'foreign_id_card', foreign_id_card_data],
+      ] as const) {
+        if (!val) continue;
+        const result = await ingestBlob('employees', contract.employee_id, field, val);
+        if (result) {
+          empUpdateClauses.push(`${name} = CASE WHEN COALESCE(${name}, '') = '' AND COALESCE(${field}_path, '') = '' THEN ? ELSE ${name} END`);
+          empParams.push(result.data);
+          empUpdateClauses.push(`${field}_path = CASE WHEN COALESCE(${name}, '') = '' AND COALESCE(${field}_path, '') = '' THEN ? ELSE ${field}_path END`);
+          empParams.push(result.path);
+        }
+      }
       if (id_number)            { empUpdateClauses.push('id_number = CASE WHEN COALESCE(id_number, \'\') = \'\' THEN ? ELSE id_number END');        empParams.push(id_number); }
       if (birth_date)           { empUpdateClauses.push('birth_date = CASE WHEN COALESCE(birth_date, \'\') = \'\' THEN ? ELSE birth_date END');     empParams.push(birth_date); }
 

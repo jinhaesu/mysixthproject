@@ -1,6 +1,8 @@
 node_modules/
 .env
 .env.local
+.env.direct
+.env.*
 frontend/out/
 frontend/.next/
 dist/

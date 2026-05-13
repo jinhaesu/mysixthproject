@@ -18,6 +18,42 @@ import { AuthRequest } from '../middleware/auth';
 import { sendOnboardingNotification, OnboardingRecord } from '../services/onboardingEmail';
 import { buildOnboardingCSV, OnboardingRecord as OnboardingCSVRecord } from '../services/insuranceExport';
 import { sendGeneralSms } from '../services/smsService';
+import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
+
+const BLOB_FIELD_MAP: Record<string, string> = {
+  bank_slip_data: 'bank_slip',
+  foreign_id_card_data: 'foreign_id_card',
+  family_register_data: 'family_register',
+  resident_register_data: 'resident_register',
+};
+
+async function ingestEmployeeBlob(empId: number, name: string, value: string | undefined): Promise<{ data: string; path: string } | null> {
+  if (value === undefined) return null;
+  if (value === '') return { data: '', path: '' };
+  const field = BLOB_FIELD_MAP[name];
+  if (!field) return { data: value, path: '' };
+  if (isStorageEnabled() && shouldUseStorage(value)) {
+    try {
+      const { path } = await uploadBase64(`employees/${empId}/${field}`, value);
+      return { data: '', path };
+    } catch (e: any) {
+      console.error(`[Storage] upload failed (employees/${empId}/${field}):`, e.message);
+      return { data: value, path: '' };
+    }
+  }
+  return { data: value, path: '' };
+}
+
+async function expandEmployeeBlobUrls(row: any): Promise<void> {
+  if (!row) return;
+  for (const [dataField, field] of Object.entries(BLOB_FIELD_MAP)) {
+    const p = row[`${field}_path`];
+    if (p && typeof p === 'string') {
+      try { row[dataField] = await getSignedUrl(p); }
+      catch (e: any) { console.error(`[Storage] signed URL failed (${p}):`, e.message); }
+    }
+  }
+}
 
 const router = Router();
 
@@ -546,20 +582,25 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const enriched = await enrichEmployee(emp);
 
     // enrichEmployee 가 blob 을 strip 함. detail 응답엔 blob 다시 포함.
-    res.json({
+    const detailResponse: any = {
       ...enriched,
-      // monthly_salary 가 0/빈 값이면 salary_settings 의 합산으로 자동 표시.
       monthly_salary: Number(emp.monthly_salary || 0) > 0 ? emp.monthly_salary : (computedSalary > 0 ? computedSalary : ''),
       salary_settings_base_pay: basePay,
       salary_settings_total: computedSalary,
-      // blob 필드를 그대로 노출 (admin 이 첨부 확인용)
-      bank_slip_data: emp.bank_slip_data || '',
-      foreign_id_card_data: emp.foreign_id_card_data || '',
-      family_register_data: emp.family_register_data || '',
+      // blob 데이터/path 둘 다 노출. expandEmployeeBlobUrls 가 path 있으면 *_data 자리에 signed URL 덮어쓰기.
+      bank_slip_data:         emp.bank_slip_data || '',
+      bank_slip_path:         emp.bank_slip_path || '',
+      foreign_id_card_data:   emp.foreign_id_card_data || '',
+      foreign_id_card_path:   emp.foreign_id_card_path || '',
+      family_register_data:   emp.family_register_data || '',
+      family_register_path:   emp.family_register_path || '',
       resident_register_data: emp.resident_register_data || '',
+      resident_register_path: emp.resident_register_path || '',
       signed_contract_url: emp.signed_contract_url || '',
       latest_contract: latestContract || null,
-    });
+    };
+    await expandEmployeeBlobUrls(detailResponse);
+    res.json(detailResponse);
   } catch (error: any) {
     console.error('GET /api/onboarding/:id error:', error);
     res.status(500).json({ error: error.message });
@@ -636,10 +677,19 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     const params: any[] = [];
 
     for (const [key, val] of Object.entries(req.body)) {
-      if (PATCHABLE_ONBOARDING_FIELDS.has(key)) {
-        setClauses.push(`${key} = ?`);
-        params.push(val);
+      if (!PATCHABLE_ONBOARDING_FIELDS.has(key)) continue;
+      // blob 필드는 Storage 분기
+      if (BLOB_FIELD_MAP[key]) {
+        const result = await ingestEmployeeBlob(id, key, val as string | undefined);
+        if (result) {
+          const field = BLOB_FIELD_MAP[key];
+          setClauses.push(`${key} = ?`, `${field}_path = ?`);
+          params.push(result.data, result.path);
+        }
+        continue;
       }
+      setClauses.push(`${key} = ?`);
+      params.push(val);
     }
 
     if (setClauses.length === 0) {

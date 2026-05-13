@@ -24,6 +24,7 @@ import { sendOffboardingNotification, OffboardingRecord } from '../services/offb
 import { computeSeveranceTax, SeveranceTaxBreakdown } from '../services/severanceTax';
 import { buildOffboardingCSV, OffboardingRecord as OffboardingCSVRecord } from '../services/insuranceExport';
 import { sendGeneralSms } from '../services/smsService';
+import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
 
 const router = Router();
 
@@ -455,6 +456,15 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
     // Compute tax breakdown from current severance_final + dates
     const taxBreakdown = buildTaxBreakdownFromRecord(record);
+
+    // Storage path → signed URL 변환 (resignation_letter_data 자리에 덮어쓰기)
+    if (record.resignation_letter_path) {
+      try {
+        record.resignation_letter_data = await getSignedUrl(record.resignation_letter_path);
+      } catch (e: any) {
+        console.error('[Storage] resignation_letter signed URL failed:', e.message);
+      }
+    }
 
     res.json({ ...record, employee, tax_breakdown: taxBreakdown });
   } catch (error: any) {
@@ -950,14 +960,29 @@ router.patch('/:id/upload-resignation-letter', async (req: AuthRequest, res: Res
       return;
     }
 
+    // Storage 분기 — 큰 PDF 는 Storage 로
+    let storedData = file_data;
+    let storedPath = '';
+    if (isStorageEnabled() && shouldUseStorage(file_data)) {
+      try {
+        const { path } = await uploadBase64(`offboardings/${id}/resignation_letter`, file_data);
+        storedData = '';
+        storedPath = path;
+      } catch (e: any) {
+        console.error(`[Storage] resignation_letter upload failed (#${id}):`, e.message);
+      }
+    }
+
     await dbRun(
       `UPDATE employee_offboardings
        SET resignation_letter_data = ?,
+           resignation_letter_path = ?,
            resignation_letter_filename = ?,
            resignation_letter_received = 1,
            updated_at = NOW()
        WHERE id = ?`,
-      file_data,
+      storedData,
+      storedPath,
       filename,
       id,
     );

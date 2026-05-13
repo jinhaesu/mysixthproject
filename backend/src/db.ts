@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.24.1';
+  const SCHEMA_VERSION = 'schema-v2.25.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -956,6 +956,18 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query('CREATE INDEX IF NOT EXISTS idx_labor_contracts_phone_end ON labor_contracts(phone, contract_end DESC)'); } catch {}
   try { await pool.query('CREATE INDEX IF NOT EXISTS idx_survey_responses_clockin ON survey_responses(request_id) WHERE clock_in_time IS NOT NULL'); } catch {}
   try { await pool.query('CREATE INDEX IF NOT EXISTS idx_workers_category ON workers(category)'); } catch {}
+
+  // v2.25.0: Supabase Storage 마이그레이션 — base64 blob → Storage path 컬럼 추가.
+  // 큰 첨부파일 (통장사본/외국인등록증/주민등록등본/가족관계증명서/사직서/계약서스캔본) 을
+  // Storage 로 옮기고 DB 에는 path 만 저장. 기존 *_data 컬럼은 fallback 으로 한동안 유지.
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS bank_slip_path TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS foreign_id_card_path TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS family_register_path TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_employees ADD COLUMN IF NOT EXISTS resident_register_path TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS bank_slip_path TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS foreign_id_card_path TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS scanned_file_path TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_path TEXT DEFAULT ''"); } catch {}
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}

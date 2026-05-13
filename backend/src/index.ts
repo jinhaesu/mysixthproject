@@ -72,7 +72,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '2.24.0',
+    version: '2.25.0',
     features: {
       manualAttendance: true,
       onboarding: true,
@@ -116,6 +116,7 @@ app.get('/api/health', (_req, res) => {
       deadCheckoutFix: true,               // Supavisor stale socket: idle 10s, keepAlive 3s, retry 3회, heartbeat 30s
       emergencyPoolStabilization: true,    // reminderService/heartbeat 비활성화, pool min:2, statement_timeout 8s
       workerProcessSplit: true,            // Web/Worker 프로세스 분리 — 별도 Railway 서비스로 reminderService 운영
+      storageBlobMigration: true,          // base64 첨부 → Supabase Storage path 전환
     },
   });
 });

@@ -42,8 +42,37 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   process.exit(1);
 }
 
-const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 2,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 30_000,
+  keepAlive: true,
+});
+pool.on('error', (e) => console.error('[pool] idle err:', e.message));
+
 const supa = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+
+async function withRetry(fn, label, attempts = 4) {
+  let last;
+  for (let i = 1; i <= attempts; i++) {
+    try { return await fn(); }
+    catch (e) {
+      last = e;
+      const msg = e?.message || String(e);
+      const retryable = /fetch failed|ECONNRESET|terminated|ETIMEDOUT|timeout|503|502|504|EDBHANDLEREXITED|Connection terminated/i.test(msg);
+      if (i < attempts && retryable) {
+        const backoff = 500 * Math.pow(2, i - 1);
+        console.error(`  ↻ ${label}: ${msg.substring(0, 80)} — retry ${i}/${attempts - 1} in ${backoff}ms`);
+        await new Promise(r => setTimeout(r, backoff));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw last;
+}
 
 function dataUrlToBuffer(dataUrl) {
   const m = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/);
@@ -77,41 +106,43 @@ async function migrateColumn({ table, idCol, dataCol, pathCol, scope, field }) {
   );
   console.log(`  대상: ${rows.rowCount} rows`);
 
-  let uploaded = 0, failed = 0;
+  let uploaded = 0, failed = 0, skipped = 0;
   for (const r of rows.rows) {
-    const detail = await pool.query(
-      `SELECT ${dataCol} AS data FROM ${table} WHERE ${idCol} = $1`,
-      [r.id],
-    );
-    const base64 = detail.rows[0].data;
-    const { buf, contentType } = dataUrlToBuffer(base64);
-    const ext = inferExtension(contentType);
-    const objectPath = `${scope}/${r.id}/${field}.${ext}`;
-
-    if (DRY_RUN) {
-      console.log(`  [dry-run] #${r.id} → ${objectPath} (${(buf.length/1024).toFixed(0)} KB, ${contentType})`);
-      continue;
-    }
-
     try {
-      const { error } = await supa.storage.from(BUCKET).upload(objectPath, buf, {
-        contentType,
-        upsert: true,
-        cacheControl: '3600',
-      });
-      if (error) throw new Error(error.message);
-      await pool.query(
-        `UPDATE ${table} SET ${pathCol} = $1 WHERE ${idCol} = $2`,
-        [objectPath, r.id],
+      const detail = await withRetry(
+        () => pool.query(`SELECT ${dataCol} AS data FROM ${table} WHERE ${idCol} = $1`, [r.id]),
+        `SELECT ${table}#${r.id}`,
+      );
+      const base64 = detail.rows[0]?.data;
+      if (!base64) { skipped++; continue; }
+      const { buf, contentType } = dataUrlToBuffer(base64);
+      const ext = inferExtension(contentType);
+      const objectPath = `${scope}/${r.id}/${field}.${ext}`;
+
+      if (DRY_RUN) {
+        console.log(`  [dry-run] #${r.id} → ${objectPath} (${(buf.length/1024).toFixed(0)} KB, ${contentType})`);
+        continue;
+      }
+
+      await withRetry(async () => {
+        const { error } = await supa.storage.from(BUCKET).upload(objectPath, buf, {
+          contentType, upsert: true, cacheControl: '3600',
+        });
+        if (error) throw new Error(error.message || JSON.stringify(error));
+      }, `upload ${objectPath}`);
+
+      await withRetry(
+        () => pool.query(`UPDATE ${table} SET ${pathCol} = $1 WHERE ${idCol} = $2`, [objectPath, r.id]),
+        `UPDATE ${table}#${r.id}`,
       );
       uploaded++;
-      if (uploaded % 10 === 0) process.stdout.write(`  ... ${uploaded}/${rows.rowCount}\r`);
+      if (uploaded % 5 === 0) console.log(`  ... ${uploaded}/${rows.rowCount} (#${r.id})`);
     } catch (e) {
-      console.error(`  ✗ #${r.id}: ${e.message}`);
+      console.error(`  ✗ #${r.id}: ${e?.message || e}`);
       failed++;
     }
   }
-  console.log(`  완료: 업로드 ${uploaded}, 실패 ${failed}, dry-run ${DRY_RUN ? rows.rowCount : 0}`);
+  console.log(`  완료: 업로드 ${uploaded}, 실패 ${failed}, skip ${skipped}, dry-run ${DRY_RUN ? rows.rowCount : 0}`);
 }
 
 async function verifyColumn({ table, idCol, dataCol, pathCol }) {

@@ -699,6 +699,16 @@ export default function OffboardingPage() {
                           <Button size="xs" variant="secondary" leadingIcon={<Send size={12}/>} loading={sendingResignSms} onClick={handleSendResignSms}>
                             직원에게 작성 SMS
                           </Button>
+                          {localDetail.resignation_letter_submitted_at && (
+                            <Button
+                              size="xs"
+                              variant="secondary"
+                              leadingIcon={<FileDown size={12}/>}
+                              onClick={() => detailId && window.open(`/offboarding/print/resignation-letter?id=${detailId}`, "_blank")}
+                            >
+                              사직서 양식 보기 (PDF)
+                            </Button>
+                          )}
                           {localDetail.resignation_letter_employee_reason && (
                             <div className="text-[11.5px] text-[var(--text-3)] mt-1 w-full">
                               <b>직원 작성 사유:</b> {localDetail.resignation_letter_employee_reason}
@@ -708,7 +718,7 @@ export default function OffboardingPage() {
                         </div>
                         {localDetail.resignation_letter_data && (
                           <FilePreview
-                            label="제출된 사직서"
+                            label="제출된 사직서 파일 (관리자 첨부)"
                             data={localDetail.resignation_letter_data}
                             filenamePrefix={`사직서_${localDetail.employee_name || detailId}`}
                             maxHeight={240}

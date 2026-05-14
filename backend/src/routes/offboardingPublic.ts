@@ -70,9 +70,10 @@ router.get('/by-token/:token', async (req, res) => {
 router.post('/submit/:token', async (req, res) => {
   try {
     const token = String(req.params.token || '');
-    const { reason_label, detail } = req.body as {
+    const { reason_label, detail, signature_data } = req.body as {
       reason_label: string;
       detail?: string;
+      signature_data?: string;
     };
 
     if (!token) {
@@ -81,6 +82,11 @@ router.post('/submit/:token', async (req, res) => {
     }
     if (!reason_label) {
       res.status(400).json({ error: '사유를 선택해주세요.' });
+      return;
+    }
+    // 사인패드 서명 필수 — data:image/png;base64,... 형태여야 함
+    if (!signature_data || !signature_data.startsWith('data:image/')) {
+      res.status(400).json({ error: '서명을 입력해주세요.' });
       return;
     }
 
@@ -117,6 +123,7 @@ router.post('/submit/:token', async (req, res) => {
       `UPDATE employee_offboardings
        SET resignation_letter_employee_reason = ?,
            resignation_letter_detail = ?,
+           resignation_letter_signature_data = ?,
            resignation_letter_submitted_at = NOW(),
            resignation_letter_received = 1,
            reason_code = CASE WHEN reason_code = '' OR reason_code IS NULL THEN ? ELSE reason_code END,
@@ -124,6 +131,7 @@ router.post('/submit/:token', async (req, res) => {
        WHERE id = ?`,
       reason_label,
       detail || '',
+      signature_data,
       reasonCode,
       row.id,
     );

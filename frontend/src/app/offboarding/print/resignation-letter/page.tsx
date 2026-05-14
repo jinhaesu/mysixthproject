@@ -45,6 +45,7 @@ function PrintDocContent() {
   const resignDate = data.resign_date ?? "-";
   const reason = data.resignation_letter_employee_reason || "";
   const detail = data.resignation_letter_detail || "";
+  const signature = data.resignation_letter_signature_data || "";
   const submittedAt = data.resignation_letter_submitted_at
     ? new Date(data.resignation_letter_submitted_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })
     : new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
@@ -189,8 +190,17 @@ function PrintDocContent() {
 
         <div className="sign-area">
           <div>{submittedAt}</div>
-          <div style={{ marginTop: 12 }}>
-            성명 : {name} <span style={{ marginLeft: 12 }}>(인)</span>
+          <div style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span>성명 : {name}</span>
+            {signature ? (
+              <img
+                src={signature}
+                alt="서명"
+                style={{ height: 56, width: "auto", marginLeft: 4, verticalAlign: "middle", filter: "contrast(1.15)" }}
+              />
+            ) : (
+              <span style={{ marginLeft: 12 }}>(인)</span>
+            )}
           </div>
         </div>
 

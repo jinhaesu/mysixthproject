@@ -36,6 +36,7 @@ import {
   TD,
   useToast,
 } from "@/components/ui";
+import { FilePreview } from "@/components/FilePreview";
 import { AlertTriangle, Users, Mail, RefreshCw, Trash2, Save, FileDown, Receipt, Download, Paperclip, Send } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -705,6 +706,14 @@ export default function OffboardingPage() {
                             </div>
                           )}
                         </div>
+                        {localDetail.resignation_letter_data && (
+                          <FilePreview
+                            label="제출된 사직서"
+                            data={localDetail.resignation_letter_data}
+                            filenamePrefix={`사직서_${localDetail.employee_name || detailId}`}
+                            maxHeight={240}
+                          />
+                        )}
                       </div>
                     );
                   }

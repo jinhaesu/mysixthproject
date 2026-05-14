@@ -1017,6 +1017,9 @@ router.get('/shift-plan', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/regular/employees/:id/resign - 퇴사처리
+// 1) regular_employees.is_active=0 으로 비활성화
+// 2) employee_offboardings 에 in_progress 레코드 없으면 자동 INSERT
+//    (안 그러면 근무자DB 퇴사자 명단엔 떠도 퇴사관리 메뉴엔 안 나타남)
 router.put('/employees/:id/resign', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -1029,6 +1032,41 @@ router.put('/employees/:id/resign', async (req: AuthRequest, res: Response) => {
       'UPDATE regular_employees SET is_active = 0, resign_date = ?, resigned_at = ?, updated_at = NOW() WHERE id = ?',
       resign_date, getKSTTimestamp(), id
     );
+
+    // 퇴사관리 레코드 자동 생성 (이미 있으면 skip)
+    const existing = await dbGet(
+      `SELECT id FROM employee_offboardings
+       WHERE employee_type = 'regular' AND employee_ref_id = ? AND status != 'cancelled'`,
+      id,
+    );
+    if (!existing) {
+      const emp = await dbGet(
+        'SELECT name, phone, department, hire_date FROM regular_employees WHERE id = ?',
+        id,
+      );
+      if (emp) {
+        // loss_date = resign_date + 1 day
+        const d = new Date(resign_date + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + 1);
+        const lossDate = d.toISOString().slice(0, 10);
+        await dbRun(
+          `INSERT INTO employee_offboardings (
+            employee_type, employee_ref_id, employee_name, employee_phone,
+            department, hire_date, resign_date, loss_date,
+            reason_code, reason_detail, status,
+            email_sent, created_at, updated_at
+          ) VALUES ('regular', ?, ?, ?, ?, ?, ?, ?, '', '', 'in_progress', 0, NOW(), NOW())`,
+          id,
+          emp.name || '',
+          emp.phone || '',
+          emp.department || '',
+          emp.hire_date || '',
+          resign_date,
+          lossDate,
+        );
+      }
+    }
+
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

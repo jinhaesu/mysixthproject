@@ -39,6 +39,12 @@ app.use(cors({
   origin: true,
   credentials: true,
 }));
+// MCP routes — must mount BEFORE express.json() so SSEServerTransport can
+// read the raw POST body. If express.json() runs first it consumes the
+// stream and SDK clients get 400 Bad Request on every message.
+import { setupMcpRoutes } from './routes/mcp';
+setupMcpRoutes(app);
+
 // Body limit 20MB — 통장사본·외국인등록증·사직서 등 Base64 이미지/PDF 업로드 허용
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
@@ -120,10 +126,6 @@ app.get('/api/health', (_req, res) => {
     },
   });
 });
-
-// MCP SSE endpoint (remote MCP server for Claude Desktop/Mobile)
-import { setupMcpRoutes } from './routes/mcp';
-setupMcpRoutes(app);
 
 // Error handling
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

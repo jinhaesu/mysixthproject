@@ -184,7 +184,7 @@ export default function SettlementAlbaPage() {
     const incomeTax = Math.round(netBeforeTax * 0.033);
     const localTax = Math.round(netBeforeTax * 0.0033);
     const netPay = netBeforeTax - incomeTax - localTax;
-    return { rate, basePay, overtimePay, nightPay, whPay, grossPay, meal, netBeforeTax, incomeTax, localTax, netPay };
+    return { rate, basePay, overtimePay, holidayPay, nightPay, whPay, grossPay, meal, netBeforeTax, incomeTax, localTax, netPay };
   };
 
   const onRateChange = (idx: number, workerId: number | null, value: string) => {
@@ -210,13 +210,13 @@ export default function SettlementAlbaPage() {
   const results = data?.results || [];
   const rows = results.map((r: any, i: number) => ({ ...r, idx: i, ...calcEmp(r, i) }));
   const totals: any = {};
-  ['work_days','regular_hours','overtime_hours','night_hours','weekly_holiday_hours','basePay','overtimePay','nightPay','whPay','grossPay','meal','incomeTax','localTax','netPay'].forEach(k => {
+  ['work_days','regular_hours','overtime_hours','night_hours','holiday_pay_hours','weekly_holiday_hours','basePay','overtimePay','holidayPay','nightPay','whPay','grossPay','meal','incomeTax','localTax','netPay'].forEach(k => {
     totals[k] = rows.reduce((s: number, r: any) => s + (r[k] || 0), 0);
   });
 
   const handleExcel = () => {
-    const header = ['이름','소속','연락처','은행','계좌번호','근무일','시급','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','소득세(3.3%)','지방세(0.33%)','실지급'];
-    const csvRows = rows.map((r: any) => [r.name,r.department || r.workplace || '',r.phone,r.bank_name,r.bank_account,r.work_days,r.rate || 0,r.regular_hours,r.overtime_hours,r.night_hours || 0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.incomeTax,r.localTax,r.netPay]);
+    const header = ['이름','소속','연락처','은행','계좌번호','근무일','시급','기본h','연장h','야간h','휴일h','주휴h','기본급','연장수당','휴일수당','야간수당','주휴수당','급여계','식대공제','소득세(3.3%)','지방세(0.33%)','실지급'];
+    const csvRows = rows.map((r: any) => [r.name,r.department || r.workplace || '',r.phone,r.bank_name,r.bank_account,r.work_days,r.rate || 0,r.regular_hours,r.overtime_hours,r.night_hours || 0,r.holiday_pay_hours || 0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.holidayPay,r.nightPay,r.whPay,r.grossPay,r.meal,r.incomeTax,r.localTax,r.netPay]);
     const csv = [header, ...csvRows].map(r => r.join(',')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -301,6 +301,8 @@ export default function SettlementAlbaPage() {
                 <col className="w-[38px]" />
                 <col className="w-[38px]" />
                 <col className="w-[38px]" />
+                <col className="w-[38px]" />
+                <col className="w-[65px]" />
                 <col className="w-[65px]" />
                 <col className="w-[65px]" />
                 <col className="w-[65px]" />
@@ -323,9 +325,11 @@ export default function SettlementAlbaPage() {
                   <TH numeric>기본h</TH>
                   <TH numeric>연장h</TH>
                   <TH numeric>야간h</TH>
+                  <TH numeric>휴일h</TH>
                   <TH numeric>주휴h</TH>
                   <TH numeric>기본급</TH>
                   <TH numeric>연장수당</TH>
+                  <TH numeric>휴일수당</TH>
                   <TH numeric>야간수당</TH>
                   <TH numeric>주휴수당</TH>
                   <TH numeric>급여계</TH>
@@ -356,9 +360,11 @@ export default function SettlementAlbaPage() {
                     <TD numeric>{r.regular_hours}</TD>
                     <TD numeric className="text-[var(--warning-fg)]">{r.overtime_hours}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{(r.night_hours || 0).toFixed(1)}</TD>
+                    <TD numeric className="text-[var(--warning-fg)]">{(r.holiday_pay_hours || 0).toFixed(1)}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{r.weekly_holiday_hours}</TD>
                     <TD numeric>{fmt.format(r.basePay)}</TD>
                     <TD numeric className="text-[var(--warning-fg)]">{fmt.format(r.overtimePay)}</TD>
+                    <TD numeric className="text-[var(--warning-fg)]">{fmt.format(r.holidayPay)}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.nightPay)}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.whPay)}</TD>
                     <TD numeric emphasis>{fmt.format(r.grossPay)}</TD>
@@ -380,9 +386,11 @@ export default function SettlementAlbaPage() {
                   <TD numeric>{(totals.regular_hours || 0).toFixed(1)}</TD>
                   <TD numeric>{(totals.overtime_hours || 0).toFixed(1)}</TD>
                   <TD numeric>{(totals.night_hours || 0).toFixed(1)}</TD>
+                  <TD numeric>{(totals.holiday_pay_hours || 0).toFixed(1)}</TD>
                   <TD numeric>{totals.weekly_holiday_hours || 0}</TD>
                   <TD numeric>{fmt.format(totals.basePay || 0)}</TD>
                   <TD numeric>{fmt.format(totals.overtimePay || 0)}</TD>
+                  <TD numeric>{fmt.format(totals.holidayPay || 0)}</TD>
                   <TD numeric>{fmt.format(totals.nightPay || 0)}</TD>
                   <TD numeric>{fmt.format(totals.whPay || 0)}</TD>
                   <TD numeric>{fmt.format(totals.grossPay || 0)}</TD>

@@ -607,6 +607,17 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const newId = insertResult.lastInsertRowid as number;
     const newRecord = await dbGet('SELECT * FROM employee_offboardings WHERE id = ?', newId);
 
+    // 정규직 마스터 동기화 — regular_employees.resign_date / is_active 도 함께 업데이트.
+    // 이게 빠지면 퇴사관리엔 떠도 급여계산(/payroll-calc)에서 퇴사일이 안 보임 (닷·반하이 등 케이스).
+    if (employee_type === 'regular' && employee_ref_id) {
+      await dbRun(
+        `UPDATE regular_employees
+         SET is_active = 0, resign_date = ?, resigned_at = NOW(), updated_at = NOW()
+         WHERE id = ?`,
+        resign_date, employee_ref_id,
+      );
+    }
+
     // Send email if requested
     if (send_email) {
       const recipients = await getEmailRecipients();
@@ -750,6 +761,15 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     );
 
     const updated = await dbGet('SELECT * FROM employee_offboardings WHERE id = ?', id);
+
+    // resign_date 가 변경됐고 정규직이면 regular_employees 도 동기화
+    if (req.body.resign_date !== undefined && updated.employee_type === 'regular' && updated.employee_ref_id) {
+      await dbRun(
+        `UPDATE regular_employees SET resign_date = ?, updated_at = NOW() WHERE id = ?`,
+        updated.resign_date, updated.employee_ref_id,
+      );
+    }
+
     res.json(updated);
   } catch (error: any) {
     console.error('PATCH /api/offboarding/:id error:', error);

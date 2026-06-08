@@ -1833,6 +1833,42 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
          )
     `, yearMonth, monthStart, yearMonth) as any[];
 
+    // resign_date fallback — regular_employees.resign_date 가 비어있는 직원에 대해
+    // employee_offboardings 에서 보강. ref_id → name → phone 정규화 순으로 매칭.
+    // 닷·반하이·실비아·카당카당·테오살린 등 동기화 누락 케이스를 즉시 해결.
+    const emptyResignSalaries = salaries.filter((s: any) => !s.resign_date || s.resign_date === '');
+    if (emptyResignSalaries.length > 0) {
+      const offbs = await dbAll(`
+        SELECT employee_ref_id, employee_name, employee_phone, resign_date, created_at
+        FROM employee_offboardings
+        WHERE status <> 'cancelled'
+          AND resign_date IS NOT NULL AND resign_date <> ''
+        ORDER BY created_at DESC
+      `) as any[];
+
+      const offbByRefId = new Map<number, string>();
+      const offbByName = new Map<string, string>();
+      const offbByPhone = new Map<string, string>();
+      for (const eo of offbs) {
+        if (eo.employee_ref_id && !offbByRefId.has(eo.employee_ref_id)) {
+          offbByRefId.set(eo.employee_ref_id, eo.resign_date);
+        }
+        if (eo.employee_name && !offbByName.has(eo.employee_name)) {
+          offbByName.set(eo.employee_name, eo.resign_date);
+        }
+        if (eo.employee_phone) {
+          const np = norm(eo.employee_phone);
+          if (np && !offbByPhone.has(np)) offbByPhone.set(np, eo.resign_date);
+        }
+      }
+      for (const sal of emptyResignSalaries) {
+        let r = offbByRefId.get(sal.employee_id);
+        if (!r && sal.name) r = offbByName.get(sal.name);
+        if (!r && sal.phone) r = offbByPhone.get(norm(sal.phone));
+        if (r) sal.resign_date = r;
+      }
+    }
+
     // 마감 여부 먼저 확인 (마감 전이면 기본급 전액, 마감 후면 결근 차감)
     const closingCheck = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
     const payrollClosed = !!closingCheck;

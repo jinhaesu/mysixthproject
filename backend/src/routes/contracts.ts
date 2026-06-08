@@ -299,7 +299,7 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
       }
 
       const contracts = await dbAll(
-        `SELECT id, employee_id, phone, name, contract_start, contract_end, status, sms_sent,
+        `SELECT id, employee_id, phone, worker_name as name, contract_start, contract_end, status, sms_sent,
                 token, created_at, updated_at, work_start_date,
                 position_title, annual_salary, base_pay, meal_allowance, other_allowance,
                 pay_day, work_hours, work_place, department, email, nationality, visa_type, visa_expiry,
@@ -328,7 +328,7 @@ router.get('/history', async (req: AuthRequest, res: Response) => {
       }
 
       const contracts = await dbAll(
-        `SELECT id, phone, name, contract_start, contract_end, sms_sent, created_at,
+        `SELECT id, phone, worker_name as name, contract_start, contract_end, sms_sent, created_at,
                 COALESCE(is_legacy_scan, 0) as is_legacy_scan,
                 COALESCE(legacy_filename, '') as legacy_filename
          FROM labor_contracts WHERE phone = ? ORDER BY created_at DESC`,

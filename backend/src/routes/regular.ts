@@ -1767,6 +1767,12 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     const confirmedWithVacation = Array.from(empMap.values());
 
     // Get salary settings
+    // 포함 조건 — 퇴사관리 리스트와 동일한 기준으로 끌어와 정산 누락 방지:
+    //   1) 활성 직원 (is_active=1)
+    //   2) 퇴사관리 리스트에 잡힌 모든 퇴사자 (resign_date != '')
+    //      → "5월에 퇴사한 사람이 5월 급여계산에 없다", "퇴사관리엔 있는데 급여계산엔 없다" 신고 해결.
+    //      4월 말 퇴사자도 5월에 정산할 미지급 항목(연차수당, 마지막 주 주휴, 사후 조정 등)이 있을 수 있음.
+    //   3) 데이터 이상(is_active=0 + resign_date 비어있음)이라도 해당 월 confirmed_attendance 가 있으면 포함.
     const salaries = await dbAll(`
       SELECT re.id as employee_id, re.name, re.phone, re.department, re.team, re.hire_date,
              COALESCE(re.resign_date, '') as resign_date,
@@ -1784,8 +1790,20 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       FROM regular_employees re
       LEFT JOIN regular_salary_settings ss ON re.id = ss.employee_id
       LEFT JOIN regular_payroll_adjustments adj ON re.id = adj.employee_id AND adj.year_month = ?
-      WHERE re.is_active = 1 OR (re.resign_date != '' AND re.resign_date >= ?)
-    `, yearMonth, monthStart) as any[];
+      WHERE re.is_active = 1
+         OR COALESCE(re.resign_date, '') <> ''
+         OR EXISTS (
+           SELECT 1 FROM confirmed_attendance ca
+           WHERE ca.year_month = ?
+             AND ca.employee_type = '정규직'
+             AND (
+               (re.phone IS NOT NULL AND re.phone <> ''
+                AND REGEXP_REPLACE(COALESCE(ca.employee_phone, ''), '[-\\s]', '', 'g')
+                  = REGEXP_REPLACE(re.phone, '[-\\s]', '', 'g'))
+               OR ca.employee_name = re.name
+             )
+         )
+    `, yearMonth, yearMonth) as any[];
 
     // 마감 여부 먼저 확인 (마감 전이면 기본급 전액, 마감 후면 결근 차감)
     const closingCheck = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;

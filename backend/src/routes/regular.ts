@@ -1073,6 +1073,34 @@ router.put('/employees/:id/resign', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/regular/diagnose-employee?name=... - 직원 상태 진단 (퇴사일 동기화 확인용)
+router.get('/diagnose-employee', async (req: AuthRequest, res: Response) => {
+  try {
+    const name = (req.query.name as string || '').trim();
+    if (!name) {
+      res.status(400).json({ error: 'name 쿼리 파라미터가 필요합니다.' });
+      return;
+    }
+    const re_rows = await dbAll(
+      `SELECT id, name, phone, is_active, hire_date, resign_date, resigned_at
+       FROM regular_employees
+       WHERE name = ? OR name ILIKE ?`,
+      name, `%${name}%`
+    );
+    const eo_rows = await dbAll(
+      `SELECT id, employee_type, employee_ref_id, employee_name, employee_phone,
+              hire_date, resign_date, loss_date, status, created_at
+       FROM employee_offboardings
+       WHERE employee_name = ? OR employee_name ILIKE ?
+       ORDER BY created_at DESC`,
+      name, `%${name}%`
+    );
+    res.json({ name, regular_employees: re_rows, employee_offboardings: eo_rows });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/regular/employees/resigned - 퇴사자 목록
 router.get('/employees/resigned', async (_req: AuthRequest, res: Response) => {
   try {

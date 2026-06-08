@@ -974,14 +974,16 @@ export async function initializeDB(): Promise<void> {
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}
 
-  // 데이터 동기화 마이그레이션 (별도 키 — 스키마 가드와 독립적, 한 번만 실행)
+  // 데이터 동기화 마이그레이션 (별도 키 — 스키마 가드와 독립적)
   // employee_offboardings 에는 퇴사 기록이 있는데 regular_employees.resign_date 가 비어있어
-  // 급여계산 화면(/payroll-calc)에서 퇴사일이 안 뜨는 케이스 보정 (닷·반하이 등).
+  // 급여계산 화면(/payroll-calc)에서 퇴사일이 안 뜨는 케이스 보정.
+  // v2: employee_ref_id 매칭 + employee_name fallback 매칭 — 닷·반하이·실비아·카당카당·테오살린·조진윈·모하마드 등.
   try {
-    const dataKey = 'data-sync-regular-resign-from-offboardings-v1';
+    const dataKey = 'data-sync-regular-resign-from-offboardings-v2';
     const dataCheck = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [dataKey]);
     if (!dataCheck.rowCount) {
-      const syncResult = await pool.query(`
+      // 1단계: employee_ref_id 매칭 (정확)
+      const r1 = await pool.query(`
         UPDATE regular_employees re
         SET resign_date = eo.resign_date,
             is_active = 0,
@@ -993,7 +995,27 @@ export async function initializeDB(): Promise<void> {
           AND eo.resign_date IS NOT NULL AND eo.resign_date <> ''
           AND (re.resign_date IS NULL OR re.resign_date = '')
       `);
-      console.log(`[data-sync] regular_employees.resign_date backfilled from offboardings: ${syncResult.rowCount} rows`);
+      console.log(`[data-sync] resign_date backfilled via employee_ref_id: ${r1.rowCount} rows`);
+
+      // 2단계: employee_name fallback 매칭 — employee_ref_id 가 NULL 이거나 employee_type 이 다른 값으로 저장된 케이스
+      const r2 = await pool.query(`
+        UPDATE regular_employees re
+        SET resign_date = sub.resign_date,
+            is_active = 0,
+            updated_at = NOW()
+        FROM (
+          SELECT DISTINCT ON (eo.employee_name) eo.employee_name, eo.resign_date
+          FROM employee_offboardings eo
+          WHERE eo.status <> 'cancelled'
+            AND eo.resign_date IS NOT NULL AND eo.resign_date <> ''
+            AND eo.employee_name IS NOT NULL AND eo.employee_name <> ''
+          ORDER BY eo.employee_name, eo.created_at DESC
+        ) sub
+        WHERE re.name = sub.employee_name
+          AND (re.resign_date IS NULL OR re.resign_date = '')
+      `);
+      console.log(`[data-sync] resign_date backfilled via employee_name fallback: ${r2.rowCount} rows`);
+
       await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [dataKey]);
     }
   } catch (err: any) {

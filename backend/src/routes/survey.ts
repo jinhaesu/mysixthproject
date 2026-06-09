@@ -1323,7 +1323,7 @@ router.post('/fix-long-shifts', async (_req: AuthRequest, res: Response) => {
 router.get('/contracts', async (_req: AuthRequest, res: Response) => {
   try {
     const contracts = await dbAll(`
-      SELECT id, phone, name, contract_start, contract_end, sms_sent, created_at,
+      SELECT id, phone, worker_name as name, contract_start, contract_end, sms_sent, created_at,
              COALESCE(is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(legacy_filename, '') as legacy_filename
       FROM labor_contracts ORDER BY created_at DESC

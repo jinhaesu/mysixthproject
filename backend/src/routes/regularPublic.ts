@@ -404,7 +404,7 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
     if (!address || !signature_data) { res.status(400).json({ error: '주소와 서명은 필수입니다.' }); return; }
 
     const contract = await dbGet(
-      `SELECT id, employee_id, phone, name, contract_start, contract_end, status, token,
+      `SELECT id, employee_id, phone, worker_name as name, contract_start, contract_end, status, token,
               sms_sent, created_at, updated_at, work_start_date,
               position_title, annual_salary, base_pay, meal_allowance, other_allowance,
               pay_day, work_hours, work_place, department, email, nationality,

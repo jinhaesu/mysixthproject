@@ -1158,18 +1158,59 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
       : (employee.hire_date || cStart);
 
     await dbRun(
-      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place, sms_sent)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       employee.id, employee.phone, employee.name, cStart, cEnd, token,
       wStart, department || employee.department || '', position_title || '사원',
-      annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00', work_place || ''
+      annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00', work_place || '', 0
     );
 
     const contractLink = getFrontendUrl(`/regular-contract?token=${token}`);
     const message = `[조인앤조인 근로계약서]\n${employee.name}님, 근로계약서를 작성해주세요.\n아래 링크를 눌러 서명해주세요.\n${contractLink}`;
-    await sendGeneralSms(employee.phone, message);
+    const smsResult = await sendGeneralSms(employee.phone, message);
 
-    res.json({ success: true });
+    if (smsResult.success) {
+      await dbRun(`UPDATE regular_labor_contracts SET sms_sent = 1 WHERE token = ?`, token);
+      res.json({ success: true, messageId: smsResult.messageId });
+    } else {
+      console.error(`[contracts/send] SMS 발송 실패 — employee_id=${employee.id} (${employee.name}) phone=${employee.phone} error=${smsResult.error}`);
+      res.status(502).json({
+        success: false,
+        error: smsResult.error || 'SMS 발송 실패',
+        message: 'DB에는 계약서 row 가 생성되었으나 SMS 가 발송되지 않았습니다. SOLAPI 설정·잔액·수신번호를 확인하세요.',
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/contracts/diagnose?name=... - 계약서 발송 진단 (sms_sent 상태 + SMS provider)
+router.get('/contracts/diagnose', async (req: AuthRequest, res: Response) => {
+  try {
+    const name = (req.query.name as string || '').trim();
+    if (!name) { res.status(400).json({ error: 'name 쿼리 파라미터가 필요합니다.' }); return; }
+
+    const rows = await dbAll(
+      `SELECT rlc.id, rlc.employee_id, rlc.worker_name, rlc.phone, rlc.contract_start,
+              rlc.contract_end, rlc.status, rlc.sms_sent, rlc.token, rlc.created_at,
+              re.is_active, re.phone as employee_phone_master
+       FROM regular_labor_contracts rlc
+       LEFT JOIN regular_employees re ON rlc.employee_id = re.id
+       WHERE rlc.worker_name = ? OR rlc.worker_name ILIKE ?
+          OR re.name = ? OR re.name ILIKE ?
+       ORDER BY rlc.created_at DESC
+       LIMIT 20`,
+      name, `%${name}%`, name, `%${name}%`
+    );
+
+    res.json({
+      name,
+      sms_provider: process.env.SMS_PROVIDER || 'mock',
+      solapi_configured: Boolean(process.env.SOLAPI_API_KEY && process.env.SOLAPI_API_SECRET && process.env.SOLAPI_SENDER_NUMBER),
+      solapi_sender: process.env.SOLAPI_SENDER_NUMBER ? process.env.SOLAPI_SENDER_NUMBER.replace(/(\d{3})\d+(\d{4})/, '$1****$2') : null,
+      contracts: rows,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -7,7 +7,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { Calendar, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info, RefreshCw } from "lucide-react";
-import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList, getSalarySettings } from "@/lib/api";
+import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList, getSalarySettings, getWorkersLite } from "@/lib/api";
 import {
   PageHeader, Card, CardHeader, Badge, Button, Tabs, SkeletonCard, EmptyState, CenterSpinner, Section,
 } from "@/components/ui";
@@ -30,6 +30,9 @@ interface SummaryRow {
   overtime_hours: number;
   night_hours: number;
   annual_leave_days: number;
+  // 추가: settlement과 산식 일치 위함 (출처: confirmed records 워크주차 집계)
+  holiday_pay_hours?: number;       // 휴일근로(공휴일 또는 주5일초과 휴일근무)
+  weekly_holiday_hours?: number;    // 주휴수당 시간 (qualifying weeks × 8)
 }
 
 interface DailyRow {
@@ -91,6 +94,24 @@ const TABS: { id: TabId; label: string; icon: typeof Calendar }[] = [
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 const ZERO_TOTALS: Totals = { attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, annual_leave_days: 0 };
+
+// 공휴일 — settlement-alba와 동일 (휴일수당 산정용)
+const HOLIDAYS: Record<number, string[]> = {
+  2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
+  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-01','2026-05-05','2026-05-24','2026-05-25','2026-06-06','2026-08-15','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25'],
+  2027: ['2027-01-01','2027-02-05','2027-02-06','2027-02-07','2027-03-01','2027-05-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-10-03','2027-10-09','2027-10-14','2027-10-15','2027-10-16','2027-12-25'],
+};
+const isHolidayOrWeekend = (dateStr: string): boolean => {
+  const d = new Date(dateStr + 'T00:00:00+09:00');
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true;
+  return (HOLIDAYS[d.getFullYear()] || []).includes(dateStr);
+};
+const isKoreanHoliday = (dateStr: string): boolean => {
+  const year = parseInt(dateStr.slice(0, 4));
+  return (HOLIDAYS[year] || []).includes(dateStr);
+};
+const normalizePhone = (p: string | null | undefined) => (p || '').replace(/[-\s]/g, '').trim();
 
 // --- Utilities ---
 const fmt = (n: number) => n.toFixed(1);
@@ -191,12 +212,29 @@ function DashboardContent() {
       const allowedCats = isRegular ? REGULAR_CATS : DISPATCH_CATS;
 
       // Fetch both: confirmed (priority) + excel (fallback)
-      const [currentConfirmed, prevConfirmed, excelSummary, excelDaily] = await Promise.all([
+      const [currentConfirmed, prevConfirmed, excelSummary, excelDaily, workersResp] = await Promise.all([
         getConfirmedList(yearMonth, '').catch(() => []),
         getConfirmedList(prevYearMonth, '').catch(() => []),
         getReportSummary(year, month).catch(() => ({ current: [], previous: [] })),
         getReportDaily(year, month).catch(() => ({ data: [] })),
+        getWorkersLite().catch(() => ({ workers: [] })),
       ]);
+
+      // workers DB lookup map — emp.department 비었을 때 fallback (이슈 #4)
+      const workersList = (workersResp as any).workers || (workersResp as any) || [];
+      const deptByIdentity = new Map<string, string>();
+      for (const w of workersList) {
+        const np = normalizePhone(w.phone || '');
+        if (w.department) {
+          if (np) deptByIdentity.set(np, w.department);
+          if (w.name_ko) deptByIdentity.set(w.name_ko, w.department);
+        }
+      }
+      const lookupDept = (emp: any): string => {
+        if (emp.department) return emp.department;
+        const np = normalizePhone(emp.phone || '');
+        return deptByIdentity.get(np) || deptByIdentity.get(emp.name) || '';
+      };
 
       const parseRow = (r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, regular_hours: parseFloat(r.regular_hours) || 0, overtime_hours: parseFloat(r.overtime_hours) || 0, night_hours: parseFloat(r.night_hours) || 0, attendance_count: parseInt(r.attendance_count) || 0, unique_workers: parseInt(r.unique_workers) || 0, annual_leave_days: parseInt(r.annual_leave_days) || 0 });
       const filterCat = (rows: any[]) => (rows || []).filter((r: any) => allowedCats.some(c => (r.category || '').includes(c))).map(parseRow);
@@ -206,6 +244,33 @@ function DashboardContent() {
 
       // Build confirmed summary rows
       const confirmedNames = new Set<string>();
+      // 직원별 휴일·주휴 시간 (이슈 #3 — settlement-alba와 산식 일치)
+      const calcEmpHolidayHours = (emp: any): { holidayPayHours: number; weeklyHolidayHours: number } => {
+        const weekMap = new Map<string, { days: number; hours: number; hasHoliday: boolean; holidayHours: number; publicHolidayHours: number }>();
+        for (const rec of (emp.records || [])) {
+          const regH = parseFloat(rec.regular_hours) || 0;
+          const otH = parseFloat(rec.overtime_hours) || 0;
+          const totalH = regH + otH;
+          const d = new Date(rec.date + 'T00:00:00+09:00');
+          const weekStart = new Date(d);
+          weekStart.setDate(d.getDate() - d.getDay());
+          const weekKey = weekStart.toISOString().slice(0, 10);
+          if (!weekMap.has(weekKey)) weekMap.set(weekKey, { days: 0, hours: 0, hasHoliday: false, holidayHours: 0, publicHolidayHours: 0 });
+          const w = weekMap.get(weekKey)!;
+          w.days++;
+          w.hours += totalH;
+          if (isHolidayOrWeekend(rec.date)) { w.hasHoliday = true; w.holidayHours += totalH; }
+          if (isKoreanHoliday(rec.date)) w.publicHolidayHours += totalH;
+        }
+        let weeks = 0;
+        let holidayPayHours = 0;
+        for (const [, w] of weekMap) {
+          if (w.hours >= 15 && w.days >= 5) weeks++;
+          if (w.days > 5 && w.hasHoliday) holidayPayHours += w.holidayHours || 0;
+          else holidayPayHours += w.publicHolidayHours || 0;
+        }
+        return { holidayPayHours, weeklyHolidayHours: weeks * 8 };
+      };
       const toSummaryRows = (employees: any[]): SummaryRow[] => {
         const groupMap = new Map<string, SummaryRow>();
         for (const emp of (employees || [])) {
@@ -216,10 +281,11 @@ function DashboardContent() {
           // Determine shift: if employee has night_hours > regular_hours → 야간
           const isNightWorker = (emp.night_hours || 0) > (emp.regular_hours || 0);
           const shift = isNightWorker ? '야간' : '주간';
-          const dept = emp.department || '';
+          // 부서: confirmed-list 응답에 없으면 workers DB lookup (이슈 #4)
+          const dept = lookupDept(emp);
           const key = `${category}-${shift}-${dept}`;
           if (!groupMap.has(key)) {
-            groupMap.set(key, { department: dept, workplace: '', category, shift, attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, annual_leave_days: 0 });
+            groupMap.set(key, { department: dept, workplace: '', category, shift, attendance_count: 0, unique_workers: 0, total_hours: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, annual_leave_days: 0, holiday_pay_hours: 0, weekly_holiday_hours: 0 });
           }
           const row = groupMap.get(key)!;
           row.attendance_count += emp.days || 0;
@@ -228,6 +294,9 @@ function DashboardContent() {
           row.overtime_hours += emp.overtime_hours || 0;
           row.night_hours += emp.night_hours || 0;
           row.total_hours += (emp.regular_hours || 0) + floor30g(emp.overtime_hours || 0) + (emp.night_hours || 0);
+          const { holidayPayHours, weeklyHolidayHours } = calcEmpHolidayHours(emp);
+          row.holiday_pay_hours = (row.holiday_pay_hours || 0) + holidayPayHours;
+          row.weekly_holiday_hours = (row.weekly_holiday_hours || 0) + weeklyHolidayHours;
         }
         return Array.from(groupMap.values());
       };
@@ -317,7 +386,17 @@ function DashboardContent() {
 
       // Load salary settings for regular dashboard
       if (isRegular) {
-        try { const sd = await getSalarySettings(); setSalaryData(sd || []); } catch {}
+        try {
+          const sd = await getSalarySettings();
+          // 이슈 #4: regular_employees.department 비었으면 workers DB에서 lookup
+          const enriched = (sd || []).map((s: any) => {
+            if (s.department) return s;
+            const np = normalizePhone(s.phone || '');
+            const fallback = deptByIdentity.get(np) || deptByIdentity.get(s.name) || '';
+            return fallback ? { ...s, department: fallback } : s;
+          });
+          setSalaryData(enriched);
+        } catch {}
       }
       // Save to cache
       _dashCache[cacheKey] = {
@@ -404,44 +483,48 @@ function DashboardContent() {
 
   // 30분 단위 내림
 
-  const calcSalary = useCallback((rows: SummaryRow[]) => {
-    if (isRegular) {
-      // 정규직: 기본급 합계를 일할 계산 + 연장/야간/휴일 수당
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const today = new Date();
-      const currentDay = (today.getFullYear() === year && today.getMonth() + 1 === month)
-        ? today.getDate() : daysInMonth;
-      const dayRatio = currentDay / daysInMonth;
+  // 일할 계산 비율 (현재 달은 오늘까지, 그 외 월은 100%)
+  const dayRatioFor = useCallback((y: number, m: number) => {
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const today = new Date();
+    if (today.getFullYear() === y && today.getMonth() + 1 === m) {
+      return today.getDate() / daysInMonth;
+    }
+    return 1.0;
+  }, []);
 
+  const calcSalary = useCallback((rows: SummaryRow[], dayRatio = 1.0) => {
+    if (isRegular) {
+      // 정규직: 기본급 일할 + 연장(1.5배) + 야간(0.5 가산)
       let total = 0;
-      // 기본급 일할 계산
       for (const s of salaryData) {
         const monthlyPay = parseFloat(s.base_pay || 0) + parseFloat(s.meal_allowance || 0) + parseFloat(s.bonus || 0) + parseFloat(s.position_allowance || 0) + parseFloat(s.other_allowance || 0);
         total += monthlyPay * dayRatio;
       }
-      // 연장/야간 수당 추가
       for (const r of rows) {
         const rate = rates["정규직"] || 10030;
         const otH = floor30g(r.overtime_hours);
         total += otH * rate * 1.5;
-        total += (r.night_hours || 0) * rate * 0.5; // 야간 가산 50%
+        total += (r.night_hours || 0) * rate * 0.5;
       }
       return total;
     } else {
-      // 파견/알바: 시간당 단가 계산
+      // 파견/알바: settlement-alba 산식 일치 (이슈 #3)
+      //   regular×rate + ot×rate×1.5 + night×rate×1.5 + holiday×rate×1.5
       let total = 0;
       for (const r of rows) {
         const rate = getRateForCategory(r.category);
         const otH = floor30g(r.overtime_hours);
-        if (r.shift === "야간") {
-          total += r.regular_hours * rate * 1.5 + otH * rate * 2.0;
-        } else {
-          total += r.regular_hours * rate + otH * rate * 1.5;
-        }
+        const nightH = floor30g(r.night_hours || 0);
+        const holH = floor30g(r.holiday_pay_hours || 0);
+        total += r.regular_hours * rate
+              + otH * rate * 1.5
+              + nightH * rate * 1.5
+              + holH * rate * 1.5;
       }
       return total;
     }
-  }, [getRateForCategory, isRegular, year, month, salaryData, rates]);
+  }, [getRateForCategory, isRegular, salaryData, rates]);
 
   // Weekly holiday bonus (주휴수당): hours × base rate per category (파견/알바만)
   const calcWHBonus = useCallback((whh: Record<string, number>) => {
@@ -450,18 +533,20 @@ function DashboardContent() {
   }, [rates, isRegular]);
 
   const curSalary = useMemo(() =>
-    calcSalary(summaryData?.current || []) + calcWHBonus(summaryData?.weeklyHolidayHours?.current || {}),
-    [summaryData, calcSalary, calcWHBonus]);
-  const prevSalary = useMemo(() =>
-    calcSalary(summaryData?.previous || []) + calcWHBonus(summaryData?.weeklyHolidayHours?.previous || {}),
-    [summaryData, calcSalary, calcWHBonus]);
+    calcSalary(summaryData?.current || [], dayRatioFor(year, month)) + calcWHBonus(summaryData?.weeklyHolidayHours?.current || {}),
+    [summaryData, calcSalary, calcWHBonus, year, month, dayRatioFor]);
+  const prevSalary = useMemo(() => {
+    const py = summaryData?.prevYear ?? year;
+    const pm = summaryData?.prevMonth ?? month;
+    return calcSalary(summaryData?.previous || [], dayRatioFor(py, pm)) + calcWHBonus(summaryData?.weeklyHolidayHours?.previous || {});
+  }, [summaryData, calcSalary, calcWHBonus, year, month, dayRatioFor]);
   const twoMonthsAgoSalary = useMemo(() =>
-    calcSalary(twoMonthsAgoData) + calcWHBonus(twoMonthsAgoWHH),
+    calcSalary(twoMonthsAgoData, 1.0) + calcWHBonus(twoMonthsAgoWHH),
     [twoMonthsAgoData, calcSalary, twoMonthsAgoWHH, calcWHBonus]);
 
   // Salary breakdown by category + shift for detailed comparison
   const salaryBreakdown = useMemo(() => {
-    const compute = (rows: SummaryRow[]) => {
+    const compute = (rows: SummaryRow[], dayRatio: number) => {
       const map = new Map<string, { regular_hours: number; overtime_hours: number; salary: number }>();
       for (const r of rows) {
         const n = normCat(r.category);
@@ -470,13 +555,19 @@ function DashboardContent() {
         const prev = map.get(key) || { regular_hours: 0, overtime_hours: 0, salary: 0 };
         const rate = getRateForCategory(r.category);
         const otH = floor30g(r.overtime_hours);
+        const nightH = floor30g(r.night_hours || 0);
+        const holH = floor30g(r.holiday_pay_hours || 0);
         let sal: number;
         if (isRegular) {
-          sal = otH * (rates["정규직"] || 10030) * 1.5; // 정규직은 연장수당만
+          // 정규직: 연장(1.5) + 야간 가산(0.5) — 기본급은 아래에서 일괄 합산 (이슈 #2)
+          const regRate = rates["정규직"] || 10030;
+          sal = otH * regRate * 1.5 + (r.night_hours || 0) * regRate * 0.5;
         } else {
-          sal = r.shift === "야간"
-            ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
-            : r.regular_hours * rate + otH * rate * 1.5;
+          // 파견/알바: settlement-alba 산식 일치 (이슈 #3)
+          sal = r.regular_hours * rate
+              + otH * rate * 1.5
+              + nightH * rate * 1.5
+              + holH * rate * 1.5;
         }
         map.set(key, {
           regular_hours: prev.regular_hours + r.regular_hours,
@@ -484,23 +575,34 @@ function DashboardContent() {
           salary: prev.salary + sal,
         });
       }
+      // 정규직: 기본급 일할 합계를 "정규직 주간" row 에 합산 (이슈 #2)
+      // 기본급이 있으면 미퇴사로 보고 매달 기본 포함
+      if (isRegular && salaryData.length > 0) {
+        let basePaySum = 0;
+        for (const s of salaryData) {
+          const mp = parseFloat(s.base_pay || 0) + parseFloat(s.meal_allowance || 0) + parseFloat(s.bonus || 0) + parseFloat(s.position_allowance || 0) + parseFloat(s.other_allowance || 0);
+          basePaySum += mp * dayRatio;
+        }
+        const dayKey = `정규직|주간`;
+        const existing = map.get(dayKey) || { regular_hours: 0, overtime_hours: 0, salary: 0 };
+        map.set(dayKey, { ...existing, salary: existing.salary + basePaySum });
+      }
       return map;
     };
+    const py = summaryData?.prevYear ?? year;
+    const pm = summaryData?.prevMonth ?? month;
     return {
-      current: compute(summaryData?.current || []),
-      previous: compute(summaryData?.previous || []),
+      current: compute(summaryData?.current || [], dayRatioFor(year, month)),
+      previous: compute(summaryData?.previous || [], dayRatioFor(py, pm)),
     };
-  }, [summaryData, getRateForCategory, isRegular, rates]);
+  }, [summaryData, getRateForCategory, isRegular, rates, salaryData, year, month, dayRatioFor]);
 
   const deptSalary = useMemo(() => {
     if (!summaryData) return [];
     const map = new Map<string, number>();
     if (isRegular) {
-      // 정규직: 부서별 기본급 합계 + 연장수당
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const today = new Date();
-      const currentDay = (today.getFullYear() === year && today.getMonth() + 1 === month) ? today.getDate() : daysInMonth;
-      const dayRatio = currentDay / daysInMonth;
+      // 정규직: 부서별 기본급 합계 + 연장수당 + 야간가산
+      const dayRatio = dayRatioFor(year, month);
       for (const s of salaryData) {
         const dept = s.department || "미분류";
         const mp = parseFloat(s.base_pay || 0) + parseFloat(s.meal_allowance || 0) + parseFloat(s.bonus || 0) + parseFloat(s.position_allowance || 0) + parseFloat(s.other_allowance || 0);
@@ -509,21 +611,27 @@ function DashboardContent() {
       for (const r of summaryData.current) {
         const dept = r.department || "미분류";
         const otH = floor30g(r.overtime_hours);
-        map.set(dept, (map.get(dept) || 0) + otH * (rates["정규직"] || 10030) * 1.5);
+        const regRate = rates["정규직"] || 10030;
+        const add = otH * regRate * 1.5 + (r.night_hours || 0) * regRate * 0.5;
+        map.set(dept, (map.get(dept) || 0) + add);
       }
     } else {
+      // 파견/알바: settlement-alba 산식 일치 (이슈 #3)
       for (const r of summaryData.current) {
         const dept = r.department || "미분류";
         const rate = getRateForCategory(r.category);
         const otH = floor30g(r.overtime_hours);
-        const s = r.shift === "야간"
-          ? r.regular_hours * rate * 1.5 + otH * rate * 2.0
-          : r.regular_hours * rate + otH * rate * 1.5;
+        const nightH = floor30g(r.night_hours || 0);
+        const holH = floor30g(r.holiday_pay_hours || 0);
+        const s = r.regular_hours * rate
+              + otH * rate * 1.5
+              + nightH * rate * 1.5
+              + holH * rate * 1.5;
         map.set(dept, (map.get(dept) || 0) + s);
       }
     }
     return Array.from(map.entries()).map(([dept, cost]) => ({ dept, cost }));
-  }, [summaryData, getRateForCategory, isRegular, year, month, salaryData, rates]);
+  }, [summaryData, getRateForCategory, isRegular, year, month, salaryData, rates, dayRatioFor]);
 
   // 3-month trend data for chart
   const threeMonthTrend = useMemo(() => {

@@ -47,10 +47,11 @@ export default function SettlementDispatchPage() {
   const [yearMonth, setYearMonth] = usePersistedState("sd_yearMonth", (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })());
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [hourlyRate, setHourlyRate] = useState(11000);
-  const [feeRate, setFeeRate] = useState(10);
+  const [hourlyRate, setHourlyRate] = usePersistedState<number>("sd_hourlyRate", 11000);
+  const [feeRate, setFeeRate] = usePersistedState<number>("sd_feeRate", 10);
   const [checkedEmps, setCheckedEmps] = useState<Set<number>>(new Set());
-  const [mealDeductions, setMealDeductions] = useState<Record<number, number>>({});
+  // 식대공제: { "yyyy-mm|이름": 금액 } — 월별·인원별 영속화
+  const [mealDeductionsByKey, setMealDeductionsByKey] = usePersistedState<Record<string, number>>("sd_mealDeductionsByKey", {});
   // 직원별 시급(로컬) — workerByIdentity 매칭으로 worker.hourly_rate 초기화
   const [rates, setRates] = useState<Record<number, number>>({});
   const rateTimers = useRef<Record<number, any>>({});
@@ -156,14 +157,12 @@ export default function SettlementDispatchPage() {
       results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setData({ results });
       setCheckedEmps(new Set(results.map((_: any, i: number) => i)));
-      const meals: Record<number, number> = {};
       const initRates: Record<number, number> = {};
       results.forEach((r: any, i: number) => {
-        meals[i] = 0;
         initRates[i] = r.hourly_rate > 0 ? r.hourly_rate : hourlyRate;
       });
-      setMealDeductions(meals);
       setRates(initRates);
+      // 식대공제는 sessionStorage 영속값 그대로 유지 (mealDeductionsByKey)
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
   }, [yearMonth, hourlyRate]);
@@ -171,6 +170,18 @@ export default function SettlementDispatchPage() {
   useEffect(() => { if (authorized) load(); }, [load, authorized]);
 
   const floor30 = (h: number) => Math.floor(h * 2) / 2;
+
+  const mealKey = (name: string) => `${yearMonth}|${name || ''}`;
+  const getMeal = (name: string) => mealDeductionsByKey[mealKey(name)] || 0;
+  const setMeal = (name: string, value: number) => {
+    const k = mealKey(name);
+    setMealDeductionsByKey(prev => {
+      const next = { ...prev };
+      if (value > 0) next[k] = value;
+      else delete next[k];
+      return next;
+    });
+  };
 
   const calcEmp = (r: any, idx: number) => {
     const rate = rates[idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate);
@@ -183,7 +194,7 @@ export default function SettlementDispatchPage() {
     const nightPay = Math.round(nightHours * rate * 1.5);
     const whPay = Math.round(r.weekly_holiday_hours * rate);
     const grossPay = basePay + overtimePay + holidayPay + nightPay + whPay;
-    const meal = mealDeductions[idx] || 0;
+    const meal = getMeal(r.name);
     const net = grossPay - meal;
     const np = Math.round(net * 0.0475);
     const hi = Math.round(net * 0.03595);
@@ -378,7 +389,7 @@ export default function SettlementDispatchPage() {
                     <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.whPay)}</TD>
                     <TD numeric emphasis>{fmt.format(r.grossPay)}</TD>
                     <TD>
-                      <Input type="number" inputSize="sm" value={mealDeductions[r.idx] || ''} onChange={e => setMealDeductions({...mealDeductions, [r.idx]: parseInt(e.target.value) || 0})}
+                      <Input type="number" inputSize="sm" value={getMeal(r.name) || ''} onChange={e => setMeal(r.name, parseInt(e.target.value) || 0)}
                         className="w-16 text-right" placeholder="0" />
                     </TD>
                     <TD numeric muted>{fmt.format(r.np)}</TD>

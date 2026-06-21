@@ -45,7 +45,6 @@ const groups: NavGroup[] = [
     items: [
       { href: "/attendance-live", label: "실시간 현황판", icon: Activity },
       { href: "/survey-manage", label: "설문 출퇴근", icon: MessageSquare },
-      { href: "/cafe-contract-send", label: "카페팀 근로계약 발송", icon: FileSignature },
       { href: "/workers", label: "근무자 DB", icon: Contact },
       { href: "/weekly-holiday", label: "주휴수당 관리", icon: Shield },
     ],
@@ -70,6 +69,7 @@ const groups: NavGroup[] = [
       { href: "/upload", label: "엑셀 업로드", icon: UploadCloud },
       { href: "/settlement-dispatch", label: "파견 정산관리", icon: Calculator },
       { href: "/settlement-alba", label: "알바(사업소득) 정산관리", icon: Calculator },
+      { href: "/cafe-contract-send", label: "카페팀 근로계약 및 출퇴근", icon: FileSignature },
     ],
   },
   {

@@ -24,6 +24,7 @@ import contractsRoutes from './routes/contracts';
 import offboardingRoutes from './routes/offboarding';
 import offboardingPublicRoutes from './routes/offboardingPublic';
 import onboardingRoutes from './routes/onboarding';
+import cafeContractRoutes, { publicRouter as cafeContractPublicRoutes } from './routes/cafeContract';
 import { requireAuth } from './middleware/auth';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
 
@@ -72,6 +73,8 @@ app.use('/api/contracts', requireAuth, contractsRoutes);
 app.use('/api/offboarding', requireAuth, offboardingRoutes);
 app.use('/api/offboarding-public', offboardingPublicRoutes);  // no auth
 app.use('/api/onboarding', requireAuth, onboardingRoutes);
+app.use('/api/cafe-contract', requireAuth, cafeContractRoutes);
+app.use('/api/cafe-contract-public', cafeContractPublicRoutes);  // no auth
 
 // Health check
 app.get('/api/health', (_req, res) => {

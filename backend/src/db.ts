@@ -948,6 +948,20 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS legacy_filename TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS scanned_file_data TEXT DEFAULT ''"); } catch {}
 
+  // 카페 단독 문자 웹링크용 컬럼 — worker_type='cafe_alba' 로 구분.
+  // 발송 시 admin이 매장·근무시간·시급·근무일 지정 → 직원이 본인 정보+서명 제출.
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS token TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS store_name TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS work_time_start TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS work_time_end TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS work_days TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS consent_signature_data TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS birth_date TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS id_number TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("CREATE INDEX IF NOT EXISTS idx_labor_contracts_token ON labor_contracts(token) WHERE token <> ''"); } catch {}
+
   // workers — 개별 시급 (알바·파견 정산용)
   try { await pool.query('ALTER TABLE workers ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0'); } catch {}
 

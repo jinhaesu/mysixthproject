@@ -45,6 +45,7 @@ const groups: NavGroup[] = [
     items: [
       { href: "/attendance-live", label: "실시간 현황판", icon: Activity },
       { href: "/survey-manage", label: "설문 출퇴근", icon: MessageSquare },
+      { href: "/cafe-contract-send", label: "카페팀 근로계약 발송", icon: FileSignature },
       { href: "/workers", label: "근무자 DB", icon: Contact },
       { href: "/weekly-holiday", label: "주휴수당 관리", icon: Shield },
     ],

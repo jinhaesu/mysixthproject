@@ -1,11 +1,37 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbRun, dbAll, getKSTDate, normalizePhone, getFrontendUrl } from '../db';
+import { dbGet, dbRun, dbAll, getKSTDate, normalizePhone, getFrontendUrl, pool } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms, sendSurveyMessage } from '../services/smsService';
 
 const TOKEN_EXPIRY_HOURS = 24;
+
+// 방어적 스키마 보장 — db.ts initializeDB 가 silent fail 한 경우에도
+// 첫 호출 시 컬럼을 보장. 부팅 이후 1회만 실행.
+let schemaEnsured = false;
+async function ensureCafeSchema(): Promise<void> {
+  if (schemaEnsured) return;
+  const stmts = [
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS token TEXT DEFAULT ''",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS store_name TEXT DEFAULT ''",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS work_time_start TEXT DEFAULT ''",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS work_time_end TEXT DEFAULT ''",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS work_days TEXT DEFAULT ''",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS consent_signature_data TEXT DEFAULT ''",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS birth_date TEXT DEFAULT ''",
+    "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS id_number TEXT DEFAULT ''",
+  ];
+  for (const s of stmts) {
+    try { await pool.query(s); } catch (e: any) {
+      console.error('[ensureCafeSchema] failed:', s, e.message);
+    }
+  }
+  schemaEnsured = true;
+  console.log('[ensureCafeSchema] all cafe columns ensured');
+}
 
 // 매장명 → survey_workplaces 행 자동 ensure (없으면 생성).
 // GPS 좌표는 0 으로 두고, admin 이 추후 workplace_manage 에서 보정 가능.
@@ -45,6 +71,7 @@ const STORE_OPTIONS = ['해방촌', '행궁동', '경복궁'] as const;
 // ============================================================================
 router.post('/send', async (req: AuthRequest, res: Response) => {
   try {
+    await ensureCafeSchema();
     const {
       phone,
       worker_name,
@@ -245,6 +272,7 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
 // ============================================================================
 router.get('/workers', async (_req: AuthRequest, res: Response) => {
   try {
+    await ensureCafeSchema();
     const rows = await dbAll(
       `SELECT DISTINCT ON (phone)
               phone, worker_name, store_name, work_time_start, work_time_end,
@@ -291,6 +319,7 @@ router.get('/list-attendance', async (_req: AuthRequest, res: Response) => {
 // ============================================================================
 router.get('/list', async (_req: AuthRequest, res: Response) => {
   try {
+    await ensureCafeSchema();
     const rows = await dbAll(
       `SELECT id, phone, worker_name, store_name, work_time_start, work_time_end,
               work_days, hourly_rate, contract_start, contract_end,
@@ -317,6 +346,7 @@ export const publicRouter = Router();
 
 publicRouter.get('/:token', async (req: Request, res: Response) => {
   try {
+    await ensureCafeSchema();
     const { token } = req.params;
     if (!token) {
       res.status(400).json({ error: '유효하지 않은 링크입니다.' });

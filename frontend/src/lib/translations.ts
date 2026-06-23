@@ -19,6 +19,7 @@ export const translations: Record<string, Record<string, string>> = {
     contactAdmin: '관리자에게 문의하여 근무지가 지정된 새 설문 링크를 요청해주세요.',
     // Parking
     parkingNotice: '차량으로 방문 시, 공장 내 주차가 불가합니다. 인근 공영주차장을 이용해 주세요.',
+    cafeParkingNotice: '카페 매장은 차량 출퇴근이 불가합니다. 대중교통을 이용해 주세요.',
     // Clock-in form
     clockInTitle: '출근 기록',
     allFieldsRequired: '모든 정보를 정확히 입력해주셔야 합니다.',
@@ -99,6 +100,7 @@ export const translations: Record<string, Record<string, string>> = {
     noWorkplace: 'No workplace assigned',
     contactAdmin: 'Please contact administrator for a new survey link.',
     parkingNotice: 'Parking inside the factory is not available. Please use nearby public parking.',
+    cafeParkingNotice: 'Driving to/from the cafe is not permitted. Please use public transit.',
     clockInTitle: 'Clock In',
     allFieldsRequired: 'All fields must be filled in accurately.',
     nameKo: 'Korean Name',
@@ -172,6 +174,7 @@ export const translations: Record<string, Record<string, string>> = {
     noWorkplace: '未指定工作地点',
     contactAdmin: '请联系管理员获取新的调查链接。',
     parkingNotice: '工厂内不提供停车。请使用附近的公共停车场。',
+    cafeParkingNotice: '咖啡店不允许开车上下班。请使用公共交通。',
     clockInTitle: '上班打卡',
     allFieldsRequired: '所有信息必须准确填写。',
     nameKo: '韩文姓名',
@@ -245,6 +248,7 @@ export const translations: Record<string, Record<string, string>> = {
     noWorkplace: 'Chưa chỉ định nơi làm việc',
     contactAdmin: 'Vui lòng liên hệ quản trị viên để lấy liên kết khảo sát mới.',
     parkingNotice: 'Không có chỗ đậu xe trong nhà máy. Vui lòng sử dụng bãi đậu xe công cộng gần đó.',
+    cafeParkingNotice: 'Không được phép lái xe đến/đi quán cà phê. Vui lòng sử dụng phương tiện công cộng.',
     clockInTitle: 'Chấm công vào',
     allFieldsRequired: 'Tất cả thông tin phải được điền chính xác.',
     nameKo: 'Tên tiếng Hàn',

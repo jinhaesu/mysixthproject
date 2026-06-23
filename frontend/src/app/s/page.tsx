@@ -202,6 +202,15 @@ function SurveyContent() {
 
   useEffect(() => { checkContract(); }, [checkContract]);
 
+  // 카페팀(널담은공간)은 별도 채널로 근로계약을 체결하므로 출퇴근 페이지에서는
+  // 파견/알바 선택 및 호출형 근로계약 단계를 건너뛴다.
+  useEffect(() => {
+    if (data?.workplace?.name?.startsWith('널담은공간')) {
+      if (!workerType) setWorkerType('alba');
+      if (!contractDone) setContractDone(true);
+    }
+  }, [data?.workplace?.name, workerType, contractDone]);
+
   const startDrawing = (e: React.TouchEvent | React.MouseEvent) => {
     const canvas = signatureCanvasRef.current;
     if (!canvas) return;
@@ -365,6 +374,7 @@ function SurveyContent() {
   const gpsReady = gpsStatus === "acquired";
   const canAct = hasWorkplace && gpsReady && isWithinRadius;
   const showForm = data.status === "sent" || data.status === "clock_in";
+  const isCafe = !!data.workplace?.name && data.workplace.name.startsWith('널담은공간');
 
   return (
     <div className="min-h-screen bg-[var(--bg-canvas)] fade-in">
@@ -395,7 +405,7 @@ function SurveyContent() {
         {showForm && (
           <div className="mt-3 bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-md)] px-3 py-2 flex items-start gap-2">
             <Car className="w-4 h-4 text-[var(--warning-fg)] shrink-0 mt-0.5" />
-            <p className="text-[var(--fs-caption)] text-[var(--warning-fg)]">{t(lang, 'parkingNotice')}</p>
+            <p className="text-[var(--fs-caption)] text-[var(--warning-fg)]">{t(lang, isCafe ? 'cafeParkingNotice' : 'parkingNotice')}</p>
           </div>
         )}
       </div>
@@ -543,7 +553,7 @@ function SurveyContent() {
         )}
 
         {/* Factory Guide Video - after agreement, shown regardless of GPS */}
-        {data.status === "sent" && agreementAccepted && (
+        {data.status === "sent" && agreementAccepted && !isCafe && (
           <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] overflow-hidden">
             <div className="px-5 pt-4 pb-2">
               <h2 className="font-semibold text-[var(--text-1)] text-[var(--fs-body)]">
@@ -574,7 +584,7 @@ function SurveyContent() {
         )}
 
         {/* Worker Type Selection */}
-        {data.status === "sent" && agreementAccepted && !workerType && (
+        {data.status === "sent" && agreementAccepted && !workerType && !isCafe && (
           <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
             <h2 className="font-semibold text-[var(--text-1)] text-center">근무 유형을 선택해주세요</h2>
             <div className="grid grid-cols-2 gap-3">
@@ -598,8 +608,8 @@ function SurveyContent() {
           </div>
         )}
 
-        {/* Labor Contract (Alba only) */}
-        {data.status === "sent" && agreementAccepted && workerType === "alba" && !contractDone && (
+        {/* Labor Contract (Alba only) - 공장 알바만. 카페는 별도 채널로 체결. */}
+        {data.status === "sent" && agreementAccepted && workerType === "alba" && !contractDone && !isCafe && (
           <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5 space-y-4">
             <h2 className="font-semibold text-[var(--text-1)] flex items-center gap-2">
               📋 단시간 근로자 표준근로계약서
@@ -685,8 +695,8 @@ function SurveyContent() {
           </div>
         )}
 
-        {/* Worker type badge (auto-filled from previous) */}
-        {data.status === "sent" && agreementAccepted && workerType && (
+        {/* Worker type badge (auto-filled from previous) - 카페는 표기 안 함 */}
+        {data.status === "sent" && agreementAccepted && workerType && !isCafe && (
           <div className="flex items-center justify-between bg-[var(--bg-0)] rounded-[var(--r-xl)] px-4 py-3 border border-[var(--border-2)]">
             <div className="flex items-center gap-2">
               <span className="text-[var(--fs-body)] text-[var(--text-3)]">근무 유형:</span>

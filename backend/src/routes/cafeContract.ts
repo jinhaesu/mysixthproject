@@ -34,32 +34,59 @@ async function ensureCafeSchema(): Promise<void> {
 }
 
 // 매장명 → survey_workplaces 행 자동 ensure (없으면 생성).
-// GPS 좌표는 0 으로 두고, admin 이 추후 workplace_manage 에서 보정 가능.
+// 기존 행에 좌표가 0/0 으로 박혀 있으면 정확 좌표로 UPDATE.
 async function ensureCafeWorkplace(store: string): Promise<number> {
   const name = `널담은공간 ${store}점`;
+  const geo = CAFE_STORE_GEO[store];
+  const addr = CAFE_STORE_ADDRESSES[store] || '';
   const existing = await dbGet(
-    "SELECT id FROM survey_workplaces WHERE name = ? AND is_active = 1",
+    "SELECT id, latitude, longitude, radius_meters FROM survey_workplaces WHERE name = ? AND is_active = 1",
     name,
   ) as any;
-  if (existing) return Number(existing.id);
-  const addr = CAFE_STORE_ADDRESSES[store] || '';
+  if (existing) {
+    if (geo && (Number(existing.latitude) === 0 || Number(existing.longitude) === 0 || Number(existing.radius_meters) === 0)) {
+      await dbRun(
+        "UPDATE survey_workplaces SET latitude = ?, longitude = ?, radius_meters = ?, address = ? WHERE id = ?",
+        geo.lat,
+        geo.lng,
+        CAFE_DEFAULT_RADIUS_M,
+        addr,
+        existing.id,
+      );
+    }
+    return Number(existing.id);
+  }
   const inserted = await dbRun(
     `INSERT INTO survey_workplaces (name, address, latitude, longitude, radius_meters, is_active)
-     VALUES (?, ?, 0, 0, 0, 1)`,
+     VALUES (?, ?, ?, ?, ?, 1)`,
     name,
     addr,
+    geo?.lat ?? 0,
+    geo?.lng ?? 0,
+    geo ? CAFE_DEFAULT_RADIUS_M : 0,
   );
   return Number(inserted.lastInsertRowid);
 }
 
 const router = Router();
 
-// 매장 주소 — 발송 시 계약서 본문에 표시. 실제 주소는 관리자 확인 후 보정.
+// 매장 주소 — 발송 시 계약서 본문에 표시.
+// 출처: nuldamspace.com/en/pages/store-information (공식 매장 안내).
 const CAFE_STORE_ADDRESSES: Record<string, string> = {
-  '해방촌': '서울특별시 용산구 신흥로 (널담은공간 해방촌점)',
-  '행궁동': '경기도 수원시 팔달구 행궁동 (널담은공간 행궁동점)',
-  '경복궁': '서울특별시 종로구 (널담은공간 경복궁점)',
+  '해방촌': '서울특별시 용산구 신흥로15길 18-12',
+  '행궁동': '경기도 수원시 팔달구 정조로886번길 14 1층 (널담은공간 화홍문점)',
+  '경복궁': '서울특별시 종로구 삼청로 24',
 };
+
+// 매장 좌표 — Nominatim 으로 도로명 주소 기준 정확값.
+const CAFE_STORE_GEO: Record<string, { lat: number; lng: number }> = {
+  '해방촌': { lat: 37.5442883, lng: 126.9860645 },
+  '행궁동': { lat: 37.2871381, lng: 127.0161432 },
+  '경복궁': { lat: 37.5779938, lng: 126.9798259 },
+};
+
+// 카페 매장 기본 GPS 반경 — 100m (매장 + 인접 보도).
+const CAFE_DEFAULT_RADIUS_M = 100;
 
 const STORE_OPTIONS = ['해방촌', '행궁동', '경복궁'] as const;
 
@@ -309,6 +336,25 @@ router.get('/list-attendance', async (_req: AuthRequest, res: Response) => {
     res.json(rows);
   } catch (error: any) {
     console.error('GET /api/cafe-contract/list-attendance error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// Admin: 카페 매장 좌표/반경 보정 (이미 lat=0/lng=0 인 워크플레이스에 정확 좌표 주입)
+// POST /api/cafe-contract/sync-workplaces
+// ============================================================================
+router.post('/sync-workplaces', async (_req: AuthRequest, res: Response) => {
+  try {
+    const updated: Array<{ store: string; workplace_id: number; lat: number; lng: number }> = [];
+    for (const store of STORE_OPTIONS) {
+      const id = await ensureCafeWorkplace(store);
+      const geo = CAFE_STORE_GEO[store];
+      if (geo) updated.push({ store, workplace_id: id, lat: geo.lat, lng: geo.lng });
+    }
+    res.json({ success: true, updated });
+  } catch (error: any) {
+    console.error('POST /api/cafe-contract/sync-workplaces error:', error);
     res.status(500).json({ error: error.message });
   }
 });

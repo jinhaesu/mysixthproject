@@ -1,12 +1,34 @@
 import { Router, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTDate, normalizePhone } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, normalizePhone, pool } from '../db';
 import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+// 방어적 스키마 보장 — db.ts initializeDB 의 ALTER TABLE 이 silent fail 한
+// 경우에도 라우트 첫 호출 시 컬럼 보장. 부팅 이후 1회만 실행.
+let workersSchemaEnsured = false;
+async function ensureWorkersSchema(): Promise<void> {
+  if (workersSchemaEnsured) return;
+  const stmts = [
+    "ALTER TABLE workers ADD COLUMN IF NOT EXISTS division TEXT DEFAULT ''",
+    "ALTER TABLE workers ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT ''",
+    "ALTER TABLE workers ADD COLUMN IF NOT EXISTS birth_year INTEGER",
+    "ALTER TABLE workers ADD COLUMN IF NOT EXISTS agency TEXT DEFAULT ''",
+    "ALTER TABLE workers ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0",
+  ];
+  for (const s of stmts) {
+    try { await pool.query(s); } catch (e: any) {
+      console.error('[ensureWorkersSchema] failed:', s, e?.message);
+    }
+  }
+  workersSchemaEnsured = true;
+  console.log('[ensureWorkersSchema] all worker columns ensured');
+}
+
 // GET /api/workers/lite — 경량 (subquery 없음, 정산 페이지 등 대량 로드용)
 router.get('/lite', async (_req: AuthRequest, res: Response) => {
   try {
+    await ensureWorkersSchema();
     const workers = await dbAll(`
       SELECT id, phone, name_ko, name_en, bank_name, bank_account, id_number,
              category, division, department, workplace,
@@ -22,6 +44,7 @@ router.get('/lite', async (_req: AuthRequest, res: Response) => {
 // GET /api/workers - List with search/pagination (LATERAL joins for speed)
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
+    await ensureWorkersSchema();
     const { search, category, division, page = '1', limit = '50' } = req.query as Record<string, string>;
 
     let where = 'WHERE 1=1';
@@ -100,6 +123,7 @@ router.get('/by-phone/:phone', async (req: AuthRequest, res: Response) => {
 // POST /api/workers
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
+    await ensureWorkersSchema();
     const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, division, department, workplace, memo } = req.body;
     const phone = normalizePhone(rawPhone);
     if (!phone) {
@@ -128,6 +152,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // PUT /api/workers/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    await ensureWorkersSchema();
     const { id } = req.params;
     const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, division, department, workplace, memo } = req.body;
     const phone = normalizePhone(rawPhone);

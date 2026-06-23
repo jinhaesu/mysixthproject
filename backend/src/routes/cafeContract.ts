@@ -357,16 +357,56 @@ router.post('/set-radius', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: '반경은 1~100000 미터 사이여야 합니다.' });
       return;
     }
-    const id = await ensureCafeWorkplace(store);
-    await dbRun(
-      'UPDATE survey_workplaces SET radius_meters = ? WHERE id = ?',
-      r,
-      id,
+    const name = `널담은공간 ${store}점`;
+    // ensure 가 신규 생성·좌표 보정만 책임지고, UPDATE 는 이름 기준 전체 활성 행에 적용
+    await ensureCafeWorkplace(store);
+    const beforeRows = await dbAll(
+      `SELECT id, name, latitude, longitude, radius_meters, is_active
+       FROM survey_workplaces
+       WHERE name = ?`,
+      name,
     );
-    console.log(`[cafe-contract.set-radius] store=${store} workplace_id=${id} radius=${r}m`);
-    res.json({ success: true, store, workplace_id: id, radius_meters: r });
+    const update = await dbRun(
+      `UPDATE survey_workplaces SET radius_meters = ? WHERE name = ? AND is_active = 1`,
+      r,
+      name,
+    );
+    const afterRows = await dbAll(
+      `SELECT id, name, latitude, longitude, radius_meters, is_active
+       FROM survey_workplaces
+       WHERE name = ?`,
+      name,
+    );
+    console.log(`[cafe-contract.set-radius] store=${store} radius=${r}m rows=${(update as any)?.rowCount ?? (update as any)?.changes ?? '?'}`);
+    res.json({
+      success: true,
+      store,
+      radius_meters: r,
+      affected_rows: (update as any)?.rowCount ?? (update as any)?.changes ?? null,
+      before: beforeRows,
+      after: afterRows,
+    });
   } catch (error: any) {
     console.error('POST /api/cafe-contract/set-radius error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// Admin: 카페 매장 현재 상태 조회 (진단용)
+// GET /api/cafe-contract/workplace-status
+// ============================================================================
+router.get('/workplace-status', async (_req: AuthRequest, res: Response) => {
+  try {
+    const rows = await dbAll(
+      `SELECT id, name, address, latitude, longitude, radius_meters, is_active
+       FROM survey_workplaces
+       WHERE name LIKE '널담은공간%점'
+       ORDER BY name, id`,
+    );
+    res.json({ count: (rows as any[]).length, rows });
+  } catch (error: any) {
+    console.error('GET /api/cafe-contract/workplace-status error:', error);
     res.status(500).json({ error: error.message });
   }
 });

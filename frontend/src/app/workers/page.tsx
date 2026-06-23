@@ -358,14 +358,14 @@ export default function WorkersPage() {
         onSubmit={handleSearch}
         className="flex items-center gap-3 mb-6 mt-4"
       >
-        <div className="flex-1 max-w-md">
+        <div className="flex-1 min-w-0">
           <Input
             type="text"
             placeholder="이름 또는 전화번호 검색..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            inputSize="md"
-            iconLeft={<Search size={14} />}
+            inputSize="lg"
+            iconLeft={<Search size={18} />}
           />
         </div>
         <Select
@@ -374,8 +374,8 @@ export default function WorkersPage() {
             setCategory(e.target.value);
             setPage(1);
           }}
-          inputSize="md"
-          className="w-36"
+          inputSize="lg"
+          className="w-44 shrink-0"
         >
           <option value="">전체 구분</option>
           <option value="파견">파견</option>
@@ -383,8 +383,11 @@ export default function WorkersPage() {
           <option value="계약직">계약직</option>
           <option value="일용직">일용직</option>
           <option value="아르바이트">아르바이트</option>
+          <option value="카페">카페</option>
+          <option value="생산">생산</option>
+          <option value="물류">물류</option>
         </Select>
-        <Button type="submit" variant="secondary" size="md">
+        <Button type="submit" variant="secondary" size="lg" className="shrink-0">
           검색
         </Button>
       </form>

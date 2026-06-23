@@ -341,6 +341,37 @@ router.get('/list-attendance', async (_req: AuthRequest, res: Response) => {
 });
 
 // ============================================================================
+// Admin: 매장 GPS 반경 임시 변경 (테스트 시 일시적으로 넓히기 위함)
+// POST /api/cafe-contract/set-radius
+// body: { store: '해방촌'|'행궁동'|'경복궁', radius: number(미터) }
+// ============================================================================
+router.post('/set-radius', async (req: AuthRequest, res: Response) => {
+  try {
+    const { store, radius } = req.body as { store?: string; radius?: number | string };
+    if (!store || !STORE_OPTIONS.includes(store as any)) {
+      res.status(400).json({ error: `매장은 ${STORE_OPTIONS.join('/')} 중 하나여야 합니다.` });
+      return;
+    }
+    const r = Number(radius);
+    if (!Number.isFinite(r) || r < 1 || r > 100000) {
+      res.status(400).json({ error: '반경은 1~100000 미터 사이여야 합니다.' });
+      return;
+    }
+    const id = await ensureCafeWorkplace(store);
+    await dbRun(
+      'UPDATE survey_workplaces SET radius_meters = ? WHERE id = ?',
+      r,
+      id,
+    );
+    console.log(`[cafe-contract.set-radius] store=${store} workplace_id=${id} radius=${r}m`);
+    res.json({ success: true, store, workplace_id: id, radius_meters: r });
+  } catch (error: any) {
+    console.error('POST /api/cafe-contract/set-radius error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // Admin: 카페 매장 좌표/반경 보정 (이미 lat=0/lng=0 인 워크플레이스에 정확 좌표 주입)
 // POST /api/cafe-contract/sync-workplaces
 // ============================================================================

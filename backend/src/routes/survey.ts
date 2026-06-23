@@ -373,6 +373,15 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   // Create empty response row
   await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
+  // 발송 시점의 배정 부서를 workers.department 에 즉시 반영
+  if (department) {
+    try {
+      await dbRun(`UPDATE workers SET department = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`, department, phone);
+    } catch (e: any) {
+      console.warn('[survey.send] workers.department backfill failed:', e?.message);
+    }
+  }
+
   // Only send SMS if not scheduled
   let sendResult: any = { success: true };
   if (!isScheduled) {
@@ -461,6 +470,15 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
     `, token, trimmedPhone, workplace_id, date, message_type || 'sms', expiresAt, department || '', planned_clock_in || null, planned_clock_out || null, scheduled_at || null, isScheduled ? 'scheduled' : 'immediate', isScheduled ? 'scheduled' : 'sent');
 
     await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
+
+    // 발송 시점의 배정 부서를 workers.department 에 즉시 반영
+    if (department) {
+      try {
+        await dbRun(`UPDATE workers SET department = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`, department, trimmedPhone);
+      } catch (e: any) {
+        console.warn('[survey.send-batch] workers.department backfill failed:', e?.message);
+      }
+    }
 
     if (!isScheduled) {
       const sendResult = await sendSurveyMessage(trimmedPhone, token, date, workplace.name, message_type || 'sms', department || '');
@@ -953,6 +971,13 @@ router.post('/run-scheduler', async (_req: AuthRequest, res: Response) => {
       if (result.success) {
         await dbRun("UPDATE survey_requests SET scheduled_status = 'sent', status = 'sent' WHERE id = ?", req.id);
         surveysSent++;
+        if (req.department) {
+          try {
+            await dbRun(`UPDATE workers SET department = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`, req.department, req.phone);
+          } catch (e: any) {
+            console.warn('[survey.scheduled] workers.department backfill failed:', e?.message);
+          }
+        }
       }
     }
 

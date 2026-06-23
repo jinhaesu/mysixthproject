@@ -153,6 +153,13 @@ async function checkAndSendScheduledSurveys() {
       const result = await sendSurveyMessage(req.phone, req.token, req.date, req.workplace_name || '', 'sms', req.department || '');
       if (result.success) {
         await dbRun("UPDATE survey_requests SET scheduled_status = 'sent', status = 'sent' WHERE id = ?", req.id);
+        if (req.department) {
+          try {
+            await dbRun(`UPDATE workers SET department = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`, req.department, req.phone);
+          } catch (e: any) {
+            console.warn('[reminderService] workers.department backfill failed:', e?.message);
+          }
+        }
       }
     }
     if (pending.length > 0) console.log(`[Scheduler] Sent ${pending.length} scheduled surveys`);

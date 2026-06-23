@@ -210,6 +210,58 @@ router.post('/import', async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/workers/backfill-department - 빈 department 를 가장 최근 survey_requests.department 로 채움
+// body 옵션: { force: boolean }  force=true 면 비어있지 않은 행도 최신 발송 부서로 덮어쓰기
+router.post('/backfill-department', async (req: AuthRequest, res: Response) => {
+  try {
+    const force = !!(req.body || {}).force;
+    const targets = await dbAll(
+      force
+        ? `SELECT id, phone, name_ko FROM workers`
+        : `SELECT id, phone, name_ko FROM workers WHERE department IS NULL OR department = ''`,
+    ) as any[];
+
+    let updated = 0;
+    const notFound: string[] = [];
+
+    for (const w of targets) {
+      const phoneNorm = (w.phone || '').replace(/-/g, '');
+      const latest = await dbGet(
+        `SELECT department
+         FROM survey_requests
+         WHERE REPLACE(phone, '-', '') = ?
+           AND department IS NOT NULL AND department != ''
+         ORDER BY COALESCE(scheduled_at, created_at) DESC
+         LIMIT 1`,
+        phoneNorm,
+      ) as any;
+
+      if (latest?.department) {
+        await dbRun(
+          'UPDATE workers SET department = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          latest.department,
+          w.id,
+        );
+        updated++;
+      } else {
+        notFound.push(w.name_ko || w.phone);
+      }
+    }
+
+    res.json({
+      success: true,
+      mode: force ? 'force' : 'empty-only',
+      candidates: targets.length,
+      updated,
+      not_found_count: notFound.length,
+      not_found_sample: notFound.slice(0, 20),
+    });
+  } catch (error: any) {
+    console.error('POST /api/workers/backfill-department error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/workers/backfill-category - Fill empty category from survey_responses
 router.post('/backfill-category', async (req: AuthRequest, res: Response) => {
   try {

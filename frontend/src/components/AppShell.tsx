@@ -14,6 +14,7 @@ const PUBLIC_PAGES = [
   "/regular-contract",
   "/resignation-letter",
   "/onboarding-info",
+  "/cafe-contract",
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

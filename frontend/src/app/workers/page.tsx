@@ -44,6 +44,7 @@ interface Worker {
   id_number: string;
   emergency_contact: string;
   category: string;
+  division: string;
   department: string;
   workplace: string;
   memo: string;
@@ -65,6 +66,7 @@ const emptyForm: Omit<Worker, "id"> = {
   id_number: "",
   emergency_contact: "",
   category: "",
+  division: "",
   department: "",
   workplace: "",
   memo: "",
@@ -82,6 +84,7 @@ export default function WorkersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = usePersistedState("w_search", "");
   const [category, setCategory] = usePersistedState("w_category", "");
+  const [division, setDivision] = usePersistedState("w_division", "");
   const [page, setPage] = usePersistedState("w_page", 1);
 
   // Modal state
@@ -155,6 +158,7 @@ export default function WorkersPage() {
       };
       if (search) params.search = search;
       if (category) params.category = category;
+      if (division) params.division = division;
 
       const data = await getWorkers(params);
       setWorkers(data.workers);
@@ -168,7 +172,7 @@ export default function WorkersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, category, toast]);
+  }, [page, search, category, division, toast]);
 
   useEffect(() => {
     loadWorkers();
@@ -255,6 +259,7 @@ export default function WorkersPage() {
       id_number: worker.id_number,
       emergency_contact: worker.emergency_contact,
       category: worker.category,
+      division: worker.division || "",
       department: worker.department,
       workplace: worker.workplace,
       memo: worker.memo,
@@ -356,26 +361,40 @@ export default function WorkersPage() {
       {/* Search & Filter */}
       <form
         onSubmit={handleSearch}
-        className="flex items-center gap-3 mb-6 mt-4"
+        className="flex flex-wrap items-center gap-3 mb-6 mt-4"
       >
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-[260px]">
           <Input
             type="text"
             placeholder="이름 또는 전화번호 검색..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            inputSize="lg"
-            iconLeft={<Search size={18} />}
+            inputSize="md"
+            iconLeft={<Search size={16} />}
           />
         </div>
+        <Select
+          value={division}
+          onChange={(e) => {
+            setDivision(e.target.value);
+            setPage(1);
+          }}
+          inputSize="md"
+          className="w-36 shrink-0"
+        >
+          <option value="">전체 사업부</option>
+          <option value="카페">카페</option>
+          <option value="생산">생산</option>
+          <option value="물류">물류</option>
+        </Select>
         <Select
           value={category}
           onChange={(e) => {
             setCategory(e.target.value);
             setPage(1);
           }}
-          inputSize="lg"
-          className="w-44 shrink-0"
+          inputSize="md"
+          className="w-36 shrink-0"
         >
           <option value="">전체 구분</option>
           <option value="파견">파견</option>
@@ -383,11 +402,8 @@ export default function WorkersPage() {
           <option value="계약직">계약직</option>
           <option value="일용직">일용직</option>
           <option value="아르바이트">아르바이트</option>
-          <option value="카페">카페</option>
-          <option value="생산">생산</option>
-          <option value="물류">물류</option>
         </Select>
-        <Button type="submit" variant="secondary" size="lg" className="shrink-0">
+        <Button type="submit" variant="secondary" size="md" className="shrink-0">
           검색
         </Button>
       </form>
@@ -406,6 +422,7 @@ export default function WorkersPage() {
                   <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">이름</th>
                   <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">전화번호</th>
                   <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">구분</th>
+                  <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">사업부</th>
                   <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">부서</th>
                   <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">은행</th>
                   <th className="px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[var(--text-3)]">계좌</th>
@@ -436,6 +453,15 @@ export default function WorkersPage() {
                       {worker.category ? (
                         <Badge tone={worker.category === '파견' ? 'warning' : worker.category === '아르바이트' ? 'success' : 'brand'}>
                           {worker.category}
+                        </Badge>
+                      ) : (
+                        <span className="text-[var(--text-4)]">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {worker.division ? (
+                        <Badge tone={worker.division === '카페' ? 'success' : worker.division === '물류' ? 'warning' : 'brand'}>
+                          {worker.division}
                         </Badge>
                       ) : (
                         <span className="text-[var(--text-4)]">-</span>
@@ -596,7 +622,7 @@ export default function WorkersPage() {
                     inputSize="md"
                   />
                 </Field>
-                <Field label="구분">
+                <Field label="구분 (고용형태)">
                   <Select
                     value={form.category}
                     onChange={(e) => updateForm("category", e.target.value)}
@@ -612,15 +638,29 @@ export default function WorkersPage() {
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="부서">
+                <Field label="사업부">
+                  <Select
+                    value={form.division}
+                    onChange={(e) => updateForm("division", e.target.value)}
+                    inputSize="md"
+                  >
+                    <option value="">선택</option>
+                    <option value="카페">카페</option>
+                    <option value="생산">생산</option>
+                    <option value="물류">물류</option>
+                  </Select>
+                </Field>
+                <Field label="부서 (배정파트)">
                   <Input
                     type="text"
                     value={form.department}
                     onChange={(e) => updateForm("department", e.target.value)}
-                    placeholder="부서명"
+                    placeholder="포장1팀 등"
                     inputSize="md"
                   />
                 </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="근무지">
                   <Input
                     type="text"
@@ -630,6 +670,7 @@ export default function WorkersPage() {
                     inputSize="md"
                   />
                 </Field>
+                <div />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="은행명">

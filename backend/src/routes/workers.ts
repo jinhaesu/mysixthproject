@@ -9,7 +9,7 @@ router.get('/lite', async (_req: AuthRequest, res: Response) => {
   try {
     const workers = await dbAll(`
       SELECT id, phone, name_ko, name_en, bank_name, bank_account, id_number,
-             category, department, workplace,
+             category, division, department, workplace,
              COALESCE(hourly_rate, 0) as hourly_rate
       FROM workers ORDER BY name_ko ASC
     `);
@@ -22,7 +22,7 @@ router.get('/lite', async (_req: AuthRequest, res: Response) => {
 // GET /api/workers - List with search/pagination (LATERAL joins for speed)
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { search, category, page = '1', limit = '50' } = req.query as Record<string, string>;
+    const { search, category, division, page = '1', limit = '50' } = req.query as Record<string, string>;
 
     let where = 'WHERE 1=1';
     const params: any[] = [];
@@ -34,6 +34,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     if (category) {
       where += ' AND category = ?';
       params.push(category);
+    }
+    if (division) {
+      where += ' AND division = ?';
+      params.push(division);
     }
 
     const pageNum = parseInt(page);
@@ -96,7 +100,7 @@ router.get('/by-phone/:phone', async (req: AuthRequest, res: Response) => {
 // POST /api/workers
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+    const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, division, department, workplace, memo } = req.body;
     const phone = normalizePhone(rawPhone);
     if (!phone) {
       res.status(400).json({ error: '전화번호는 필수입니다.' });
@@ -110,9 +114,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     }
 
     const result = await dbRun(`
-      INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, phone, name_ko || '', name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', category || '', department || '', workplace || '', memo || '');
+      INSERT INTO workers (phone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, division, department, workplace, memo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, phone, name_ko || '', name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', category || '', division || '', department || '', workplace || '', memo || '');
 
     const created = await dbGet('SELECT * FROM workers WHERE id = ?', result.lastInsertRowid);
     res.status(201).json(created);
@@ -125,15 +129,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, department, workplace, memo } = req.body;
+    const { phone: rawPhone, name_ko, name_en, bank_name, bank_account, id_number, emergency_contact, category, division, department, workplace, memo } = req.body;
     const phone = normalizePhone(rawPhone);
 
     await dbRun(`
       UPDATE workers SET phone = ?, name_ko = ?, name_en = ?, bank_name = ?, bank_account = ?,
-        id_number = ?, emergency_contact = ?, category = ?, department = ?, workplace = ?, memo = ?,
+        id_number = ?, emergency_contact = ?, category = ?, division = ?, department = ?, workplace = ?, memo = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `, phone, name_ko || '', name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', category || '', department || '', workplace || '', memo || '', id);
+    `, phone, name_ko || '', name_en || '', bank_name || '', bank_account || '', id_number || '', emergency_contact || '', category || '', division || '', department || '', workplace || '', memo || '', id);
 
     const updated = await dbGet('SELECT * FROM workers WHERE id = ?', id);
     res.json(updated);

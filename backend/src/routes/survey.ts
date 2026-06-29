@@ -317,9 +317,36 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
 
 // ===== Survey Send =====
 
+// ISO weekday: Mon=1 .. Sun=7
+function isoDow(d: Date): number {
+  const w = d.getDay();
+  return w === 0 ? 7 : w;
+}
+
+// Expand week_schedule into a list of {date, scheduled_at}.
+// week_schedule: { start_date, weekdays: number[], daily_time, repeat_weeks }
+function expandWeekSchedule(ws: { start_date: string; weekdays: number[]; daily_time: string; repeat_weeks?: number }): Array<{ dateStr: string; schedTime: string }> {
+  const repeat = Math.max(1, Math.min(8, Number(ws.repeat_weeks) || 1));
+  const weekdays = Array.isArray(ws.weekdays) ? ws.weekdays.map(Number).filter((n) => n >= 1 && n <= 7) : [];
+  if (weekdays.length === 0) return [];
+  const start = new Date(ws.start_date);
+  if (Number.isNaN(start.getTime())) return [];
+  const out: Array<{ dateStr: string; schedTime: string }> = [];
+  const totalDays = 7 * repeat;
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    if (!weekdays.includes(isoDow(d))) continue;
+    const dateStr = d.toISOString().slice(0, 10);
+    const schedTime = new Date(`${dateStr}T${ws.daily_time}`).toISOString();
+    out.push({ dateStr, schedTime });
+  }
+  return out;
+}
+
 // POST /api/survey/send - Send survey to a single phone
 router.post('/send', async (req: AuthRequest, res: Response) => {
-  const { phone: rawPhone, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range } = req.body;
+  const { phone: rawPhone, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range, week_schedule } = req.body;
   const phone = normalizePhone(rawPhone);
 
   if (!phone || !date || !workplace_id) {
@@ -330,6 +357,35 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
   const workplace = await dbGet('SELECT name FROM survey_workplaces WHERE id = ? AND is_active = 1', workplace_id) as any;
   if (!workplace) {
     res.status(400).json({ error: '유효하지 않은 근무지입니다.' });
+    return;
+  }
+
+  // Weekly recurring scheduled sending (start_date + weekdays + daily_time + repeat_weeks)
+  if (!scheduled_at && week_schedule) {
+    const slots = expandWeekSchedule(week_schedule);
+    if (slots.length === 0) {
+      res.status(400).json({ error: '주간 스케줄: 시작일/요일/시각을 확인해주세요.' });
+      return;
+    }
+    const results = [];
+    for (const { dateStr, schedTime } of slots) {
+      const t = uuidv4();
+      const exp = new Date(new Date(schedTime).getTime() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+      const r = await dbRun(`
+        INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, t, phone, workplace_id, dateStr, message_type || 'sms', exp, department || '', planned_clock_in || null, planned_clock_out || null, schedTime, 'scheduled', 'scheduled');
+      await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', r.lastInsertRowid);
+      results.push({ date: dateStr, scheduled_at: schedTime });
+    }
+    if (department) {
+      try {
+        await dbRun(`UPDATE workers SET department = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`, department, phone);
+      } catch (e: any) {
+        console.warn('[survey.send/week] workers.department backfill failed:', e?.message);
+      }
+    }
+    res.status(201).json({ success: true, scheduled_weekly: true, count: results.length, items: results });
     return;
   }
 
@@ -408,7 +464,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
 // POST /api/survey/send-batch - Send to multiple phones
 router.post('/send-batch', async (req: AuthRequest, res: Response) => {
-  const { phones, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range } = req.body;
+  const { phones, date, workplace_id, message_type, department, planned_clock_in, planned_clock_out, scheduled_at, schedule_range, week_schedule } = req.body;
 
   if (!phones || !Array.isArray(phones) || phones.length === 0 || !date || !workplace_id) {
     res.status(400).json({ error: '전화번호 목록, 날짜, 근무지는 필수입니다.' });
@@ -418,6 +474,42 @@ router.post('/send-batch', async (req: AuthRequest, res: Response) => {
   const workplace = await dbGet('SELECT name FROM survey_workplaces WHERE id = ? AND is_active = 1', workplace_id) as any;
   if (!workplace) {
     res.status(400).json({ error: '유효하지 않은 근무지입니다.' });
+    return;
+  }
+
+  // Weekly recurring scheduled sending (batch)
+  if (!scheduled_at && week_schedule) {
+    const slots = expandWeekSchedule(week_schedule);
+    if (slots.length === 0) {
+      res.status(400).json({ error: '주간 스케줄: 시작일/요일/시각을 확인해주세요.' });
+      return;
+    }
+    const results: Array<{ phone: string; date: string; scheduled_at: string }> = [];
+    for (const { dateStr, schedTime } of slots) {
+      for (const phone of phones) {
+        const trimmedPhone = normalizePhone(phone);
+        if (!trimmedPhone) continue;
+        const t = uuidv4();
+        const exp = new Date(new Date(schedTime).getTime() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+        const r = await dbRun(`
+          INSERT INTO survey_requests (token, phone, workplace_id, date, message_type, expires_at, department, planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, t, trimmedPhone, workplace_id, dateStr, message_type || 'sms', exp, department || '', planned_clock_in || null, planned_clock_out || null, schedTime, 'scheduled', 'scheduled');
+        await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', r.lastInsertRowid);
+        results.push({ phone: trimmedPhone, date: dateStr, scheduled_at: schedTime });
+      }
+    }
+    if (department) {
+      try {
+        const uniq = Array.from(new Set(phones.map((p: string) => normalizePhone(p)).filter(Boolean)));
+        for (const ph of uniq) {
+          await dbRun(`UPDATE workers SET department = ?, updated_at = CURRENT_TIMESTAMP WHERE phone = ?`, department, ph);
+        }
+      } catch (e: any) {
+        console.warn('[survey.send-batch/week] workers.department backfill failed:', e?.message);
+      }
+    }
+    res.status(201).json({ success: true, scheduled_weekly: true, count: results.length, items: results });
     return;
   }
 

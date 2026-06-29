@@ -166,7 +166,7 @@ function SendTab() {
   const [reminderResult, setReminderResult] = useState<any>(null);
   const [plannedClockIn, setPlannedClockIn] = useState("");
   const [plannedClockOut, setPlannedClockOut] = useState("");
-  const [scheduleType, setScheduleType] = useState<'immediate' | 'single' | 'range'>('immediate');
+  const [scheduleType, setScheduleType] = useState<'immediate' | 'single' | 'range' | 'weekly'>('immediate');
   const [scheduledAt, setScheduledAt] = useState(() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
@@ -177,6 +177,21 @@ function SendTab() {
     return d.toISOString().slice(0, 10);
   });
   const [rangeDailyTime, setRangeDailyTime] = useState("08:00");
+  // 주간 반복 발송 (다음 월요일 + 월~금 + 시각 + 반복 주 수)
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date();
+    const dow = d.getDay();
+    const daysUntilMon = (1 - dow + 7) % 7 || 7;
+    d.setDate(d.getDate() + daysUntilMon);
+    return d.toLocaleDateString('sv-SE');
+  });
+  const [weeklyWeekdays, setWeeklyWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [weeklyTime, setWeeklyTime] = useState("08:00");
+  const [weeklyRepeat, setWeeklyRepeat] = useState(1);
+  const toggleWeekday = (n: number) => {
+    setWeeklyWeekdays((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort((a, b) => a - b));
+  };
+  const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
 
   useEffect(() => {
     getSurveyWorkplaces().then(setWorkplaces).catch(console.error);
@@ -205,6 +220,7 @@ function SendTab() {
     if (workplaceId === null) { toast.info("근무지를 선택해주세요."); return; };
     if (!department) { toast.info("배정 파트를 선택해주세요."); return; };
     if (!plannedClockIn || !plannedClockOut) { toast.info("계획 출퇴근 시간을 입력해주세요."); return; };
+    if (scheduleType === 'weekly' && weeklyWeekdays.length === 0) { toast.info("주간 발송: 최소 한 요일은 선택해주세요."); return; }
     setSending(true);
     try {
       const schedParams: any = {};
@@ -212,9 +228,14 @@ function SendTab() {
         schedParams.scheduled_at = new Date(scheduledAt).toISOString();
       } else if (scheduleType === 'range') {
         schedParams.schedule_range = { start_date: rangeStart, end_date: rangeEnd, daily_time: rangeDailyTime };
+      } else if (scheduleType === 'weekly') {
+        schedParams.week_schedule = { start_date: weekStart, weekdays: weeklyWeekdays, daily_time: weeklyTime, repeat_weeks: weeklyRepeat };
       }
       const result = await sendSurvey({ phone: phone.trim(), date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, ...schedParams });
-      if (result.scheduled_range) {
+      if (result.scheduled_weekly) {
+        toast.success(`${result.count}회 주간 예약 완료 (${weeklyRepeat}주 × ${weeklyWeekdays.length}일)`);
+        setPhone("");
+      } else if (result.scheduled_range) {
         toast.success(`${result.count}일간 기간 예약 완료`);
         setPhone("");
       } else if (result.scheduled) {
@@ -240,6 +261,7 @@ function SendTab() {
     if (workplaceId === null) { toast.info("근무지를 선택해주세요."); return; };
     if (!department) { toast.info("배정 파트를 선택해주세요."); return; };
     if (!plannedClockIn || !plannedClockOut) { toast.info("계획 출퇴근 시간을 입력해주세요."); return; };
+    if (scheduleType === 'weekly' && weeklyWeekdays.length === 0) { toast.info("주간 발송: 최소 한 요일은 선택해주세요."); return; }
     setSending(true);
     try {
       const schedParams: any = {};
@@ -247,9 +269,13 @@ function SendTab() {
         schedParams.scheduled_at = new Date(scheduledAt).toISOString();
       } else if (scheduleType === 'range') {
         schedParams.schedule_range = { start_date: rangeStart, end_date: rangeEnd, daily_time: rangeDailyTime };
+      } else if (scheduleType === 'weekly') {
+        schedParams.week_schedule = { start_date: weekStart, weekdays: weeklyWeekdays, daily_time: weeklyTime, repeat_weeks: weeklyRepeat };
       }
       const result = await sendSurveyBatch({ phones, date, workplace_id: workplaceId, message_type: messageType, department, planned_clock_in: plannedClockIn || undefined, planned_clock_out: plannedClockOut || undefined, ...schedParams });
-      if (result.scheduled_range) {
+      if (result.scheduled_weekly) {
+        toast.success(`${result.count}건 주간 예약 완료 (${weeklyRepeat}주 × ${weeklyWeekdays.length}일 × ${phones.length}명)`);
+      } else if (result.scheduled_range) {
         toast.success(`${result.count}건 기간 예약 완료`);
       } else {
         toast.success(result.scheduled ? `${result.total}건 예약 완료` : `${result.total}건 발송 완료`);
@@ -410,6 +436,11 @@ function SendTab() {
                   onChange={() => setScheduleType('range')} className="accent-blue-600" />
                 <span className="text-sm text-[var(--text-2)]">기간 예약</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="schedType" value="weekly" checked={scheduleType === 'weekly'}
+                  onChange={() => setScheduleType('weekly')} className="accent-blue-600" />
+                <span className="text-sm text-[var(--text-2)]">주간 반복</span>
+              </label>
             </div>
 
             {scheduleType === 'single' && (
@@ -429,6 +460,52 @@ function SendTab() {
                 <Input type="time" value={rangeDailyTime} onChange={(e) => setRangeDailyTime(e.target.value)}
                   inputSize="sm" />
                 <span className="text-xs text-[var(--text-3)]">매일 발송</span>
+              </div>
+            )}
+
+            {scheduleType === 'weekly' && (
+              <div className="space-y-2 p-3 rounded-lg bg-[var(--bg-2)]/40 border border-[var(--border-1)]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[var(--text-3)] min-w-[60px]">시작일</span>
+                  <Input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} inputSize="sm" />
+                  <span className="text-xs text-[var(--text-3)] ml-3">매일</span>
+                  <Input type="time" value={weeklyTime} onChange={(e) => setWeeklyTime(e.target.value)} inputSize="sm" />
+                  <span className="text-xs text-[var(--text-3)] ml-3">반복</span>
+                  <Select value={weeklyRepeat} onChange={(e) => setWeeklyRepeat(Number(e.target.value))}
+                    className="px-2 py-1 border border-[var(--border-1)] rounded-md text-sm bg-[var(--bg-1)]">
+                    <option value={1}>1주</option>
+                    <option value={2}>2주</option>
+                    <option value={4}>4주</option>
+                    <option value={8}>8주</option>
+                  </Select>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[var(--text-3)] min-w-[60px]">요일</span>
+                  {WEEKDAY_LABELS.map((label, idx) => {
+                    const n = idx + 1;
+                    const selected = weeklyWeekdays.includes(n);
+                    const isWeekend = n >= 6;
+                    return (
+                      <button key={n} type="button" onClick={() => toggleWeekday(n)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors border ${
+                          selected
+                            ? 'bg-[var(--brand-500)] text-white border-[var(--brand-500)]'
+                            : `bg-[var(--bg-1)] ${isWeekend ? 'text-[var(--warning-fg)]' : 'text-[var(--text-3)]'} border-[var(--border-1)] hover:bg-[var(--bg-2)]`
+                        }`}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                  <button type="button"
+                    onClick={() => setWeeklyWeekdays([1, 2, 3, 4, 5])}
+                    className="ml-2 px-2 py-1 text-xs text-[var(--text-3)] underline hover:text-[var(--text-1)]">평일</button>
+                  <button type="button"
+                    onClick={() => setWeeklyWeekdays([1, 2, 3, 4, 5, 6, 7])}
+                    className="px-2 py-1 text-xs text-[var(--text-3)] underline hover:text-[var(--text-1)]">매일</button>
+                </div>
+                <p className="text-xs text-[var(--text-4)]">
+                  → 총 <span className="text-[var(--brand-400)] font-medium">{weeklyWeekdays.length * weeklyRepeat}회</span> 예약 발송 (각 발송 시점에 출퇴근 토큰 생성)
+                </p>
               </div>
             )}
 

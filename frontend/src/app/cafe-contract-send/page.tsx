@@ -123,6 +123,23 @@ export default function CafeContractSendPage() {
   const [attWorkerName, setAttWorkerName] = useState("");
   const [attSubmitting, setAttSubmitting] = useState(false);
 
+  // 주간 반복 발송 모드
+  const [attSendMode, setAttSendMode] = useState<"single" | "weekly">("single");
+  const [attWeekStart, setAttWeekStart] = useState(() => {
+    const d = new Date();
+    const dow = d.getDay();
+    const daysUntilMon = (1 - dow + 7) % 7 || 7;
+    d.setDate(d.getDate() + daysUntilMon);
+    return d.toLocaleDateString("sv-SE");
+  });
+  const [attWeekdays, setAttWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [attWeeklyTime, setAttWeeklyTime] = useState("09:00");
+  const [attWeeklyRepeat, setAttWeeklyRepeat] = useState(1);
+  const ATT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+  const toggleAttWeekday = (n: number) => {
+    setAttWeekdays((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n].sort((a, b) => a - b)));
+  };
+
   const [attendanceList, setAttendanceList] = useState<AttendanceLog[]>([]);
   const [loadingAttList, setLoadingAttList] = useState(false);
 
@@ -228,25 +245,43 @@ export default function CafeContractSendPage() {
 
   const handleSendAttendance = async () => {
     if (!attPhone.trim()) return toast.warning("전화번호를 입력해주세요.");
-    if (!attDate) return toast.warning("날짜를 선택해주세요.");
     if (!attStore) return toast.warning("매장을 선택해주세요.");
+    if (attSendMode === "single" && !attDate) return toast.warning("날짜를 선택해주세요.");
+    if (attSendMode === "weekly" && attWeekdays.length === 0) return toast.warning("주간 발송: 최소 한 요일은 선택해주세요.");
 
     setAttSubmitting(true);
     try {
+      const payload: any = {
+        phone: attPhone.trim(),
+        worker_name: attWorkerName.trim(),
+        store_name: attStore,
+        planned_clock_in: attClockIn || null,
+        planned_clock_out: attClockOut || null,
+      };
+      if (attSendMode === "weekly") {
+        payload.week_schedule = {
+          start_date: attWeekStart,
+          weekdays: attWeekdays,
+          daily_time: attWeeklyTime,
+          repeat_weeks: attWeeklyRepeat,
+        };
+      } else {
+        payload.date = attDate;
+      }
       const res = await authedFetch("/api/cafe-contract/send-attendance-link", {
         method: "POST",
-        body: JSON.stringify({
-          phone: attPhone.trim(),
-          worker_name: attWorkerName.trim(),
-          store_name: attStore,
-          date: attDate,
-          planned_clock_in: attClockIn || null,
-          planned_clock_out: attClockOut || null,
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await res.json();
       if (!res.ok || !body.success) throw new Error(body.error || `발송 실패 (HTTP ${res.status})`);
-      toast.success("출퇴근 링크 발송 완료", `${attWorkerName || attPhone} → ${attStore}점`);
+      if (body.scheduled_weekly) {
+        toast.success(
+          "주간 반복 예약 완료",
+          `${attWorkerName || attPhone} → ${attStore}점, ${body.count}회 (${attWeeklyRepeat}주 × ${attWeekdays.length}일) 자동 발송`,
+        );
+      } else {
+        toast.success("출퇴근 링크 발송 완료", `${attWorkerName || attPhone} → ${attStore}점`);
+      }
       loadAttendanceList();
     } catch (e: any) {
       toast.error("발송 실패", e.message);
@@ -425,6 +460,32 @@ export default function CafeContractSendPage() {
               근로계약을 체결한 카페팀 직원에게 출퇴근 기록용 SMS 링크를 발송합니다.
               직원이 매장에 도착해 링크를 누르면 출근, 퇴근 시 다시 눌러 퇴근이 기록됩니다.
             </p>
+            {/* 발송 모드 토글 */}
+            <div className="flex gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setAttSendMode("single")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  attSendMode === "single"
+                    ? "bg-[var(--brand-500)] text-white"
+                    : "bg-[var(--bg-2)] text-[var(--text-3)] hover:bg-[var(--bg-2)]/7"
+                }`}
+              >
+                단발 발송 (1일)
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttSendMode("weekly")}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  attSendMode === "weekly"
+                    ? "bg-[var(--brand-500)] text-white"
+                    : "bg-[var(--bg-2)] text-[var(--text-3)] hover:bg-[var(--bg-2)]/7"
+                }`}
+              >
+                주간 반복 (예약)
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="기존 직원 선택" hint="아래 필드가 자동 채워집니다. 신규 직원은 직접 입력.">
                 <Select value={selectedPhone} onChange={(e) => setSelectedPhone(e.target.value)}>
@@ -436,9 +497,16 @@ export default function CafeContractSendPage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="날짜" required>
-                <Input type="date" value={attDate} onChange={(e) => setAttDate(e.target.value)} />
-              </Field>
+              {attSendMode === "single" && (
+                <Field label="날짜" required>
+                  <Input type="date" value={attDate} onChange={(e) => setAttDate(e.target.value)} />
+                </Field>
+              )}
+              {attSendMode === "weekly" && (
+                <Field label="발송 시각" required>
+                  <Input type="time" value={attWeeklyTime} onChange={(e) => setAttWeeklyTime(e.target.value)} />
+                </Field>
+              )}
 
               <Field label="이름">
                 <Input value={attWorkerName} onChange={(e) => setAttWorkerName(e.target.value)} placeholder="예: 김카페" />
@@ -466,10 +534,80 @@ export default function CafeContractSendPage() {
               </div>
             </div>
 
+            {attSendMode === "weekly" && (
+              <div className="mt-4 p-3 rounded-lg bg-[var(--bg-2)]/40 border border-[var(--border-1)] space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[var(--text-3)] min-w-[60px]">시작일</span>
+                  <Input type="date" value={attWeekStart} onChange={(e) => setAttWeekStart(e.target.value)} />
+                  <span className="text-xs text-[var(--text-3)] ml-3">반복</span>
+                  <Select
+                    value={attWeeklyRepeat}
+                    onChange={(e) => setAttWeeklyRepeat(Number(e.target.value))}
+                    className="px-2 py-1 border border-[var(--border-1)] rounded-md text-sm bg-[var(--bg-1)]"
+                  >
+                    <option value={1}>1주</option>
+                    <option value={2}>2주</option>
+                    <option value={4}>4주</option>
+                    <option value={8}>8주</option>
+                  </Select>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[var(--text-3)] min-w-[60px]">요일</span>
+                  {ATT_WEEKDAY_LABELS.map((label, idx) => {
+                    const n = idx + 1;
+                    const selected = attWeekdays.includes(n);
+                    const isWeekend = n >= 6;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => toggleAttWeekday(n)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors border ${
+                          selected
+                            ? "bg-[var(--brand-500)] text-white border-[var(--brand-500)]"
+                            : `bg-[var(--bg-1)] ${isWeekend ? "text-[var(--warning-fg)]" : "text-[var(--text-3)]"} border-[var(--border-1)] hover:bg-[var(--bg-2)]`
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setAttWeekdays([1, 2, 3, 4, 5])}
+                    className="ml-2 px-2 py-1 text-xs text-[var(--text-3)] underline hover:text-[var(--text-1)]"
+                  >
+                    평일
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttWeekdays([1, 2, 3, 4, 5, 6, 7])}
+                    className="px-2 py-1 text-xs text-[var(--text-3)] underline hover:text-[var(--text-1)]"
+                  >
+                    매일
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttWeekdays([6, 7])}
+                    className="px-2 py-1 text-xs text-[var(--text-3)] underline hover:text-[var(--text-1)]"
+                  >
+                    토일
+                  </button>
+                </div>
+                <p className="text-xs text-[var(--text-4)]">
+                  → 총{" "}
+                  <span className="text-[var(--brand-400)] font-medium">
+                    {attWeekdays.length * attWeeklyRepeat}회
+                  </span>{" "}
+                  자동 발송 (각 발송 시점에 새 토큰 생성)
+                </p>
+              </div>
+            )}
+
             <div className="mt-4 flex justify-end">
               <Button variant="primary" size="lg" loading={attSubmitting} onClick={handleSendAttendance}>
                 <Send className="w-4 h-4 mr-1" />
-                출퇴근 링크 SMS 발송
+                {attSendMode === "weekly" ? "주간 반복 예약" : "출퇴근 링크 SMS 발송"}
               </Button>
             </div>
           </Card>

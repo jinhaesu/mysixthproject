@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { dbGet, dbAll, dbRun, getKSTDate, isHolidayOrWeekend, isKoreanHoliday, normalizePhone, getFrontendUrl } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendSurveyMessage, sendGeneralSms } from '../services/smsService';
+import { expandWeekSchedule } from '../services/scheduleHelper';
 
 const router = Router();
 
@@ -316,33 +317,6 @@ router.post('/send-safety-notice', async (req: AuthRequest, res: Response) => {
 });
 
 // ===== Survey Send =====
-
-// ISO weekday: Mon=1 .. Sun=7
-function isoDow(d: Date): number {
-  const w = d.getDay();
-  return w === 0 ? 7 : w;
-}
-
-// Expand week_schedule into a list of {date, scheduled_at}.
-// week_schedule: { start_date, weekdays: number[], daily_time, repeat_weeks }
-function expandWeekSchedule(ws: { start_date: string; weekdays: number[]; daily_time: string; repeat_weeks?: number }): Array<{ dateStr: string; schedTime: string }> {
-  const repeat = Math.max(1, Math.min(8, Number(ws.repeat_weeks) || 1));
-  const weekdays = Array.isArray(ws.weekdays) ? ws.weekdays.map(Number).filter((n) => n >= 1 && n <= 7) : [];
-  if (weekdays.length === 0) return [];
-  const start = new Date(ws.start_date);
-  if (Number.isNaN(start.getTime())) return [];
-  const out: Array<{ dateStr: string; schedTime: string }> = [];
-  const totalDays = 7 * repeat;
-  for (let i = 0; i < totalDays; i++) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    if (!weekdays.includes(isoDow(d))) continue;
-    const dateStr = d.toISOString().slice(0, 10);
-    const schedTime = new Date(`${dateStr}T${ws.daily_time}`).toISOString();
-    out.push({ dateStr, schedTime });
-  }
-  return out;
-}
 
 // POST /api/survey/send - Send survey to a single phone
 router.post('/send', async (req: AuthRequest, res: Response) => {

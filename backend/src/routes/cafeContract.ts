@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { dbGet, dbRun, dbAll, getKSTDate, normalizePhone, getFrontendUrl, pool } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms, sendSurveyMessage } from '../services/smsService';
+import { expandWeekSchedule, type WeekSchedule } from '../services/scheduleHelper';
 
 const TOKEN_EXPIRY_HOURS = 24;
 
@@ -218,6 +219,7 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
       date,
       planned_clock_in,
       planned_clock_out,
+      week_schedule,
     } = req.body as {
       phone?: string;
       worker_name?: string;
@@ -225,10 +227,11 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
       date?: string;
       planned_clock_in?: string;
       planned_clock_out?: string;
+      week_schedule?: WeekSchedule;
     };
 
-    if (!phone || !store_name || !date) {
-      res.status(400).json({ error: '전화번호·매장·날짜는 필수입니다.' });
+    if (!phone || !store_name) {
+      res.status(400).json({ error: '전화번호·매장은 필수입니다.' });
       return;
     }
     if (!STORE_OPTIONS.includes(store_name as any)) {
@@ -240,6 +243,46 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
     const workplaceId = await ensureCafeWorkplace(store_name);
     const workplaceName = `널담은공간 ${store_name}점`;
     const department = `카페(${store_name})`;
+
+    // 주간 반복 발송 분기 — 즉시 SMS 발송 없이 예약 row 만 INSERT,
+    // reminderService 크론이 scheduled_at 도래 시 자동 발송.
+    if (week_schedule) {
+      const slots = expandWeekSchedule(week_schedule);
+      if (slots.length === 0) {
+        res.status(400).json({ error: '주간 스케줄: 시작일/요일/시각을 확인해주세요.' });
+        return;
+      }
+      const items: Array<{ date: string; scheduled_at: string }> = [];
+      for (const { dateStr, schedTime } of slots) {
+        const t = uuidv4();
+        const exp = new Date(new Date(schedTime).getTime() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+        const r = await dbRun(
+          `INSERT INTO survey_requests
+            (token, phone, workplace_id, date, message_type, expires_at, department,
+             planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          t, normalized, workplaceId, dateStr, 'sms', exp, department,
+          planned_clock_in || null, planned_clock_out || null,
+          schedTime, 'scheduled', 'scheduled',
+        );
+        await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', r.lastInsertRowid);
+        items.push({ date: dateStr, scheduled_at: schedTime });
+      }
+      res.json({
+        success: true,
+        scheduled_weekly: true,
+        count: items.length,
+        items,
+        worker_name: worker_name || '',
+      });
+      return;
+    }
+
+    // 단발 즉시 발송 (기존 동작)
+    if (!date) {
+      res.status(400).json({ error: '날짜는 필수입니다.' });
+      return;
+    }
 
     const token = uuidv4();
     const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();

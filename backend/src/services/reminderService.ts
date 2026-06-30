@@ -142,15 +142,18 @@ async function checkAndSendReports() {
 
 async function checkAndSendScheduledSurveys() {
   try {
+    // break_minutes 는 카페팀 전용 컬럼(0 이면 SMS에 표기 안 함). NULL/누락 안전하게 COALESCE 처리.
     const pending = await dbAll(`
-      SELECT sr.id, sr.phone, sr.token, sr.date, sr.department, sw.name as workplace_name
+      SELECT sr.id, sr.phone, sr.token, sr.date, sr.department,
+             COALESCE(sr.break_minutes, 0) as break_minutes,
+             sw.name as workplace_name
       FROM survey_requests sr
       LEFT JOIN survey_workplaces sw ON sr.workplace_id = sw.id
       WHERE sr.scheduled_status = 'scheduled' AND sr.scheduled_at <= NOW()
     `);
 
     for (const req of pending) {
-      const result = await sendSurveyMessage(req.phone, req.token, req.date, req.workplace_name || '', 'sms', req.department || '');
+      const result = await sendSurveyMessage(req.phone, req.token, req.date, req.workplace_name || '', 'sms', req.department || '', Number(req.break_minutes) || 0);
       if (result.success) {
         await dbRun("UPDATE survey_requests SET scheduled_status = 'sent', status = 'sent' WHERE id = ?", req.id);
         if (req.department) {

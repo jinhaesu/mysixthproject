@@ -24,6 +24,8 @@ async function ensureCafeSchema(): Promise<void> {
     "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS consent_signature_data TEXT DEFAULT ''",
     "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS birth_date TEXT DEFAULT ''",
     "ALTER TABLE labor_contracts ADD COLUMN IF NOT EXISTS id_number TEXT DEFAULT ''",
+    // 카페 한정: 출퇴근 발송 시 휴게시간(분) 저장. 정규직/파견은 사용 안 함.
+    "ALTER TABLE survey_requests ADD COLUMN IF NOT EXISTS break_minutes INTEGER DEFAULT 0",
   ];
   for (const s of stmts) {
     try { await pool.query(s); } catch (e: any) {
@@ -212,6 +214,7 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 // ============================================================================
 router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => {
   try {
+    await ensureCafeSchema();
     const {
       phone,
       worker_name,
@@ -219,6 +222,7 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
       date,
       planned_clock_in,
       planned_clock_out,
+      break_minutes: rawBreak,
       week_schedule,
     } = req.body as {
       phone?: string;
@@ -227,6 +231,7 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
       date?: string;
       planned_clock_in?: string;
       planned_clock_out?: string;
+      break_minutes?: number;
       week_schedule?: WeekSchedule;
     };
 
@@ -238,6 +243,9 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
       res.status(400).json({ error: `매장은 ${STORE_OPTIONS.join('/')} 중 하나여야 합니다.` });
       return;
     }
+
+    // 휴게시간: 0/30/60 만 허용 (그 외 값은 0 으로 강제)
+    const breakMinutes = [0, 30, 60].includes(Number(rawBreak)) ? Number(rawBreak) : 0;
 
     const normalized = normalizePhone(phone);
     const workplaceId = await ensureCafeWorkplace(store_name);
@@ -259,10 +267,10 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
         const r = await dbRun(
           `INSERT INTO survey_requests
             (token, phone, workplace_id, date, message_type, expires_at, department,
-             planned_clock_in, planned_clock_out, scheduled_at, scheduled_status, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             planned_clock_in, planned_clock_out, break_minutes, scheduled_at, scheduled_status, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           t, normalized, workplaceId, dateStr, 'sms', exp, department,
-          planned_clock_in || null, planned_clock_out || null,
+          planned_clock_in || null, planned_clock_out || null, breakMinutes,
           schedTime, 'scheduled', 'scheduled',
         );
         await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', r.lastInsertRowid);
@@ -290,8 +298,8 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
     const result = await dbRun(
       `INSERT INTO survey_requests
         (token, phone, workplace_id, date, message_type, expires_at, department,
-         planned_clock_in, planned_clock_out, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         planned_clock_in, planned_clock_out, break_minutes, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       token,
       normalized,
       workplaceId,
@@ -301,12 +309,13 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
       department,
       planned_clock_in || null,
       planned_clock_out || null,
+      breakMinutes,
       'sent',
     );
 
     await dbRun('INSERT INTO survey_responses (request_id) VALUES (?)', result.lastInsertRowid);
 
-    // 카페팀용 SMS 메시지 — 정규직과 다른 prefix
+    // 카페팀용 SMS 메시지 — 정규직과 다른 prefix + 휴게시간 라인
     const sendResult = await sendSurveyMessage(
       normalized,
       token,
@@ -314,6 +323,7 @@ router.post('/send-attendance-link', async (req: AuthRequest, res: Response) => 
       workplaceName,
       'sms',
       department,
+      breakMinutes,
     );
 
     if (sendResult.messageId) {

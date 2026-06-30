@@ -24,6 +24,32 @@ import { Send, FileSignature, Clock } from "lucide-react";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 const STORES = ["해방촌", "행궁동", "경복궁"];
+
+// 매장별 휴게시간 관행 기본값(분). 절대적이지 않으며 시프트별 수동 조정 가능.
+// 행궁동(수원점)은 0분 관행이나, 4시간 이상 근무에는 법정 30분 의무 → 발송 폼에서 경고/자동보정.
+const STORE_BREAK_DEFAULT: Record<string, 0 | 30 | 60> = {
+  해방촌: 60,
+  경복궁: 30,
+  행궁동: 0,
+};
+
+// 근로기준법 제54조: 4h 이상 30분, 8h 이상 60분 의무.
+// 0.01 톨러런스로 분 단위 부동소수점 오차 흡수.
+function legalMinBreak(workMinutes: number): 0 | 30 | 60 {
+  if (workMinutes >= 8 * 60 - 1) return 60;
+  if (workMinutes >= 4 * 60 - 1) return 30;
+  return 0;
+}
+
+// 'HH:MM' ~ 'HH:MM' → 분 단위 (자정 넘김 미지원, 카페 영업시간 가정)
+function minutesBetween(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  return diff > 0 ? diff : 0;
+}
 const DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 interface CafeContract {
@@ -121,7 +147,8 @@ export default function CafeContractSendPage() {
   const [attClockOut, setAttClockOut] = useState("");
   const [attPhone, setAttPhone] = useState("");
   const [attWorkerName, setAttWorkerName] = useState("");
-  const [attBreakMinutes, setAttBreakMinutes] = useState<0 | 30 | 60>(0);
+  const [attBreakMinutes, setAttBreakMinutes] = useState<0 | 30 | 60>(60); // 기본 해방촌(60)
+  const [attBreakTouched, setAttBreakTouched] = useState(false); // 사용자가 명시 선택했는지
   const [attSubmitting, setAttSubmitting] = useState(false);
 
   // 주간 반복 발송 모드
@@ -197,7 +224,20 @@ export default function CafeContractSendPage() {
     setAttStore(w.store_name);
     setAttClockIn(w.work_time_start);
     setAttClockOut(w.work_time_end);
+    setAttBreakTouched(false); // 직원 바뀌면 매장 기본값 다시 적용
   }, [selectedPhone, workers]);
+
+  // 매장 변경 시 휴게 기본값 자동 (사용자가 명시 선택 전까지만)
+  useEffect(() => {
+    if (attBreakTouched) return;
+    const def = STORE_BREAK_DEFAULT[attStore];
+    if (def !== undefined) setAttBreakMinutes(def);
+  }, [attStore, attBreakTouched]);
+
+  // 계획 출퇴근 기반 법정 의무 휴게시간 계산
+  const attWorkMinutes = minutesBetween(attClockIn, attClockOut);
+  const attLegalMin = legalMinBreak(attWorkMinutes);
+  const attBreakViolation = attWorkMinutes > 0 && attBreakMinutes < attLegalMin;
 
   const toggleDay = (d: string) => {
     setDays((prev) =>
@@ -249,6 +289,17 @@ export default function CafeContractSendPage() {
     if (!attStore) return toast.warning("매장을 선택해주세요.");
     if (attSendMode === "single" && !attDate) return toast.warning("날짜를 선택해주세요.");
     if (attSendMode === "weekly" && attWeekdays.length === 0) return toast.warning("주간 발송: 최소 한 요일은 선택해주세요.");
+
+    // 근로기준법 휴게 의무 미달 시 발송 직전 한 번 더 명시 확인
+    if (attBreakViolation) {
+      const ok = window.confirm(
+        `⚠ 근로기준법 위반 경고\n\n` +
+          `계획 근무 ${Math.floor(attWorkMinutes / 60)}시간 ${attWorkMinutes % 60}분 → 법정 최소 휴게 ${attLegalMin}분.\n` +
+          `현재 ${attBreakMinutes}분은 부족합니다.\n\n` +
+          `그래도 이대로 발송하시겠습니까?`,
+      );
+      if (!ok) return;
+    }
 
     setAttSubmitting(true);
     try {
@@ -535,13 +586,16 @@ export default function CafeContractSendPage() {
                 </Field>
               </div>
 
-              <Field label="휴게시간" hint="카페팀 전용. 무휴게는 '없음', 4시간 이상 근무는 30분/1시간.">
+              <Field
+                label="휴게시간"
+                hint={`매장 기본값: ${attStore} = ${STORE_BREAK_DEFAULT[attStore] ?? 0}분. 법정 의무: 근무 4h이상 30분 / 8h이상 60분.`}
+              >
                 <div className="flex gap-2">
                   {([0, 30, 60] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
-                      onClick={() => setAttBreakMinutes(m)}
+                      onClick={() => { setAttBreakMinutes(m); setAttBreakTouched(true); }}
                       className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
                         attBreakMinutes === m
                           ? "bg-[var(--brand-500)] text-white border-[var(--brand-500)]"
@@ -552,6 +606,22 @@ export default function CafeContractSendPage() {
                     </button>
                   ))}
                 </div>
+                {attBreakViolation && (
+                  <div className="mt-2 p-2 rounded-md bg-[var(--warning-fg)]/10 border border-[var(--warning-fg)]/30 text-xs text-[var(--warning-fg)] flex items-start gap-2">
+                    <span className="font-semibold">⚠ 근로기준법 위반 가능</span>
+                    <span>
+                      계획 근무 {Math.floor(attWorkMinutes / 60)}시간 {attWorkMinutes % 60}분 → 법정 최소 휴게 {attLegalMin}분.
+                      현재 {attBreakMinutes}분은 부족합니다.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setAttBreakMinutes(attLegalMin); setAttBreakTouched(true); }}
+                      className="ml-auto px-2 py-0.5 rounded bg-[var(--warning-fg)] text-white whitespace-nowrap"
+                    >
+                      {attLegalMin}분으로 자동 보정
+                    </button>
+                  </div>
+                )}
               </Field>
             </div>
 

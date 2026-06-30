@@ -20,9 +20,11 @@ function buildSurveyUrl(token: string): string {
   return getSurveyUrl(token);
 }
 
-function buildMessage(surveyUrl: string, date: string, workplaceName: string, department?: string): string {
+function buildMessage(surveyUrl: string, date: string, workplaceName: string, department?: string, breakMinutes?: number): string {
   let msg = `[조인앤조인 출퇴근 기록]\n${date} 근무 설문입니다.\n근무지: ${workplaceName}`;
   if (department) msg += `\n배정파트: ${department}`;
+  // 카페팀 한정: 휴게시간 라인 (>0 일 때만)
+  if (breakMinutes && breakMinutes > 0) msg += `\n휴게시간: ${breakMinutes}분`;
   msg += `\n아래 링크를 눌러 출퇴근을 기록해주세요.\n${surveyUrl}`;
   return msg;
 }
@@ -105,10 +107,11 @@ export async function sendSurveyMessage(
   date: string,
   workplaceName: string,
   method: 'sms' | 'kakao' = 'sms',
-  department?: string
+  department?: string,
+  breakMinutes?: number,
 ): Promise<SendResult> {
   const surveyUrl = buildSurveyUrl(token);
-  const message = buildMessage(surveyUrl, date, workplaceName, department);
+  const message = buildMessage(surveyUrl, date, workplaceName, department, breakMinutes);
 
   if (method === 'kakao') {
     const kakaoResult = await sendKakaoAlimtalk(phone, message);

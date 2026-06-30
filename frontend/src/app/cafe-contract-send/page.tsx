@@ -121,6 +121,7 @@ export default function CafeContractSendPage() {
   const [attClockOut, setAttClockOut] = useState("");
   const [attPhone, setAttPhone] = useState("");
   const [attWorkerName, setAttWorkerName] = useState("");
+  const [attBreakMinutes, setAttBreakMinutes] = useState<0 | 30 | 60>(0);
   const [attSubmitting, setAttSubmitting] = useState(false);
 
   // 주간 반복 발송 모드
@@ -257,6 +258,7 @@ export default function CafeContractSendPage() {
         store_name: attStore,
         planned_clock_in: attClockIn || null,
         planned_clock_out: attClockOut || null,
+        break_minutes: attBreakMinutes,
       };
       if (attSendMode === "weekly") {
         payload.week_schedule = {
@@ -532,6 +534,25 @@ export default function CafeContractSendPage() {
                   <Input type="time" value={attClockOut} onChange={(e) => setAttClockOut(e.target.value)} />
                 </Field>
               </div>
+
+              <Field label="휴게시간" hint="카페팀 전용. 무휴게는 '없음', 4시간 이상 근무는 30분/1시간.">
+                <div className="flex gap-2">
+                  {([0, 30, 60] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setAttBreakMinutes(m)}
+                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                        attBreakMinutes === m
+                          ? "bg-[var(--brand-500)] text-white border-[var(--brand-500)]"
+                          : "bg-[var(--bg-1)] text-[var(--text-3)] border-[var(--border-1)] hover:bg-[var(--bg-2)]"
+                      }`}
+                    >
+                      {m === 0 ? "없음" : m === 30 ? "30분" : "1시간"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
             </div>
 
             {attSendMode === "weekly" && (

@@ -889,6 +889,39 @@ export default function RegularWorkersPage() {
                   maxLength={14}
                 />
               </Field>
+
+              {/* 퇴사관리 상태 (read-only). 퇴사일 편집은 /offboarding 에서만.
+                  유령상태(활성=X + 퇴사일=? / 활성=O + 퇴사일=O) 감지 시 경고 표시. */}
+              {editingEmployee && (() => {
+                const resignVal = editingEmployee.resign_date || editingEmployee.resigned_at || "";
+                const inactive = editingEmployee.is_active === 0;
+                const ghost = (inactive && !resignVal) || (!inactive && !!resignVal);
+                return (
+                  <Field label="퇴사관리 상태" hint="퇴사일 수정은 퇴사관리 페이지에서만 가능합니다.">
+                    <div className={`flex items-center justify-between gap-2 p-2.5 rounded-[var(--r-md)] border ${ghost ? 'bg-[var(--warning-bg)] border-[var(--warning-border)]' : 'bg-[var(--bg-0)] border-[var(--border-2)]'}`}>
+                      <div className="flex items-center gap-3 flex-wrap text-xs">
+                        <span className={`px-1.5 py-0.5 rounded ${inactive ? 'bg-[var(--danger-bg)] text-[var(--danger-fg)]' : 'bg-[var(--success-bg)] text-[var(--success-fg)]'}`}>
+                          {inactive ? '퇴사' : '재직중'}
+                        </span>
+                        <span className="text-[var(--text-2)] tabular">
+                          퇴사일: {resignVal ? String(resignVal).slice(0, 10) : <span className="text-[var(--text-4)]">-</span>}
+                        </span>
+                        {ghost && (
+                          <span className="text-[var(--warning-fg)] font-medium">⚠ 유령상태 (퇴사관리에서 재등록 필요)</span>
+                        )}
+                      </div>
+                      <a
+                        href={`/offboarding?search=${encodeURIComponent(editingEmployee.name)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11.5px] px-2 py-1 rounded border border-[var(--border-2)] hover:bg-[var(--bg-2)] text-[var(--text-2)] whitespace-nowrap"
+                      >
+                        퇴사관리 열기 →
+                      </a>
+                    </div>
+                  </Field>
+                );
+              })()}
             </div>
 
             {/* Attendance History */}

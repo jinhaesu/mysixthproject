@@ -780,17 +780,42 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
 // ---------------------------------------------------------------------------
 // DELETE /api/offboarding/:id
 // ---------------------------------------------------------------------------
+// 유령상태 방지: offboarding row 를 지우면 regular_employees.is_active/resign_date
+// 도 원복해야 함. 이게 없으면 마스터엔 퇴사자로 남는데 offboarding 화면엔 안 뜨는
+// 상태가 됨 (노미화 사례). 단, 다른 offboarding row 가 이미 있으면 그건 유효한
+// 퇴사 이벤트이므로 원복하지 않음.
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    const existing = await dbGet('SELECT id FROM employee_offboardings WHERE id = ?', id);
+    const existing = await dbGet(
+      'SELECT id, employee_type, employee_ref_id FROM employee_offboardings WHERE id = ?',
+      id,
+    ) as any;
     if (!existing) {
       res.status(404).json({ error: '퇴사 기록을 찾을 수 없습니다.' });
       return;
     }
 
     await dbRun('DELETE FROM employee_offboardings WHERE id = ?', id);
-    res.json({ ok: true });
+
+    // 원복: 이 직원의 다른 offboarding row 가 남아있지 않을 때만.
+    if (existing.employee_type === 'regular' && existing.employee_ref_id) {
+      const remaining = await dbGet(
+        'SELECT id FROM employee_offboardings WHERE employee_type = ? AND employee_ref_id = ? LIMIT 1',
+        'regular', existing.employee_ref_id,
+      );
+      if (!remaining) {
+        await dbRun(
+          `UPDATE regular_employees
+           SET is_active = 1, resign_date = '', resigned_at = '', updated_at = NOW()
+           WHERE id = ?`,
+          existing.employee_ref_id,
+        );
+        console.log(`[offboarding-delete] reverted regular_employees.id=${existing.employee_ref_id} to active`);
+      }
+    }
+
+    res.json({ ok: true, reverted_employee: existing.employee_type === 'regular' && !!existing.employee_ref_id });
   } catch (error: any) {
     console.error('DELETE /api/offboarding/:id error:', error);
     res.status(500).json({ error: error.message });

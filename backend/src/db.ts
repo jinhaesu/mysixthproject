@@ -1037,6 +1037,22 @@ export async function initializeDB(): Promise<void> {
     console.error('[data-sync] resign_date backfill error (continuing):', err.message);
   }
 
+  // 2026-06-03(제9회 전국동시지방선거) 임시공휴일 backfill.
+  // KOREAN_HOLIDAYS 상수에 뒤늦게 추가돼서, 이미 저장된 confirmed_attendance rows 는
+  // holiday_work=0 인 상태. dashboard.ts 는 컬럼 직접 사용 → 대시보드 휴일수당 누락됨.
+  // (regular payroll 재산정은 isHolidayOrWeekend 로 재분류하므로 자동 보정됨.)
+  try {
+    const dataKey = 'data-sync-backfill-holiday-2026-06-03-v1';
+    const dataCheck = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [dataKey]);
+    if (!dataCheck.rowCount) {
+      const r = await pool.query(`UPDATE confirmed_attendance SET holiday_work = 1 WHERE date = '2026-06-03' AND (holiday_work IS NULL OR holiday_work = 0)`);
+      console.log(`[data-sync] 2026-06-03 holiday_work backfilled: ${r.rowCount} rows`);
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [dataKey]);
+    }
+  } catch (err: any) {
+    console.error('[data-sync] 2026-06-03 holiday_work backfill error (continuing):', err.message);
+  }
+
   console.log('Database initialized successfully');
 }
 
@@ -1098,7 +1114,7 @@ export function getBusinessDate(now?: Date): string {
 // ===== Korean Public Holidays =====
 const KOREAN_HOLIDAYS: Record<number, string[]> = {
   2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
-  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-01','2026-05-05','2026-05-24','2026-05-25','2026-06-06','2026-08-15','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25'],
+  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-01','2026-05-05','2026-05-24','2026-05-25','2026-06-03','2026-06-06','2026-08-15','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25'],
   2027: ['2027-01-01','2027-02-05','2027-02-06','2027-02-07','2027-03-01','2027-05-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-10-03','2027-10-09','2027-10-14','2027-10-15','2027-10-16','2027-12-25'],
 };
 

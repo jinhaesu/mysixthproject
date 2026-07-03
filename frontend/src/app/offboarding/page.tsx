@@ -129,6 +129,7 @@ export default function OffboardingPage() {
   const [authorized, setAuthorized] = useState(false);
 
   const [tab, setTab] = useState<TabId>("in_progress");
+  const [search, setSearch] = useState<string>("");
   const [items, setItems] = useState<OffboardingRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState<any>(null);
@@ -158,6 +159,7 @@ export default function OffboardingPage() {
     try {
       const params: Record<string, string> = {};
       if (tab !== "all") params.status = tab;
+      if (search.trim()) params.search = search.trim();
       const data = await getOffboardings(params);
       setItems(Array.isArray(data) ? data : data.items || []);
     } catch (e: any) {
@@ -165,7 +167,7 @@ export default function OffboardingPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, toast]);
+  }, [tab, toast, search]);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -198,6 +200,17 @@ export default function OffboardingPage() {
       loadItems();
     }
   }, [authorized, tab, loadItems, loadRecipients]);
+
+  // URL 쿼리 ?search=이름 → 자동 검색 + "전체" 탭 (regular-workers 편집 팝업의 딥링크용)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("search");
+    if (q) {
+      setSearch(q);
+      setTab("all");
+    }
+  }, []);
 
   const openDetail = async (id: number) => {
     setDetailId(id);
@@ -417,8 +430,17 @@ export default function OffboardingPage() {
         <Stat label="퇴직금 미처리" value={String(dashboard?.missing_severance ?? "-")} unit="건" tone="neutral" />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
         <Tabs tabs={tabs} value={tab} onChange={setTab} variant="underline" />
+        {tab !== "settings" && (
+          <Input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="이름 검색"
+            className="w-48"
+          />
+        )}
       </div>
 
       {tab !== "settings" && (

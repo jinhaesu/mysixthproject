@@ -6,8 +6,10 @@ import {
   getRegularEmployees,
   getRegularContracts,
   sendRegularContract,
+  sendRegularLink,
+  sendRegularLinkBatch,
 } from "@/lib/api";
-import { Coffee, Send, Search, ExternalLink, FileSignature, Activity, Loader2 } from "lucide-react";
+import { Coffee, Send, Search, ExternalLink, FileSignature, Activity, Loader2, MessageSquare, MapPin } from "lucide-react";
 import {
   PageHeader,
   Card,
@@ -84,6 +86,10 @@ export default function RegularCafePage() {
   });
   const [sending, setSending] = useState(false);
 
+  // 출퇴근 링크 발송 상태 — 계약과 별개 흐름 (링크: /r?token=<employee.token>)
+  const [sendingAttendanceId, setSendingAttendanceId] = useState<number | null>(null);
+  const [sendingAttendanceAll, setSendingAttendanceAll] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -148,6 +154,55 @@ export default function RegularCafePage() {
       department: dept,
       work_start_date: emp.hire_date || today,
     }));
+  };
+
+  // 출퇴근 링크 개별 발송 — /r?token=<employee.token> (계약과 분리된 정규직 영구 링크).
+  // SMS 헤더는 [조인앤조인 카페팀 출퇴근] 으로 백엔드에서 분기.
+  const handleSendAttendance = async (emp: Employee) => {
+    setSendingAttendanceId(emp.id);
+    try {
+      const res = await sendRegularLink(emp.id, "cafe");
+      if (res?.success) {
+        toast.success(`${emp.name}에게 출퇴근 링크가 발송되었습니다.`);
+      } else {
+        toast.error(res?.error || "SMS 발송 실패");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "SMS 발송 실패");
+    } finally {
+      setSendingAttendanceId(null);
+    }
+  };
+
+  // 재직 중인 카페 정규직 전원에게 출퇴근 링크 일괄 발송.
+  const handleSendAttendanceAll = async () => {
+    const activeIds = filtered.filter((e) => e.is_active !== 0).map((e) => e.id);
+    if (activeIds.length === 0) {
+      toast.info("발송 대상이 없습니다.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `재직 중인 카페 정규직 ${activeIds.length}명에게 출퇴근 링크를 발송합니다. 진행할까요?`
+      )
+    ) {
+      return;
+    }
+    setSendingAttendanceAll(true);
+    try {
+      const res = await sendRegularLinkBatch(activeIds, "cafe");
+      const sent = res?.sent ?? 0;
+      const failed = res?.failed ?? 0;
+      if (failed === 0) {
+        toast.success(`${sent}명에게 출퇴근 링크가 발송되었습니다.`);
+      } else {
+        toast.info(`발송 ${sent}건 / 실패 ${failed}건`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "일괄 발송 실패");
+    } finally {
+      setSendingAttendanceAll(false);
+    }
   };
 
   const handleSend = async () => {
@@ -230,7 +285,16 @@ export default function RegularCafePage() {
           </>
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="secondary"
+              size="sm"
+              leadingIcon={<MessageSquare size={14} />}
+              onClick={handleSendAttendanceAll}
+              loading={sendingAttendanceAll}
+            >
+              전원 출퇴근 링크 발송
+            </Button>
             <Link href="/regular-live" className="text-[13px] text-[var(--brand-400)] hover:underline inline-flex items-center gap-1">
               <Activity size={14} /> 실시간 현황판
               <ExternalLink size={12} />
@@ -242,6 +306,22 @@ export default function RegularCafePage() {
           </div>
         }
       />
+
+      {/* 정규직 출퇴근 안내 배너 — 카페 알바(사업소득)와 다르게 계약이 링크에 embed되지 않음 */}
+      <div className="mb-4 p-3 rounded-[var(--r-md)] bg-[var(--bg-0)] border border-[var(--border-1)] text-[12px] text-[var(--text-3)]">
+        <div className="flex items-start gap-2">
+          <MapPin size={14} className="mt-0.5 text-[var(--brand-400)] flex-shrink-0" />
+          <div>
+            <p>
+              <span className="font-medium text-[var(--text-1)]">정규직 출퇴근 링크는 계약서와 별도</span>로 발송됩니다.
+              카페 알바(사업소득) 링크와 달리 출퇴근 링크에 근로계약이 포함되지 않으며, 급여계산도 월급·4대보험 기반입니다.
+            </p>
+            <p className="mt-1 text-[var(--text-4)]">
+              링크 형식: <code className="text-[var(--text-2)]">/r?token=&lt;직원영구토큰&gt;</code> (매일 동일 링크 사용)
+            </p>
+          </div>
+        </div>
+      </div>
 
       <div className="mb-4">
         <div className="max-w-md">
@@ -312,15 +392,28 @@ export default function RegularCafePage() {
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          leadingIcon={<Send size={12} />}
-                          onClick={() => openSend(emp)}
-                          disabled={isResigned}
-                        >
-                          카페 계약 발송
-                        </Button>
+                        <div className="inline-flex items-center gap-1.5">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            leadingIcon={<MessageSquare size={12} />}
+                            onClick={() => handleSendAttendance(emp)}
+                            disabled={isResigned || sendingAttendanceId !== null}
+                            loading={sendingAttendanceId === emp.id}
+                            title="출퇴근 링크(/r?token=...) SMS 발송 — 계약과 무관"
+                          >
+                            출퇴근 링크
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            leadingIcon={<Send size={12} />}
+                            onClick={() => openSend(emp)}
+                            disabled={isResigned}
+                          >
+                            카페 계약 발송
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );

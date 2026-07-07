@@ -1134,6 +1134,10 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
       work_start_date,   // 입사일 (regular_employees.hire_date 와 일치해야 함; 첫 계약 후엔 변경 X)
       department, position_title, annual_salary, base_pay, meal_allowance, other_allowance,
       pay_day, work_hours, work_place,
+      contract_kind,     // 'production' | 'cafe' — 생략 시 부서명이 '카페'로 시작하면 자동 cafe
+      work_duties,       // 카페용 명시 (미입력 시 contract_kind 별 기본값 사용)
+      work_days,         // 카페용 명시 (예: '주5일(로테이션)')
+      break_time,        // 카페용 명시 (예: '30분 (매장별 관행)')
     } = req.body;
     const employee = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ?`, employee_id) as any;
     if (!employee) { res.status(404).json({ error: '직원을 찾을 수 없습니다.' }); return; }
@@ -1157,16 +1161,39 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
       ? work_start_date
       : (employee.hire_date || cStart);
 
+    // contract_kind 결정: 명시 > 부서명 접두어 자동감지 > production
+    const deptForKind = String(department || employee.department || '');
+    const kind: 'production' | 'cafe' = (contract_kind === 'cafe' || contract_kind === 'production')
+      ? contract_kind
+      : (deptForKind.startsWith('카페') ? 'cafe' : 'production');
+
+    // kind 별 기본값
+    const CAFE_WORK_DUTIES = '카페 매장 운영, 음료·베이커리 제조 및 판매, 매장 청결·재고 관리 및 이에 부수하는 업무';
+    const CAFE_WORK_DAYS = '주 5일 (매장 스케줄에 따른 로테이션)';
+    const CAFE_BREAK_TIME = '근로기준법 제54조에 따른 휴게시간 (매장 스케줄에 따라 부여)';
+    const CAFE_STORE_ADDRESSES: Record<string, string> = {
+      '카페(해방촌)': '서울특별시 용산구 신흥로15길 18-12 (널담은공간 해방촌점)',
+      '카페(행궁동)': '경기도 수원시 팔달구 정조로886번길 14 1층 (널담은공간 화홍문점)',
+      '카페(경복궁)': '서울특별시 종로구 삼청로 24 (널담은공간 경복궁점)',
+    };
+    const resolvedDuties = work_duties || (kind === 'cafe' ? CAFE_WORK_DUTIES : '');
+    const resolvedDays = work_days || (kind === 'cafe' ? CAFE_WORK_DAYS : '');
+    const resolvedBreak = break_time || (kind === 'cafe' ? CAFE_BREAK_TIME : '');
+    const resolvedPlace = work_place || (kind === 'cafe' ? (CAFE_STORE_ADDRESSES[deptForKind] || '널담은공간 매장') : '');
+    const resolvedHours = work_hours || (kind === 'cafe' ? '' : '09:00~18:00');
+
     await dbRun(
-      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place, sms_sent)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place, sms_sent, contract_kind, work_duties, work_days, break_time)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       employee.id, employee.phone, employee.name, cStart, cEnd, token,
       wStart, department || employee.department || '', position_title || '사원',
-      annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', work_hours || '09:00~18:00', work_place || '', 0
+      annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', resolvedHours, resolvedPlace, 0,
+      kind, resolvedDuties, resolvedDays, resolvedBreak
     );
 
     const contractLink = getFrontendUrl(`/regular-contract?token=${token}`);
-    const message = `[조인앤조인 근로계약서]\n${employee.name}님, 근로계약서를 작성해주세요.\n아래 링크를 눌러 서명해주세요.\n${contractLink}`;
+    const smsHeader = kind === 'cafe' ? '[조인앤조인 카페팀 근로계약서]' : '[조인앤조인 근로계약서]';
+    const message = `${smsHeader}\n${employee.name}님, 근로계약서를 작성해주세요.\n아래 링크를 눌러 서명해주세요.\n${contractLink}`;
     const smsResult = await sendGeneralSms(employee.phone, message);
 
     if (smsResult.success) {

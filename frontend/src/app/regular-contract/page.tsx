@@ -135,11 +135,26 @@ function clearCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
 }
 
 function ContractArticles({ c }: { c: any }) {
-  const workPlace = c.work_place || '전북특별자치도 전주시 덕진구 기린대로 458';
-  const workDuties = c.work_duties || '제조, 포장 및 이에 부수하는 업무';
-  const workHours = c.work_hours || '09:00 ~ 18:00';
-  const breakTime = c.break_time || '1시간 (점심)';
-  const workDays = c.work_days || '월요일 ~ 금요일';
+  const kind: 'production' | 'cafe' = c.contract_kind === 'cafe' ? 'cafe' : 'production';
+  const isCafe = kind === 'cafe';
+
+  // Cafe defaults — 카페 정규직 3인(황금빛/신아름누리/전서현) 계약서 문구.
+  // 매장별 근무장소는 백엔드 send 시점에 이미 department → 주소로 매핑되어 c.work_place 에 저장.
+  const workPlace = c.work_place || (isCafe
+    ? '널담은공간 매장'
+    : '전북특별자치도 전주시 덕진구 기린대로 458');
+  const workDuties = c.work_duties || (isCafe
+    ? '카페 매장 운영, 음료·베이커리 제조 및 판매, 매장 청결·재고 관리 및 이에 부수하는 업무'
+    : '제조, 포장 및 이에 부수하는 업무');
+  const workHours = c.work_hours || (isCafe
+    ? '매장 영업 스케줄에 따라 부여 (1일 8시간, 주 40시간 기준)'
+    : '09:00 ~ 18:00');
+  const breakTime = c.break_time || (isCafe
+    ? '근로기준법 제54조에 따른 휴게시간 (매장 스케줄에 따라 부여)'
+    : '1시간 (점심)');
+  const workDays = c.work_days || (isCafe
+    ? '주 5일 (매장 스케줄에 따른 로테이션)'
+    : '월요일 ~ 금요일');
   const annualSalary = c.annual_salary || '';
   const basePay = c.base_pay || '';
   const mealAllowance = c.meal_allowance || '';

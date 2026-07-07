@@ -986,6 +986,16 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS scanned_file_path TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE employee_offboardings ADD COLUMN IF NOT EXISTS resignation_letter_path TEXT DEFAULT ''"); } catch {}
 
+  // 계약 종류 — 'production'(생산·물류 기본) | 'cafe'(카페 정규직).
+  // 카페 정규직은 담당업무·근무장소 문구가 달라 서명 페이지에서 분기 렌더링.
+  // 값 null/'' 이면 기존 로직대로 production 취급.
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS contract_kind TEXT DEFAULT 'production'"); } catch {}
+  try { await pool.query("UPDATE regular_labor_contracts SET contract_kind = 'production' WHERE contract_kind IS NULL OR contract_kind = ''"); } catch {}
+  // 담당 업무 / 근무일 / 휴게시간 — 카페용 별도 저장. production 계약은 조항에 하드코딩된 기본값 사용.
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_duties TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_days TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS break_time TEXT DEFAULT ''"); } catch {}
+
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}
 

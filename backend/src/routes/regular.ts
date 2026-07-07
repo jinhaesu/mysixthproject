@@ -1259,6 +1259,7 @@ router.get('/contracts', async (_req: AuthRequest, res: Response) => {
              rlc.visa_type, rlc.visa_expiry,
              COALESCE(rlc.is_legacy_scan, 0) as is_legacy_scan,
              COALESCE(rlc.legacy_filename, '') as legacy_filename,
+             COALESCE(rlc.contract_kind, 'production') as contract_kind,
              COALESCE(re.department, '') as department,
              COALESCE(re.team, '') as team
       FROM regular_labor_contracts rlc

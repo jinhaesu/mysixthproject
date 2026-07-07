@@ -352,11 +352,19 @@ export async function resignRegularEmployee(id: number, resign_date: string) {
 export async function getResignedEmployees() {
   return fetchAPI<any[]>('/api/regular/employees/resigned');
 }
-export async function sendRegularLink(id: number) {
-  return fetchAPI<any>(`/api/regular/employees/${id}/send-link`, { method: 'POST' });
+export async function sendRegularLink(id: number, kind?: 'cafe' | 'regular') {
+  return fetchAPI<any>(`/api/regular/employees/${id}/send-link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(kind ? { kind } : {}),
+  });
 }
-export async function sendRegularLinkBatch(ids: number[]) {
-  return fetchAPI<any>('/api/regular/employees/send-link-batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+export async function sendRegularLinkBatch(ids: number[], kind?: 'cafe' | 'regular') {
+  return fetchAPI<any>('/api/regular/employees/send-link-batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(kind ? { ids, kind } : { ids }),
+  });
 }
 export async function getRegularDashboard(date: string) {
   return fetchAPI<any>(`/api/regular/dashboard?date=${date}`);

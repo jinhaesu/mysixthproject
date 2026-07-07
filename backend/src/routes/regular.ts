@@ -186,10 +186,25 @@ router.delete('/employees/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// SMS 헤더/문구 분기 — 카페 정규직은 [조인앤조인 카페팀 출퇴근] 사용.
+// kind 명시 없으면 부서명 접두어로 자동 판단 ('카페'로 시작 시 cafe).
+// URL 구조는 동일(/r?token=<employee.token>) — 계약과 분리된 정규직 영구 링크.
+function buildAttendanceSms(employee: { name: string; department?: string }, url: string, kind?: string): string {
+  const resolvedKind = kind === 'cafe' || (kind === undefined && (employee.department || '').startsWith('카페'))
+    ? 'cafe'
+    : 'regular';
+  if (resolvedKind === 'cafe') {
+    return `[조인앤조인 카페팀 출퇴근]\n${employee.name}님, 카페팀 출퇴근 기록 링크입니다.\n매장 근무일 이 링크로 출근·퇴근을 기록해주세요.\n${url}`;
+  }
+  return `[조인앤조인 출퇴근]\n${employee.name}님, 출퇴근 기록 링크입니다.\n매일 이 링크로 출퇴근을 기록해주세요.\n${url}`;
+}
+
 // POST /api/regular/employees/:id/send-link - Send SMS with permanent link
+// body(optional): { kind?: 'cafe' | 'regular' }  — 카페 정규직용 SMS 문구 분기.
 router.post('/employees/:id/send-link', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const { kind } = (req.body || {}) as { kind?: 'cafe' | 'regular' };
 
     const employee = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ? AND is_active = 1`, id) as any;
     if (!employee) {
@@ -198,7 +213,7 @@ router.post('/employees/:id/send-link', async (req: AuthRequest, res: Response) 
     }
 
     const url = getRegularUrl(employee.token);
-    const message = `[조인앤조인 출퇴근]\n${employee.name}님, 출퇴근 기록 링크입니다.\n매일 이 링크로 출퇴근을 기록해주세요.\n${url}`;
+    const message = buildAttendanceSms(employee, url, kind);
 
     const result = await sendGeneralSms(employee.phone, message);
 
@@ -209,9 +224,10 @@ router.post('/employees/:id/send-link', async (req: AuthRequest, res: Response) 
 });
 
 // POST /api/regular/employees/send-link-batch - Send to multiple employee IDs
+// body: { ids: number[], kind?: 'cafe' | 'regular' }
 router.post('/employees/send-link-batch', async (req: AuthRequest, res: Response) => {
   try {
-    const { ids } = req.body;
+    const { ids, kind } = req.body as { ids: number[]; kind?: 'cafe' | 'regular' };
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       res.status(400).json({ error: '발송 대상을 선택해주세요.' });
@@ -226,7 +242,7 @@ router.post('/employees/send-link-batch', async (req: AuthRequest, res: Response
       if (!employee) continue;
 
       const url = getRegularUrl(employee.token);
-      const message = `[조인앤조인 출퇴근]\n${employee.name}님, 출퇴근 기록 링크입니다.\n매일 이 링크로 출퇴근을 기록해주세요.\n${url}`;
+      const message = buildAttendanceSms(employee, url, kind);
 
       const result = await sendGeneralSms(employee.phone, message);
       if (result.success) {

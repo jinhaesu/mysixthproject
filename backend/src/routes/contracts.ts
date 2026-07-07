@@ -61,6 +61,7 @@ function buildRegularContractsQuery(whereClause: string): string {
       c.token                             AS token,
       c.is_legacy_scan,
       c.legacy_filename,
+      c.contract_kind                     AS contract_kind,
       NULL::TEXT                          AS worker_type,
       cnt.contract_count
     FROM regular_employees re
@@ -71,7 +72,8 @@ function buildRegularContractsQuery(whereClause: string): string {
              position_title, annual_salary, base_pay, meal_allowance, other_allowance,
              work_hours, department, token,
              COALESCE(is_legacy_scan, 0) as is_legacy_scan,
-             COALESCE(legacy_filename, '') as legacy_filename
+             COALESCE(legacy_filename, '') as legacy_filename,
+             COALESCE(contract_kind, 'production') AS contract_kind
       FROM regular_labor_contracts
       WHERE employee_id = re.id
       ORDER BY (CASE status WHEN 'signed' THEN 0 ELSE 1 END), created_at DESC
@@ -169,6 +171,7 @@ function rowToItem(row: any) {
           is_legacy_scan: row.is_legacy_scan ?? 0,
           legacy_filename: row.legacy_filename ?? '',
           scanned_file_data: '',
+          contract_kind: row.contract_kind || 'production',
         }
       : null,
     contract_count: row.contract_count || 0,

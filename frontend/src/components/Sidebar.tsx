@@ -57,6 +57,7 @@ const groups: NavGroup[] = [
       { href: "/regular-live", label: "실시간 현황판", icon: Activity },
       { href: "/regular-manage", label: "설문 출퇴근", icon: MessageSquare },
       { href: "/regular-workers", label: "근무자 DB", icon: Contact },
+      { href: "/regular-cafe", label: "카페팀 근로계약 및 출퇴근", icon: FileSignature },
     ],
   },
   {

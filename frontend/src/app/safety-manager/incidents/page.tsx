@@ -138,7 +138,7 @@ export default function IncidentsPage() {
               {items.map((i) => (
                 <Link
                   key={i.id}
-                  href={`/safety-manager/incidents/${i.id}`}
+                  href={`/safety-manager/incidents/detail?id=${i.id}`}
                   className="block border border-[var(--border-1)] rounded-[var(--r-lg)] p-4 hover:bg-[var(--bg-2)]/40"
                 >
                   <div className="flex items-start gap-3">

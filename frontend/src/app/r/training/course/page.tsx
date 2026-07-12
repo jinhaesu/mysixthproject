@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
-import { useSearchParams, useRouter, useParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { GraduationCap, Loader2, CheckCircle, ArrowLeft, PenLine } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -41,10 +41,9 @@ interface LoadedData {
 
 function CourseContent() {
   const params = useSearchParams();
-  const routeParams = useParams();
   const router = useRouter();
   const token = params.get("token") || "";
-  const courseId = Number(routeParams?.courseId);
+  const courseId = Number(params.get("id") || 0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

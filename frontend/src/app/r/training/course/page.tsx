@@ -2,7 +2,31 @@
 
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { GraduationCap, Loader2, CheckCircle, ArrowLeft, PenLine } from "lucide-react";
+import { GraduationCap, Loader2, CheckCircle, ArrowLeft, PenLine, ExternalLink, AlertTriangle } from "lucide-react";
+
+// 유튜브 URL 정규화 — watch·youtu.be·shorts → embed 형태로 변환.
+function normalizeYouTubeEmbedUrl(input: string): string {
+  const raw = (input || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\./, "");
+    let vid = "";
+    if (host === "youtu.be") vid = u.pathname.replace(/^\//, "").split("/")[0];
+    else if (host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com")) {
+      if (u.pathname === "/watch") vid = u.searchParams.get("v") || "";
+      else if (u.pathname.startsWith("/embed/")) vid = u.pathname.replace("/embed/", "").split("/")[0];
+      else if (u.pathname.startsWith("/shorts/")) vid = u.pathname.replace("/shorts/", "").split("/")[0];
+      else if (u.pathname.startsWith("/v/")) vid = u.pathname.replace("/v/", "").split("/")[0];
+    }
+    if (/^[a-zA-Z0-9_-]{6,}$/.test(vid)) return `https://www.youtube.com/embed/${vid}`;
+    return raw;
+  } catch { return raw; }
+}
+function toWatchUrl(embed: string): string {
+  const m = embed.match(/\/embed\/([a-zA-Z0-9_-]+)/);
+  return m ? `https://www.youtube.com/watch?v=${m[1]}` : embed;
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -171,40 +195,68 @@ function CourseContent() {
           </div>
         ) : null}
 
-        {step === "watch" && (
-          <>
-            <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-4">
-              <p className="text-[var(--fs-body)] text-[var(--text-2)] mb-3">{data.course.description}</p>
-              {data.course.video_url ? (
-                <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-                  <iframe
-                    src={data.course.video_url}
-                    className="absolute top-0 left-0 w-full h-full rounded-[var(--r-md)]"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] p-6 text-center rounded-[var(--r-md)]">
-                  <p className="text-[var(--fs-body)] font-semibold text-[var(--warning-fg)]">교육 영상이 아직 등록되지 않았습니다.</p>
-                  <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-2 opacity-90">
-                    관리자가 안전보건공단(KOSHA) 공식 영상 URL을 등록하면 이수 가능합니다.
-                  </p>
-                </div>
-              )}
-              <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-3">
-                60초마다 시청 시간이 서버에 저장됩니다. 다음 단계로 넘어가려면 아래 버튼을 누르세요.
-              </p>
-            </div>
-            <button
-              onClick={goToQuiz}
-              disabled={!data.course.video_url}
-              className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {data.course.video_url ? "시청 완료 · 퀴즈 풀기" : "영상 등록 대기 중"}
-            </button>
-          </>
-        )}
+        {step === "watch" && (() => {
+          const embedUrl = normalizeYouTubeEmbedUrl(data.course.video_url || "");
+          const watchUrl = toWatchUrl(embedUrl);
+          const hasVideo = !!embedUrl;
+          return (
+            <>
+              <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-4">
+                <p className="text-[var(--fs-body)] text-[var(--text-2)] mb-3">{data.course.description}</p>
+                {hasVideo ? (
+                  <>
+                    <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+                      <iframe
+                        src={embedUrl}
+                        title={data.course.title}
+                        className="absolute top-0 left-0 w-full h-full rounded-[var(--r-md)]"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        referrerPolicy="strict-origin-when-cross-origin"
+                      />
+                    </div>
+                    <div className="mt-3 bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-[var(--info-fg)] shrink-0 mt-0.5" />
+                        <div className="flex-1 text-[var(--fs-caption)] text-[var(--info-fg)]">
+                          <p className="font-semibold">영상이 안 뜨거나 "재생 거부" 나오면?</p>
+                          <p className="opacity-90 mt-0.5">
+                            일부 영상은 외부 임베드가 차단됩니다. 아래 버튼으로 유튜브 앱에서 시청 후 돌아와 퀴즈를 푸세요.
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={watchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 w-full inline-flex items-center justify-center gap-2 py-2 bg-[var(--info-fg)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-body)] hover:opacity-90"
+                      >
+                        <ExternalLink className="w-4 h-4" /> 유튜브에서 재생
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] p-6 text-center rounded-[var(--r-md)]">
+                    <p className="text-[var(--fs-body)] font-semibold text-[var(--warning-fg)]">교육 영상이 아직 등록되지 않았습니다.</p>
+                    <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-2 opacity-90">
+                      관리자가 안전보건공단(KOSHA) 공식 영상 URL을 등록하면 이수 가능합니다.
+                    </p>
+                  </div>
+                )}
+                <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-3">
+                  60초마다 시청 시간이 서버에 저장됩니다. 시청 후 아래 버튼으로 퀴즈로 넘어가세요.
+                </p>
+              </div>
+              <button
+                onClick={goToQuiz}
+                disabled={!hasVideo}
+                className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {hasVideo ? "시청 완료 · 퀴즈 풀기" : "영상 등록 대기 중"}
+              </button>
+            </>
+          );
+        })()}
 
         {step === "quiz" && (
           <>

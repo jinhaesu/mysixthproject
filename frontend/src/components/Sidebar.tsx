@@ -33,6 +33,9 @@ import {
   Heart,
   Ticket,
   MapPin,
+  GraduationCap,
+  FileText,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -99,6 +102,8 @@ const groups: NavGroup[] = [
       { href: "/safety-manager/daily-inspection", label: "일일 순회점검", icon: MapPin },
       { href: "/safety-manager/tickets", label: "조치 티켓", icon: Ticket },
       { href: "/safety-manager/hazard-reports", label: "아차사고 처리", icon: ShieldAlert },
+      { href: "/safety-manager/training-status", label: "교육 이수 현황", icon: GraduationCap },
+      { href: "/safety-manager/survey-status", label: "설문 응답 현황", icon: FileText },
     ],
   },
   {
@@ -121,6 +126,7 @@ const bottomItems: NavItem[] = [
   { href: "/contract-manage", label: "근로계약서 관리", icon: FileSignature },
   { href: "/offboarding", label: "퇴사관리", icon: UserMinus },
   { href: "/manage", label: "데이터 관리", icon: Database },
+  { href: "/admin/training-master", label: "교육 콘텐츠 마스터", icon: BookOpen },
   { href: "/password-manage", label: "비밀번호 관리", icon: Lock },
   { href: "/policy", label: "반영기준", icon: ClipboardList },
 ];

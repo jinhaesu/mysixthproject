@@ -30,6 +30,8 @@ import safetyHazardPublicRoutes from './routes/safetyHazardPublic';
 import safetyManagerRoutes from './routes/safetyManager';
 import healthPublicRoutes from './routes/healthPublic';
 import healthManagerRoutes from './routes/healthManager';
+import trainingPublicRoutes from './routes/trainingPublic';
+import trainingManagerRoutes from './routes/trainingManager';
 import { requireAuth } from './middleware/auth';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
 
@@ -90,6 +92,13 @@ app.use('/api/safety-manager', requireAuth, safetyManagerRoutes);
 // 보건 P3 — 근로자 보건증/건강진단 (regular-public 하위, no auth)
 app.use('/api/regular-public', healthPublicRoutes);  // no auth
 app.use('/api/health-manager', requireAuth, healthManagerRoutes);
+
+// 안전보건 P4 — 반기 정기교육 + 근골격계·의견 설문
+app.use('/api/regular-public', trainingPublicRoutes);  // no auth
+// P4 관리자 API — /training-master, /training-status, /survey-status
+// safety-manager 하위에 마운트 (Sidebar 안전관리자 점검 그룹에 편입)
+app.use('/api/safety-manager', requireAuth, trainingManagerRoutes);
+app.use('/api/admin', requireAuth, trainingManagerRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { GraduationCap, Loader2, CheckCircle, ArrowLeft, PenLine, ExternalLink, AlertTriangle } from "lucide-react";
+import { GraduationCap, Loader2, CheckCircle, ArrowLeft, PenLine, Info, Timer } from "lucide-react";
 
 // 유튜브 URL 정규화 — watch·youtu.be·shorts → embed 형태로 변환.
 function normalizeYouTubeEmbedUrl(input: string): string {
@@ -23,9 +23,11 @@ function normalizeYouTubeEmbedUrl(input: string): string {
     return raw;
   } catch { return raw; }
 }
-function toWatchUrl(embed: string): string {
-  const m = embed.match(/\/embed\/([a-zA-Z0-9_-]+)/);
-  return m ? `https://www.youtube.com/watch?v=${m[1]}` : embed;
+function fmtSec(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}분 ${r.toString().padStart(2, "0")}초`;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -81,6 +83,7 @@ function CourseContent() {
   // Simple watched seconds tracker (rough)
   const startedAtRef = useRef<number>(Date.now());
   const totalWatchedRef = useRef<number>(0);
+  const [watchedSec, setWatchedSec] = useState<number>(0);
 
   useEffect(() => {
     if (!token || !courseId) { setError("유효하지 않은 링크입니다."); setLoading(false); return; }
@@ -92,6 +95,7 @@ function CourseContent() {
         setData(body);
         if (body.my_completion?.completed_at) setStep("done");
         totalWatchedRef.current = Number(body.my_completion?.watched_seconds || 0);
+        setWatchedSec(totalWatchedRef.current);
         startedAtRef.current = Date.now();
       } catch (e: any) { setError(e.message); }
       finally { setLoading(false); }
@@ -102,6 +106,7 @@ function CourseContent() {
     const inc = Math.round((Date.now() - startedAtRef.current) / 1000);
     startedAtRef.current = Date.now();
     if (inc > 0) totalWatchedRef.current += inc;
+    setWatchedSec(totalWatchedRef.current);
     try {
       await fetch(`${API_URL}/api/regular-public/${token}/training/${courseId}/watch-progress`, {
         method: "POST",
@@ -110,6 +115,17 @@ function CourseContent() {
       });
     } catch {}
   }, [token, courseId]);
+
+  // 시청 시간 실시간 카운터 — step==='watch' 인 동안 1초마다 증가 (표시용).
+  // 서버 sync 는 60s interval, 이건 UI 게이지 전용.
+  useEffect(() => {
+    if (step !== "watch") return;
+    const t = setInterval(() => {
+      const inc = Math.round((Date.now() - startedAtRef.current) / 1000);
+      setWatchedSec(totalWatchedRef.current + inc);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [step]);
 
   // 60s sync during watch step
   useEffect(() => {
@@ -122,9 +138,10 @@ function CourseContent() {
 
   const goToQuiz = async () => {
     await syncProgress();
-    const needSec = (data?.course.duration_min || 0) * 60 * 0.7; // 70% 시청 요구
+    const needSec = (data?.course.duration_min || 0) * 60 * 0.7;
     if (totalWatchedRef.current < needSec) {
-      if (!confirm(`영상을 충분히 시청하지 않았습니다 (${Math.round(totalWatchedRef.current)}s / 필요 ${Math.round(needSec)}s).\n\n그래도 퀴즈로 진행하시겠습니까?`)) return;
+      alert(`영상 시청 시간이 부족합니다.\n필요: ${fmtSec(needSec)}\n현재: ${fmtSec(totalWatchedRef.current)}\n\n영상을 마저 시청 후 다시 시도해주세요.`);
+      return;
     }
     setStep("quiz");
   };
@@ -197,44 +214,26 @@ function CourseContent() {
 
         {step === "watch" && (() => {
           const embedUrl = normalizeYouTubeEmbedUrl(data.course.video_url || "");
-          const watchUrl = toWatchUrl(embedUrl);
           const hasVideo = !!embedUrl;
+          const requiredSec = Math.round((data.course.duration_min || 0) * 60 * 0.7);
+          const remainingSec = Math.max(0, requiredSec - watchedSec);
+          const progressPct = requiredSec > 0 ? Math.min(100, Math.round((watchedSec / requiredSec) * 100)) : 0;
+          const reachedThreshold = watchedSec >= requiredSec;
           return (
             <>
               <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-4">
                 <p className="text-[var(--fs-body)] text-[var(--text-2)] mb-3">{data.course.description}</p>
                 {hasVideo ? (
-                  <>
-                    <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-                      <iframe
-                        src={embedUrl}
-                        title={data.course.title}
-                        className="absolute top-0 left-0 w-full h-full rounded-[var(--r-md)]"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                        referrerPolicy="strict-origin-when-cross-origin"
-                      />
-                    </div>
-                    <div className="mt-3 bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] p-3">
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-[var(--info-fg)] shrink-0 mt-0.5" />
-                        <div className="flex-1 text-[var(--fs-caption)] text-[var(--info-fg)]">
-                          <p className="font-semibold">영상이 안 뜨거나 "재생 거부" 나오면?</p>
-                          <p className="opacity-90 mt-0.5">
-                            일부 영상은 외부 임베드가 차단됩니다. 아래 버튼으로 유튜브 앱에서 시청 후 돌아와 퀴즈를 푸세요.
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href={watchUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 w-full inline-flex items-center justify-center gap-2 py-2 bg-[var(--info-fg)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-body)] hover:opacity-90"
-                      >
-                        <ExternalLink className="w-4 h-4" /> 유튜브에서 재생
-                      </a>
-                    </div>
-                  </>
+                  <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+                    <iframe
+                      src={embedUrl}
+                      title={data.course.title}
+                      className="absolute top-0 left-0 w-full h-full rounded-[var(--r-md)]"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
+                    />
+                  </div>
                 ) : (
                   <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] p-6 text-center rounded-[var(--r-md)]">
                     <p className="text-[var(--fs-body)] font-semibold text-[var(--warning-fg)]">교육 영상이 아직 등록되지 않았습니다.</p>
@@ -243,16 +242,51 @@ function CourseContent() {
                     </p>
                   </div>
                 )}
-                <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-3">
-                  60초마다 시청 시간이 서버에 저장됩니다. 시청 후 아래 버튼으로 퀴즈로 넘어가세요.
-                </p>
+
+                {/* 시청 안내 + 진행률 게이지 */}
+                {hasVideo && (
+                  <div className="mt-4 bg-[var(--info-bg)] border border-[var(--info-border)] rounded-[var(--r-md)] p-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <Info className="w-4 h-4 text-[var(--info-fg)] shrink-0 mt-0.5" />
+                      <div className="flex-1 text-[var(--fs-caption)] text-[var(--info-fg)]">
+                        <p className="font-semibold">이수 조건</p>
+                        <p className="opacity-90 mt-0.5">
+                          이 영상은 <b>총 {data.course.duration_min}분</b>이며, <b>{fmtSec(requiredSec)}</b>(70%) 이상 시청해야 퀴즈로 진행할 수 있습니다.
+                        </p>
+                      </div>
+                    </div>
+                    {/* 진행률 게이지 */}
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-[var(--fs-caption)] text-[var(--info-fg)] mb-1 tabular">
+                        <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" /> 시청 시간</span>
+                        <span className="font-semibold">{fmtSec(watchedSec)} / {fmtSec(requiredSec)} ({progressPct}%)</span>
+                      </div>
+                      <div className="w-full h-2 bg-[var(--bg-2)] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${reachedThreshold ? "bg-[var(--success-fg)]" : "bg-[var(--info-fg)]"}`}
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                      {!reachedThreshold && (
+                        <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-1.5">
+                          퀴즈 응시까지 <b>{fmtSec(remainingSec)}</b> 남았습니다. 영상을 계속 시청해주세요.
+                        </p>
+                      )}
+                      {reachedThreshold && (
+                        <p className="text-[var(--fs-caption)] text-[var(--success-fg)] mt-1.5 font-semibold">
+                          ✓ 시청 시간 충족. 아래 버튼으로 퀴즈에 응시하세요.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <button
                 onClick={goToQuiz}
-                disabled={!hasVideo}
+                disabled={!hasVideo || !reachedThreshold}
                 className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {hasVideo ? "시청 완료 · 퀴즈 풀기" : "영상 등록 대기 중"}
+                {!hasVideo ? "영상 등록 대기 중" : !reachedThreshold ? `시청 ${fmtSec(remainingSec)} 남음` : "시청 완료 · 퀴즈 풀기"}
               </button>
             </>
           );

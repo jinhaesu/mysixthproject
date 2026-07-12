@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.27.0';
+  const SCHEMA_VERSION = 'schema-v2.28.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1102,6 +1102,188 @@ export async function initializeDB(): Promise<void> {
     }
   } catch (e: any) {
     console.error('[safety] template seed failed:', e.message);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.28.0 — 안전보건관리 시스템 P2 (아차사고 신고 + 순회점검 + 조치 티켓)
+  // ─ safety_daily_inspections: 안전관리자 일일 순회점검 헤더
+  // ─ safety_inspection_findings: 순회점검 세부 지적
+  // ─ safety_action_tickets: 아차사고·순회점검·셀프체크 이상 공용 조치 티켓
+  // ─ hazard_reports: 근로자 아차사고·위험요인 신고
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS safety_daily_inspections (
+      id SERIAL PRIMARY KEY,
+      area_id INTEGER,
+      inspector_id INTEGER NOT NULL,
+      inspector_name TEXT DEFAULT '',
+      inspection_date TEXT NOT NULL,
+      inspected_at TIMESTAMPTZ DEFAULT NOW(),
+      status TEXT DEFAULT 'in_progress',
+      overall_notes TEXT DEFAULT '',
+      weather TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_safety_insp_date ON safety_daily_inspections(inspection_date);
+
+    CREATE TABLE IF NOT EXISTS safety_inspection_findings (
+      id SERIAL PRIMARY KEY,
+      inspection_id INTEGER NOT NULL REFERENCES safety_daily_inspections(id) ON DELETE CASCADE,
+      item_master_id INTEGER,
+      item_title TEXT DEFAULT '',
+      area_id INTEGER,
+      judgement TEXT NOT NULL,
+      photo_url TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      ticket_id INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_safety_findings_inspection ON safety_inspection_findings(inspection_id);
+
+    CREATE TABLE IF NOT EXISTS safety_action_tickets (
+      id SERIAL PRIMARY KEY,
+      source_type TEXT NOT NULL,
+      source_id INTEGER,
+      area_id INTEGER,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      severity TEXT NOT NULL DEFAULT 'mid',
+      assignee_type TEXT DEFAULT 'manager',
+      assignee_id INTEGER,
+      assignee_name TEXT DEFAULT '',
+      due_date TEXT,
+      status TEXT DEFAULT 'open',
+      completion_photo_url TEXT DEFAULT '',
+      completion_notes TEXT DEFAULT '',
+      completed_at TIMESTAMPTZ,
+      verified_by INTEGER,
+      verified_at TIMESTAMPTZ,
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_tickets_status ON safety_action_tickets(status);
+    CREATE INDEX IF NOT EXISTS idx_tickets_due ON safety_action_tickets(due_date);
+
+    CREATE TABLE IF NOT EXISTS hazard_reports (
+      id SERIAL PRIMARY KEY,
+      reporter_employee_id INTEGER,
+      reporter_name TEXT DEFAULT '',
+      reporter_phone TEXT DEFAULT '',
+      is_anonymous INTEGER DEFAULT 0,
+      occurred_at TIMESTAMPTZ DEFAULT NOW(),
+      area_id INTEGER,
+      area_name TEXT DEFAULT '',
+      hazard_type TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      photo_url TEXT DEFAULT '',
+      freq_score INTEGER,
+      intensity_score INTEGER,
+      grade TEXT,
+      assessed_by INTEGER,
+      assessed_at TIMESTAMPTZ,
+      ticket_id INTEGER,
+      response_to_reporter TEXT DEFAULT '',
+      response_sent_at TIMESTAMPTZ,
+      closed_at TIMESTAMPTZ,
+      status TEXT DEFAULT 'reported',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_hazard_status ON hazard_reports(status);
+  `);
+
+  // Seed — safety_areas 비어있으면 기본 7개 구역 삽입
+  try {
+    const areaSeed = [
+      ['RAW_STORE', '원료 입고·창고', 10],
+      ['MIXING', '배합·전처리', 20],
+      ['FORMING', '성형·충전', 30],
+      ['OVEN', '오븐·튀김·가열', 40],
+      ['COLD_STORE', '냉각·냉동·냉장', 50],
+      ['PACKAGING', '포장·출하', 60],
+      ['COMMON', '공통·통로·비상구', 70],
+    ] as const;
+    for (const [code, name, order] of areaSeed) {
+      await pool.query(
+        `INSERT INTO safety_areas (code, name, sort_order) VALUES ($1, $2, $3)
+         ON CONFLICT (code) DO NOTHING`,
+        [code, name, order]
+      );
+    }
+
+    // 구역별 daily 순회점검 템플릿 (target_role='manager') seed — 없으면 생성
+    const areas = await pool.query(`SELECT id, code, name FROM safety_areas ORDER BY sort_order`);
+    const inspectionItemsByCode: Record<string, [number, string, string][]> = {
+      RAW_STORE: [
+        [1, '원료 입고 검수기록 존재', '오늘 입고된 원료의 성적서·거래명세서·CoA 확인 여부'],
+        [2, '창고 온·습도 로그 정상 범위', '냉장 0-10℃, 냉동 -18℃ 이하 유지 로그 이상 없음'],
+        [3, '적재 안정성 (5단 이하·통로 확보)', '팔레트 적재 붕괴 위험, 비상 통로 90cm 확보'],
+        [4, '유통기한 임박·경과 재고 없음', '선입선출 표기, 유통기한 경과분 격리 표시'],
+      ],
+      MIXING: [
+        [1, '배합기 안전커버·비상정지 정상', '커버 인터록 작동, 비상정지 스위치 접근성'],
+        [2, '작업자 보호구 착용 상태', '위생복·마스크·장갑·귀마개 착용 상태'],
+        [3, '전처리 위험 원료 라벨 표시', '알레르기·중요 유해물질 라벨링'],
+        [4, '바닥 미끄럼 방지 상태', '누수·유분 즉시 처리, 미끄럼 방지 매트'],
+      ],
+      FORMING: [
+        [1, '성형기 안전문 인터록 작동', '안전문 열림 시 자동 정지 확인'],
+        [2, '금형·다이 예열·냉각 관리', '적정 온도 유지 및 화상 방지 커버'],
+        [3, '충전기 노즐·배관 청결', '이물 혼입 방지 상태'],
+        [4, '작업대 정리정돈', '공구·부품 미방치, 통로 확보'],
+      ],
+      OVEN: [
+        [1, '오븐 도어 인터록·안전 정지', '도어 열림 시 가열 자동 정지'],
+        [2, '가스·전기 누출 감지기 정상', '누출 감지기 표시 정상, 소화기 3m 이내'],
+        [3, '내열 장갑·보호구 비치·상태', '내열 장갑 파손·오염 없음'],
+        [4, '주변 인화물질 격리', '유지·기름·먼지 축적 없음, 3m 이내 인화물 없음'],
+        [5, '고온부 커버·표시 상태', '접촉 위험 부위 커버·경고 표시'],
+      ],
+      COLD_STORE: [
+        [1, '냉동실 비상 탈출 장치 정상', '내부 비상 개방 장치 및 조명 작동'],
+        [2, '온도 로그 이상 없음', '자동 기록 로그 정상, 편차 알람 정상'],
+        [3, '결로·빙결 낙하 위험 관리', '천장·문틀 결빙 즉시 제거'],
+        [4, '방한복·방한 장갑 비치', '개인용 방한 장구 상태 양호'],
+      ],
+      PACKAGING: [
+        [1, '포장기·실링기 인터록 작동', '가동 중 손 진입 시 자동 정지'],
+        [2, '컨베이어 안전 커버 정상', '롤러·풀리 커버 이탈 없음'],
+        [3, '금속 검출기 정상 가동', '캘리브레이션 로그 정상'],
+        [4, '지게차 통로 표시·경적 정상', '전용 통로 라인, 후진 경보 정상'],
+      ],
+      COMMON: [
+        [1, '비상구·유도등 정상', '비상구 앞 적재 없음, 유도등 점등'],
+        [2, '소화기·소화전 접근성', '소화기 앞 3m 이내 통로 확보, 압력 정상'],
+        [3, '통로 조명·바닥 표시 상태', '조명 300lx 이상, 바닥 라인 유지'],
+        [4, '위험물 보관소 잠금·표시', '유해물질 MSDS 비치, 잠금 상태'],
+      ],
+    };
+    for (const area of areas.rows as any[]) {
+      const items = inspectionItemsByCode[area.code];
+      if (!items) continue;
+      const exists = await pool.query(
+        `SELECT id FROM safety_check_templates
+          WHERE kind='safety' AND frequency='daily' AND target_role='manager' AND area_id = $1
+          LIMIT 1`, [area.id]
+      );
+      if (exists.rowCount && exists.rowCount > 0) continue;
+      const tpl = await pool.query(
+        `INSERT INTO safety_check_templates (kind, frequency, target_role, area_id, name, sort_order)
+         VALUES ('safety', 'daily', 'manager', $1, $2, $3) RETURNING id`,
+        [area.id, `${area.name} 일일 순회점검`, 100 + area.id]
+      );
+      const tplId = tpl.rows[0].id;
+      for (const [no, title, detail] of items) {
+        await pool.query(
+          `INSERT INTO safety_check_items_master (template_id, item_no, item_title, item_detail, requires_photo_on_x, sort_order)
+           VALUES ($1, $2, $3, $4, 1, $2)`,
+          [tplId, no, title, detail]
+        );
+      }
+    }
+    console.log('[safety P2] Seeded areas and daily inspection templates');
+  } catch (e: any) {
+    console.error('[safety P2] seed failed:', e.message);
   }
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP

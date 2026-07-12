@@ -950,3 +950,240 @@ export async function getSafetyTemplates() {
 export async function getSafetyTemplateItems(templateId: number) {
   return fetchAPI<{ items: any[] }>(`/api/safety-manager/templates/${templateId}/items`);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 안전보건 시스템 P2 — 아차사고 신고 + 순회점검 + 조치 티켓
+// ═══════════════════════════════════════════════════════════════
+
+export interface SafetyArea {
+  id: number;
+  code: string;
+  name: string;
+  sort_order: number;
+  active: number;
+}
+
+export interface InspectionTemplateItem {
+  id: number;
+  item_no: number;
+  item_title: string;
+  item_detail: string;
+  requires_photo_on_x: number;
+  sort_order: number;
+}
+
+export interface InspectionTemplate {
+  id: number;
+  name: string;
+  area_id: number | null;
+  area_name?: string;
+  area_code?: string;
+  sort_order: number;
+  items: InspectionTemplateItem[];
+}
+
+export interface SafetyTicket {
+  id: number;
+  source_type: 'inspection' | 'hazard' | 'selfcheck' | string;
+  source_id: number | null;
+  area_id: number | null;
+  area_name?: string;
+  area_code?: string;
+  title: string;
+  description: string;
+  severity: 'low' | 'mid' | 'high' | 'critical' | string;
+  assignee_type: string;
+  assignee_id: number | null;
+  assignee_name: string;
+  due_date: string | null;
+  status: 'open' | 'in_progress' | 'done' | string;
+  completion_photo_url: string;
+  completion_notes: string;
+  completed_at: string | null;
+  verified_by: number | null;
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+  is_overdue?: boolean;
+}
+
+export interface HazardReport {
+  id: number;
+  reporter_employee_id: number | null;
+  reporter_name: string;
+  reporter_phone: string;
+  is_anonymous: number;
+  occurred_at: string;
+  area_id: number | null;
+  area_name: string;
+  area_name_lookup?: string;
+  hazard_type: string;
+  description: string;
+  photo_url: string;
+  freq_score: number | null;
+  intensity_score: number | null;
+  grade: string | null;
+  assessed_by: number | null;
+  assessed_at: string | null;
+  ticket_id: number | null;
+  ticket_status?: string;
+  ticket_severity?: string;
+  ticket_due_date?: string;
+  response_to_reporter: string;
+  response_sent_at: string | null;
+  closed_at: string | null;
+  status: 'reported' | 'assessed' | 'in_progress' | 'closed' | string;
+  created_at: string;
+}
+
+// ---- Public (근로자 토큰) ----
+export async function reportHazard(token: string, body: {
+  hazard_type: string;
+  description?: string;
+  area_id?: number | null;
+  area_name?: string;
+  is_anonymous?: boolean;
+  photo_url?: string;
+  occurred_at?: string;
+}) {
+  const res = await fetch(`${API_URL}/api/regular-public/${token}/hazard/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data as { success: boolean; id: number; message: string };
+}
+
+export async function getHazardHistory(token: string) {
+  const res = await fetch(`${API_URL}/api/regular-public/${token}/hazard/history`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data as { reports: HazardReport[] };
+}
+
+// ---- 관리자 (JWT 필요) ----
+export async function listSafetyAreas() {
+  return fetchAPI<{ areas: SafetyArea[] }>('/api/safety-manager/areas');
+}
+
+export async function getInspectionTemplates(areaId?: number) {
+  const qs = areaId ? `?area_id=${areaId}` : '';
+  return fetchAPI<{ templates: InspectionTemplate[] }>(`/api/safety-manager/inspection-templates${qs}`);
+}
+
+export async function getInspections(params?: { date?: string; area_id?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.date) qs.set('date', params.date);
+  if (params?.area_id) qs.set('area_id', String(params.area_id));
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{ date: string; inspections: any[] }>(`/api/safety-manager/inspections${suffix}`);
+}
+
+export async function createInspection(body: {
+  area_id: number;
+  inspection_date?: string;
+  weather?: string;
+  overall_notes?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number; inspection_date: string }>(
+    '/api/safety-manager/inspections',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchInspection(id: number, body: {
+  status?: string; overall_notes?: string; weather?: string;
+}) {
+  return fetchAPI<{ success: boolean }>(`/api/safety-manager/inspections/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+}
+
+export async function saveFindings(inspectionId: number, findings: Array<{
+  item_master_id?: number | null;
+  item_title: string;
+  judgement: 'O' | '△' | 'X';
+  photo_url?: string;
+  notes?: string;
+}>) {
+  return fetchAPI<{
+    success: boolean;
+    inspection_id: number;
+    findings_saved: number;
+    tickets_created: number;
+    results: { finding_id: number; ticket_id: number | null }[];
+  }>(`/api/safety-manager/inspections/${inspectionId}/findings`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ findings }),
+  });
+}
+
+export async function getFindings(inspectionId: number) {
+  return fetchAPI<{ inspection_id: number; findings: any[] }>(
+    `/api/safety-manager/inspections/${inspectionId}/findings`
+  );
+}
+
+export async function listTickets(filter?: {
+  status?: string; severity?: string; area_id?: number; overdue?: boolean;
+}) {
+  const qs = new URLSearchParams();
+  if (filter?.status) qs.set('status', filter.status);
+  if (filter?.severity) qs.set('severity', filter.severity);
+  if (filter?.area_id) qs.set('area_id', String(filter.area_id));
+  if (filter?.overdue) qs.set('overdue', '1');
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{
+    tickets: SafetyTicket[];
+    summary: { total: number; open: number; in_progress: number; done: number; overdue: number };
+  }>(`/api/safety-manager/tickets${suffix}`);
+}
+
+export async function patchTicket(id: number, body: Partial<{
+  status: string; severity: string; assignee_name: string; assignee_id: number;
+  due_date: string; title: string; description: string;
+  completion_photo_url: string; completion_notes: string;
+}>) {
+  return fetchAPI<{ success: boolean; ticket: SafetyTicket }>(
+    `/api/safety-manager/tickets/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function listHazardReports(filter?: { status?: string; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (filter?.status) qs.set('status', filter.status);
+  if (filter?.limit) qs.set('limit', String(filter.limit));
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{
+    reports: HazardReport[];
+    summary: { total: number; reported: number; assessed: number; in_progress: number; closed: number };
+  }>(`/api/safety-manager/hazard-reports${suffix}`);
+}
+
+export async function assessHazardReport(id: number, body: {
+  freq_score: number; intensity_score: number;
+  severity?: string; due_date?: string; assignee_name?: string; notes?: string;
+}) {
+  return fetchAPI<{ success: boolean; report: HazardReport; ticket_id: number }>(
+    `/api/safety-manager/hazard-reports/${id}/assess`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchHazardReport(id: number, body: Partial<{
+  status: string; area_id: number | null; area_name: string; description: string; hazard_type: string;
+}>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/hazard-reports/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function replyToHazardReport(id: number, response_to_reporter: string) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/hazard-reports/${id}/reply`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response_to_reporter }) }
+  );
+}

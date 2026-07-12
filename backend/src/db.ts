@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.36.0';
+  const SCHEMA_VERSION = 'schema-v2.37.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -2311,6 +2311,19 @@ export async function initializeDB(): Promise<void> {
   } catch (e: any) {
     console.error('[safety P7D] seed failed:', e.message);
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.37.0 — P7E 중처법 반기점검 9개 항목 자동 근거·모듈 통합
+  //  cdpa_review_items 에 다음 컬럼 추가:
+  //   - evidence_module_key TEXT : 자동 근거 모듈 키 (policy/org/risk_assessment/...)
+  //   - auto_status TEXT         : 자동 계산된 상태 (done/in_progress/pending/na)
+  //   - auto_status_summary JSONB: 자동 계산 근거 데이터 (건수·비율 등)
+  //   - module_link TEXT         : 관련 모듈 프론트엔드 경로
+  // ═══════════════════════════════════════════════════════════════
+  try { await pool.query("ALTER TABLE cdpa_review_items ADD COLUMN IF NOT EXISTS evidence_module_key TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE cdpa_review_items ADD COLUMN IF NOT EXISTS auto_status TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE cdpa_review_items ADD COLUMN IF NOT EXISTS auto_status_summary JSONB DEFAULT '{}'::jsonb"); } catch {}
+  try { await pool.query("ALTER TABLE cdpa_review_items ADD COLUMN IF NOT EXISTS module_link TEXT DEFAULT ''"); } catch {}
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}

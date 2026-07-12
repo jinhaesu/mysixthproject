@@ -1928,6 +1928,11 @@ export interface CdpaReviewItem {
   evidence_url: string;
   notes: string;
   improvement_action: string;
+  // P7E — 자동 근거·모듈 통합
+  evidence_module_key?: string;
+  auto_status?: string;
+  auto_status_summary?: Record<string, any>;
+  module_link?: string;
 }
 
 export async function listCdpaReviews(year?: number) {
@@ -2619,4 +2624,33 @@ export interface ContractorActiveSummary {
 
 export async function getContractorActiveSummary() {
   return fetchAPI<ContractorActiveSummary>('/api/contractor/active-summary');
+}
+
+// ─── P7E — 중처법 반기점검 9개 항목 자동 근거·모듈 통합 ─────────
+export interface CdpaAutoRecomputeResponse {
+  success: boolean;
+  updated: number;
+  items: Array<{
+    id: number;
+    item_no: number;
+    evidence_module_key: string;
+    module_link: string;
+    auto_status: string;
+    auto_status_summary: Record<string, any>;
+  }>;
+}
+
+export async function autoRecomputeCdpaReview(id: number) {
+  return fetchAPI<CdpaAutoRecomputeResponse>(`/api/ceo/cdpa-reviews/${id}/auto-recompute`);
+}
+
+export async function overrideCdpaItem(
+  reviewId: number,
+  itemId: number,
+  body: { status?: string; notes?: string; evidence_source?: string; evidence_url?: string }
+) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/ceo/cdpa-reviews/${reviewId}/items/${itemId}/link`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
 }

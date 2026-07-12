@@ -43,6 +43,7 @@ import {
   Gauge,
   Award,
   Timer,
+  PiggyBank,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -117,6 +118,7 @@ const groups: NavGroup[] = [
       { href: "/safety-manager/incidents", label: "산업재해", icon: AlertOctagon },
       { href: "/safety-manager/committee", label: "산업안전보건위원회", icon: Users },
       { href: "/safety-manager/manager-hours", label: "겸직 관리자 시간", icon: Timer },
+      { href: "/admin/safety-budget/dashboard", label: "예산 편성·집행", icon: PiggyBank },
     ],
   },
   {

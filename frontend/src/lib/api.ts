@@ -2117,3 +2117,159 @@ export async function getSafetyOrgHistory(id: number) {
 export async function getSafetyOrgCompliance() {
   return fetchAPI<SafetyOrgComplianceResponse>('/api/safety-org/compliance-check');
 }
+
+// ===== P7C — 안전보건 예산 편성·집행 =====
+export interface SafetyBudgetPlan {
+  id: number;
+  year: number;
+  category: string;
+  category_label: string;
+  planned_amount: number;
+  notes: string;
+  created_by?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SafetyBudgetExecution {
+  id: number;
+  budget_plan_id: number;
+  executed_at: string; // YYYY-MM-DD
+  amount: number;
+  description: string;
+  receipt_url: string;
+  vendor: string;
+  executor_id?: number | null;
+  executor_name: string;
+  approved_by?: number | null;
+  approved_by_name: string;
+  linked_to_ticket_id: number | null;
+  notes: string;
+  created_at?: string;
+  // Joined from safety_budget_plans (GET /executions)
+  year?: number;
+  category?: string;
+  category_label?: string;
+}
+
+export interface SafetyBudgetSummaryCategory {
+  category: string;
+  category_label: string;
+  planned: number;
+  executed: number;
+  execution_rate: number | null;
+  remaining: number;
+  count: number;
+}
+
+export interface SafetyBudgetSummaryMonthly {
+  month: number;
+  executed: number;
+  by_category: Record<string, number>;
+}
+
+export interface SafetyBudgetSummaryQuarterly {
+  quarter: number;
+  months: number[];
+  executed: number;
+}
+
+export interface SafetyBudgetSummaryResponse {
+  year: number;
+  categories: SafetyBudgetSummaryCategory[];
+  monthly: SafetyBudgetSummaryMonthly[];
+  quarterly: SafetyBudgetSummaryQuarterly[];
+  totals: {
+    planned: number;
+    executed: number;
+    execution_rate: number | null;
+    remaining: number;
+  };
+}
+
+export async function listSafetyBudgetPlans(year: number) {
+  return fetchAPI<{ year: number; plans: SafetyBudgetPlan[] }>(
+    `/api/safety-budget/plans?year=${year}`
+  );
+}
+
+export async function createSafetyBudgetPlan(body: {
+  year: number;
+  category: string;
+  category_label?: string;
+  planned_amount?: number;
+  notes?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/safety-budget/plans',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchSafetyBudgetPlan(id: number, body: Partial<{
+  category_label: string;
+  planned_amount: number;
+  notes: string;
+}>) {
+  return fetchAPI<{ success: boolean; plan: SafetyBudgetPlan }>(
+    `/api/safety-budget/plans/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function listSafetyBudgetExecutions(params: { year: number; category?: string }) {
+  const q = new URLSearchParams();
+  q.set('year', String(params.year));
+  if (params.category) q.set('category', params.category);
+  return fetchAPI<{ year: number; category: string | null; executions: SafetyBudgetExecution[] }>(
+    `/api/safety-budget/executions?${q.toString()}`
+  );
+}
+
+export async function createSafetyBudgetExecution(body: {
+  budget_plan_id: number;
+  executed_at: string;
+  amount: number;
+  description: string;
+  receipt_url?: string;
+  vendor?: string;
+  executor_name?: string;
+  approved_by_name?: string;
+  linked_to_ticket_id?: number | null;
+  notes?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/safety-budget/executions',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchSafetyBudgetExecution(id: number, body: Partial<{
+  executed_at: string;
+  amount: number;
+  description: string;
+  receipt_url: string;
+  vendor: string;
+  executor_name: string;
+  approved_by_name: string;
+  linked_to_ticket_id: number | null;
+  notes: string;
+}>) {
+  return fetchAPI<{ success: boolean; execution: SafetyBudgetExecution }>(
+    `/api/safety-budget/executions/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function deleteSafetyBudgetExecution(id: number) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-budget/executions/${id}`,
+    { method: 'DELETE' }
+  );
+}
+
+export async function getSafetyBudgetSummary(year: number) {
+  return fetchAPI<SafetyBudgetSummaryResponse>(
+    `/api/safety-budget/summary?year=${year}`
+  );
+}

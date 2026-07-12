@@ -125,6 +125,7 @@ const groups: NavGroup[] = [
       { href: "/admin/emergency-manuals", label: "매뉴얼", icon: BookMarked },
       { href: "/safety-manager/emergency-drills", label: "비상훈련", icon: Siren },
       { href: "/admin/contractors", label: "도급업체 관리", icon: Building2 },
+      { href: "/admin/policy-management", label: "방침·규정 문서 관리", icon: FileText },
     ],
   },
   {

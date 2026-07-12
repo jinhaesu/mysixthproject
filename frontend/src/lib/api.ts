@@ -2654,3 +2654,138 @@ export async function overrideCdpaItem(
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
 }
+
+// ===== P7A — 안전보건 방침·규정 문서 관리 (§4-1) =====
+export type PolicyKind = 'policy' | 'regulation' | 'manual' | 'goal';
+export type PolicyStatus = 'draft' | 'published' | 'archived';
+export type PolicyTargetRole = 'all' | 'production' | 'cafe' | 'office';
+
+export interface PolicyDocument {
+  id: number;
+  kind: PolicyKind;
+  title: string;
+  version: string;
+  content_html: string;
+  attachment_url: string;
+  status: PolicyStatus;
+  effective_from: string | null;
+  effective_to: string | null;
+  superseded_by: number | null;
+  requires_acknowledgment: number;
+  target_role: PolicyTargetRole;
+  published_at: string | null;
+  published_by: number | null;
+  ceo_signed_at: string | null;
+  ceo_signature_name: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function listPolicyDocuments(params: { kind?: string; status?: string } = {}) {
+  const q = new URLSearchParams();
+  if (params.kind) q.set('kind', params.kind);
+  if (params.status) q.set('status', params.status);
+  const s = q.toString();
+  return fetchAPI<{ documents: PolicyDocument[] }>(
+    `/api/policy-manager/documents${s ? `?${s}` : ''}`
+  );
+}
+
+export async function getPolicyDocument(id: number) {
+  return fetchAPI<{ document: PolicyDocument }>(`/api/policy-manager/documents/${id}`);
+}
+
+export async function createPolicy(body: {
+  kind: string;
+  title: string;
+  version?: string;
+  content_html?: string;
+  attachment_url?: string;
+  target_role?: string;
+  requires_acknowledgment?: number;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/policy-manager/documents',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchPolicy(id: number, body: Partial<{
+  kind: string;
+  title: string;
+  version: string;
+  content_html: string;
+  attachment_url: string;
+  effective_from: string | null;
+  effective_to: string | null;
+  target_role: string;
+  requires_acknowledgment: number;
+  status: string;
+  ceo_signature_name: string;
+}>) {
+  return fetchAPI<{ success: boolean; document: PolicyDocument }>(
+    `/api/policy-manager/documents/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function publishPolicy(
+  id: number,
+  body: { effective_from?: string; ceo_signature_name?: string } = {}
+) {
+  return fetchAPI<{ success: boolean; document: PolicyDocument }>(
+    `/api/policy-manager/documents/${id}/publish`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function archivePolicy(id: number) {
+  return fetchAPI<{ success: boolean; document: PolicyDocument }>(
+    `/api/policy-manager/documents/${id}/archive`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }
+  );
+}
+
+export interface PolicyAcknowledgment {
+  id: number;
+  employee_id: number;
+  employee_name: string | null;
+  department: string | null;
+  team: string | null;
+  acknowledged_at: string;
+  signature_notes: string;
+  client_ip: string;
+}
+
+export async function getPolicyAcks(id: number) {
+  return fetchAPI<{ acknowledgments: PolicyAcknowledgment[] }>(
+    `/api/policy-manager/documents/${id}/acknowledgments`
+  );
+}
+
+export interface PolicyComplianceRow {
+  id: number;
+  name: string;
+  department: string | null;
+  team: string | null;
+  role: string | null;
+  acknowledged_at: string | null;
+}
+
+export interface PolicyComplianceResponse {
+  document: { id: number; kind: PolicyKind; target_role: PolicyTargetRole; status: PolicyStatus };
+  summary: {
+    target_total: number;
+    acknowledged_count: number;
+    missing_count: number;
+    rate_pct: number;
+  };
+  by_department: Array<{ dept: string; total: number; done: number; missing: number }>;
+  rows: PolicyComplianceRow[];
+}
+
+export async function getPolicyCompliance(id: number) {
+  return fetchAPI<PolicyComplianceResponse>(
+    `/api/policy-manager/documents/${id}/compliance`
+  );
+}

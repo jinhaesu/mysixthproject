@@ -39,6 +39,8 @@ import safetyBudgetRoutes from './routes/safetyBudget';
 import emergencyManualRoutes from './routes/emergencyManual';
 import emergencyDrillRoutes from './routes/emergencyDrill';
 import contractorRoutes from './routes/contractor';
+import policyManagerRoutes from './routes/policyManager';
+import policyPublicRoutes from './routes/policyPublic';
 import { requireAuth } from './middleware/auth';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
 
@@ -123,6 +125,10 @@ app.use('/api/safety-budget', requireAuth, safetyBudgetRoutes);
 app.use('/api/emergency-manual', requireAuth, emergencyManualRoutes);
 app.use('/api/emergency-drill', requireAuth, emergencyDrillRoutes);
 app.use('/api/contractor', requireAuth, contractorRoutes);
+
+// 안전보건 P7A — 방침·규정 문서 관리 (§4-1)
+app.use('/api/policy-manager', requireAuth, policyManagerRoutes);
+app.use('/api/regular-public', policyPublicRoutes);  // no auth (근로자 token)
 
 // Health check
 app.get('/api/health', (_req, res) => {

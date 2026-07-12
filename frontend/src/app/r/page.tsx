@@ -958,6 +958,22 @@ function RegularContent() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+        {/* ── 아차사고·위험요인 신고 (상시 가시성, 경고 톤) ───────── */}
+        {data && (data.status as string) !== "deactivated" && (
+          <a
+            href={`/r/hazard-report?token=${token}`}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] text-white font-semibold shadow-[var(--elev-1)] transition-transform hover:scale-[1.01]"
+            style={{ background: "linear-gradient(135deg, #dc2626 0%, #ea580c 100%)" }}
+          >
+            <ShieldAlert className="w-5 h-5" />
+            <div className="flex-1 text-left">
+              <p className="text-[var(--fs-base)] leading-tight">아차사고·위험요인 신고</p>
+              <p className="text-[var(--fs-caption)] opacity-90 mt-0.5">위험 상황을 목격했다면 즉시 알려주세요</p>
+            </div>
+            <span className="text-[var(--fs-caption)] font-bold">신고</span>
+          </a>
+        )}
+
         {/* ── Language Selector ──────────────────────────────────── */}
         <div className="flex justify-center gap-2">
           {LANGS.map((l) => (

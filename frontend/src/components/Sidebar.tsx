@@ -22,6 +22,7 @@ import {
   UserCheck,
   Shield,
   ShieldCheck,
+  ShieldAlert,
   HardHat,
   Lock,
   CalendarCheck,
@@ -30,6 +31,8 @@ import {
   UserMinus,
   Wallet,
   Heart,
+  Ticket,
+  MapPin,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -93,6 +96,9 @@ const groups: NavGroup[] = [
     icon: ShieldCheck,
     items: [
       { href: "/safety-manager/worker-compliance", label: "근로자 셀프체크 이행 현황", icon: Activity },
+      { href: "/safety-manager/daily-inspection", label: "일일 순회점검", icon: MapPin },
+      { href: "/safety-manager/tickets", label: "조치 티켓", icon: Ticket },
+      { href: "/safety-manager/hazard-reports", label: "아차사고 처리", icon: ShieldAlert },
     ],
   },
   {

@@ -26,6 +26,7 @@ import offboardingPublicRoutes from './routes/offboardingPublic';
 import onboardingRoutes from './routes/onboarding';
 import cafeContractRoutes, { publicRouter as cafeContractPublicRoutes } from './routes/cafeContract';
 import safetyPublicRoutes from './routes/safetyPublic';
+import safetyHazardPublicRoutes from './routes/safetyHazardPublic';
 import safetyManagerRoutes from './routes/safetyManager';
 import { requireAuth } from './middleware/auth';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
@@ -80,6 +81,8 @@ app.use('/api/cafe-contract-public', cafeContractPublicRoutes);  // no auth
 
 // 안전보건 시스템 P1 — 근로자 문자 웹링크 재활용 (safetyPublic은 /api/regular-public 하위에 마운트)
 app.use('/api/regular-public', safetyPublicRoutes);  // no auth
+// 안전보건 P2 — 근로자 아차사고·위험요인 신고 (동일하게 regular-public 하위)
+app.use('/api/regular-public', safetyHazardPublicRoutes);  // no auth
 app.use('/api/safety-manager', requireAuth, safetyManagerRoutes);
 
 // Health check

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { dbGet, dbAll, dbRun, getKSTDate } from '../db';
+import { logManagerHours } from '../lib/managerHours';
 
 const router = Router();
 
@@ -79,7 +80,14 @@ router.post('/risk-assessments', async (req: Request, res: Response) => {
        VALUES (?, ?, ?, ?, 'draft', ?)`,
       y, kind || 'regular', title, triggered_by || '', user?.id || 0
     );
-    res.json({ success: true, id: result.lastInsertRowid, year: y });
+    const raId = Number(result.lastInsertRowid);
+    await logManagerHours({
+      managerId: user?.id || 0, managerName: user?.email || '',
+      activityType: 'risk_assessment', minutes: 360,
+      sourceType: 'risk_assessments', sourceId: raId,
+      notes: `위험성평가: ${title}`,
+    });
+    res.json({ success: true, id: raId, year: y });
   } catch (error: any) {
     console.error('[risk-assessments/create]', error);
     res.status(500).json({ error: error.message });
@@ -663,7 +671,15 @@ router.post('/committee-minutes', async (req: Request, res: Response) => {
       b.participants_employer || '', b.participants_worker || '',
       user?.id || 0
     );
-    res.json({ success: true, id: result.lastInsertRowid });
+    const commId = Number(result.lastInsertRowid);
+    await logManagerHours({
+      managerId: user?.id || 0, managerName: user?.email || '',
+      activityType: 'safety_committee', minutes: 120,
+      sourceType: 'safety_committee_minutes', sourceId: commId,
+      occurredAt: b.held_at,
+      notes: `${year}년 ${quarter}분기 산업안전보건위원회`,
+    });
+    res.json({ success: true, id: commId });
   } catch (error: any) {
     console.error('[committee/create]', error);
     res.status(500).json({ error: error.message });

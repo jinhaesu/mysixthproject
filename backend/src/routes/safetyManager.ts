@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { dbGet, dbAll, dbRun, getBusinessDate, getKSTDate } from '../db';
+import { logManagerHours, ACTIVITY_LABEL, ACTIVITY_DEFAULT_MINUTES } from '../lib/managerHours';
 
 const router = Router();
 
@@ -298,7 +299,14 @@ router.post('/inspections', async (req: Request, res: Response) => {
        VALUES (?, ?, ?, ?, ?, ?, 'in_progress')`,
       area_id || null, inspectorId, inspectorName, date, weather || '', overall_notes || ''
     );
-    res.json({ success: true, id: result.lastInsertRowid, inspection_date: date });
+    const insId = Number(result.lastInsertRowid);
+    await logManagerHours({
+      managerId: inspectorId, managerName: inspectorName,
+      activityType: 'safety_daily_inspection', minutes: 60,
+      sourceType: 'safety_daily_inspections', sourceId: insId,
+      notes: `일일 순회점검 ${date}`,
+    });
+    res.json({ success: true, id: insId, inspection_date: date });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -620,6 +628,12 @@ router.post('/hazard-reports/:id/assess', async (req: Request, res: Response) =>
       f, i, grade, createdBy, ticketId, id
     );
     const updated = await dbGet(`SELECT * FROM hazard_reports WHERE id = ?`, id);
+    await logManagerHours({
+      managerId: createdBy, managerName: user?.email || '',
+      activityType: 'hazard_processing', minutes: 15,
+      sourceType: 'hazard_reports', sourceId: id,
+      notes: `아차사고 등급판정: ${grade}`,
+    });
     res.json({ success: true, report: updated, ticket_id: ticketId });
   } catch (error: any) {
     console.error('[hazard/assess]', error);
@@ -647,6 +661,175 @@ router.post('/hazard-reports/:id/reply', async (req: Request, res: Response) => 
       response_to_reporter, id
     );
     res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// P6 — 겸직 관리자 활동시간 결산
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/safety-manager/manager-hours?year=&month=&manager_name=
+ * 월별·연간 결산. manager_name 로 필터, 미지정 시 전체(관리자별 집계).
+ * 반기 685~802h 목표 대비 게이지 값 함께 반환.
+ */
+router.get('/manager-hours', async (req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const year = req.query.year ? parseInt(req.query.year as string) : kstNow.getUTCFullYear();
+    const managerName = (req.query.manager_name as string) || '';
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+
+    const params: any[] = [yearStart, yearEnd];
+    let where = 'occurred_at >= ? AND occurred_at < (?::date + INTERVAL \'1 day\')';
+    if (managerName) { where += ' AND manager_name = ?'; params.push(managerName); }
+
+    // 월별 (활동유형별 breakdown 도)
+    const monthlyRows = await dbAll(
+      `SELECT to_char(occurred_at, 'YYYY-MM') AS month,
+              activity_type,
+              COALESCE(SUM(minutes), 0) AS mins,
+              COUNT(*) AS event_count
+         FROM manager_activity_hours
+        WHERE ${where}
+        GROUP BY 1, 2
+        ORDER BY 1, 2`,
+      ...params
+    ) as any[];
+
+    // 활동 유형별 합계 (연간)
+    const byActivity: Record<string, { minutes: number; hours: number; events: number; label: string }> = {};
+    // 월별 격자 구조
+    const monthlyGrid: Record<string, Record<string, number>> = {};
+    for (const r of monthlyRows) {
+      byActivity[r.activity_type] = byActivity[r.activity_type] || { minutes: 0, hours: 0, events: 0, label: ACTIVITY_LABEL[r.activity_type] || r.activity_type };
+      byActivity[r.activity_type].minutes += Number(r.mins) || 0;
+      byActivity[r.activity_type].events += Number(r.event_count) || 0;
+      monthlyGrid[r.month] = monthlyGrid[r.month] || {};
+      monthlyGrid[r.month][r.activity_type] = Number(r.mins) || 0;
+    }
+    for (const k of Object.keys(byActivity)) {
+      byActivity[k].hours = Math.round((byActivity[k].minutes / 60) * 10) / 10;
+    }
+
+    const monthly: Array<{ month: string; total_hours: number; by_activity: Record<string, number> }> = [];
+    for (let m = 1; m <= 12; m++) {
+      const ym = `${year}-${String(m).padStart(2, '0')}`;
+      const g = monthlyGrid[ym] || {};
+      const totalMins = Object.values(g).reduce((s, v) => s + v, 0);
+      // by_activity 도 시간 단위로
+      const perActivityHours: Record<string, number> = {};
+      for (const [k, v] of Object.entries(g)) perActivityHours[k] = Math.round((v / 60) * 10) / 10;
+      monthly.push({ month: ym, total_hours: Math.round((totalMins / 60) * 10) / 10, by_activity: perActivityHours });
+    }
+
+    // 관리자별(name) 집계 — 미필터 시 유용
+    const perManager = managerName ? [] : await dbAll(
+      `SELECT COALESCE(NULLIF(manager_name, ''), '(미지정)') AS name,
+              COALESCE(SUM(minutes), 0) AS mins,
+              COUNT(*) AS event_count
+         FROM manager_activity_hours
+        WHERE occurred_at >= ? AND occurred_at < (?::date + INTERVAL '1 day')
+        GROUP BY 1
+        ORDER BY 2 DESC`,
+      yearStart, yearEnd
+    );
+    const perManagerFmt = (perManager as any[]).map(r => ({
+      name: r.name,
+      hours: Math.round((Number(r.mins) / 60) * 10) / 10,
+      minutes: Number(r.mins),
+      event_count: Number(r.event_count),
+    }));
+
+    // 반기 게이지
+    const h1Start = `${year}-01-01`, h1End = `${year}-06-30`;
+    const h2Start = `${year}-07-01`, h2End = `${year}-12-31`;
+    const halfSumParams: any[] = [];
+    let halfWhere = 'occurred_at >= ? AND occurred_at < (?::date + INTERVAL \'1 day\')';
+    if (managerName) { halfWhere += ' AND manager_name = ?'; }
+    const h1 = await dbGet(
+      `SELECT COALESCE(SUM(minutes), 0) AS mins FROM manager_activity_hours WHERE ${halfWhere}`,
+      ...(managerName ? [h1Start, h1End, managerName] : [h1Start, h1End])
+    ) as any;
+    const h2 = await dbGet(
+      `SELECT COALESCE(SUM(minutes), 0) AS mins FROM manager_activity_hours WHERE ${halfWhere}`,
+      ...(managerName ? [h2Start, h2End, managerName] : [h2Start, h2End])
+    ) as any;
+    const yearMins = Number(h1?.mins || 0) + Number(h2?.mins || 0);
+    const HALF_TARGET_MIN = 685;
+    const HALF_TARGET_MAX = 802;
+
+    res.json({
+      year,
+      manager_name: managerName || null,
+      total_hours: Math.round((yearMins / 60) * 10) / 10,
+      by_activity: byActivity,
+      activity_labels: ACTIVITY_LABEL,
+      monthly,
+      per_manager: perManagerFmt,
+      half_summary: {
+        H1: {
+          hours: Math.round((Number(h1?.mins || 0) / 60) * 10) / 10,
+          target_min: HALF_TARGET_MIN,
+          target_max: HALF_TARGET_MAX,
+          gauge_pct: Math.min(200, Math.round((Number(h1?.mins || 0) / 60 / HALF_TARGET_MIN) * 1000) / 10),
+        },
+        H2: {
+          hours: Math.round((Number(h2?.mins || 0) / 60) * 10) / 10,
+          target_min: HALF_TARGET_MIN,
+          target_max: HALF_TARGET_MAX,
+          gauge_pct: Math.min(200, Math.round((Number(h2?.mins || 0) / 60 / HALF_TARGET_MIN) * 1000) / 10),
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[manager-hours]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/safety-manager/manager-hours/log — 수동 로깅
+ * body: { activity_type, minutes, occurred_at?, manager_name?, notes? }
+ */
+router.post('/manager-hours/log', async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const b = req.body || {};
+    const activityType = b.activity_type as string;
+    if (!activityType || !ACTIVITY_LABEL[activityType]) {
+      res.status(400).json({ error: 'activity_type 필수' }); return;
+    }
+    const minutes = parseInt(b.minutes) || ACTIVITY_DEFAULT_MINUTES[activityType] || 30;
+    const managerName = (b.manager_name as string) || user?.email || '';
+    if (!managerName) { res.status(400).json({ error: 'manager_name 또는 로그인 필요' }); return; }
+    await logManagerHours({
+      managerId: 0,
+      managerName,
+      activityType: activityType as any,
+      minutes,
+      occurredAt: b.occurred_at || new Date().toISOString(),
+      sourceType: 'manual',
+      notes: b.notes || '',
+    });
+    res.json({ success: true, minutes });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** GET /api/safety-manager/manager-hours/managers — dropdown용 관리자 이름 목록 */
+router.get('/manager-hours/managers', async (_req: Request, res: Response) => {
+  try {
+    const rows = await dbAll(
+      `SELECT DISTINCT manager_name FROM manager_activity_hours
+        WHERE COALESCE(manager_name, '') <> '' ORDER BY manager_name`
+    );
+    res.json({ managers: (rows as any[]).map(r => r.manager_name) });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

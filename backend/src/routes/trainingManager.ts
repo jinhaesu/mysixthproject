@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { dbGet, dbAll, dbRun } from '../db';
 import { currentHalfYearPeriod, halfYearEndDate } from './trainingPublic';
+import { logManagerHours } from '../lib/managerHours';
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.get('/training-master', async (_req: Request, res: Response) => {
 
 router.post('/training-master', async (req: Request, res: Response) => {
   try {
+    const user = (req as any).user;
     const { title, description, video_source_type, video_url, duration_min,
             half_year_credit_hours, target_role, category, active, sort_order } = req.body || {};
     if (!title) { res.status(400).json({ error: 'title 필요' }); return; }
@@ -38,7 +40,15 @@ router.post('/training-master', async (req: Request, res: Response) => {
       target_role || 'production', category || 'safety',
       active === 0 ? 0 : 1, Number(sort_order) || 0
     );
-    res.json({ success: true, id: r.lastInsertRowid });
+    const cid = Number(r.lastInsertRowid);
+    // 교육 콘텐츠 신설 = 강사(안전·보건관리자) 준비·실시 활동 (180분)
+    await logManagerHours({
+      managerId: 0, managerName: user?.email || '',
+      activityType: 'training_delivery', minutes: 180,
+      sourceType: 'training_courses', sourceId: cid,
+      notes: `교육 콘텐츠 등록: ${title}`,
+    });
+    res.json({ success: true, id: cid });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 

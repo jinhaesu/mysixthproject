@@ -39,6 +39,10 @@ import {
   Users,
   AlertOctagon,
   Zap,
+  Crown,
+  Gauge,
+  Award,
+  Timer,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -111,6 +115,15 @@ const groups: NavGroup[] = [
       { href: "/safety-manager/loto", label: "LOTO 작업허가", icon: Zap },
       { href: "/safety-manager/incidents", label: "산업재해", icon: AlertOctagon },
       { href: "/safety-manager/committee", label: "산업안전보건위원회", icon: Users },
+      { href: "/safety-manager/manager-hours", label: "겸직 관리자 시간", icon: Timer },
+    ],
+  },
+  {
+    label: "대표이사",
+    icon: Crown,
+    items: [
+      { href: "/ceo/dashboard", label: "대시보드", icon: Gauge },
+      { href: "/ceo/half-year-review", label: "중처법 반기 이행점검", icon: Award },
     ],
   },
   {

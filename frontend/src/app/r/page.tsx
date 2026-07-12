@@ -560,6 +560,13 @@ function RegularContent() {
     postcheck_ok?: boolean | null;
   } | null>(null);
 
+  // 보건증 상태 (P3)
+  const [healthCert, setHealthCert] = useState<{
+    days_until_expiry: number | null;
+    status_hint: "none" | "valid" | "warning" | "urgent" | "expired";
+    certificate: { expiry_date: string } | null;
+  } | null>(null);
+
   const toggleDept = (dept: string) => {
     setExpandedDepts((prev) => {
       const next = new Set(prev);
@@ -627,8 +634,20 @@ function RegularContent() {
     } catch {}
   }, [token]);
 
+  const loadHealthCert = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/health/certificate`);
+      if (res.ok) {
+        const body = await res.json();
+        setHealthCert(body);
+      }
+    } catch {}
+  }, [token]);
+
   useEffect(() => { loadVacations(); }, [loadVacations]);
   useEffect(() => { loadSafetyStatus(); }, [loadSafetyStatus]);
+  useEffect(() => { loadHealthCert(); }, [loadHealthCert]);
 
   useEffect(() => {
     const isHalf = vacType.startsWith('오전') || vacType.startsWith('오후');
@@ -801,6 +820,13 @@ function RegularContent() {
       if (res.status === 409) {
         const body = await res.json().catch(() => null);
         if (body?.code === 'SAFETY_TASK_INCOMPLETE') {
+          const pending = Array.isArray(body?.pending) ? body.pending : [];
+          if (pending.includes('health_cert_expired') || pending.includes('health_cert_missing')) {
+            if (confirm('보건증이 없거나 만료가 임박했습니다.\n보건증 관리 화면으로 이동할까요?')) {
+              window.location.href = `/r/health-cert?token=${token}`;
+            }
+            return;
+          }
           if (confirm('출근 전 안전 셀프체크를 먼저 완료해야 합니다.\n지금 이동하시겠습니까?')) {
             window.location.href = `/r/safety-check?token=${token}&kind=precheck`;
           }
@@ -839,6 +865,13 @@ function RegularContent() {
       if (res.status === 409) {
         const body = await res.json().catch(() => null);
         if (body?.code === 'SAFETY_TASK_INCOMPLETE') {
+          const pending = Array.isArray(body?.pending) ? body.pending : [];
+          if (pending.includes('health_cert_expired') || pending.includes('health_cert_missing')) {
+            if (confirm('보건증이 없거나 만료가 임박했습니다.\n보건증 관리 화면으로 이동할까요?')) {
+              window.location.href = `/r/health-cert?token=${token}`;
+            }
+            return;
+          }
           if (confirm('퇴근 전 안전 셀프체크를 먼저 완료해야 합니다.\n지금 이동하시겠습니까?')) {
             window.location.href = `/r/safety-check?token=${token}&kind=postcheck`;
           }
@@ -958,6 +991,45 @@ function RegularContent() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+        {/* ── 보건증 상태 카드 (D-30 이내 빨강·긴급, D-30~D-60 노랑) ─── */}
+        {data && (data.status as string) !== "deactivated" && healthCert && (
+          (healthCert.status_hint === "expired" || healthCert.status_hint === "urgent" || healthCert.status_hint === "none") ? (
+            <a
+              href={`/r/health-cert?token=${token}`}
+              className="flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] bg-[var(--danger-bg)] border border-[var(--danger-border)]"
+            >
+              <ShieldAlert className="w-5 h-5 text-[var(--danger-fg)] shrink-0" />
+              <div className="flex-1 text-left">
+                <p className="text-[var(--fs-base)] leading-tight font-semibold text-[var(--danger-fg)]">
+                  {healthCert.status_hint === "none" ? "보건증 미등록" :
+                   healthCert.status_hint === "expired" ? "보건증 만료" :
+                   `보건증 만료 임박 (D-${healthCert.days_until_expiry ?? "?"})`}
+                </p>
+                <p className="text-[var(--fs-caption)] opacity-90 mt-0.5 text-[var(--danger-fg)]">
+                  출퇴근 기록이 차단됩니다. 즉시 확인해주세요.
+                </p>
+              </div>
+              <span className="text-[var(--fs-caption)] font-bold text-[var(--danger-fg)]">확인</span>
+            </a>
+          ) : healthCert.status_hint === "warning" ? (
+            <a
+              href={`/r/health-cert?token=${token}`}
+              className="flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] bg-[var(--warning-bg)] border border-[var(--warning-border)]"
+            >
+              <ShieldAlert className="w-5 h-5 text-[var(--warning-fg)] shrink-0" />
+              <div className="flex-1 text-left">
+                <p className="text-[var(--fs-base)] leading-tight font-semibold text-[var(--warning-fg)]">
+                  보건증 만료 예정 (D-{healthCert.days_until_expiry ?? "?"})
+                </p>
+                <p className="text-[var(--fs-caption)] opacity-90 mt-0.5 text-[var(--warning-fg)]">
+                  미리 갱신 절차를 준비해주세요.
+                </p>
+              </div>
+              <span className="text-[var(--fs-caption)] font-bold text-[var(--warning-fg)]">확인</span>
+            </a>
+          ) : null
+        )}
+
         {/* ── 아차사고·위험요인 신고 (상시 가시성, 경고 톤) ───────── */}
         {data && (data.status as string) !== "deactivated" && (
           <a

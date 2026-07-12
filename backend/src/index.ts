@@ -28,6 +28,8 @@ import cafeContractRoutes, { publicRouter as cafeContractPublicRoutes } from './
 import safetyPublicRoutes from './routes/safetyPublic';
 import safetyHazardPublicRoutes from './routes/safetyHazardPublic';
 import safetyManagerRoutes from './routes/safetyManager';
+import healthPublicRoutes from './routes/healthPublic';
+import healthManagerRoutes from './routes/healthManager';
 import { requireAuth } from './middleware/auth';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
 
@@ -84,6 +86,10 @@ app.use('/api/regular-public', safetyPublicRoutes);  // no auth
 // 안전보건 P2 — 근로자 아차사고·위험요인 신고 (동일하게 regular-public 하위)
 app.use('/api/regular-public', safetyHazardPublicRoutes);  // no auth
 app.use('/api/safety-manager', requireAuth, safetyManagerRoutes);
+
+// 보건 P3 — 근로자 보건증/건강진단 (regular-public 하위, no auth)
+app.use('/api/regular-public', healthPublicRoutes);  // no auth
+app.use('/api/health-manager', requireAuth, healthManagerRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -105,7 +105,11 @@ const groups: NavGroup[] = [
     label: "보건관리자 점검",
     icon: Heart,
     items: [
-      { href: "/health-manager/coming-soon", label: "준비 중 (P3)", icon: ClipboardList },
+      { href: "/health-manager/inspections", label: "주간 보건 순회점검", icon: MapPin },
+      { href: "/health-manager/consultations", label: "건강상담 기록", icon: MessageSquare },
+      { href: "/health-manager/msds", label: "MSDS 관리대장", icon: ClipboardList },
+      { href: "/health-manager/checkups", label: "건강진단 관리", icon: CalendarCheck },
+      { href: "/health-manager/certificates", label: "보건증 만료 관리", icon: Shield },
     ],
   },
 ];

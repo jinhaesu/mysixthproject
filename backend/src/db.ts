@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.34.0';
+  const SCHEMA_VERSION = 'schema-v2.35.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -2007,6 +2007,73 @@ export async function initializeDB(): Promise<void> {
     console.log('[safety P7B] Seeded safety_org_positions');
   } catch (e: any) {
     console.error('[safety P7B] seed failed:', e.message);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.35.0 — P7C 안전보건 예산 편성·집행 (중처법 §4-4)
+  // safety_budget_plans     : 연도·카테고리별 편성 계획 (planned_amount 원)
+  // safety_budget_executions: 실제 집행 내역 (영수증 URL, 벤더, 조치티켓 연결)
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS safety_budget_plans (
+      id SERIAL PRIMARY KEY,
+      year INTEGER NOT NULL,
+      category TEXT NOT NULL,
+      category_label TEXT NOT NULL,
+      planned_amount BIGINT NOT NULL DEFAULT 0,
+      notes TEXT DEFAULT '',
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (year, category)
+    );
+
+    CREATE TABLE IF NOT EXISTS safety_budget_executions (
+      id SERIAL PRIMARY KEY,
+      budget_plan_id INTEGER NOT NULL REFERENCES safety_budget_plans(id) ON DELETE CASCADE,
+      executed_at TEXT NOT NULL,
+      amount BIGINT NOT NULL,
+      description TEXT NOT NULL,
+      receipt_url TEXT DEFAULT '',
+      vendor TEXT DEFAULT '',
+      executor_id INTEGER,
+      executor_name TEXT DEFAULT '',
+      approved_by INTEGER,
+      approved_by_name TEXT DEFAULT '',
+      linked_to_ticket_id INTEGER,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_budget_exec_plan ON safety_budget_executions(budget_plan_id);
+    CREATE INDEX IF NOT EXISTS idx_budget_exec_date ON safety_budget_executions(executed_at);
+  `);
+
+  // P7C seed — 2026 년 5개 카테고리 기본 계획 (planned_amount=0, 관리자가 편집)
+  // consulting(전문가 자문) 카테고리는 스키마상 허용되지만 seed 는 5건으로 고정.
+  // 관리자가 필요 시 POST /api/safety-budget/plans 로 별도 추가.
+  try {
+    const budgetSeed: Array<{ category: string; category_label: string }> = [
+      { category: 'ppe',      category_label: '보호구' },
+      { category: 'training', category_label: '교육' },
+      { category: 'facility', category_label: '설비개선' },
+      { category: 'checkup',  category_label: '검진' },
+      { category: 'other',    category_label: '기타' },
+    ];
+    for (const b of budgetSeed) {
+      const exists = await pool.query(
+        `SELECT id FROM safety_budget_plans WHERE year = $1 AND category = $2 LIMIT 1`,
+        [2026, b.category]
+      );
+      if (exists.rowCount && exists.rowCount > 0) continue;
+      await pool.query(
+        `INSERT INTO safety_budget_plans (year, category, category_label, planned_amount, notes)
+         VALUES ($1, $2, $3, 0, '')`,
+        [2026, b.category, b.category_label]
+      );
+    }
+    console.log('[safety P7C] Seeded safety_budget_plans 2026');
+  } catch (e: any) {
+    console.error('[safety P7C] seed failed:', e.message);
   }
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP

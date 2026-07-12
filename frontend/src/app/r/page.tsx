@@ -24,6 +24,8 @@ import {
   Ban,
   Calendar,
   ClipboardCheck,
+  GraduationCap,
+  FileText,
 } from "lucide-react";
 
 // ─── Translations (정규직 version) ──────────────────────────────
@@ -567,6 +569,19 @@ function RegularContent() {
     certificate: { expiry_date: string } | null;
   } | null>(null);
 
+  // 반기 교육·설문 상태 (P4)
+  const [trainingSurvey, setTrainingSurvey] = useState<{
+    gated: boolean;
+    period: string;
+    period_end: string;
+    days_left_in_period?: number;
+    training_total?: number;
+    training_done?: number;
+    training_incomplete?: boolean;
+    musculoskeletal_done?: boolean;
+    opinion_done?: boolean;
+  } | null>(null);
+
   const toggleDept = (dept: string) => {
     setExpandedDepts((prev) => {
       const next = new Set(prev);
@@ -645,9 +660,21 @@ function RegularContent() {
     } catch {}
   }, [token]);
 
+  const loadTrainingSurvey = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/training-survey/status`);
+      if (res.ok) {
+        const body = await res.json();
+        setTrainingSurvey(body);
+      }
+    } catch {}
+  }, [token]);
+
   useEffect(() => { loadVacations(); }, [loadVacations]);
   useEffect(() => { loadSafetyStatus(); }, [loadSafetyStatus]);
   useEffect(() => { loadHealthCert(); }, [loadHealthCert]);
+  useEffect(() => { loadTrainingSurvey(); }, [loadTrainingSurvey]);
 
   useEffect(() => {
     const isHalf = vacType.startsWith('오전') || vacType.startsWith('오후');
@@ -872,6 +899,24 @@ function RegularContent() {
             }
             return;
           }
+          if (pending.includes('training_incomplete')) {
+            if (confirm('반기 필수 안전보건교육이 미완료입니다.\n교육 페이지로 이동할까요?')) {
+              window.location.href = `/r/training?token=${token}`;
+            }
+            return;
+          }
+          if (pending.includes('musculoskeletal_survey')) {
+            if (confirm('근골격계 증상 설문을 제출해야 합니다.\n설문으로 이동할까요?')) {
+              window.location.href = `/r/survey/musculoskeletal?token=${token}`;
+            }
+            return;
+          }
+          if (pending.includes('opinion_survey')) {
+            if (confirm('안전보건 의견 설문을 제출해야 합니다.\n설문으로 이동할까요?')) {
+              window.location.href = `/r/survey/opinion?token=${token}`;
+            }
+            return;
+          }
           if (confirm('퇴근 전 안전 셀프체크를 먼저 완료해야 합니다.\n지금 이동하시겠습니까?')) {
             window.location.href = `/r/safety-check?token=${token}&kind=postcheck`;
           }
@@ -1044,6 +1089,63 @@ function RegularContent() {
             </div>
             <span className="text-[var(--fs-caption)] font-bold">신고</span>
           </a>
+        )}
+
+        {/* ── 반기 교육·설문 D-30 이내 미완 경보 (P4) ─────────────── */}
+        {data && (data.status as string) !== "deactivated" && trainingSurvey?.gated && (trainingSurvey.days_left_in_period ?? 999) <= 30 && (
+          <>
+            {trainingSurvey.training_incomplete && (
+              <a
+                href={`/r/training?token=${token}`}
+                className={`flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] border ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "bg-[var(--danger-bg)] border-[var(--danger-border)]" : "bg-[var(--warning-bg)] border-[var(--warning-border)]"}`}
+              >
+                <GraduationCap className={`w-5 h-5 shrink-0 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`} />
+                <div className="flex-1 text-left">
+                  <p className={`text-[var(--fs-base)] leading-tight font-semibold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
+                    반기 필수 교육 미이수 (D-{trainingSurvey.days_left_in_period ?? "?"})
+                  </p>
+                  <p className={`text-[var(--fs-caption)] opacity-90 mt-0.5 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
+                    {trainingSurvey.training_done}/{trainingSurvey.training_total} 완료 · D-14부터 퇴근 차단
+                  </p>
+                </div>
+                <span className={`text-[var(--fs-caption)] font-bold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>학습</span>
+              </a>
+            )}
+            {!trainingSurvey.musculoskeletal_done && (
+              <a
+                href={`/r/survey/musculoskeletal?token=${token}`}
+                className={`flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] border ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "bg-[var(--danger-bg)] border-[var(--danger-border)]" : "bg-[var(--warning-bg)] border-[var(--warning-border)]"}`}
+              >
+                <FileText className={`w-5 h-5 shrink-0 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`} />
+                <div className="flex-1 text-left">
+                  <p className={`text-[var(--fs-base)] leading-tight font-semibold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
+                    근골격계 증상 설문 미제출
+                  </p>
+                  <p className={`text-[var(--fs-caption)] opacity-90 mt-0.5 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
+                    D-{trainingSurvey.days_left_in_period ?? "?"} · D-14부터 퇴근 차단
+                  </p>
+                </div>
+                <span className={`text-[var(--fs-caption)] font-bold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>설문</span>
+              </a>
+            )}
+            {!trainingSurvey.opinion_done && (
+              <a
+                href={`/r/survey/opinion?token=${token}`}
+                className={`flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] border ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "bg-[var(--danger-bg)] border-[var(--danger-border)]" : "bg-[var(--warning-bg)] border-[var(--warning-border)]"}`}
+              >
+                <FileText className={`w-5 h-5 shrink-0 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`} />
+                <div className="flex-1 text-left">
+                  <p className={`text-[var(--fs-base)] leading-tight font-semibold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
+                    안전보건 의견 설문 미제출
+                  </p>
+                  <p className={`text-[var(--fs-caption)] opacity-90 mt-0.5 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
+                    D-{trainingSurvey.days_left_in_period ?? "?"} · D-14부터 퇴근 차단
+                  </p>
+                </div>
+                <span className={`text-[var(--fs-caption)] font-bold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>설문</span>
+              </a>
+            )}
+          </>
         )}
 
         {/* ── Language Selector ──────────────────────────────────── */}

@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.29.0';
+  const SCHEMA_VERSION = 'schema-v2.30.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1279,6 +1279,80 @@ export async function initializeDB(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_healthcert_emp ON health_certificates(employee_id);
     CREATE INDEX IF NOT EXISTS idx_healthcert_exp ON health_certificates(expiry_date);
+
+    -- ═══════════════════════════════════════════════════════════════
+    -- P4 — 반기 정기교육 + 근골격계·의견 설문 + 게이팅 확대
+    -- ═══════════════════════════════════════════════════════════════
+
+    -- 교육 콘텐츠 마스터 (KOSHA 유튜브 링크 등)
+    CREATE TABLE IF NOT EXISTS training_courses (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      video_source_type TEXT DEFAULT 'youtube',
+      video_url TEXT DEFAULT '',
+      duration_min INTEGER DEFAULT 0,
+      half_year_credit_hours DOUBLE PRECISION DEFAULT 0,
+      target_role TEXT DEFAULT 'production',
+      category TEXT DEFAULT 'safety',
+      active INTEGER DEFAULT 1,
+      sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- 교육 퀴즈
+    CREATE TABLE IF NOT EXISTS training_quiz_items (
+      id SERIAL PRIMARY KEY,
+      course_id INTEGER NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
+      question_no INTEGER NOT NULL,
+      question TEXT NOT NULL,
+      choices JSONB NOT NULL,
+      correct_index INTEGER NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- 이수 기록 (반기 단위)
+    CREATE TABLE IF NOT EXISTS training_completions (
+      id SERIAL PRIMARY KEY,
+      employee_id INTEGER NOT NULL,
+      course_id INTEGER NOT NULL REFERENCES training_courses(id),
+      watched_seconds INTEGER DEFAULT 0,
+      quiz_score INTEGER,
+      quiz_total INTEGER,
+      signed_at TIMESTAMPTZ,
+      completed_at TIMESTAMPTZ,
+      credited_hours DOUBLE PRECISION DEFAULT 0,
+      half_year_period TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (employee_id, course_id, half_year_period)
+    );
+    CREATE INDEX IF NOT EXISTS idx_train_comp_emp ON training_completions(employee_id);
+
+    -- 설문 마스터 (근골격계 증상·안전보건 의견)
+    CREATE TABLE IF NOT EXISTS surveys (
+      id SERIAL PRIMARY KEY,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      form_json JSONB NOT NULL,
+      frequency TEXT DEFAULT 'semi',
+      active INTEGER DEFAULT 1,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- 안전보건 설문 응답 (기존 survey_responses 와 충돌 방지 위해 _safety 접미사)
+    CREATE TABLE IF NOT EXISTS survey_responses_safety (
+      id SERIAL PRIMARY KEY,
+      survey_id INTEGER NOT NULL REFERENCES surveys(id),
+      employee_id INTEGER NOT NULL,
+      response_json JSONB NOT NULL,
+      submitted_at TIMESTAMPTZ DEFAULT NOW(),
+      period TEXT,
+      UNIQUE (survey_id, employee_id, period)
+    );
+    CREATE INDEX IF NOT EXISTS idx_survey_resp_safety_emp ON survey_responses_safety(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_survey_resp_safety_period ON survey_responses_safety(period);
   `);
 
   // Seed — safety_areas 비어있으면 기본 7개 구역 삽입
@@ -1373,6 +1447,133 @@ export async function initializeDB(): Promise<void> {
     console.log('[safety P2] Seeded areas and daily inspection templates');
   } catch (e: any) {
     console.error('[safety P2] seed failed:', e.message);
+  }
+
+  // ── P4 seed — 설문 마스터 2건 + 교육 콘텐츠 3건 ──────────────────
+  try {
+    // 근골격계 증상 설문 (v2 §3-5)
+    const muscForm = {
+      version: 'v2',
+      description: '지난 1년간 목·어깨·팔/팔꿈치·손/손목·허리·다리/무릎의 통증·불편감 여부와 정도를 조사합니다.',
+      body_parts: [
+        { key: 'neck', label: '목' },
+        { key: 'shoulder', label: '어깨' },
+        { key: 'arm', label: '팔·팔꿈치' },
+        { key: 'hand', label: '손·손목·손가락' },
+        { key: 'back', label: '허리' },
+        { key: 'leg', label: '다리·무릎·발' },
+      ],
+      questions: [
+        { key: 'q1', text: '통증·불편감을 느낀 적이 있습니까?', type: 'yesno' },
+        { key: 'q2', text: '통증이 얼마나 자주 나타납니까?', type: 'select', choices: ['거의 없음', '한 달에 1회', '한 달에 2-3회', '주 1회 이상', '매일'] },
+        { key: 'q3', text: '통증의 심한 정도는?', type: 'select', choices: ['약함', '보통', '심함', '매우 심함'] },
+        { key: 'q4', text: '통증이 지난 1주간 계속되었습니까?', type: 'yesno' },
+        { key: 'q5', text: '병원 진료·물리치료가 필요하다고 느낍니까?', type: 'yesno' },
+      ],
+      overall: [
+        { key: 'work_hours', text: '하루 평균 작업시간(시간)', type: 'number' },
+        { key: 'main_task', text: '주된 작업 내용', type: 'text' },
+        { key: 'wants_consult', text: '보건관리자 상담을 원하십니까?', type: 'yesno' },
+      ],
+    };
+    await pool.query(
+      `INSERT INTO surveys (kind, title, description, form_json, frequency, active)
+       SELECT 'musculoskeletal', '근골격계 증상 설문(반기)', '산업안전보건법 39조 근골격계 부담작업 유해요인 조사', $1::jsonb, 'semi', 1
+       WHERE NOT EXISTS (SELECT 1 FROM surveys WHERE kind = 'musculoskeletal')`,
+      [JSON.stringify(muscForm)]
+    );
+
+    // 안전보건 의견 설문 (v2 §5-4)
+    const opinionForm = {
+      version: 'v2',
+      description: '최근 반기 근무 중 느낀 안전·보건 관련 개선의견을 수집합니다. 관리자에게 공유되며 익명 옵션 사용 가능.',
+      questions: [
+        { key: 'q1', text: '현재 근무공간의 안전 수준에 만족하십니까?', type: 'select', choices: ['매우 불만족', '불만족', '보통', '만족', '매우 만족'] },
+        { key: 'q2', text: '현재 보호구·안전 장비가 충분히 지급·정비되고 있습니까?', type: 'select', choices: ['전혀 아님', '부족함', '보통', '충분함', '매우 충분함'] },
+        { key: 'q3', text: '작업 중 스트레스·과중한 업무 부담이 있습니까?', type: 'select', choices: ['전혀 없음', '가끔', '자주', '매일'] },
+        { key: 'q4', text: '휴게·복지시설(휴게실·화장실·세면)의 상태는 어떻습니까?', type: 'select', choices: ['매우 나쁨', '나쁨', '보통', '좋음', '매우 좋음'] },
+        { key: 'q5', text: '아차사고·위험 상황을 자유롭게 신고할 수 있는 분위기입니까?', type: 'yesno' },
+        { key: 'q6', text: '가장 우선적으로 개선했으면 하는 안전보건 이슈는?', type: 'text' },
+        { key: 'q7', text: '관리자에게 하고 싶은 말씀', type: 'text' },
+      ],
+      allow_anonymous: true,
+    };
+    await pool.query(
+      `INSERT INTO surveys (kind, title, description, form_json, frequency, active)
+       SELECT 'opinion', '안전보건 의견 설문(반기)', '반기별 근로자 안전보건 의견·건의사항 수렴', $1::jsonb, 'semi', 1
+       WHERE NOT EXISTS (SELECT 1 FROM surveys WHERE kind = 'opinion')`,
+      [JSON.stringify(opinionForm)]
+    );
+
+    // 교육 콘텐츠 3건 — KOSHA 유튜브 placeholder
+    const courseSeed = [
+      {
+        title: '근골격계 부담작업 예방',
+        description: '올바른 자세·인력물자취급·스트레칭으로 요통·목 어깨 통증을 예방합니다.',
+        video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        duration_min: 25,
+        half_year_credit_hours: 1.0,
+        category: 'safety',
+        sort_order: 10,
+        quiz: [
+          { question: '중량물 인력취급 시 허리를 굽히기 전에 확인해야 할 사항으로 옳은 것은?', choices: ['체중을 뒤로 두고 양팔로 들어올린다', '무릎을 굽히고 물체를 몸에 밀착시킨다', '한손으로 균형을 잡는다', '아무 자세나 상관없다'], correct_index: 1 },
+          { question: '근골격계 부담작업의 대표적 증상이 아닌 것은?', choices: ['목·어깨 통증', '허리 통증', '팔꿈치 저림', '심한 두통'], correct_index: 3 },
+          { question: '작업 중 스트레칭은 언제 하는 것이 좋은가?', choices: ['작업 시작 전·중간·끝', '점심시간에만', '통증이 있을 때만', '주말에만'], correct_index: 0 },
+        ],
+      },
+      {
+        title: '컨베이어 끼임 예방 + LOTO(잠금·표찰) 절차',
+        description: '설비 정비 시 반드시 지켜야 할 잠금·표찰 절차와 컨베이어 안전수칙.',
+        video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        duration_min: 20,
+        half_year_credit_hours: 0.75,
+        category: 'safety',
+        sort_order: 20,
+        quiz: [
+          { question: 'LOTO 절차의 첫 단계는?', choices: ['전원 차단', '작업 지시', '안전화 착용', '휴식'], correct_index: 0 },
+          { question: '컨베이어 정비 시 반드시 해야 할 것은?', choices: ['안전커버 제거 후 손 삽입', '전원 차단 및 잠금·표찰', '동료 감시 하 가동', '장갑만 착용'], correct_index: 1 },
+          { question: '컨베이어 가동 중 이물 제거 방법으로 옳은 것은?', choices: ['가동 상태로 손으로 제거', '가동 상태로 도구로 제거', '정지 후 잠금·표찰 후 제거', '동료에게 부탁'], correct_index: 2 },
+        ],
+      },
+      {
+        title: '화학물질 취급 안전 + MSDS 활용법',
+        description: '화학물질 취급 전 MSDS 확인·PPE 착용·응급조치 원칙.',
+        video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        duration_min: 20,
+        half_year_credit_hours: 0.75,
+        category: 'health',
+        sort_order: 30,
+        quiz: [
+          { question: 'MSDS(물질안전보건자료)에 반드시 포함되는 것이 아닌 것은?', choices: ['유해성·위험성 정보', '응급조치 요령', '취급자 개인정보', '보관·취급 방법'], correct_index: 2 },
+          { question: '화학물질 취급 시 우선 확인할 사항은?', choices: ['가격', 'MSDS·라벨·PPE', '색깔', '냄새'], correct_index: 1 },
+          { question: '화학물질이 피부에 묻었을 때 첫 조치는?', choices: ['수건으로 닦기', '즉시 흐르는 물로 15분 이상 씻기', '연고 바르기', '무시하기'], correct_index: 1 },
+        ],
+      },
+    ];
+    for (const c of courseSeed) {
+      const exists = await pool.query(`SELECT id FROM training_courses WHERE title = $1 LIMIT 1`, [c.title]);
+      if (exists.rowCount && exists.rowCount > 0) continue;
+      const ins = await pool.query(
+        `INSERT INTO training_courses
+           (title, description, video_source_type, video_url, duration_min, half_year_credit_hours,
+            target_role, category, active, sort_order)
+         VALUES ($1, $2, 'youtube', $3, $4, $5, 'production', $6, 1, $7)
+         RETURNING id`,
+        [c.title, c.description, c.video_url, c.duration_min, c.half_year_credit_hours, c.category, c.sort_order]
+      );
+      const cid = ins.rows[0].id;
+      let qno = 1;
+      for (const q of c.quiz) {
+        await pool.query(
+          `INSERT INTO training_quiz_items (course_id, question_no, question, choices, correct_index)
+           VALUES ($1, $2, $3, $4::jsonb, $5)`,
+          [cid, qno++, q.question, JSON.stringify(q.choices), q.correct_index]
+        );
+      }
+    }
+    console.log('[safety P4] Seeded surveys and training courses');
+  } catch (e: any) {
+    console.error('[safety P4] seed failed:', e.message);
   }
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP

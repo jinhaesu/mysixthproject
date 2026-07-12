@@ -1385,3 +1385,143 @@ export async function listExpiringCerts() {
   return fetchAPI<{ today: string; items: HealthCertificate[] }>(`/api/health-manager/expiring-certs`);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 안전보건 P4 — 반기 정기교육 + 근골격계·의견 설문
+// ═══════════════════════════════════════════════════════════════
+
+export interface TrainingCourse {
+  id: number;
+  title: string;
+  description: string;
+  video_source_type: string;
+  video_url: string;
+  duration_min: number;
+  half_year_credit_hours: number;
+  target_role: string;
+  category: string;
+  active: number;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+  quiz_count?: number;
+}
+
+export interface TrainingQuizItem {
+  id: number;
+  question_no: number;
+  question: string;
+  choices: string[];
+  correct_index?: number;
+}
+
+export interface TrainingStatusRow {
+  employee_id: number;
+  name: string;
+  phone: string;
+  department: string | null;
+  team: string | null;
+  role: string | null;
+  done_count: number;
+  required_count: number;
+  credited_hours: number;
+  status: 'complete' | 'partial' | 'not_started' | 'no_required';
+}
+
+export interface SurveyStatusRow {
+  employee_id: number;
+  name: string;
+  phone: string;
+  department: string | null;
+  team: string | null;
+  role: string | null;
+  musculoskeletal_done?: boolean;
+  musculoskeletal_at?: string | null;
+  opinion_done?: boolean;
+  opinion_at?: string | null;
+}
+
+// ── 교육 콘텐츠 마스터 CRUD ────────────────────────────────
+export async function listTrainingCourses() {
+  return fetchAPI<{ courses: TrainingCourse[] }>(`/api/admin/training-master`);
+}
+export async function createTrainingCourse(body: Partial<TrainingCourse> & { title: string }) {
+  return fetchAPI<{ success: boolean; id: number }>(`/api/admin/training-master`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+}
+export async function patchTrainingCourse(id: number, body: Partial<TrainingCourse>) {
+  return fetchAPI<{ success: boolean }>(`/api/admin/training-master/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+}
+export async function deleteTrainingCourse(id: number) {
+  return fetchAPI<{ success: boolean }>(`/api/admin/training-master/${id}`, { method: 'DELETE' });
+}
+
+// 퀴즈 편집
+export async function listTrainingQuiz(courseId: number) {
+  return fetchAPI<{ items: (TrainingQuizItem & { correct_index: number })[] }>(
+    `/api/admin/training-master/${courseId}/quiz`
+  );
+}
+export async function createTrainingQuiz(courseId: number, body: { question: string; choices: string[]; correct_index: number }) {
+  return fetchAPI<{ success: boolean; id: number; question_no: number }>(
+    `/api/admin/training-master/${courseId}/quiz`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+export async function patchTrainingQuiz(courseId: number, qid: number, body: Partial<{ question: string; choices: string[]; correct_index: number }>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/admin/training-master/${courseId}/quiz/${qid}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+export async function deleteTrainingQuiz(courseId: number, qid: number) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/admin/training-master/${courseId}/quiz/${qid}`,
+    { method: 'DELETE' }
+  );
+}
+
+// ── 안전관리자 이수·설문 현황 ──────────────────────────────
+export async function getTrainingStatus(period?: string) {
+  const qs = period ? `?period=${encodeURIComponent(period)}` : '';
+  return fetchAPI<{
+    period: string;
+    period_end: string;
+    summary: { period: string; period_end: string; required_count: number; target_count: number; complete: number; partial: number; not_started: number };
+    rows: TrainingStatusRow[];
+    by_department: { dept: string; total: number; complete: number; partial: number; not_started: number }[];
+  }>(`/api/safety-manager/training-status${qs}`);
+}
+
+export async function getSurveyStatus(period?: string, kind?: 'musculoskeletal' | 'opinion') {
+  const p = new URLSearchParams();
+  if (period) p.set('period', period);
+  if (kind) p.set('kind', kind);
+  const qs = p.toString();
+  return fetchAPI<{
+    period: string;
+    period_end: string;
+    summary: any;
+    rows: SurveyStatusRow[];
+  }>(`/api/safety-manager/survey-status${qs ? `?${qs}` : ''}`);
+}
+
+export async function getSafetySurveyResponses(kind: 'musculoskeletal' | 'opinion', period?: string) {
+  const qs = period ? `?period=${encodeURIComponent(period)}` : '';
+  return fetchAPI<{
+    period: string;
+    kind: string;
+    responses: {
+      id: number;
+      submitted_at: string;
+      name: string;
+      department: string;
+      team: string;
+      response_json: any;
+      survey_title: string;
+    }[];
+  }>(`/api/safety-manager/survey-status/${kind}/responses${qs}`);
+}
+

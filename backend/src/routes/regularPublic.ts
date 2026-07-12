@@ -5,6 +5,7 @@ import { sendGeneralSms } from '../services/smsService';
 import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
 import safetyPublicRouter, { isSafetyGatedEmployee } from './safetyPublic';
 import { checkHealthCertGate } from './healthPublic';
+import { checkTrainingSurveyGate } from './trainingPublic';
 
 const router = Router();
 
@@ -970,6 +971,25 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
           : '보건증 만료가 임박했거나 만료되었습니다. 갱신 후 등록해 주세요.',
         code: 'SAFETY_TASK_INCOMPLETE',
         pending: [healthGateOut],
+        gate: 'clock-out',
+      });
+      return;
+    }
+
+    // 안전보건 P4 — 반기 마감 D-14 이내 필수 교육·설문 미이수 게이팅 (clock-out 만).
+    // clock-in 은 출근 지장 방지 위해 게이팅 안 함 — 홈 카드로 경보만.
+    const trainingSurveyPending = await checkTrainingSurveyGate(employee.id, employee.department);
+    if (trainingSurveyPending.length > 0) {
+      const first = trainingSurveyPending[0];
+      const msg =
+        first === 'training_incomplete' ? '이번 반기 필수 안전보건교육을 완료해야 합니다.' :
+        first === 'musculoskeletal_survey' ? '근골격계 증상 설문을 제출해야 합니다.' :
+        first === 'opinion_survey' ? '안전보건 의견 설문을 제출해야 합니다.' :
+        '반기 필수 안전보건 과제가 남아 있습니다.';
+      res.status(409).json({
+        error: `${msg} (반기 마감 D-14 이내)`,
+        code: 'SAFETY_TASK_INCOMPLETE',
+        pending: trainingSurveyPending,
         gate: 'clock-out',
       });
       return;

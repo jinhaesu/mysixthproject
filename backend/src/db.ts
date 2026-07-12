@@ -1510,7 +1510,7 @@ export async function initializeDB(): Promise<void> {
       {
         title: '근골격계 부담작업 예방',
         description: '올바른 자세·인력물자취급·스트레칭으로 요통·목 어깨 통증을 예방합니다.',
-        video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        video_url: '', // 관리자가 /admin/training-master 에서 실제 KOSHA 공식 유튜브 URL 등록 필요
         duration_min: 25,
         half_year_credit_hours: 1.0,
         category: 'safety',
@@ -1524,7 +1524,7 @@ export async function initializeDB(): Promise<void> {
       {
         title: '컨베이어 끼임 예방 + LOTO(잠금·표찰) 절차',
         description: '설비 정비 시 반드시 지켜야 할 잠금·표찰 절차와 컨베이어 안전수칙.',
-        video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        video_url: '', // 관리자가 /admin/training-master 에서 실제 KOSHA 공식 유튜브 URL 등록 필요
         duration_min: 20,
         half_year_credit_hours: 0.75,
         category: 'safety',
@@ -1538,7 +1538,7 @@ export async function initializeDB(): Promise<void> {
       {
         title: '화학물질 취급 안전 + MSDS 활용법',
         description: '화학물질 취급 전 MSDS 확인·PPE 착용·응급조치 원칙.',
-        video_url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        video_url: '', // 관리자가 /admin/training-master 에서 실제 KOSHA 공식 유튜브 URL 등록 필요
         duration_min: 20,
         half_year_credit_hours: 0.75,
         category: 'health',
@@ -1824,6 +1824,20 @@ export async function initializeDB(): Promise<void> {
     }
   } catch (err: any) {
     console.error('[data-sync] 2026-06-03 holiday_work backfill error (continuing):', err.message);
+  }
+
+  // v2.30.0 Rick Roll placeholder seed 청소 — workflow subagent 가 넣은 dQw4w9WgXcQ URL 을
+  // 빈 값으로 UPDATE. 관리자가 /admin/training-master 에서 실제 KOSHA 공식 URL 을 등록해야 함.
+  try {
+    const dataKey = 'data-sync-clear-rickroll-training-seed-v1';
+    const dataCheck = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [dataKey]);
+    if (!dataCheck.rowCount) {
+      const r = await pool.query(`UPDATE training_courses SET video_url = '' WHERE video_url LIKE '%dQw4w9WgXcQ%'`);
+      console.log(`[data-sync] cleared placeholder training video_url: ${r.rowCount} rows`);
+      await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [dataKey]);
+    }
+  } catch (err: any) {
+    console.error('[data-sync] rickroll clear error (continuing):', err.message);
   }
 
   console.log('Database initialized successfully');

@@ -26,6 +26,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   FileText,
+  Stethoscope,
 } from "lucide-react";
 
 // ─── Translations (정규직 version) ──────────────────────────────
@@ -582,6 +583,13 @@ function RegularContent() {
     opinion_done?: boolean;
   } | null>(null);
 
+  // 건강진단 상태 (P3)
+  const [checkupStatus, setCheckupStatus] = useState<{
+    pending_count: number;
+    next_scheduled: string | null;
+    last_received_at: string | null;
+  } | null>(null);
+
   const toggleDept = (dept: string) => {
     setExpandedDepts((prev) => {
       const next = new Set(prev);
@@ -671,10 +679,29 @@ function RegularContent() {
     } catch {}
   }, [token]);
 
+  const loadCheckupStatus = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/health/checkup-status`);
+      if (res.ok) {
+        const body = await res.json();
+        const checkups = Array.isArray(body?.checkups) ? body.checkups : [];
+        const pending = checkups.filter((c: any) => !c.received_at);
+        const done = checkups.filter((c: any) => c.received_at).sort((a: any, b: any) => (b.received_at || '').localeCompare(a.received_at || ''));
+        setCheckupStatus({
+          pending_count: pending.length,
+          next_scheduled: pending[0]?.scheduled_month || null,
+          last_received_at: done[0]?.received_at || null,
+        });
+      }
+    } catch {}
+  }, [token]);
+
   useEffect(() => { loadVacations(); }, [loadVacations]);
   useEffect(() => { loadSafetyStatus(); }, [loadSafetyStatus]);
   useEffect(() => { loadHealthCert(); }, [loadHealthCert]);
   useEffect(() => { loadTrainingSurvey(); }, [loadTrainingSurvey]);
+  useEffect(() => { loadCheckupStatus(); }, [loadCheckupStatus]);
 
   useEffect(() => {
     const isHalf = vacType.startsWith('오전') || vacType.startsWith('오후');
@@ -1036,117 +1063,181 @@ function RegularContent() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        {/* ── 보건증 상태 카드 (D-30 이내 빨강·긴급, D-30~D-60 노랑) ─── */}
-        {data && (data.status as string) !== "deactivated" && healthCert && (
-          (healthCert.status_hint === "expired" || healthCert.status_hint === "urgent" || healthCert.status_hint === "none") ? (
-            <a
-              href={`/r/health-cert?token=${token}`}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] bg-[var(--danger-bg)] border border-[var(--danger-border)]"
-            >
-              <ShieldAlert className="w-5 h-5 text-[var(--danger-fg)] shrink-0" />
-              <div className="flex-1 text-left">
-                <p className="text-[var(--fs-base)] leading-tight font-semibold text-[var(--danger-fg)]">
-                  {healthCert.status_hint === "none" ? "보건증 미등록" :
-                   healthCert.status_hint === "expired" ? "보건증 만료" :
-                   `보건증 만료 임박 (D-${healthCert.days_until_expiry ?? "?"})`}
-                </p>
-                <p className="text-[var(--fs-caption)] opacity-90 mt-0.5 text-[var(--danger-fg)]">
-                  출퇴근 기록이 차단됩니다. 즉시 확인해주세요.
-                </p>
-              </div>
-              <span className="text-[var(--fs-caption)] font-bold text-[var(--danger-fg)]">확인</span>
-            </a>
-          ) : healthCert.status_hint === "warning" ? (
-            <a
-              href={`/r/health-cert?token=${token}`}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] bg-[var(--warning-bg)] border border-[var(--warning-border)]"
-            >
-              <ShieldAlert className="w-5 h-5 text-[var(--warning-fg)] shrink-0" />
-              <div className="flex-1 text-left">
-                <p className="text-[var(--fs-base)] leading-tight font-semibold text-[var(--warning-fg)]">
-                  보건증 만료 예정 (D-{healthCert.days_until_expiry ?? "?"})
-                </p>
-                <p className="text-[var(--fs-caption)] opacity-90 mt-0.5 text-[var(--warning-fg)]">
-                  미리 갱신 절차를 준비해주세요.
-                </p>
-              </div>
-              <span className="text-[var(--fs-caption)] font-bold text-[var(--warning-fg)]">확인</span>
-            </a>
-          ) : null
-        )}
+        {/* ═══════════════════════════════════════════════════════════
+              안전보건 태스크 상시 섹션 — 항상 표시.
+              각 카드가 자체적으로 상태(완료·미완·마감임박·게이팅)를 표시.
+              반기 태스크는 반기 초부터 접근 가능. D-30 노랑, D-14 빨강.
+            ═══════════════════════════════════════════════════════════ */}
+        {data && (data.status as string) !== "deactivated" && (() => {
+          const daysLeft = trainingSurvey?.days_left_in_period ?? 999;
+          const isUrgent = daysLeft <= 14;
+          const isWarning = daysLeft <= 30 && !isUrgent;
+          const gated = !!trainingSurvey?.gated;
 
-        {/* ── 아차사고·위험요인 신고 (상시 가시성, 경고 톤) ───────── */}
-        {data && (data.status as string) !== "deactivated" && (
-          <a
-            href={`/r/hazard-report?token=${token}`}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] text-white font-semibold shadow-[var(--elev-1)] transition-transform hover:scale-[1.01]"
-            style={{ background: "linear-gradient(135deg, #dc2626 0%, #ea580c 100%)" }}
-          >
-            <ShieldAlert className="w-5 h-5" />
-            <div className="flex-1 text-left">
-              <p className="text-[var(--fs-base)] leading-tight">아차사고·위험요인 신고</p>
-              <p className="text-[var(--fs-caption)] opacity-90 mt-0.5">위험 상황을 목격했다면 즉시 알려주세요</p>
-            </div>
-            <span className="text-[var(--fs-caption)] font-bold">신고</span>
-          </a>
-        )}
+          const StatusChip = ({ status }: { status: "done" | "urgent" | "warning" | "info" }) => {
+            const map = {
+              done: { label: "완료", cls: "bg-[var(--success-bg)] text-[var(--success-fg)] border-[var(--success-border)]" },
+              urgent: { label: "긴급", cls: "bg-[var(--danger-fg)] text-white border-transparent" },
+              warning: { label: "마감임박", cls: "bg-[var(--warning-fg)] text-white border-transparent" },
+              info: { label: "가능", cls: "bg-[var(--bg-2)] text-[var(--text-3)] border-[var(--border-1)]" },
+            } as const;
+            const m = map[status];
+            return <span className={`px-2 py-0.5 rounded-[var(--r-pill)] text-[10px] font-bold border ${m.cls} tabular`}>{m.label}</span>;
+          };
 
-        {/* ── 반기 교육·설문 D-30 이내 미완 경보 (P4) ─────────────── */}
-        {data && (data.status as string) !== "deactivated" && trainingSurvey?.gated && (trainingSurvey.days_left_in_period ?? 999) <= 30 && (
-          <>
-            {trainingSurvey.training_incomplete && (
+          const TaskCard = ({
+            href, icon: Icon, title, subtitle, chipStatus, tone,
+          }: {
+            href: string; icon: any; title: string; subtitle: string;
+            chipStatus: "done" | "urgent" | "warning" | "info";
+            tone: "danger" | "warning" | "info" | "success" | "gradient";
+          }) => {
+            const toneCls = {
+              danger: "bg-[var(--danger-bg)] border-[var(--danger-border)]",
+              warning: "bg-[var(--warning-bg)] border-[var(--warning-border)]",
+              info: "bg-[var(--bg-1)] border-[var(--border-1)]",
+              success: "bg-[var(--success-bg)] border-[var(--success-border)]",
+              gradient: "text-white border-transparent",
+            }[tone];
+            const iconCls = {
+              danger: "text-[var(--danger-fg)]", warning: "text-[var(--warning-fg)]",
+              info: "text-[var(--brand-500)]", success: "text-[var(--success-fg)]",
+              gradient: "text-white",
+            }[tone];
+            const titleCls = {
+              danger: "text-[var(--danger-fg)]", warning: "text-[var(--warning-fg)]",
+              info: "text-[var(--text-1)]", success: "text-[var(--success-fg)]",
+              gradient: "text-white",
+            }[tone];
+            const subCls = {
+              danger: "text-[var(--danger-fg)] opacity-90", warning: "text-[var(--warning-fg)] opacity-90",
+              info: "text-[var(--text-3)]", success: "text-[var(--success-fg)] opacity-90",
+              gradient: "text-white opacity-90",
+            }[tone];
+            return (
               <a
+                href={href}
+                className={`flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] border ${toneCls}`}
+                style={tone === "gradient" ? { background: "linear-gradient(135deg, #dc2626 0%, #ea580c 100%)" } : undefined}
+              >
+                <Icon className={`w-5 h-5 shrink-0 ${iconCls}`} />
+                <div className="flex-1 text-left min-w-0">
+                  <p className={`text-[var(--fs-base)] leading-tight font-semibold ${titleCls}`}>{title}</p>
+                  <p className={`text-[var(--fs-caption)] mt-0.5 truncate ${subCls}`}>{subtitle}</p>
+                </div>
+                <StatusChip status={chipStatus} />
+              </a>
+            );
+          };
+
+          // 톤 결정 헬퍼: 완료 우선, 다음 게이팅 임박도
+          const toneByStatus = (isDone: boolean, isCritical = false) =>
+            isDone ? "success" : isCritical ? "danger" : isUrgent && gated ? "danger" : isWarning && gated ? "warning" : "info";
+          const chipByStatus = (isDone: boolean, isCritical = false) =>
+            isDone ? "done" : isCritical ? "urgent" : isUrgent && gated ? "urgent" : isWarning && gated ? "warning" : "info";
+
+          // 보건증
+          const cert = healthCert;
+          const certCritical = cert && (cert.status_hint === "expired" || cert.status_hint === "urgent" || cert.status_hint === "none");
+          const certWarning = cert && cert.status_hint === "warning";
+          const certDone = cert && cert.status_hint === "valid";
+          const certTitle = !cert ? "보건증 상태 로드 중" :
+            cert.status_hint === "none" ? "보건증 미등록" :
+            cert.status_hint === "expired" ? "보건증 만료" :
+            cert.status_hint === "urgent" ? `보건증 만료 임박 (D-${cert.days_until_expiry ?? "?"})` :
+            cert.status_hint === "warning" ? `보건증 만료 예정 (D-${cert.days_until_expiry ?? "?"})` :
+            "보건증 유효";
+          const certSub = certCritical ? "출퇴근이 차단됩니다. 즉시 갱신해주세요."
+            : certWarning ? "미리 갱신 절차를 준비해주세요."
+            : certDone ? (cert?.certificate?.expiry_date ? `유효기한: ${cert.certificate.expiry_date}` : "유효") : "로드 중";
+
+          // 건강진단
+          const checkupPending = (checkupStatus?.pending_count ?? 0) > 0;
+          const checkupDone = checkupStatus && !checkupPending;
+          const checkupTitle = "건강진단 안내";
+          const checkupSub = !checkupStatus ? "로드 중"
+            : checkupPending ? `예정된 검진 ${checkupStatus.pending_count}건 · ${checkupStatus.next_scheduled || "일정 안내 예정"}`
+            : checkupStatus.last_received_at ? `최근 수검일: ${(checkupStatus.last_received_at || "").slice(0,10)}` : "수검 예정 없음";
+
+          // 교육
+          const trainDone = !!trainingSurvey && !trainingSurvey.training_incomplete;
+          const trainSub = !trainingSurvey ? "로드 중"
+            : `${trainingSurvey.training_done ?? 0}/${trainingSurvey.training_total ?? 0} 완료${gated ? ` · 반기 마감 D-${daysLeft}` : ""}`;
+
+          // 근골격계 설문
+          const muscDone = !!trainingSurvey?.musculoskeletal_done;
+          // 의견 설문
+          const opinDone = !!trainingSurvey?.opinion_done;
+
+          return (
+            <>
+              <div className="flex items-center gap-2 pt-1">
+                <ShieldCheck className="w-4 h-4 text-[var(--brand-500)]" />
+                <h2 className="text-[var(--fs-body)] font-semibold text-[var(--text-2)]">안전보건 태스크</h2>
+              </div>
+
+              {/* 아차사고·위험요인 신고 — 상시, 항상 최상단 강조 */}
+              <TaskCard
+                href={`/r/hazard-report?token=${token}`}
+                icon={ShieldAlert}
+                title="아차사고·위험요인 신고"
+                subtitle="위험 상황을 목격했다면 즉시 알려주세요"
+                chipStatus="info"
+                tone="gradient"
+              />
+
+              {/* 보건증 */}
+              <TaskCard
+                href={`/r/health-cert?token=${token}`}
+                icon={ShieldAlert}
+                title={certTitle}
+                subtitle={certSub}
+                chipStatus={certCritical ? "urgent" : certWarning ? "warning" : certDone ? "done" : "info"}
+                tone={certCritical ? "danger" : certWarning ? "warning" : certDone ? "success" : "info"}
+              />
+
+              {/* 건강진단 안내 */}
+              <TaskCard
+                href={`/r/checkup?token=${token}`}
+                icon={Stethoscope}
+                title={checkupTitle}
+                subtitle={checkupSub}
+                chipStatus={checkupPending ? "info" : checkupDone ? "done" : "info"}
+                tone={checkupPending ? "info" : checkupDone ? "success" : "info"}
+              />
+
+              {/* 반기 정기교육 */}
+              <TaskCard
                 href={`/r/training?token=${token}`}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] border ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "bg-[var(--danger-bg)] border-[var(--danger-border)]" : "bg-[var(--warning-bg)] border-[var(--warning-border)]"}`}
-              >
-                <GraduationCap className={`w-5 h-5 shrink-0 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`} />
-                <div className="flex-1 text-left">
-                  <p className={`text-[var(--fs-base)] leading-tight font-semibold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
-                    반기 필수 교육 미이수 (D-{trainingSurvey.days_left_in_period ?? "?"})
-                  </p>
-                  <p className={`text-[var(--fs-caption)] opacity-90 mt-0.5 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
-                    {trainingSurvey.training_done}/{trainingSurvey.training_total} 완료 · D-14부터 퇴근 차단
-                  </p>
-                </div>
-                <span className={`text-[var(--fs-caption)] font-bold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>학습</span>
-              </a>
-            )}
-            {!trainingSurvey.musculoskeletal_done && (
-              <a
+                icon={GraduationCap}
+                title="반기 정기 안전보건교육"
+                subtitle={trainSub}
+                chipStatus={chipByStatus(trainDone)}
+                tone={toneByStatus(trainDone)}
+              />
+
+              {/* 근골격계 설문 */}
+              <TaskCard
                 href={`/r/survey/musculoskeletal?token=${token}`}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] border ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "bg-[var(--danger-bg)] border-[var(--danger-border)]" : "bg-[var(--warning-bg)] border-[var(--warning-border)]"}`}
-              >
-                <FileText className={`w-5 h-5 shrink-0 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`} />
-                <div className="flex-1 text-left">
-                  <p className={`text-[var(--fs-base)] leading-tight font-semibold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
-                    근골격계 증상 설문 미제출
-                  </p>
-                  <p className={`text-[var(--fs-caption)] opacity-90 mt-0.5 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
-                    D-{trainingSurvey.days_left_in_period ?? "?"} · D-14부터 퇴근 차단
-                  </p>
-                </div>
-                <span className={`text-[var(--fs-caption)] font-bold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>설문</span>
-              </a>
-            )}
-            {!trainingSurvey.opinion_done && (
-              <a
+                icon={FileText}
+                title="근골격계 증상 설문"
+                subtitle={muscDone ? "제출 완료" : (gated ? `연 1회 · 반기 마감 D-${daysLeft}` : "연 1회 · 언제든 제출 가능")}
+                chipStatus={chipByStatus(muscDone)}
+                tone={toneByStatus(muscDone)}
+              />
+
+              {/* 의견 설문 */}
+              <TaskCard
                 href={`/r/survey/opinion?token=${token}`}
-                className={`flex items-center gap-3 w-full px-4 py-3 rounded-[var(--r-xl)] shadow-[var(--elev-1)] transition-transform hover:scale-[1.01] border ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "bg-[var(--danger-bg)] border-[var(--danger-border)]" : "bg-[var(--warning-bg)] border-[var(--warning-border)]"}`}
-              >
-                <FileText className={`w-5 h-5 shrink-0 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`} />
-                <div className="flex-1 text-left">
-                  <p className={`text-[var(--fs-base)] leading-tight font-semibold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
-                    안전보건 의견 설문 미제출
-                  </p>
-                  <p className={`text-[var(--fs-caption)] opacity-90 mt-0.5 ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>
-                    D-{trainingSurvey.days_left_in_period ?? "?"} · D-14부터 퇴근 차단
-                  </p>
-                </div>
-                <span className={`text-[var(--fs-caption)] font-bold ${(trainingSurvey.days_left_in_period ?? 999) <= 14 ? "text-[var(--danger-fg)]" : "text-[var(--warning-fg)]"}`}>설문</span>
-              </a>
-            )}
-          </>
-        )}
+                icon={FileText}
+                title="안전보건 의견 설문"
+                subtitle={opinDone ? "제출 완료" : (gated ? `반기 1회 · 마감 D-${daysLeft}` : "반기 1회 · 언제든 제출 가능")}
+                chipStatus={chipByStatus(opinDone)}
+                tone={toneByStatus(opinDone)}
+              />
+            </>
+          );
+        })()}
 
         {/* ── Language Selector ──────────────────────────────────── */}
         <div className="flex justify-center gap-2">

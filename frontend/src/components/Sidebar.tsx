@@ -44,6 +44,9 @@ import {
   Award,
   Timer,
   PiggyBank,
+  BookMarked,
+  Siren,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -119,6 +122,9 @@ const groups: NavGroup[] = [
       { href: "/safety-manager/committee", label: "산업안전보건위원회", icon: Users },
       { href: "/safety-manager/manager-hours", label: "겸직 관리자 시간", icon: Timer },
       { href: "/admin/safety-budget/dashboard", label: "예산 편성·집행", icon: PiggyBank },
+      { href: "/admin/emergency-manuals", label: "매뉴얼", icon: BookMarked },
+      { href: "/safety-manager/emergency-drills", label: "비상훈련", icon: Siren },
+      { href: "/admin/contractors", label: "도급업체 관리", icon: Building2 },
     ],
   },
   {

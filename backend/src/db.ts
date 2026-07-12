@@ -2076,6 +2076,242 @@ export async function initializeDB(): Promise<void> {
     console.error('[safety P7C] seed failed:', e.message);
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // v2.36.0 — P7D 매뉴얼·훈련·도급업체 관리 (중처법 §4-8 + §4-9)
+  // emergency_manuals            : 시나리오별 대응 매뉴얼(화재/가스누출/정전/중대재해/화학사고 등)
+  // emergency_drills             : 반기 대응 훈련 실시 기록 (findings·개선사항)
+  // contractor_registry          : 수급인·용역업체 마스터
+  // contractor_work_permits      : 도급업체 작업허가서 (위험작업 발행)
+  // contractor_joint_inspections : 원·수급 합동 안전점검
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS emergency_manuals (
+      id SERIAL PRIMARY KEY,
+      scenario_kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      version TEXT NOT NULL DEFAULT '1.0',
+      content_html TEXT DEFAULT '',
+      attachment_url TEXT DEFAULT '',
+      effective_from TEXT,
+      status TEXT DEFAULT 'draft',
+      superseded_by INTEGER REFERENCES emergency_manuals(id),
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_manual_kind_status ON emergency_manuals(scenario_kind, status);
+
+    CREATE TABLE IF NOT EXISTS emergency_drills (
+      id SERIAL PRIMARY KEY,
+      manual_id INTEGER REFERENCES emergency_manuals(id) ON DELETE SET NULL,
+      scenario_kind TEXT NOT NULL,
+      drill_date TEXT NOT NULL,
+      location TEXT DEFAULT '',
+      participant_count INTEGER DEFAULT 0,
+      participant_names TEXT DEFAULT '',
+      findings TEXT DEFAULT '',
+      improvements TEXT DEFAULT '',
+      photo_urls TEXT DEFAULT '',
+      led_by INTEGER,
+      led_by_name TEXT DEFAULT '',
+      ticket_id INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_drill_date ON emergency_drills(drill_date);
+
+    CREATE TABLE IF NOT EXISTS contractor_registry (
+      id SERIAL PRIMARY KEY,
+      business_name TEXT NOT NULL,
+      business_reg_no TEXT DEFAULT '',
+      representative_name TEXT DEFAULT '',
+      contact_phone TEXT DEFAULT '',
+      contact_email TEXT DEFAULT '',
+      work_scope TEXT NOT NULL,
+      contract_start TEXT,
+      contract_end TEXT,
+      safety_docs_url TEXT DEFAULT '',
+      insurance_status TEXT DEFAULT '',
+      status TEXT DEFAULT 'active',
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS contractor_work_permits (
+      id SERIAL PRIMARY KEY,
+      contractor_id INTEGER NOT NULL REFERENCES contractor_registry(id) ON DELETE CASCADE,
+      permit_no TEXT DEFAULT '',
+      work_description TEXT NOT NULL,
+      hazard_types TEXT DEFAULT '',
+      permit_date TEXT NOT NULL,
+      expiry_date TEXT NOT NULL,
+      area_id INTEGER,
+      ppe_required TEXT DEFAULT '',
+      safety_measures TEXT DEFAULT '',
+      approver_id INTEGER,
+      approver_name TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending',
+      closed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_permit_contractor ON contractor_work_permits(contractor_id);
+    CREATE INDEX IF NOT EXISTS idx_permit_status ON contractor_work_permits(status);
+
+    CREATE TABLE IF NOT EXISTS contractor_joint_inspections (
+      id SERIAL PRIMARY KEY,
+      contractor_id INTEGER REFERENCES contractor_registry(id) ON DELETE CASCADE,
+      permit_id INTEGER REFERENCES contractor_work_permits(id) ON DELETE SET NULL,
+      inspected_at TIMESTAMPTZ NOT NULL,
+      inspector_id INTEGER,
+      inspector_name TEXT DEFAULT '',
+      findings TEXT DEFAULT '',
+      actions TEXT DEFAULT '',
+      photos TEXT DEFAULT '',
+      ticket_id INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
+  // P7D seed — emergency_manuals draft 4건 (fire / gas_leak / blackout / critical_incident)
+  try {
+    const manualSeed = [
+      {
+        scenario_kind: 'fire',
+        title: '화재 대응 매뉴얼 (v1.0)',
+        content_html: `
+          <h2>화재 대응 매뉴얼</h2>
+          <p>산업안전보건기준 §232, 소방법 시행령 §11에 따라 화재 발생 시 이행할 대응절차를 정한다.</p>
+          <h3>1단계 (0-1분) - 초동 조치</h3>
+          <ul>
+            <li>화재 발견자는 즉시 "불이야!"를 외치고 화재경보 발신기를 누른다.</li>
+            <li>초기 진화가 가능한 경우 인근 소화기 사용(사용법: 안전핀 뽑기 → 노즐 잡기 → 손잡이 누르기 → 좌우 방사).</li>
+            <li>119에 즉시 신고 (주소·건물명·화재규모·부상자 유무 전달).</li>
+          </ul>
+          <h3>2단계 (1-5분) - 대피 및 통보</h3>
+          <ul>
+            <li>안전관리자·관리감독자·대표이사에게 즉시 보고.</li>
+            <li>비상방송을 통해 전 근로자 대피 지시. 엘리베이터 사용 금지.</li>
+            <li>대피 시 낮은 자세로 젖은 수건으로 코·입 가리기.</li>
+          </ul>
+          <h3>3단계 (5분 이후) - 집결·인원 파악</h3>
+          <ul>
+            <li>지정 집결지에 부서별 집결 후 관리감독자가 인원 확인.</li>
+            <li>인원 미확인 시 즉시 소방대에 위치·특징 전달.</li>
+          </ul>
+          <h3>주요 연락처</h3>
+          <ul>
+            <li>119(소방) · 안전관리자 · 대표이사 · 관할 소방서</li>
+          </ul>
+        `,
+      },
+      {
+        scenario_kind: 'gas_leak',
+        title: '냉매·가스누출 대응 매뉴얼 (v1.0)',
+        content_html: `
+          <h2>냉매·가스누출 대응 매뉴얼</h2>
+          <p>냉동설비·LPG·CO2·암모니아 등 화학·냉매 누출 사고 대응 절차.</p>
+          <h3>1단계 (0-1분) - 초동 조치</h3>
+          <ul>
+            <li>누출 인지 즉시 화기 사용 중단, 모든 전기 스위치 조작 금지(정전기·스파크 폭발 위험).</li>
+            <li>가스 밸브 차단 가능 시 즉시 차단. 무리하지 말고 대피 우선.</li>
+            <li>냄새·경보기 작동 시 창문·문 열어 환기, 밀폐공간이면 즉시 이탈.</li>
+          </ul>
+          <h3>2단계 (1-5분) - 대피 및 통보</h3>
+          <ul>
+            <li>119 신고 및 가스공급자·냉동설비 관리업체에 연락.</li>
+            <li>안전관리자·대표이사에게 보고.</li>
+            <li>바람 방향의 역방향(풍상)으로 대피, 최소 100m 이격.</li>
+          </ul>
+          <h3>3단계 (5분 이후) - 격리·복구</h3>
+          <ul>
+            <li>소방·가스업체 도착 시까지 근로자 접근 금지, 통제선 유지.</li>
+            <li>노출자 발생 시 즉시 신선한 공기 있는 곳으로 옮기고 119 이송.</li>
+            <li>사고 원인 조사 완료 및 안전 확인 후 복구.</li>
+          </ul>
+        `,
+      },
+      {
+        scenario_kind: 'blackout',
+        title: '정전 대응 매뉴얼 (v1.0)',
+        content_html: `
+          <h2>정전 대응 매뉴얼</h2>
+          <p>공장 전체 정전 시 조업 중단·인명보호·설비보호 절차.</p>
+          <h3>1단계 (0-1분) - 초동 조치</h3>
+          <ul>
+            <li>비상조명 점등 확인. 미점등 시 손전등·핸드폰 라이트 활용.</li>
+            <li>가동 중인 컨베이어·성형기·오븐 등 즉시 정지 스위치 조작.</li>
+            <li>냉동·냉장 창고 문 개폐 최소화(온도 유지).</li>
+          </ul>
+          <h3>2단계 (1-10분) - 상황 파악 및 통보</h3>
+          <ul>
+            <li>한전 고객센터(123) 및 관리업체에 정전 원인·복구시간 확인.</li>
+            <li>안전관리자·대표이사에게 상황 보고.</li>
+            <li>비상발전기(있는 경우) 가동 여부 결정.</li>
+          </ul>
+          <h3>3단계 (10분 이후) - 대기·복구</h3>
+          <ul>
+            <li>30분 이상 정전 지속 시 근로자 안전 대기 지시 및 조업 중단 판단.</li>
+            <li>복구 시 설비별 재가동 순서·안전확인 절차 준수(LOTO).</li>
+            <li>냉동제품 등 손실 재고 조사 및 기록.</li>
+          </ul>
+        `,
+      },
+      {
+        scenario_kind: 'critical_incident',
+        title: '중대재해 대응 매뉴얼 (v1.0)',
+        content_html: `
+          <h2>중대재해 대응 매뉴얼</h2>
+          <p>산업안전보건법 시행규칙 §67, 중대재해처벌법 §2·§8에 따라 중대재해 발생 시 즉시 이행할 대응절차를 정한다.</p>
+          <h3>중대재해 정의</h3>
+          <ul>
+            <li>사망자 1명 이상 발생</li>
+            <li>3개월 이상 요양이 필요한 부상자 2명 이상</li>
+            <li>부상자 또는 직업성 질병자 동시 10명 이상</li>
+          </ul>
+          <h3>1단계 (0-5분) - 초동 조치</h3>
+          <ul>
+            <li>재해자 구호(심폐소생술·지혈·기도확보) 및 119 신고.</li>
+            <li>2차 사고 방지: 전원 차단, 위험구역 격리, 인접 근로자 대피.</li>
+          </ul>
+          <h3>2단계 (5-30분) - 보고</h3>
+          <ul>
+            <li>관리감독자 → 안전관리자 → 대표이사 순 즉시 보고.</li>
+            <li>목격자·현장 사진 확보(수사 대비, 훼손 금지).</li>
+          </ul>
+          <h3>3단계 (30분-1시간) - 신고</h3>
+          <ul>
+            <li>지방고용노동관서 산재예방과 · 지자체 · 관할 경찰서에 즉시 신고.</li>
+            <li>가족 통보(대표이사 또는 안전관리자 직접).</li>
+          </ul>
+          <h3>4단계 (1시간 이후) - 현장 보존</h3>
+          <ul>
+            <li>노동청 조사 종료 시까지 현장 훼손 금지.</li>
+            <li>재해 관련 문서·기록·서류 원본 보관.</li>
+          </ul>
+          <h3>5단계 - 조사·재발방지</h3>
+          <ul>
+            <li>원인 조사 · 산업재해조사표 제출 · 재발방지 대책 수립 · 실행.</li>
+          </ul>
+        `,
+      },
+    ] as const;
+    for (const m of manualSeed) {
+      const exists = await pool.query(
+        `SELECT id FROM emergency_manuals WHERE scenario_kind = $1 AND title = $2 LIMIT 1`,
+        [m.scenario_kind, m.title]
+      );
+      if (exists.rowCount && exists.rowCount > 0) continue;
+      await pool.query(
+        `INSERT INTO emergency_manuals (scenario_kind, title, version, content_html, status)
+         VALUES ($1, $2, '1.0', $3, 'draft')`,
+        [m.scenario_kind, m.title, m.content_html]
+      );
+    }
+    console.log('[safety P7D] Seeded emergency_manuals (draft)');
+  } catch (e: any) {
+    console.error('[safety P7D] seed failed:', e.message);
+  }
+
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}
 

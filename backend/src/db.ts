@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.32.0';
+  const SCHEMA_VERSION = 'schema-v2.34.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1758,6 +1758,256 @@ export async function initializeDB(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_mgr_hours_month ON manager_activity_hours(manager_id, occurred_at);
     CREATE INDEX IF NOT EXISTS idx_mgr_hours_name_month ON manager_activity_hours(manager_name, occurred_at);
   `);
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.33.0 — P7A 안전보건 방침·규정 문서 관리
+  // ─ policy_documents (경영방침·안전보건관리규정·매뉴얼·연간 목표)
+  //   중대재해처벌법 시행령 §4-1 '안전보건 경영방침·목표 수립' 이행 증빙.
+  // ─ policy_acknowledgments (근로자 확인 서명 이력)
+  //   산업안전보건법 25조 관련 규정 공지·인지 증빙.
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS policy_documents (
+      id SERIAL PRIMARY KEY,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      version TEXT NOT NULL DEFAULT '1.0',
+      content_html TEXT NOT NULL DEFAULT '',
+      attachment_url TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft',
+      effective_from TEXT,
+      effective_to TEXT,
+      superseded_by INTEGER REFERENCES policy_documents(id),
+      requires_acknowledgment INTEGER DEFAULT 1,
+      target_role TEXT DEFAULT 'all',
+      published_at TIMESTAMPTZ,
+      published_by INTEGER,
+      ceo_signed_at TIMESTAMPTZ,
+      ceo_signature_name TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_policy_kind_status ON policy_documents(kind, status);
+
+    CREATE TABLE IF NOT EXISTS policy_acknowledgments (
+      id SERIAL PRIMARY KEY,
+      document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+      employee_id INTEGER NOT NULL,
+      acknowledged_at TIMESTAMPTZ DEFAULT NOW(),
+      signature_notes TEXT DEFAULT '',
+      client_ip TEXT DEFAULT '',
+      user_agent TEXT DEFAULT '',
+      UNIQUE (document_id, employee_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_policy_ack_doc ON policy_acknowledgments(document_id);
+    CREATE INDEX IF NOT EXISTS idx_policy_ack_emp ON policy_acknowledgments(employee_id);
+  `);
+
+  // P7A seed — draft 4건 (관리자가 발행 처리 필요)
+  try {
+    const seedDocs = [
+      {
+        kind: 'policy',
+        title: '조인앤조인 안전보건 경영방침 (2026)',
+        version: '1.0',
+        target_role: 'all',
+        content_html: `
+          <h2>안전보건 경영방침</h2>
+          <p>주식회사 조인앤조인(이하 "회사")은 임직원의 생명과 건강을 최우선 가치로 삼으며,
+          쾌적하고 안전한 근무환경을 조성하기 위해 다음과 같이 안전보건 경영방침을 선언한다.</p>
+          <ol>
+            <li>대표이사는 안전보건 확보를 최고 경영 목표로 삼고, 안전보건에 필요한 예산·인력·조직을 우선 배정한다.</li>
+            <li>산업안전보건법·중대재해처벌법 등 관련 법령을 철저히 준수한다.</li>
+            <li>유해·위험 요인을 사전 발굴하여 정기 위험성평가를 통해 개선한다.</li>
+            <li>모든 임직원은 안전보건 활동에 적극적으로 참여하고 의견을 제시할 권리와 의무가 있다.</li>
+            <li>수급인·협력사 종사자에 대해서도 동등한 안전보건 확보 조치를 취한다.</li>
+          </ol>
+          <p>본 방침은 매년 이행실적을 점검하고 필요 시 개정한다.</p>
+          <p>2026년 1월 1일 · 대표이사 진해수</p>
+        `,
+      },
+      {
+        kind: 'goal',
+        title: '2026년 안전보건 목표 및 세부 실행계획',
+        version: '1.0',
+        target_role: 'all',
+        content_html: `
+          <h2>2026년 안전보건 목표</h2>
+          <ul>
+            <li><b>중대재해 0건</b> — 사망·중상 재해 발생 시 대표이사 즉시 보고 체계 운영</li>
+            <li><b>재해율 전년 대비 30% 감축</b></li>
+            <li><b>위험성평가 100% 이행</b> — 정기평가(년 1회) · 수시평가(공정 변경 시)</li>
+            <li><b>안전보건교육 이수율 95% 이상</b> — 반기별 정기교육 · 신규 채용 시 특별교육</li>
+            <li><b>근로자 의견 수렴 반기 1회 이상</b></li>
+          </ul>
+          <h3>세부 실행계획</h3>
+          <ol>
+            <li>매월 안전관리자 순회점검 및 지적사항 개선 (조치 완료율 90% 이상)</li>
+            <li>분기별 산업안전보건위원회 개최 · 회의록 작성</li>
+            <li>반기별 안전보건교육(생산직 12h, 사무직 6h) 및 이수현황 관리</li>
+            <li>매년 정기 건강진단 · 보건증 갱신 관리</li>
+            <li>중대재해처벌법 시행령 §4 이행 반기점검 → 대표이사 보고</li>
+          </ol>
+        `,
+      },
+      {
+        kind: 'regulation',
+        title: '안전보건관리규정 (v1.0)',
+        version: '1.0',
+        target_role: 'all',
+        content_html: `
+          <h2>안전보건관리규정</h2>
+          <p>본 규정은 산업안전보건법 25조에 근거하여 조인앤조인 근로자의 안전과 보건 유지·증진을 위한 사항을 정한다.</p>
+          <h3>제1장 총칙</h3>
+          <p>본 규정은 회사의 모든 임직원(정규직·계약직·파견·수급인 종사자 포함)에게 적용된다.</p>
+          <h3>제2장 안전보건관리 조직</h3>
+          <ul>
+            <li>대표이사 = 안전보건 총괄 책임자</li>
+            <li>안전관리자 · 보건관리자 각 1명 이상 (겸직 가능, 관련 자격 보유)</li>
+            <li>산업안전보건위원회 = 근로자 대표 참여, 분기 1회 개최</li>
+          </ul>
+          <h3>제3장 작업장 안전조치</h3>
+          <ul>
+            <li>모든 근로자는 지정된 안전보호구를 착용한다.</li>
+            <li>기계·설비 정비 시 LOTO(잠금·표찰) 절차를 따른다.</li>
+            <li>위험 상황 발견 시 즉시 관리자에게 보고한다.</li>
+          </ul>
+          <h3>제4장 보건 조치</h3>
+          <ul>
+            <li>정기·특수·배치전 건강진단을 실시한다.</li>
+            <li>식품위생법 30조에 따라 보건증을 매년 갱신한다.</li>
+            <li>근골격계 부담작업 종사자는 3년마다 유해요인조사를 실시한다.</li>
+          </ul>
+          <h3>제5장 교육·훈련</h3>
+          <ul>
+            <li>신규 채용 시 안전보건교육을 실시한다 (사무직 6h, 생산직 12h).</li>
+            <li>반기별 정기 안전보건교육을 실시한다.</li>
+            <li>중대재해 대응 훈련을 연 1회 이상 실시한다.</li>
+          </ul>
+        `,
+      },
+      {
+        kind: 'manual',
+        title: '중대재해 대응 매뉴얼 (v1.0)',
+        version: '1.0',
+        target_role: 'all',
+        content_html: `
+          <h2>중대재해 대응 매뉴얼</h2>
+          <p>산업안전보건법 시행규칙 §67, 중대재해처벌법 §2·§8에 따라 중대재해 발생 시 즉시 이행할 대응절차를 정한다.</p>
+          <h3>중대재해 정의</h3>
+          <ul>
+            <li>사망자 1명 이상 발생</li>
+            <li>3개월 이상 요양이 필요한 부상자 2명 이상</li>
+            <li>부상자 또는 직업성 질병자 동시 10명 이상</li>
+          </ul>
+          <h3>단계별 대응 절차</h3>
+          <ol>
+            <li><b>1단계 (0-5분) - 초동 조치</b>: 재해자 구호·119 신고 · 2차 사고 방지 (전원 차단, 격리)</li>
+            <li><b>2단계 (5-30분) - 보고</b>: 관리감독자 → 안전관리자 → 대표이사 순 보고</li>
+            <li><b>3단계 (30분-1시간) - 신고</b>: 지방고용노동관서 · 지자체 · 관할 경찰서에 즉시 신고</li>
+            <li><b>4단계 (1시간 이후) - 현장 보존</b>: 노동청 조사 종료 시까지 현장 훼손 금지</li>
+            <li><b>5단계 - 조사·재발방지</b>: 원인 조사 · 산업재해조사표 제출 · 재발방지 대책 수립</li>
+          </ol>
+          <h3>주요 연락처</h3>
+          <ul>
+            <li>119 (소방·응급) · 112 (경찰)</li>
+            <li>지방고용노동관서 산재예방과</li>
+            <li>대표이사 · 안전관리자 · 보건관리자 비상연락망</li>
+          </ul>
+          <p>본 매뉴얼은 대표이사가 반기점검 시 훈련 실시 여부를 검토한다.</p>
+        `,
+      },
+    ];
+    for (const doc of seedDocs) {
+      const exists = await pool.query(
+        `SELECT id FROM policy_documents WHERE kind = $1 AND title = $2 LIMIT 1`,
+        [doc.kind, doc.title]
+      );
+      if (exists.rowCount && exists.rowCount > 0) continue;
+      await pool.query(
+        `INSERT INTO policy_documents
+           (kind, title, version, content_html, status, requires_acknowledgment, target_role)
+         VALUES ($1, $2, $3, $4, 'draft', 1, $5)`,
+        [doc.kind, doc.title, doc.version, doc.content_html, doc.target_role]
+      );
+    }
+    console.log('[safety P7A] Seeded policy_documents (draft)');
+  } catch (e: any) {
+    console.error('[safety P7A] seed failed:', e.message);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.34.0 — P7B 안전보건 조직도·선임계
+  // 중처법 §4-2(업무 총괄 조직·인력) + §4-6(법정 인력 배치·업무시간 보장) 통합.
+  // safety_org_positions : 직위별 선임자 카드 (CEO / 책임자 / 안전관리자 / 보건관리자 /
+  //                       근로자대표 / 관리감독자 / 명예감독관)
+  // safety_org_history   : 선임·경력 변경 이력 (append-only, position 삭제 시 CASCADE)
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS safety_org_positions (
+      id SERIAL PRIMARY KEY,
+      position_key TEXT NOT NULL,
+      position_name TEXT NOT NULL,
+      employee_id INTEGER,
+      employee_name TEXT DEFAULT '',
+      appointed_at TEXT,
+      resigned_at TEXT,
+      appointment_doc_url TEXT DEFAULT '',
+      certification_name TEXT DEFAULT '',
+      certification_no TEXT DEFAULT '',
+      is_concurrent INTEGER DEFAULT 0,
+      statutory_min_hours DOUBLE PRECISION DEFAULT 0,
+      department TEXT DEFAULT '',
+      parent_position_id INTEGER REFERENCES safety_org_positions(id),
+      status TEXT DEFAULT 'active',
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_safety_org_key_status ON safety_org_positions(position_key, status);
+
+    CREATE TABLE IF NOT EXISTS safety_org_history (
+      id SERIAL PRIMARY KEY,
+      position_id INTEGER NOT NULL REFERENCES safety_org_positions(id) ON DELETE CASCADE,
+      action TEXT NOT NULL,
+      occurred_at TIMESTAMPTZ DEFAULT NOW(),
+      actor_id INTEGER,
+      details_json JSONB DEFAULT '{}',
+      notes TEXT DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_safety_org_history_pos ON safety_org_history(position_id, occurred_at);
+  `);
+
+  // P7B seed — 6개 필수 직위 (선임자 미배치 상태)
+  try {
+    const orgSeed: Array<{
+      key: string; name: string; is_concurrent: number;
+      statutory_min_hours: number; department: string;
+    }> = [
+      { key: 'ceo',            name: '대표이사',              is_concurrent: 0, statutory_min_hours: 0,   department: '경영진' },
+      { key: 'chief',          name: '안전보건관리책임자',    is_concurrent: 1, statutory_min_hours: 0,   department: '경영지원' },
+      { key: 'safety_mgr',     name: '안전관리자',            is_concurrent: 1, statutory_min_hours: 685, department: '안전보건' },
+      { key: 'health_mgr',     name: '보건관리자',            is_concurrent: 1, statutory_min_hours: 685, department: '안전보건' },
+      { key: 'worker_rep',     name: '근로자대표',            is_concurrent: 0, statutory_min_hours: 0,   department: '' },
+      { key: 'supervisor',     name: '관리감독자',            is_concurrent: 0, statutory_min_hours: 0,   department: '생산' },
+    ];
+    for (const p of orgSeed) {
+      const exists = await pool.query(
+        `SELECT id FROM safety_org_positions WHERE position_key = $1 LIMIT 1`,
+        [p.key]
+      );
+      if (exists.rowCount && exists.rowCount > 0) continue;
+      await pool.query(
+        `INSERT INTO safety_org_positions
+           (position_key, position_name, is_concurrent, statutory_min_hours, department, status)
+         VALUES ($1, $2, $3, $4, $5, 'active')`,
+        [p.key, p.name, p.is_concurrent, p.statutory_min_hours, p.department]
+      );
+    }
+    console.log('[safety P7B] Seeded safety_org_positions');
+  } catch (e: any) {
+    console.error('[safety P7B] seed failed:', e.message);
+  }
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}

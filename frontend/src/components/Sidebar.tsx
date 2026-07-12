@@ -105,6 +105,7 @@ const groups: NavGroup[] = [
     label: "안전관리자 점검",
     icon: ShieldCheck,
     items: [
+      { href: "/admin/safety-org", label: "안전보건 조직도·선임", icon: Users },
       { href: "/safety-manager/worker-compliance", label: "근로자 셀프체크 이행 현황", icon: Activity },
       { href: "/safety-manager/daily-inspection", label: "일일 순회점검", icon: MapPin },
       { href: "/safety-manager/tickets", label: "조치 티켓", icon: Ticket },

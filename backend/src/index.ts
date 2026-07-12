@@ -34,6 +34,7 @@ import trainingPublicRoutes from './routes/trainingPublic';
 import trainingManagerRoutes from './routes/trainingManager';
 import safetyGovernanceRoutes from './routes/safetyGovernance';
 import ceoRoutes from './routes/ceo';
+import safetyOrgRoutes from './routes/safetyOrg';
 import { requireAuth } from './middleware/auth';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
 
@@ -107,6 +108,9 @@ app.use('/api/safety-manager', requireAuth, safetyGovernanceRoutes);
 
 // 안전보건 P6 — 대표이사 대시보드 + 중처법 반기 이행점검 + 겸직 관리자 시간 결산
 app.use('/api/ceo', requireAuth, ceoRoutes);
+
+// 안전보건 P7B — 안전보건 조직도·선임계 (§4-2 + §4-6)
+app.use('/api/safety-org', requireAuth, safetyOrgRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

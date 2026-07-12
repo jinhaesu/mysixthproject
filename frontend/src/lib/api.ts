@@ -2009,3 +2009,111 @@ export async function logManagerHoursManual(body: {
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
 }
+
+// ===== P7B — 안전보건 조직도·선임계 =====
+export interface SafetyOrgPosition {
+  id: number;
+  position_key: string;
+  position_name: string;
+  employee_id: number | null;
+  employee_name: string;
+  appointed_at: string | null;
+  resigned_at: string | null;
+  appointment_doc_url: string;
+  certification_name: string;
+  certification_no: string;
+  is_concurrent: number;
+  statutory_min_hours: number;
+  department: string;
+  parent_position_id: number | null;
+  status: string;
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
+  emp_department?: string | null;
+  emp_role?: string | null;
+}
+
+export interface SafetyOrgHistoryEntry {
+  id: number;
+  position_id: number;
+  action: 'appoint' | 'resign' | 'change' | 'certification_update';
+  occurred_at: string;
+  actor_id: number | null;
+  details_json: any;
+  notes: string;
+}
+
+export interface SafetyOrgHoursSummary {
+  position_id: number;
+  position_key: string;
+  position_name: string;
+  employee_id: number | null;
+  employee_name: string;
+  statutory_min_hours: number;
+  is_concurrent: number;
+  half_minutes: number;
+  half_hours: number;
+  gauge_pct: number | null;
+  shortfall_hours: number;
+}
+
+export interface SafetyOrgComplianceResponse {
+  positions: SafetyOrgPosition[];
+  missing: Array<{ position_key: string; position_name: string }>;
+  hours_summary: SafetyOrgHoursSummary[];
+  period: { year: number; half: number; from: string; to: string; label: string };
+  required_keys: string[];
+  compliant: boolean;
+}
+
+export async function listSafetyOrgPositions() {
+  return fetchAPI<{ positions: SafetyOrgPosition[] }>('/api/safety-org/positions');
+}
+
+export async function createSafetyOrgPosition(body: {
+  position_key: string;
+  position_name?: string;
+  department?: string;
+  is_concurrent?: boolean | number;
+  statutory_min_hours?: number;
+  parent_position_id?: number | null;
+  notes?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/safety-org/positions',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchSafetyOrgPosition(id: number, body: Partial<{
+  position_name: string;
+  employee_id: number | null;
+  employee_name: string;
+  appointed_at: string | null;
+  resigned_at: string | null;
+  appointment_doc_url: string;
+  certification_name: string;
+  certification_no: string;
+  is_concurrent: boolean | number;
+  statutory_min_hours: number;
+  department: string;
+  parent_position_id: number | null;
+  status: string;
+  notes: string;
+}>) {
+  return fetchAPI<{ success: boolean; position: SafetyOrgPosition }>(
+    `/api/safety-org/positions/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function getSafetyOrgHistory(id: number) {
+  return fetchAPI<{ history: SafetyOrgHistoryEntry[] }>(
+    `/api/safety-org/positions/${id}/history`
+  );
+}
+
+export async function getSafetyOrgCompliance() {
+  return fetchAPI<SafetyOrgComplianceResponse>('/api/safety-org/compliance-check');
+}

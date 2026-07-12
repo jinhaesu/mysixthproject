@@ -15,6 +15,7 @@ import {
   XCircle,
   Car,
   Shield,
+  ShieldCheck,
   Megaphone,
   Users,
   Building2,
@@ -22,6 +23,7 @@ import {
   ChevronUp,
   Ban,
   Calendar,
+  ClipboardCheck,
 } from "lucide-react";
 
 // ─── Translations (정규직 version) ──────────────────────────────
@@ -549,6 +551,15 @@ function RegularContent() {
   // Org chart expand
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
 
+  // Safety check status (P1 안전보건)
+  const [safetyStatus, setSafetyStatus] = useState<{
+    gated: boolean;
+    precheck_done: boolean;
+    postcheck_done: boolean;
+    precheck_ok?: boolean | null;
+    postcheck_ok?: boolean | null;
+  } | null>(null);
+
   const toggleDept = (dept: string) => {
     setExpandedDepts((prev) => {
       const next = new Set(prev);
@@ -605,7 +616,19 @@ function RegularContent() {
     } catch {}
   }, [token]);
 
+  const loadSafetyStatus = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/safety/status`);
+      if (res.ok) {
+        const body = await res.json();
+        setSafetyStatus(body);
+      }
+    } catch {}
+  }, [token]);
+
   useEffect(() => { loadVacations(); }, [loadVacations]);
+  useEffect(() => { loadSafetyStatus(); }, [loadSafetyStatus]);
 
   useEffect(() => {
     const isHalf = vacType.startsWith('오전') || vacType.startsWith('오후');
@@ -775,6 +798,16 @@ function RegularContent() {
           }),
         }
       );
+      if (res.status === 409) {
+        const body = await res.json().catch(() => null);
+        if (body?.code === 'SAFETY_TASK_INCOMPLETE') {
+          if (confirm('출근 전 안전 셀프체크를 먼저 완료해야 합니다.\n지금 이동하시겠습니까?')) {
+            window.location.href = `/r/safety-check?token=${token}&kind=precheck`;
+          }
+          return;
+        }
+        throw new Error(body?.error || `Error 409`);
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `Error ${res.status}`);
@@ -803,6 +836,16 @@ function RegularContent() {
           }),
         }
       );
+      if (res.status === 409) {
+        const body = await res.json().catch(() => null);
+        if (body?.code === 'SAFETY_TASK_INCOMPLETE') {
+          if (confirm('퇴근 전 안전 셀프체크를 먼저 완료해야 합니다.\n지금 이동하시겠습니까?')) {
+            window.location.href = `/r/safety-check?token=${token}&kind=postcheck`;
+          }
+          return;
+        }
+        throw new Error(body?.error || `Error 409`);
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `Error ${res.status}`);
@@ -1332,6 +1375,38 @@ function RegularContent() {
               </div>
             )}
 
+            {/* 안전보건 셀프체크 카드 — 게이팅 대상만 표시 */}
+            {safetyStatus?.gated && !safetyStatus.precheck_done && (
+              <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-xl)] p-5">
+                <div className="flex items-center gap-2 text-[var(--warning-fg)] mb-2">
+                  <ShieldCheck className="w-5 h-5" />
+                  <h2 className="font-semibold">출근 전 안전 셀프체크 필요</h2>
+                </div>
+                <p className="text-[var(--fs-body)] text-[var(--warning-fg)] mb-3">
+                  위생복 갈아입기 전에 오늘 근무 준비 상태를 확인해주세요. 완료해야 출근 기록이 가능합니다.
+                </p>
+                <a
+                  href={`/r/safety-check?token=${token}&kind=precheck`}
+                  className="w-full py-2.5 bg-[var(--warning-fg)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-body)] flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                >
+                  <ClipboardCheck className="w-5 h-5" />
+                  셀프체크 시작
+                </a>
+              </div>
+            )}
+            {safetyStatus?.gated && safetyStatus.precheck_done && (
+              <div className="bg-[var(--success-bg)] border border-[var(--success-border)] rounded-[var(--r-md)] p-3 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-[var(--success-fg)] shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[var(--fs-body)] font-semibold text-[var(--success-fg)]">출근 전 셀프체크 완료</p>
+                  {safetyStatus.precheck_ok === false && (
+                    <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-0.5">이상 항목 감지됨 — 관리자 확인 중</p>
+                  )}
+                </div>
+                <a href={`/r/safety-check?token=${token}&kind=precheck`} className="text-[var(--fs-caption)] text-[var(--brand-500)] underline">재제출</a>
+              </div>
+            )}
+
             <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5">
               <div className="flex items-center gap-2 text-[var(--brand-400)] mb-2">
                 <LogIn className="w-5 h-5" />
@@ -1348,7 +1423,7 @@ function RegularContent() {
 
               <button
                 onClick={handleClockIn}
-                disabled={submitting || !agreementAccepted || !phoneVerified}
+                disabled={submitting || !agreementAccepted || !phoneVerified || (safetyStatus?.gated === true && !safetyStatus.precheck_done)}
                 className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {submitting ? (
@@ -1398,6 +1473,38 @@ function RegularContent() {
               </div>
             </div>
 
+            {/* 안전보건 퇴근 전 셀프체크 카드 */}
+            {safetyStatus?.gated && !safetyStatus.postcheck_done && (
+              <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] rounded-[var(--r-xl)] p-5">
+                <div className="flex items-center gap-2 text-[var(--warning-fg)] mb-2">
+                  <ShieldCheck className="w-5 h-5" />
+                  <h2 className="font-semibold">퇴근 전 안전 셀프체크 필요</h2>
+                </div>
+                <p className="text-[var(--fs-body)] text-[var(--warning-fg)] mb-3">
+                  오늘 근무 중 발생한 이상 유무를 확인해주세요. 완료해야 퇴근 기록이 가능합니다.
+                </p>
+                <a
+                  href={`/r/safety-check?token=${token}&kind=postcheck`}
+                  className="w-full py-2.5 bg-[var(--warning-fg)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-body)] flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                >
+                  <ClipboardCheck className="w-5 h-5" />
+                  셀프체크 시작
+                </a>
+              </div>
+            )}
+            {safetyStatus?.gated && safetyStatus.postcheck_done && (
+              <div className="bg-[var(--success-bg)] border border-[var(--success-border)] rounded-[var(--r-md)] p-3 flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-[var(--success-fg)] shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[var(--fs-body)] font-semibold text-[var(--success-fg)]">퇴근 전 셀프체크 완료</p>
+                  {safetyStatus.postcheck_ok === false && (
+                    <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-0.5">이상 항목 감지됨 — 관리자 확인 중</p>
+                  )}
+                </div>
+                <a href={`/r/safety-check?token=${token}&kind=postcheck`} className="text-[var(--fs-caption)] text-[var(--brand-500)] underline">재제출</a>
+              </div>
+            )}
+
             {/* Clock-out button */}
             {canAct && (
               <div className="bg-[var(--bg-1)] rounded-[var(--r-xl)] shadow-[var(--elev-1)] border border-[var(--border-1)] p-5">
@@ -1412,7 +1519,7 @@ function RegularContent() {
                 </p>
                 <button
                   onClick={handleClockOut}
-                  disabled={submitting}
+                  disabled={submitting || (safetyStatus?.gated === true && !safetyStatus.postcheck_done)}
                   className="w-full py-3 bg-[var(--warning-fg)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-50 hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                 >
                   {submitting ? (

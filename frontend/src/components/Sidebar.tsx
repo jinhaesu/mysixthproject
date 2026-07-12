@@ -21,6 +21,7 @@ import {
   Briefcase,
   UserCheck,
   Shield,
+  ShieldCheck,
   HardHat,
   Lock,
   CalendarCheck,
@@ -28,6 +29,7 @@ import {
   FileSignature,
   UserMinus,
   Wallet,
+  Heart,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -84,6 +86,20 @@ const groups: NavGroup[] = [
       { href: "/upload-regular", label: "엑셀 업로드", icon: UploadCloud },
       { href: "/salary-manage", label: "기본급 관리", icon: Calculator },
       { href: "/payroll-calc", label: "급여 계산", icon: Calculator },
+    ],
+  },
+  {
+    label: "안전관리자 점검",
+    icon: ShieldCheck,
+    items: [
+      { href: "/safety-manager/worker-compliance", label: "근로자 셀프체크 이행 현황", icon: Activity },
+    ],
+  },
+  {
+    label: "보건관리자 점검",
+    icon: Heart,
+    items: [
+      { href: "/health-manager/coming-soon", label: "준비 중 (P3)", icon: ClipboardList },
     ],
   },
 ];

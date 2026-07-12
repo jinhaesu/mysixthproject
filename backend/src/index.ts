@@ -32,6 +32,7 @@ import healthPublicRoutes from './routes/healthPublic';
 import healthManagerRoutes from './routes/healthManager';
 import trainingPublicRoutes from './routes/trainingPublic';
 import trainingManagerRoutes from './routes/trainingManager';
+import safetyGovernanceRoutes from './routes/safetyGovernance';
 import { requireAuth } from './middleware/auth';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
 
@@ -99,6 +100,9 @@ app.use('/api/regular-public', trainingPublicRoutes);  // no auth
 // safety-manager 하위에 마운트 (Sidebar 안전관리자 점검 그룹에 편입)
 app.use('/api/safety-manager', requireAuth, trainingManagerRoutes);
 app.use('/api/admin', requireAuth, trainingManagerRoutes);
+
+// 안전보건 P5 — 위험성평가 + LOTO + 산업재해 + 산업안전보건위원회
+app.use('/api/safety-manager', requireAuth, safetyGovernanceRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

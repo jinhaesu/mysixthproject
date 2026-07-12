@@ -36,6 +36,9 @@ import {
   GraduationCap,
   FileText,
   BookOpen,
+  Users,
+  AlertOctagon,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -104,6 +107,10 @@ const groups: NavGroup[] = [
       { href: "/safety-manager/hazard-reports", label: "아차사고 처리", icon: ShieldAlert },
       { href: "/safety-manager/training-status", label: "교육 이수 현황", icon: GraduationCap },
       { href: "/safety-manager/survey-status", label: "설문 응답 현황", icon: FileText },
+      { href: "/safety-manager/risk-assessment", label: "위험성평가", icon: ShieldAlert },
+      { href: "/safety-manager/loto", label: "LOTO 작업허가", icon: Zap },
+      { href: "/safety-manager/incidents", label: "산업재해", icon: AlertOctagon },
+      { href: "/safety-manager/committee", label: "산업안전보건위원회", icon: Users },
     ],
   },
   {

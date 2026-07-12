@@ -1525,3 +1525,331 @@ export async function getSafetySurveyResponses(kind: 'musculoskeletal' | 'opinio
   }>(`/api/safety-manager/survey-status/${kind}/responses${qs}`);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 안전보건 시스템 P5 — 위험성평가 + LOTO + 산업재해 + 산업안전보건위원회
+// ═══════════════════════════════════════════════════════════════
+
+// ---- 위험성평가 ----
+export interface RiskAssessment {
+  id: number;
+  year: number;
+  kind: string;
+  title: string;
+  triggered_by: string;
+  status: string;
+  posted_at: string | null;
+  ceo_reported_at: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  item_count?: number;
+  participant_count?: number;
+  signed_count?: number;
+}
+
+export interface RiskAssessmentItem {
+  id: number;
+  assessment_id: number;
+  process: string;
+  task: string;
+  hazard: string;
+  freq_score: number;
+  intensity_score: number;
+  risk_grade: string;
+  mitigation: string;
+  assignee_id: number | null;
+  assignee_name: string;
+  due_date: string | null;
+  closed_risk_grade: string;
+  ticket_id: number | null;
+  created_at: string;
+}
+
+export interface RiskAssessmentParticipant {
+  id: number;
+  assessment_id: number;
+  employee_id: number | null;
+  participant_name: string;
+  role: string;
+  signed_at: string | null;
+  signature_notes: string;
+}
+
+export async function listRiskAssessments(params?: { year?: number; status?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.year) qs.set('year', String(params.year));
+  if (params?.status) qs.set('status', params.status);
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{ items: RiskAssessment[] }>(`/api/safety-manager/risk-assessments${suffix}`);
+}
+
+export async function getRiskAssessment(id: number) {
+  return fetchAPI<{
+    assessment: RiskAssessment;
+    items: RiskAssessmentItem[];
+    participants: RiskAssessmentParticipant[];
+  }>(`/api/safety-manager/risk-assessments/${id}`);
+}
+
+export async function createRiskAssessment(body: {
+  year: number;
+  kind?: string;
+  title: string;
+  triggered_by?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number; year: number }>(
+    '/api/safety-manager/risk-assessments',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchRiskAssessment(id: number, body: {
+  status?: string; title?: string; triggered_by?: string; kind?: string;
+  posted?: boolean; ceo_reported?: boolean;
+}) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/risk-assessments/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function addRiskAssessmentItem(id: number, body: {
+  process: string; task?: string; hazard: string;
+  freq_score: number; intensity_score: number;
+  mitigation?: string; assignee_name?: string; assignee_id?: number; due_date?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number; ticket_id: number; risk_grade: string }>(
+    `/api/safety-manager/risk-assessments/${id}/items`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchRiskAssessmentItem(id: number, itemId: number, body: {
+  closed_risk_grade?: string; mitigation?: string;
+}) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/risk-assessments/${id}/items/${itemId}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function addRiskAssessmentParticipant(id: number, body: {
+  participant_name: string; employee_id?: number; role?: string;
+  signature_notes?: string; signed?: boolean;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    `/api/safety-manager/risk-assessments/${id}/participants`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchRiskAssessmentParticipant(id: number, pid: number, body: {
+  signed?: boolean; signature_notes?: string;
+}) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/risk-assessments/${id}/participants/${pid}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+// ---- LOTO ----
+export interface LotoAuthorization {
+  id: number;
+  equipment_name: string;
+  area_id: number | null;
+  area_name?: string;
+  area_code?: string;
+  work_description: string;
+  worker_ids: string;
+  worker_names: string;
+  expected_hours: number;
+  energy_off_photo_url: string;
+  lock_photo_url: string;
+  verify_no_energy: number;
+  release_photo_url: string;
+  trial_run_ok: number;
+  status: string;
+  started_at: string | null;
+  released_at: string | null;
+  created_by: number | null;
+  created_at: string;
+}
+
+export async function listLoto(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return fetchAPI<{
+    items: LotoAuthorization[];
+    summary: { total: number; requested: number; in_progress: number; released: number };
+  }>(`/api/safety-manager/loto${qs}`);
+}
+
+export async function getLoto(id: number) {
+  return fetchAPI<{ item: LotoAuthorization }>(`/api/safety-manager/loto/${id}`);
+}
+
+export async function createLoto(body: {
+  equipment_name: string; area_id?: number; work_description: string;
+  worker_names?: string; worker_ids?: string; expected_hours?: number;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/safety-manager/loto',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchLoto(id: number, body: Partial<{
+  equipment_name: string; area_id: number | null; work_description: string;
+  worker_names: string; worker_ids: string; expected_hours: number;
+  energy_off_photo_url: string; lock_photo_url: string; verify_no_energy: boolean;
+  release_photo_url: string; trial_run_ok: boolean; status: string;
+}>) {
+  return fetchAPI<{ success: boolean; item: LotoAuthorization }>(
+    `/api/safety-manager/loto/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+// ---- 산업재해 ----
+export interface Incident {
+  id: number;
+  occurred_at: string;
+  area_id: number | null;
+  area_name: string;
+  area_name_lookup?: string;
+  injured_employee_id: number | null;
+  injured_name: string;
+  injury_body_part: string;
+  injury_severity: string;
+  witnesses: string;
+  description: string;
+  photo_url: string;
+  hospital_transfer: number;
+  first_aid_notes: string;
+  is_critical: number;
+  cause_unsafe_state: string;
+  cause_unsafe_action: string;
+  cause_managerial: string;
+  mitigation: string;
+  hospitalization_days: number;
+  requires_report: number;
+  report_deadline: string | null;
+  report_submitted_at: string | null;
+  report_receipt_url: string;
+  status: string;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  is_report_overdue?: boolean;
+  days_until_deadline?: number | null;
+}
+
+export async function listIncidents(params?: { year?: number; status?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.year) qs.set('year', String(params.year));
+  if (params?.status) qs.set('status', params.status);
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{
+    items: Incident[];
+    summary: { total: number; critical: number; requires_report: number; report_overdue: number; closed: number };
+  }>(`/api/safety-manager/incidents${suffix}`);
+}
+
+export async function getIncident(id: number) {
+  return fetchAPI<{ item: Incident }>(`/api/safety-manager/incidents/${id}`);
+}
+
+export async function createIncident(body: {
+  occurred_at: string;
+  area_id?: number; area_name?: string;
+  injured_employee_id?: number; injured_name?: string;
+  injury_body_part?: string; injury_severity?: string;
+  hospitalization_days?: number; description?: string; photo_url?: string;
+  hospital_transfer?: boolean; first_aid_notes?: string; witnesses?: string;
+}) {
+  return fetchAPI<{
+    success: boolean; id: number;
+    is_critical: boolean; requires_report: boolean; report_deadline: string;
+  }>(
+    '/api/safety-manager/incidents',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchIncident(id: number, body: Partial<{
+  area_id: number | null;
+  area_name: string;
+  injured_employee_id: number | null;
+  injured_name: string;
+  injury_body_part: string;
+  injury_severity: string;
+  hospitalization_days: number;
+  witnesses: string;
+  description: string;
+  photo_url: string;
+  hospital_transfer: boolean;
+  first_aid_notes: string;
+  cause_unsafe_state: string;
+  cause_unsafe_action: string;
+  cause_managerial: string;
+  mitigation: string;
+  status: string;
+}>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/incidents/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function submitIncidentReport(id: number, body: { report_receipt_url?: string }) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/incidents/${id}/report-submitted`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+// ---- 산업안전보건위원회 ----
+export interface CommitteeMinute {
+  id: number;
+  year: number;
+  quarter: number;
+  round_no: number | null;
+  held_at: string;
+  location: string;
+  agenda_reported: string;
+  agenda_decided: string;
+  decisions: string;
+  worker_rep_input: string;
+  participants_employer: string;
+  participants_worker: string;
+  status: string;
+  created_by: number | null;
+  created_at: string;
+}
+
+export async function listCommitteeMinutes(year?: number) {
+  const qs = year ? `?year=${year}` : '';
+  return fetchAPI<{ items: CommitteeMinute[] }>(`/api/safety-manager/committee-minutes${qs}`);
+}
+
+export async function getCommitteeMinute(id: number) {
+  return fetchAPI<{ item: CommitteeMinute }>(`/api/safety-manager/committee-minutes/${id}`);
+}
+
+export async function createCommitteeMinute(body: {
+  year: number; quarter: number; round_no?: number; held_at: string;
+  location?: string; agenda_reported?: string; agenda_decided?: string;
+  decisions?: string; worker_rep_input?: string;
+  participants_employer?: string; participants_worker?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/safety-manager/committee-minutes',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchCommitteeMinute(id: number, body: Partial<CommitteeMinute>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/safety-manager/committee-minutes/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}

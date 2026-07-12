@@ -27,6 +27,7 @@ import {
   GraduationCap,
   FileText,
   Stethoscope,
+  BookOpen,
 } from "lucide-react";
 
 // ─── Translations (정규직 version) ──────────────────────────────
@@ -590,6 +591,12 @@ function RegularContent() {
     last_received_at: string | null;
   } | null>(null);
 
+  // 방침·규정 문서 미확인 카운트 (P7A)
+  const [policyPending, setPolicyPending] = useState<{
+    pending_count: number;
+    total_count: number;
+  } | null>(null);
+
   const toggleDept = (dept: string) => {
     setExpandedDepts((prev) => {
       const next = new Set(prev);
@@ -697,11 +704,25 @@ function RegularContent() {
     } catch {}
   }, [token]);
 
+  const loadPolicyPending = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/${token}/policy/pending`);
+      if (res.ok) {
+        const body = await res.json();
+        const pending = Array.isArray(body?.pending) ? body.pending.length : 0;
+        const acknowledged = Array.isArray(body?.acknowledged) ? body.acknowledged.length : 0;
+        setPolicyPending({ pending_count: pending, total_count: pending + acknowledged });
+      }
+    } catch {}
+  }, [token]);
+
   useEffect(() => { loadVacations(); }, [loadVacations]);
   useEffect(() => { loadSafetyStatus(); }, [loadSafetyStatus]);
   useEffect(() => { loadHealthCert(); }, [loadHealthCert]);
   useEffect(() => { loadTrainingSurvey(); }, [loadTrainingSurvey]);
   useEffect(() => { loadCheckupStatus(); }, [loadCheckupStatus]);
+  useEffect(() => { loadPolicyPending(); }, [loadPolicyPending]);
 
   useEffect(() => {
     const isHalf = vacType.startsWith('오전') || vacType.startsWith('오후');
@@ -1185,6 +1206,18 @@ function RegularContent() {
                 chipStatus="info"
                 tone="gradient"
               />
+
+              {/* 미확인 방침·규정 — 대상 문서가 있고 미확인 카운트 > 0 시에만 노출 */}
+              {policyPending && policyPending.pending_count > 0 && (
+                <TaskCard
+                  href={`/r/policy?token=${token}`}
+                  icon={BookOpen}
+                  title="미확인 방침·규정"
+                  subtitle={`대표이사가 발행한 문서 ${policyPending.pending_count}건 확인이 필요합니다`}
+                  chipStatus="urgent"
+                  tone="danger"
+                />
+              )}
 
               {/* 보건증 */}
               <TaskCard

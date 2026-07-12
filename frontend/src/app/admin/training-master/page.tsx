@@ -54,6 +54,20 @@ export default function TrainingMasterPage() {
       />
 
       <Card>
+        <div className="p-4 bg-[var(--info-bg)] border-l-4 border-[var(--info-fg)]">
+          <p className="text-[var(--fs-body)] font-semibold text-[var(--info-fg)]">
+            KOSHA 공식 안전보건교육 영상을 등록해주세요
+          </p>
+          <p className="text-[var(--fs-caption)] text-[var(--info-fg)] mt-1 opacity-90">
+            • 초기 seed 코스 3건은 <b>영상 URL이 비어있는 상태</b>로 등록되어 있습니다. 각 코스를 편집해 실제 유튜브 embed URL을 입력해야 근로자가 이수 가능합니다.<br />
+            • 추천 소스: <b>안전보건공단(KOSHA) 공식 유튜브 채널</b> — <code>youtube.com/@safetykoshatv</code><br />
+            • 유튜브 URL 형식: <code>https://www.youtube.com/embed/&lt;VIDEO_ID&gt;</code> (일반 watch?v= URL이 아닌 <b>embed</b> URL 사용)<br />
+            • 반기별 필수 이수 시간: 생산직 12h · 사무직 6h (산업안전보건법)
+          </p>
+        </div>
+      </Card>
+
+      <Card>
         <div className="p-5">
           {loading ? (
             <div className="py-12 flex items-center justify-center text-[var(--text-3)]">

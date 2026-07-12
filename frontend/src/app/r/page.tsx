@@ -1196,15 +1196,17 @@ function RegularContent() {
                 tone={certCritical ? "danger" : certWarning ? "warning" : certDone ? "success" : "info"}
               />
 
-              {/* 건강진단 안내 */}
-              <TaskCard
-                href={`/r/checkup?token=${token}`}
-                icon={Stethoscope}
-                title={checkupTitle}
-                subtitle={checkupSub}
-                chipStatus={checkupPending ? "info" : checkupDone ? "done" : "info"}
-                tone={checkupPending ? "info" : checkupDone ? "success" : "info"}
-              />
+              {/* 건강진단 안내 — 대상자만 표시 (예정 있음 or 이력 있음) */}
+              {checkupStatus && (checkupStatus.pending_count > 0 || checkupStatus.last_received_at) && (
+                <TaskCard
+                  href={`/r/checkup?token=${token}`}
+                  icon={Stethoscope}
+                  title={checkupTitle}
+                  subtitle={checkupSub}
+                  chipStatus={checkupPending ? "info" : "done"}
+                  tone={checkupPending ? "info" : "success"}
+                />
+              )}
 
               {/* 반기 정기교육 */}
               <TaskCard
@@ -1216,15 +1218,17 @@ function RegularContent() {
                 tone={toneByStatus(trainDone)}
               />
 
-              {/* 근골격계 설문 */}
-              <TaskCard
-                href={`/r/survey/musculoskeletal?token=${token}`}
-                icon={FileText}
-                title="근골격계 증상 설문"
-                subtitle={muscDone ? "제출 완료" : (gated ? `연 1회 · 반기 마감 D-${daysLeft}` : "연 1회 · 언제든 제출 가능")}
-                chipStatus={chipByStatus(muscDone)}
-                tone={toneByStatus(muscDone)}
-              />
+              {/* 근골격계 설문 — 부담작업 종사자(생산직)만 표시. 사무·카페는 대상 아님 */}
+              {gated && (
+                <TaskCard
+                  href={`/r/survey/musculoskeletal?token=${token}`}
+                  icon={FileText}
+                  title="근골격계 증상 설문"
+                  subtitle={muscDone ? "제출 완료" : `연 1회 · 반복작업 종사자 대상`}
+                  chipStatus={chipByStatus(muscDone)}
+                  tone={toneByStatus(muscDone)}
+                />
+              )}
 
               {/* 의견 설문 */}
               <TaskCard

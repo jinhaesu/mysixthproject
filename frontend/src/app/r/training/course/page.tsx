@@ -185,8 +185,11 @@ function CourseContent() {
                   />
                 </div>
               ) : (
-                <div className="bg-[var(--bg-0)] p-8 text-center text-[var(--text-3)] rounded-[var(--r-md)]">
-                  영상 URL이 등록되지 않았습니다.
+                <div className="bg-[var(--warning-bg)] border border-[var(--warning-border)] p-6 text-center rounded-[var(--r-md)]">
+                  <p className="text-[var(--fs-body)] font-semibold text-[var(--warning-fg)]">교육 영상이 아직 등록되지 않았습니다.</p>
+                  <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-2 opacity-90">
+                    관리자가 안전보건공단(KOSHA) 공식 영상 URL을 등록하면 이수 가능합니다.
+                  </p>
                 </div>
               )}
               <p className="text-[var(--fs-caption)] text-[var(--text-3)] mt-3">
@@ -195,9 +198,10 @@ function CourseContent() {
             </div>
             <button
               onClick={goToQuiz}
-              className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)]"
+              disabled={!data.course.video_url}
+              className="w-full py-3 bg-[var(--brand-500)] hover:bg-[var(--brand-600)] text-white rounded-[var(--r-md)] font-semibold text-[var(--fs-base)] disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              시청 완료 · 퀴즈 풀기
+              {data.course.video_url ? "시청 완료 · 퀴즈 풀기" : "영상 등록 대기 중"}
             </button>
           </>
         )}

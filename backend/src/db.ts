@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.28.0';
+  const SCHEMA_VERSION = 'schema-v2.29.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1190,6 +1190,95 @@ export async function initializeDB(): Promise<void> {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_hazard_status ON hazard_reports(status);
+
+    -- ═══════════════════════════════════════════════════════════════
+    -- P3 — 보건관리자 + 건강진단 + 보건증
+    -- ═══════════════════════════════════════════════════════════════
+
+    -- 주간 보건 순회점검 (소음/분진/온습도/휴게공간/세면/응급/AED/화학물질 보관)
+    CREATE TABLE IF NOT EXISTS health_weekly_inspections (
+      id SERIAL PRIMARY KEY,
+      inspector_id INTEGER NOT NULL,
+      inspector_name TEXT DEFAULT '',
+      inspection_date TEXT NOT NULL,
+      noise_status TEXT DEFAULT '',
+      dust_status TEXT DEFAULT '',
+      temp_status TEXT DEFAULT '',
+      rest_area_status TEXT DEFAULT '',
+      wash_area_status TEXT DEFAULT '',
+      first_aid_status TEXT DEFAULT '',
+      aed_status TEXT DEFAULT '',
+      chemical_storage_status TEXT DEFAULT '',
+      overall_notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_insp_date ON health_weekly_inspections(inspection_date);
+
+    -- 근로자 건강상담 기록 (요양보호법 준수 목적, 개인정보 접근권한 유의)
+    CREATE TABLE IF NOT EXISTS health_consultations (
+      id SERIAL PRIMARY KEY,
+      employee_id INTEGER NOT NULL,
+      employee_name TEXT DEFAULT '',
+      consultation_date TEXT NOT NULL,
+      consultation_type TEXT NOT NULL,
+      chief_complaint TEXT DEFAULT '',
+      action_taken TEXT DEFAULT '',
+      next_followup_date TEXT,
+      consulted_by INTEGER,
+      consulted_by_name TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_consult_emp ON health_consultations(employee_id);
+
+    -- MSDS(물질안전보건자료) 관리대장
+    CREATE TABLE IF NOT EXISTS msds_registry (
+      id SERIAL PRIMARY KEY,
+      material_name TEXT NOT NULL,
+      usage_description TEXT DEFAULT '',
+      handling_dept TEXT DEFAULT '',
+      handling_location TEXT DEFAULT '',
+      posted_photo_url TEXT DEFAULT '',
+      container_label_photo_url TEXT DEFAULT '',
+      required_ppe TEXT DEFAULT '',
+      training_completed_at TIMESTAMPTZ,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- 일반·특수건강진단 관리
+    CREATE TABLE IF NOT EXISTS health_checkups (
+      id SERIAL PRIMARY KEY,
+      employee_id INTEGER NOT NULL,
+      employee_name TEXT DEFAULT '',
+      checkup_type TEXT NOT NULL,
+      scheduled_month TEXT,
+      scheduled_year INTEGER,
+      received_at TIMESTAMPTZ,
+      result_grade TEXT DEFAULT '',
+      result_notes TEXT DEFAULT '',
+      followup_required INTEGER DEFAULT 0,
+      followup_actions TEXT DEFAULT '',
+      followup_completed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_checkup_emp ON health_checkups(employee_id);
+
+    -- 보건증(식품위생법 30조) — 식품취급자 필수, 만료 D-30 이내 clock-in/out 게이팅
+    CREATE TABLE IF NOT EXISTS health_certificates (
+      id SERIAL PRIMARY KEY,
+      employee_id INTEGER NOT NULL,
+      employee_name TEXT DEFAULT '',
+      cert_type TEXT DEFAULT 'food_handler',
+      issue_date TEXT NOT NULL,
+      expiry_date TEXT NOT NULL,
+      cert_photo_url TEXT DEFAULT '',
+      status TEXT DEFAULT 'valid',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_healthcert_emp ON health_certificates(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_healthcert_exp ON health_certificates(expiry_date);
   `);
 
   // Seed — safety_areas 비어있으면 기본 7개 구역 삽입

@@ -1187,3 +1187,201 @@ export async function replyToHazardReport(id: number, response_to_reporter: stri
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response_to_reporter }) }
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 보건 P3 — 보건관리자 (관리자 API)
+// ═══════════════════════════════════════════════════════════════
+
+export interface HealthInspection {
+  id: number;
+  inspector_id: number;
+  inspector_name: string;
+  inspection_date: string;
+  noise_status: string;
+  dust_status: string;
+  temp_status: string;
+  rest_area_status: string;
+  wash_area_status: string;
+  first_aid_status: string;
+  aed_status: string;
+  chemical_storage_status: string;
+  overall_notes: string;
+  created_at: string;
+}
+
+export interface HealthConsultation {
+  id: number;
+  employee_id: number;
+  employee_name: string;
+  consultation_date: string;
+  consultation_type: string;
+  chief_complaint: string;
+  action_taken: string;
+  next_followup_date: string | null;
+  consulted_by: number | null;
+  consulted_by_name: string;
+  employee_department?: string | null;
+  employee_team?: string | null;
+  created_at: string;
+}
+
+export interface MsdsEntry {
+  id: number;
+  material_name: string;
+  usage_description: string;
+  handling_dept: string;
+  handling_location: string;
+  posted_photo_url: string;
+  container_label_photo_url: string;
+  required_ppe: string;
+  training_completed_at: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HealthCheckup {
+  id: number;
+  employee_id: number;
+  employee_name: string;
+  checkup_type: string;
+  scheduled_year: number | null;
+  scheduled_month: string | null;
+  received_at: string | null;
+  result_grade: string;
+  result_notes: string;
+  followup_required: number;
+  followup_actions: string;
+  followup_completed_at: string | null;
+  employee_department?: string | null;
+  employee_team?: string | null;
+  employee_phone?: string | null;
+  created_at: string;
+}
+
+export interface HealthCertificate {
+  id: number;
+  employee_id: number;
+  employee_name: string;
+  cert_type: string;
+  issue_date: string;
+  expiry_date: string;
+  cert_photo_url: string;
+  status: string;
+  days_until_expiry: number | null;
+  status_hint: 'valid' | 'warning' | 'urgent' | 'expired';
+  employee_department?: string | null;
+  employee_team?: string | null;
+  employee_phone?: string | null;
+  is_active?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── 주간 순회 ──────────────────────────────────
+export async function listHealthInspections(from?: string, to?: string) {
+  const qs = new URLSearchParams();
+  if (from) qs.set('from', from);
+  if (to) qs.set('to', to);
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{ inspections: HealthInspection[] }>(`/api/health-manager/inspections${suffix}`);
+}
+export async function createHealthInspection(body: Partial<HealthInspection>) {
+  return fetchAPI<{ success: boolean; id: number; inspection_date: string }>(
+    `/api/health-manager/inspections`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+// ── 건강상담 ──────────────────────────────────
+export async function listHealthConsultations(employeeId?: number) {
+  const qs = employeeId ? `?employee_id=${employeeId}` : '';
+  return fetchAPI<{ consultations: HealthConsultation[] }>(`/api/health-manager/consultations${qs}`);
+}
+export async function createHealthConsultation(body: {
+  employee_id: number; consultation_type: string; consultation_date?: string;
+  chief_complaint?: string; action_taken?: string; next_followup_date?: string | null;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    `/api/health-manager/consultations`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+// ── MSDS ──────────────────────────────────────
+export async function listMsds(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return fetchAPI<{ msds: MsdsEntry[] }>(`/api/health-manager/msds${qs}`);
+}
+export async function createMsds(body: Partial<MsdsEntry>) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    `/api/health-manager/msds`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+export async function patchMsds(id: number, body: Partial<MsdsEntry>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/health-manager/msds/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+// ── 건강진단 ──────────────────────────────────
+export async function listHealthCheckups(filter?: {
+  employee_id?: number; year?: number; type?: string; followup_only?: boolean;
+}) {
+  const qs = new URLSearchParams();
+  if (filter?.employee_id) qs.set('employee_id', String(filter.employee_id));
+  if (filter?.year) qs.set('year', String(filter.year));
+  if (filter?.type) qs.set('type', filter.type);
+  if (filter?.followup_only) qs.set('followup_only', '1');
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{
+    checkups: HealthCheckup[];
+    summary: { total: number; received: number; not_received: number; followup: number };
+  }>(`/api/health-manager/checkups${suffix}`);
+}
+export async function createHealthCheckup(body: Partial<HealthCheckup> & { employee_id: number; checkup_type: string }) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    `/api/health-manager/checkups`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+export async function patchHealthCheckup(id: number, body: Partial<HealthCheckup>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/health-manager/checkups/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+// ── 보건증 ─────────────────────────────────────
+export async function listHealthCertificates(filter?: { employee_id?: number; status?: string }) {
+  const qs = new URLSearchParams();
+  if (filter?.employee_id) qs.set('employee_id', String(filter.employee_id));
+  if (filter?.status) qs.set('status', filter.status);
+  const suffix = qs.toString() ? `?${qs}` : '';
+  return fetchAPI<{
+    certificates: HealthCertificate[];
+    summary: { total: number; urgent: number; expired: number; warning: number; valid: number };
+  }>(`/api/health-manager/certificates${suffix}`);
+}
+export async function createHealthCertificate(body: {
+  employee_id: number; issue_date: string; expiry_date: string;
+  cert_type?: string; cert_photo_url?: string; status?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    `/api/health-manager/certificates`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+export async function patchHealthCertificate(id: number, body: Partial<HealthCertificate>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/health-manager/certificates/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function listExpiringCerts() {
+  return fetchAPI<{ today: string; items: HealthCertificate[] }>(`/api/health-manager/expiring-certs`);
+}
+

@@ -4,6 +4,7 @@ import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
 import safetyPublicRouter, { isSafetyGatedEmployee } from './safetyPublic';
+import { checkHealthCertGate } from './healthPublic';
 
 const router = Router();
 
@@ -844,6 +845,20 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       }
     }
 
+    // 보건 P3 — 보건증 만료 D-30 이내(또는 미보유) 게이팅. 식품업 필수라 카페·사무직도 대상.
+    const healthGate = await checkHealthCertGate(employee.id);
+    if (healthGate) {
+      res.status(409).json({
+        error: healthGate === 'health_cert_missing'
+          ? '유효한 보건증이 없습니다. 보건증을 발급받아 등록해 주세요.'
+          : '보건증 만료가 임박했거나 만료되었습니다. 갱신 후 등록해 주세요.',
+        code: 'SAFETY_TASK_INCOMPLETE',
+        pending: [healthGate],
+        gate: 'clock-in',
+      });
+      return;
+    }
+
     await dbRun(`
       INSERT INTO regular_attendance (employee_id, date, clock_in_time, clock_in_lat, clock_in_lng, gps_valid, agreement_accepted, agreement_accepted_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -944,6 +959,20 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
         });
         return;
       }
+    }
+
+    // 보건 P3 — 보건증 만료 D-30 이내(또는 미보유) 게이팅. 식품업 필수라 카페·사무직도 대상.
+    const healthGateOut = await checkHealthCertGate(employee.id);
+    if (healthGateOut) {
+      res.status(409).json({
+        error: healthGateOut === 'health_cert_missing'
+          ? '유효한 보건증이 없습니다. 보건증을 발급받아 등록해 주세요.'
+          : '보건증 만료가 임박했거나 만료되었습니다. 갱신 후 등록해 주세요.',
+        code: 'SAFETY_TASK_INCOMPLETE',
+        pending: [healthGateOut],
+        gate: 'clock-out',
+      });
+      return;
     }
 
     await dbRun(`

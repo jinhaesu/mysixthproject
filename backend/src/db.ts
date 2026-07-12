@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.31.0';
+  const SCHEMA_VERSION = 'schema-v2.32.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1704,6 +1704,59 @@ export async function initializeDB(): Promise<void> {
       UNIQUE (year, quarter)
     );
     CREATE INDEX IF NOT EXISTS idx_committee_year ON safety_committee_minutes(year);
+  `);
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.32.0 — P6 대표이사 대시보드 + 중처법 반기 이행점검 + 겸직 관리자 시간 결산
+  // ─ cdpa_reviews / cdpa_review_items
+  //   (중대재해처벌법 시행령 제4조 각 호 — 안전보건확보의무 반기 이행점검)
+  // ─ manager_activity_hours
+  //   (겸직 안전·보건관리자 활동시간 결산 — 이벤트별 자동 로깅)
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cdpa_reviews (
+      id SERIAL PRIMARY KEY,
+      year INTEGER NOT NULL,
+      half INTEGER NOT NULL,
+      status TEXT DEFAULT 'draft',
+      ceo_signed_at TIMESTAMPTZ,
+      ceo_signature_name TEXT DEFAULT '',
+      summary TEXT DEFAULT '',
+      improvement_plan TEXT DEFAULT '',
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (year, half)
+    );
+
+    CREATE TABLE IF NOT EXISTS cdpa_review_items (
+      id SERIAL PRIMARY KEY,
+      review_id INTEGER NOT NULL REFERENCES cdpa_reviews(id) ON DELETE CASCADE,
+      item_no INTEGER NOT NULL,
+      obligation_name TEXT NOT NULL,
+      status TEXT DEFAULT 'not_started',
+      evidence_source TEXT DEFAULT '',
+      evidence_url TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      improvement_action TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_cdpa_items_review ON cdpa_review_items(review_id);
+
+    CREATE TABLE IF NOT EXISTS manager_activity_hours (
+      id SERIAL PRIMARY KEY,
+      manager_id INTEGER NOT NULL,
+      manager_name TEXT DEFAULT '',
+      activity_type TEXT NOT NULL,
+      minutes INTEGER NOT NULL,
+      occurred_at TIMESTAMPTZ NOT NULL,
+      source_type TEXT DEFAULT '',
+      source_id INTEGER,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_mgr_hours_month ON manager_activity_hours(manager_id, occurred_at);
+    CREATE INDEX IF NOT EXISTS idx_mgr_hours_name_month ON manager_activity_hours(manager_name, occurred_at);
   `);
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP

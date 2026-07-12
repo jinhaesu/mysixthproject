@@ -1853,3 +1853,159 @@ export async function patchCommitteeMinute(id: number, body: Partial<CommitteeMi
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// P6 — 대표이사 대시보드 + 중처법 반기 이행점검 + 시간 결산
+// ═══════════════════════════════════════════════════════════════
+
+export interface CeoDashboardKpis {
+  cdpa_compliance: {
+    review_id: number | null;
+    total: number;
+    done: number;
+    in_progress: number;
+    not_started: number;
+    rate: number | null;
+    status: string | null;
+    ceo_signed_at: string | null;
+  };
+  open_tickets: { open: number; overdue: number; high_severity: number };
+  training_compliance: {
+    period: string;
+    target_count: number;
+    complete: number;
+    required_count: number;
+    rate: number | null;
+  };
+  hazard_trend: Array<{ month: string; count: number }>;
+  manager_hours: {
+    current_month: string;
+    current_month_hours: number;
+    current_half: string;
+    current_half_hours: number;
+    year: number;
+    year_hours: number;
+    half_target_min: number;
+    half_target_max: number;
+    half_gauge_pct: number;
+    monthly_breakdown: Array<{ month: string; hours: number }>;
+  };
+}
+
+export interface CeoDashboardResponse {
+  kpis: CeoDashboardKpis;
+  generated_at: string;
+  year: number;
+  half: number;
+}
+
+export async function getCeoDashboard(year?: number) {
+  const qs = year ? `?year=${year}` : '';
+  return fetchAPI<CeoDashboardResponse>(`/api/ceo/dashboard${qs}`);
+}
+
+export interface CdpaReview {
+  id: number;
+  year: number;
+  half: number;
+  status: string;
+  ceo_signed_at: string | null;
+  ceo_signature_name: string;
+  summary: string;
+  improvement_plan: string;
+  item_count?: number;
+  done_count?: number;
+  updated_at?: string;
+}
+
+export interface CdpaReviewItem {
+  id: number;
+  review_id: number;
+  item_no: number;
+  obligation_name: string;
+  status: string;
+  evidence_source: string;
+  evidence_url: string;
+  notes: string;
+  improvement_action: string;
+}
+
+export async function listCdpaReviews(year?: number) {
+  const qs = year ? `?year=${year}` : '';
+  return fetchAPI<{ items: CdpaReview[] }>(`/api/ceo/cdpa-reviews${qs}`);
+}
+
+export async function getCdpaReview(id: number) {
+  return fetchAPI<{ review: CdpaReview; items: CdpaReviewItem[] }>(`/api/ceo/cdpa-reviews/${id}`);
+}
+
+export async function createCdpaReview(body: { year: number; half: 1 | 2 }) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/ceo/cdpa-reviews',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchCdpaReview(id: number, body: Partial<Pick<CdpaReview, 'summary' | 'improvement_plan' | 'status'>>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/ceo/cdpa-reviews/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchCdpaReviewItem(reviewId: number, itemId: number, body: Partial<CdpaReviewItem>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/ceo/cdpa-reviews/${reviewId}/items/${itemId}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function signCdpaReview(id: number, ceo_signature_name: string) {
+  return fetchAPI<{ success: boolean; signed_at: string }>(
+    `/api/ceo/cdpa-reviews/${id}/sign`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ceo_signature_name }) }
+  );
+}
+
+export interface ManagerHoursHalfSummary {
+  hours: number;
+  target_min: number;
+  target_max: number;
+  gauge_pct: number;
+}
+
+export interface ManagerHoursResponse {
+  year: number;
+  manager_name: string | null;
+  total_hours: number;
+  by_activity: Record<string, { minutes: number; hours: number; events: number; label: string }>;
+  activity_labels: Record<string, string>;
+  monthly: Array<{ month: string; total_hours: number; by_activity: Record<string, number> }>;
+  per_manager: Array<{ name: string; hours: number; minutes: number; event_count: number }>;
+  half_summary: { H1: ManagerHoursHalfSummary; H2: ManagerHoursHalfSummary };
+}
+
+export async function getManagerHours(year?: number, managerName?: string) {
+  const params = new URLSearchParams();
+  if (year) params.set('year', String(year));
+  if (managerName) params.set('manager_name', managerName);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return fetchAPI<ManagerHoursResponse>(`/api/safety-manager/manager-hours${qs}`);
+}
+
+export async function listManagerHoursManagers() {
+  return fetchAPI<{ managers: string[] }>(`/api/safety-manager/manager-hours/managers`);
+}
+
+export async function logManagerHoursManual(body: {
+  activity_type: string;
+  minutes?: number;
+  manager_name?: string;
+  occurred_at?: string;
+  notes?: string;
+}) {
+  return fetchAPI<{ success: boolean; minutes: number }>(
+    '/api/safety-manager/manager-hours/log',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}

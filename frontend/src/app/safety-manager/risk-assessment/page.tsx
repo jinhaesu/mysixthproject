@@ -116,7 +116,7 @@ export default function RiskAssessmentListPage() {
               {items.map((r) => (
                 <Link
                   key={r.id}
-                  href={`/safety-manager/risk-assessment/${r.id}`}
+                  href={`/safety-manager/risk-assessment/detail?id=${r.id}`}
                   className="block border border-[var(--border-1)] rounded-[var(--r-lg)] p-4 hover:bg-[var(--bg-2)]/40"
                 >
                   <div className="flex items-start gap-3">

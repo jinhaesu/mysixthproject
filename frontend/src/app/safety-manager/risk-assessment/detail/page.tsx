@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Plus, ArrowLeft, Save, ShieldAlert, Users, CheckCircle, FileText } from "lucide-react";
 import {
@@ -50,8 +50,8 @@ function statusBadge(s: string) {
 }
 
 export default function RiskAssessmentDetailPage() {
-  const params = useParams();
-  const id = Number(params?.id);
+  const params = useSearchParams();
+  const id = Number(params?.get("id") || 0);
   const toast = useToast();
   const [ra, setRa] = useState<RiskAssessment | null>(null);
   const [items, setItems] = useState<RiskAssessmentItem[]>([]);

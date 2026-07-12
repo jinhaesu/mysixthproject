@@ -103,7 +103,7 @@ function TrainingContent() {
             return (
               <a
                 key={c.id}
-                href={`/r/training/${c.id}?token=${token}`}
+                href={`/r/training/course?id=${c.id}&token=${token}`}
                 className={`block rounded-[var(--r-xl)] shadow-[var(--elev-1)] border p-4 transition-transform hover:scale-[1.005] ${done ? "bg-[var(--success-bg)] border-[var(--success-border)]" : "bg-[var(--bg-1)] border-[var(--border-1)]"}`}
               >
                 <div className="flex items-start justify-between gap-3">

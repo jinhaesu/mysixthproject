@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Save, AlertOctagon, AlertTriangle, FileText, CheckCircle } from "lucide-react";
 import {
@@ -45,8 +45,8 @@ function statusBadge(s: string) {
 }
 
 export default function IncidentDetailPage() {
-  const params = useParams();
-  const id = Number(params?.id);
+  const params = useSearchParams();
+  const id = Number(params?.get("id") || 0);
   const toast = useToast();
   const [inc, setInc] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(false);

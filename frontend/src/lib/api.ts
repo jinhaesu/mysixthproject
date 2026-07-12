@@ -2273,3 +2273,350 @@ export async function getSafetyBudgetSummary(year: number) {
     `/api/safety-budget/summary?year=${year}`
   );
 }
+
+// ===== P7D — 비상 매뉴얼·훈련·도급업체 관리 =====
+export type EmergencyScenarioKind =
+  | 'fire' | 'gas_leak' | 'blackout' | 'critical_incident' | 'chemical' | 'other';
+
+export interface EmergencyManual {
+  id: number;
+  scenario_kind: EmergencyScenarioKind;
+  title: string;
+  version: string;
+  content_html: string;
+  attachment_url: string;
+  effective_from: string | null;
+  status: string; // draft | active | superseded
+  superseded_by: number | null;
+  created_by?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function listEmergencyManuals(params: { kind?: string; status?: string } = {}) {
+  const q = new URLSearchParams();
+  if (params.kind) q.set('kind', params.kind);
+  if (params.status) q.set('status', params.status);
+  const s = q.toString();
+  return fetchAPI<{ manuals: EmergencyManual[] }>(
+    `/api/emergency-manual/manuals${s ? `?${s}` : ''}`
+  );
+}
+
+export async function getEmergencyManual(id: number) {
+  return fetchAPI<{ manual: EmergencyManual }>(`/api/emergency-manual/manuals/${id}`);
+}
+
+export async function createEmergencyManual(body: {
+  scenario_kind: string;
+  title: string;
+  version?: string;
+  content_html?: string;
+  attachment_url?: string;
+  effective_from?: string | null;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/emergency-manual/manuals',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchEmergencyManual(id: number, body: Partial<{
+  scenario_kind: string;
+  title: string;
+  version: string;
+  content_html: string;
+  attachment_url: string;
+  effective_from: string | null;
+  status: string;
+  superseded_by: number | null;
+}>) {
+  return fetchAPI<{ success: boolean; manual: EmergencyManual }>(
+    `/api/emergency-manual/manuals/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function publishEmergencyManual(id: number, body: { effective_from?: string } = {}) {
+  return fetchAPI<{ success: boolean; manual: EmergencyManual }>(
+    `/api/emergency-manual/manuals/${id}/publish`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export interface EmergencyDrill {
+  id: number;
+  manual_id: number | null;
+  scenario_kind: EmergencyScenarioKind;
+  drill_date: string;
+  location: string;
+  participant_count: number;
+  participant_names: string;
+  findings: string;
+  improvements: string;
+  photo_urls: string;
+  led_by?: number | null;
+  led_by_name: string;
+  ticket_id: number | null;
+  created_at?: string;
+  manual_title?: string;
+  manual_version?: string;
+}
+
+export async function listEmergencyDrills(params: { kind?: string; from?: string; to?: string } = {}) {
+  const q = new URLSearchParams();
+  if (params.kind) q.set('kind', params.kind);
+  if (params.from) q.set('from', params.from);
+  if (params.to) q.set('to', params.to);
+  const s = q.toString();
+  return fetchAPI<{ drills: EmergencyDrill[] }>(
+    `/api/emergency-drill/drills${s ? `?${s}` : ''}`
+  );
+}
+
+export async function createEmergencyDrill(body: {
+  scenario_kind: string;
+  drill_date: string;
+  manual_id?: number | null;
+  location?: string;
+  participant_count?: number;
+  participant_names?: string;
+  findings?: string;
+  improvements?: string;
+  photo_urls?: string;
+  led_by_name?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number; ticket_id: number | null }>(
+    '/api/emergency-drill/drills',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchEmergencyDrill(id: number, body: Partial<{
+  manual_id: number | null;
+  location: string;
+  participant_count: number;
+  participant_names: string;
+  findings: string;
+  improvements: string;
+  photo_urls: string;
+  led_by_name: string;
+}>) {
+  return fetchAPI<{ success: boolean }>(
+    `/api/emergency-drill/drills/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export interface EmergencyDrillCoverage {
+  period: { year: number; half: number; from: string; to: string; label: string };
+  required_kinds: string[];
+  items: Array<{
+    scenario_kind: string;
+    drill_count: number;
+    last_drill_date: string | null;
+    completed: boolean;
+  }>;
+  completed_count: number;
+  required_count: number;
+  compliant: boolean;
+}
+
+export async function getEmergencyDrillCoverage(half?: string) {
+  const q = half ? `?half=${encodeURIComponent(half)}` : '';
+  return fetchAPI<EmergencyDrillCoverage>(`/api/emergency-drill/coverage${q}`);
+}
+
+// ── 도급업체 ─────────────────────────────────────────────────────
+export interface Contractor {
+  id: number;
+  business_name: string;
+  business_reg_no: string;
+  representative_name: string;
+  contact_phone: string;
+  contact_email: string;
+  work_scope: string;
+  contract_start: string | null;
+  contract_end: string | null;
+  safety_docs_url: string;
+  insurance_status: string;
+  status: string; // active | suspended | terminated
+  notes: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function listContractors(params: { status?: string; search?: string } = {}) {
+  const q = new URLSearchParams();
+  if (params.status) q.set('status', params.status);
+  if (params.search) q.set('search', params.search);
+  const s = q.toString();
+  return fetchAPI<{ contractors: Contractor[] }>(
+    `/api/contractor/registry${s ? `?${s}` : ''}`
+  );
+}
+
+export async function getContractor(id: number) {
+  return fetchAPI<{ contractor: Contractor }>(`/api/contractor/registry/${id}`);
+}
+
+export async function createContractor(body: {
+  business_name: string;
+  work_scope: string;
+  business_reg_no?: string;
+  representative_name?: string;
+  contact_phone?: string;
+  contact_email?: string;
+  contract_start?: string | null;
+  contract_end?: string | null;
+  safety_docs_url?: string;
+  insurance_status?: string;
+  status?: string;
+  notes?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/contractor/registry',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchContractor(id: number, body: Partial<{
+  business_name: string;
+  business_reg_no: string;
+  representative_name: string;
+  contact_phone: string;
+  contact_email: string;
+  work_scope: string;
+  contract_start: string | null;
+  contract_end: string | null;
+  safety_docs_url: string;
+  insurance_status: string;
+  status: string;
+  notes: string;
+}>) {
+  return fetchAPI<{ success: boolean; contractor: Contractor }>(
+    `/api/contractor/registry/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export interface ContractorWorkPermit {
+  id: number;
+  contractor_id: number;
+  permit_no: string;
+  work_description: string;
+  hazard_types: string;
+  permit_date: string;
+  expiry_date: string;
+  area_id: number | null;
+  ppe_required: string;
+  safety_measures: string;
+  approver_id?: number | null;
+  approver_name: string;
+  status: string; // pending | approved | in_progress | closed | overdue
+  closed_at?: string | null;
+  created_at?: string;
+  is_overdue?: boolean;
+  contractor_name?: string;
+  area_name?: string | null;
+}
+
+export async function listContractorPermits(params: { status?: string; contractor_id?: number } = {}) {
+  const q = new URLSearchParams();
+  if (params.status) q.set('status', params.status);
+  if (params.contractor_id) q.set('contractor_id', String(params.contractor_id));
+  const s = q.toString();
+  return fetchAPI<{ permits: ContractorWorkPermit[] }>(
+    `/api/contractor/permits${s ? `?${s}` : ''}`
+  );
+}
+
+export async function createContractorPermit(body: {
+  contractor_id: number;
+  work_description: string;
+  permit_date: string;
+  expiry_date: string;
+  permit_no?: string;
+  hazard_types?: string;
+  area_id?: number | null;
+  ppe_required?: string;
+  safety_measures?: string;
+  approver_name?: string;
+  status?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number }>(
+    '/api/contractor/permits',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function patchContractorPermit(id: number, body: Partial<{
+  permit_no: string;
+  work_description: string;
+  hazard_types: string;
+  permit_date: string;
+  expiry_date: string;
+  area_id: number | null;
+  ppe_required: string;
+  safety_measures: string;
+  approver_name: string;
+  status: string;
+}>) {
+  return fetchAPI<{ success: boolean; permit: ContractorWorkPermit }>(
+    `/api/contractor/permits/${id}`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export interface ContractorJointInspection {
+  id: number;
+  contractor_id: number | null;
+  permit_id: number | null;
+  inspected_at: string;
+  inspector_id?: number | null;
+  inspector_name: string;
+  findings: string;
+  actions: string;
+  photos: string;
+  ticket_id: number | null;
+  created_at?: string;
+  contractor_name?: string | null;
+  permit_description?: string | null;
+}
+
+export async function listContractorInspections(params: { contractor_id?: number; permit_id?: number } = {}) {
+  const q = new URLSearchParams();
+  if (params.contractor_id) q.set('contractor_id', String(params.contractor_id));
+  if (params.permit_id) q.set('permit_id', String(params.permit_id));
+  const s = q.toString();
+  return fetchAPI<{ inspections: ContractorJointInspection[] }>(
+    `/api/contractor/inspections${s ? `?${s}` : ''}`
+  );
+}
+
+export async function createContractorInspection(body: {
+  inspected_at: string;
+  contractor_id?: number | null;
+  permit_id?: number | null;
+  findings?: string;
+  actions?: string;
+  photos?: string;
+  inspector_name?: string;
+}) {
+  return fetchAPI<{ success: boolean; id: number; ticket_id: number | null }>(
+    '/api/contractor/inspections',
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export interface ContractorActiveSummary {
+  as_of: string;
+  active_contractor_count: number;
+  open_permit_count: number;
+  overdue_permit_count: number;
+  inspection_count_30d: number;
+}
+
+export async function getContractorActiveSummary() {
+  return fetchAPI<ContractorActiveSummary>('/api/contractor/active-summary');
+}

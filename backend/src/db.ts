@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.30.0';
+  const SCHEMA_VERSION = 'schema-v2.31.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1575,6 +1575,136 @@ export async function initializeDB(): Promise<void> {
   } catch (e: any) {
     console.error('[safety P4] seed failed:', e.message);
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.31.0 — 안전보건관리 시스템 P5
+  // ─ risk_assessments / risk_assessment_items / risk_assessment_participants
+  //   (산업안전보건법 36조 위험성평가 — 정기·수시·최초, 매트릭스 판정, 근로자 서명)
+  // ─ loto_authorizations
+  //   (설비 정비 시 잠금·표찰 6단계 절차 — 사진 필수)
+  // ─ incidents (산업재해)
+  //   (중대재해처벌법 대응 — 자동 판별, 산업재해조사표 제출 카운트다운)
+  // ─ safety_committee_minutes
+  //   (산업안전보건위원회 — 분기별, 근로자 대표 참여, 의결·보고사항)
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS risk_assessments (
+      id SERIAL PRIMARY KEY,
+      year INTEGER NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'regular',
+      title TEXT NOT NULL,
+      triggered_by TEXT DEFAULT '',
+      status TEXT DEFAULT 'draft',
+      posted_at TIMESTAMPTZ,
+      ceo_reported_at TIMESTAMPTZ,
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_risk_assess_year ON risk_assessments(year);
+
+    CREATE TABLE IF NOT EXISTS risk_assessment_items (
+      id SERIAL PRIMARY KEY,
+      assessment_id INTEGER NOT NULL REFERENCES risk_assessments(id) ON DELETE CASCADE,
+      process TEXT NOT NULL,
+      task TEXT DEFAULT '',
+      hazard TEXT NOT NULL,
+      freq_score INTEGER NOT NULL,
+      intensity_score INTEGER NOT NULL,
+      risk_grade TEXT NOT NULL,
+      mitigation TEXT DEFAULT '',
+      assignee_id INTEGER,
+      assignee_name TEXT DEFAULT '',
+      due_date TEXT,
+      closed_risk_grade TEXT DEFAULT '',
+      ticket_id INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_risk_items_assess ON risk_assessment_items(assessment_id);
+
+    CREATE TABLE IF NOT EXISTS risk_assessment_participants (
+      id SERIAL PRIMARY KEY,
+      assessment_id INTEGER NOT NULL REFERENCES risk_assessments(id) ON DELETE CASCADE,
+      employee_id INTEGER,
+      participant_name TEXT NOT NULL,
+      role TEXT DEFAULT 'worker',
+      signed_at TIMESTAMPTZ,
+      signature_notes TEXT DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_risk_part_assess ON risk_assessment_participants(assessment_id);
+
+    CREATE TABLE IF NOT EXISTS loto_authorizations (
+      id SERIAL PRIMARY KEY,
+      equipment_name TEXT NOT NULL,
+      area_id INTEGER,
+      work_description TEXT NOT NULL,
+      worker_ids TEXT DEFAULT '',
+      worker_names TEXT DEFAULT '',
+      expected_hours DOUBLE PRECISION DEFAULT 1,
+      energy_off_photo_url TEXT DEFAULT '',
+      lock_photo_url TEXT DEFAULT '',
+      verify_no_energy INTEGER DEFAULT 0,
+      release_photo_url TEXT DEFAULT '',
+      trial_run_ok INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'requested',
+      started_at TIMESTAMPTZ,
+      released_at TIMESTAMPTZ,
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_loto_status ON loto_authorizations(status);
+
+    CREATE TABLE IF NOT EXISTS incidents (
+      id SERIAL PRIMARY KEY,
+      occurred_at TIMESTAMPTZ NOT NULL,
+      area_id INTEGER,
+      area_name TEXT DEFAULT '',
+      injured_employee_id INTEGER,
+      injured_name TEXT DEFAULT '',
+      injury_body_part TEXT DEFAULT '',
+      injury_severity TEXT DEFAULT '',
+      witnesses TEXT DEFAULT '',
+      description TEXT DEFAULT '',
+      photo_url TEXT DEFAULT '',
+      hospital_transfer INTEGER DEFAULT 0,
+      first_aid_notes TEXT DEFAULT '',
+      is_critical INTEGER DEFAULT 0,
+      cause_unsafe_state TEXT DEFAULT '',
+      cause_unsafe_action TEXT DEFAULT '',
+      cause_managerial TEXT DEFAULT '',
+      mitigation TEXT DEFAULT '',
+      hospitalization_days INTEGER DEFAULT 0,
+      requires_report INTEGER DEFAULT 0,
+      report_deadline TEXT,
+      report_submitted_at TIMESTAMPTZ,
+      report_receipt_url TEXT DEFAULT '',
+      status TEXT DEFAULT 'reported',
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_incidents_date ON incidents(occurred_at);
+
+    CREATE TABLE IF NOT EXISTS safety_committee_minutes (
+      id SERIAL PRIMARY KEY,
+      year INTEGER NOT NULL,
+      quarter INTEGER NOT NULL,
+      round_no INTEGER,
+      held_at TIMESTAMPTZ NOT NULL,
+      location TEXT DEFAULT '',
+      agenda_reported TEXT DEFAULT '',
+      agenda_decided TEXT DEFAULT '',
+      decisions TEXT DEFAULT '',
+      worker_rep_input TEXT DEFAULT '',
+      participants_employer TEXT DEFAULT '',
+      participants_worker TEXT DEFAULT '',
+      status TEXT DEFAULT 'draft',
+      created_by INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (year, quarter)
+    );
+    CREATE INDEX IF NOT EXISTS idx_committee_year ON safety_committee_minutes(year);
+  `);
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}

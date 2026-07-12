@@ -889,3 +889,64 @@ export async function bulkUpdateOnboarding(ids: number[], updates: Record<string
     body: JSON.stringify({ ids, updates }),
   });
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 안전보건 시스템 P1 — 근로자 셀프체크 이행 현황 (관리자)
+// ═══════════════════════════════════════════════════════════════
+
+export interface SafetyComplianceRow {
+  employee_id: number;
+  name: string;
+  phone: string;
+  department: string | null;
+  team: string | null;
+  role: string | null;
+  clock_in_time: string | null;
+  clock_out_time: string | null;
+  precheck_done: boolean;
+  precheck_ok: boolean | null;
+  precheck_completed_at: string | null;
+  postcheck_done: boolean;
+  postcheck_ok: boolean | null;
+  postcheck_completed_at: string | null;
+  status: 'no_attendance' | 'pre_missing' | 'post_missing' | 'has_issue' | 'complete';
+  missing_pre_7d: number;
+  missing_post_7d: number;
+}
+
+export interface SafetyComplianceResponse {
+  date: string;
+  items: SafetyComplianceRow[];
+  summary: {
+    total: number;
+    no_attendance: number;
+    pre_missing: number;
+    post_missing: number;
+    has_issue: number;
+    complete: number;
+  };
+}
+
+export async function getSafetyWorkerCompliance(date?: string, department?: string) {
+  const params = new URLSearchParams();
+  if (date) params.set('date', date);
+  if (department) params.set('department', department);
+  const qs = params.toString();
+  return fetchAPI<SafetyComplianceResponse>(`/api/safety-manager/worker-compliance${qs ? `?${qs}` : ''}`);
+}
+
+export async function getSafetyWorkerDetail(employeeId: number, from: string, to?: string) {
+  const params = new URLSearchParams({ from });
+  if (to) params.set('to', to);
+  return fetchAPI<{ employee: any; from: string; to: string; logs: any[] }>(
+    `/api/safety-manager/worker-compliance/${employeeId}/detail?${params.toString()}`
+  );
+}
+
+export async function getSafetyTemplates() {
+  return fetchAPI<{ templates: any[] }>('/api/safety-manager/templates');
+}
+
+export async function getSafetyTemplateItems(templateId: number) {
+  return fetchAPI<{ items: any[] }>(`/api/safety-manager/templates/${templateId}/items`);
+}

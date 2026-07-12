@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.26.0';
+  const SCHEMA_VERSION = 'schema-v2.27.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -995,6 +995,114 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_duties TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_days TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS break_time TEXT DEFAULT ''"); } catch {}
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.27.0 — 안전보건관리 시스템 P1 (근로자 매일 셀프체크 + 게이팅)
+  // 산업안전보건법 + 중대재해처벌법 기준 이행 증빙 자동 축적 구조.
+  // 카페 정규직 제외, 생산직 대상. clock-in/out API 훅에서 미완 시 409.
+  // ═══════════════════════════════════════════════════════════════
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS safety_areas (
+      id SERIAL PRIMARY KEY,
+      code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      workplace_id INTEGER,
+      sort_order INTEGER DEFAULT 0,
+      active INTEGER DEFAULT 1,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS safety_check_templates (
+      id SERIAL PRIMARY KEY,
+      kind TEXT NOT NULL,
+      frequency TEXT NOT NULL,
+      area_id INTEGER REFERENCES safety_areas(id) ON DELETE SET NULL,
+      target_role TEXT DEFAULT 'worker',
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      active INTEGER DEFAULT 1,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS safety_check_items_master (
+      id SERIAL PRIMARY KEY,
+      template_id INTEGER NOT NULL REFERENCES safety_check_templates(id) ON DELETE CASCADE,
+      item_no INTEGER NOT NULL,
+      item_title TEXT NOT NULL,
+      item_detail TEXT DEFAULT '',
+      requires_photo_on_x INTEGER DEFAULT 0,
+      sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_safety_items_template ON safety_check_items_master(template_id);
+
+    CREATE TABLE IF NOT EXISTS worker_safety_task_log (
+      id SERIAL PRIMARY KEY,
+      employee_id INTEGER NOT NULL,
+      task_type TEXT NOT NULL,
+      task_date TEXT NOT NULL,
+      template_id INTEGER,
+      response_json JSONB DEFAULT '{}'::jsonb,
+      overall_ok INTEGER DEFAULT 1,
+      completed_at TIMESTAMPTZ DEFAULT NOW(),
+      client_ip TEXT DEFAULT '',
+      user_agent TEXT DEFAULT '',
+      UNIQUE (employee_id, task_type, task_date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_worker_task_log_emp_date ON worker_safety_task_log(employee_id, task_date);
+    CREATE INDEX IF NOT EXISTS idx_worker_task_log_type_date ON worker_safety_task_log(task_type, task_date);
+  `);
+
+  // 게이팅 대상 판정 함수는 서비스 계층에서. 여기서는 스키마만.
+  // 기본 마스터 시드 — 없으면 삽입. P1은 매일 precheck/postcheck 2종 하드코딩 seed.
+  try {
+    const seedCheck = await pool.query("SELECT id FROM safety_check_templates WHERE frequency = 'daily' AND kind = 'safety' AND target_role = 'worker' LIMIT 1");
+    if (!seedCheck.rowCount) {
+      // 출근 전 셀프체크
+      const preRes = await pool.query(
+        `INSERT INTO safety_check_templates (kind, frequency, target_role, name, sort_order)
+         VALUES ('safety', 'daily', 'worker', '출근 전 셀프체크', 10) RETURNING id`
+      );
+      const preId = preRes.rows[0].id;
+      const preItems = [
+        [1, '위생모·마스크·안전화 착용 완료', '위생복·위생모·마스크·안전화를 모두 착용하고 반지·시계·목걸이 등 개인 장신구는 제거했습니까?'],
+        [2, '오늘 발열·감기·소화기 증상 없음', '체온 37.5℃ 미만 및 감기·설사·구토 등 증상이 없습니까?'],
+        [3, '충분한 수면·컨디션 양호', '수면 부족·과음·복용 중인 약물로 작업에 지장이 있는 상태가 아닙니까?'],
+        [4, '어제 신고한 안전 이슈 재확인 없음', '전일 신고한 아차사고·이상 상황이 오늘 재발할 위험이 없습니까?'],
+        [5, '작업장 진입 안전 서약', '오늘 지시받은 작업 내용을 숙지했고 위험 상황 발견 시 즉시 관리자에 보고할 것을 약속합니까?'],
+      ];
+      for (const [no, title, detail] of preItems) {
+        await pool.query(
+          `INSERT INTO safety_check_items_master (template_id, item_no, item_title, item_detail, sort_order)
+           VALUES ($1, $2, $3, $4, $2)`, [preId, no, title, detail]
+        );
+      }
+      // 퇴근 전 셀프체크
+      const postRes = await pool.query(
+        `INSERT INTO safety_check_templates (kind, frequency, target_role, name, sort_order)
+         VALUES ('safety', 'daily', 'worker', '퇴근 전 셀프체크', 20) RETURNING id`
+      );
+      const postId = postRes.rows[0].id;
+      const postItems = [
+        [1, '오늘 근무 중 통증·근골격 이상 없음', '오늘 작업 중 새로 발생한 목·어깨·팔·허리·다리 통증이 없습니까? (있으면 X 선택 후 상세 기재)'],
+        [2, '오늘 목격한 아차사고·위험요인 신고 완료', '오늘 목격한 위험 상황이 있다면 아차사고 신고를 제출했습니까? (없으면 O)'],
+        [3, '담당 라인·설비 안전 이상 없이 인계', '담당 설비의 전원 차단·정리정돈·다음 조 인계가 완료되었습니까?'],
+        [4, '개인 소지품·보호구 회수·반납 완료', '개인 물품 회수 및 재사용 보호구 반납이 완료되었습니까?'],
+      ];
+      for (const [no, title, detail] of postItems) {
+        await pool.query(
+          `INSERT INTO safety_check_items_master (template_id, item_no, item_title, item_detail, sort_order)
+           VALUES ($1, $2, $3, $4, $2)`, [postId, no, title, detail]
+        );
+      }
+      console.log('[safety] Seeded default daily precheck/postcheck templates');
+    }
+  } catch (e: any) {
+    console.error('[safety] template seed failed:', e.message);
+  }
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}

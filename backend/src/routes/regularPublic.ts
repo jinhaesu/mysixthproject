@@ -3,6 +3,7 @@ import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, getBusinessDate, norm
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
+import safetyPublicRouter, { isSafetyGatedEmployee } from './safetyPublic';
 
 const router = Router();
 
@@ -825,6 +826,24 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       return;
     }
 
+    // 안전보건 P1 — 출근 전 셀프체크(precheck) 게이팅.
+    // 카페·사무직 제외. 게이팅 대상은 미완 시 SAFETY_TASK_INCOMPLETE 409.
+    if (await isSafetyGatedEmployee(employee.department)) {
+      const pre = await dbGet(
+        `SELECT id FROM worker_safety_task_log WHERE employee_id = ? AND task_type = 'precheck' AND task_date = ?`,
+        employee.id, businessToday
+      );
+      if (!pre) {
+        res.status(409).json({
+          error: '출근 전 안전 셀프체크를 먼저 완료해주세요.',
+          code: 'SAFETY_TASK_INCOMPLETE',
+          pending: ['precheck'],
+          gate: 'clock-in',
+        });
+        return;
+      }
+    }
+
     await dbRun(`
       INSERT INTO regular_attendance (employee_id, date, clock_in_time, clock_in_lat, clock_in_lng, gps_valid, agreement_accepted, agreement_accepted_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -908,6 +927,23 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     if (attendance.clock_out_time) {
       res.status(400).json({ error: '이미 퇴근이 기록되었습니다.' });
       return;
+    }
+
+    // 안전보건 P1 — 퇴근 전 셀프체크(postcheck) 게이팅.
+    if (await isSafetyGatedEmployee(employee.department)) {
+      const post = await dbGet(
+        `SELECT id FROM worker_safety_task_log WHERE employee_id = ? AND task_type = 'postcheck' AND task_date = ?`,
+        employee.id, attendance.date
+      );
+      if (!post) {
+        res.status(409).json({
+          error: '퇴근 전 안전 셀프체크를 먼저 완료해주세요.',
+          code: 'SAFETY_TASK_INCOMPLETE',
+          pending: ['postcheck'],
+          gate: 'clock-out',
+        });
+        return;
+      }
     }
 
     await dbRun(`

@@ -144,6 +144,30 @@ export default function TrainingMasterPage() {
   );
 }
 
+/**
+ * 유튜브 URL 정규화 — watch·youtu.be·shorts → embed 형태 변환.
+ * iframe 임베드는 반드시 /embed/<VIDEO_ID> 형식이어야 재생됨.
+ */
+export function normalizeYouTubeEmbedUrl(input: string): string {
+  const raw = (input || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\./, "");
+    let vid = "";
+    if (host === "youtu.be") {
+      vid = u.pathname.replace(/^\//, "").split("/")[0];
+    } else if (host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com")) {
+      if (u.pathname === "/watch") vid = u.searchParams.get("v") || "";
+      else if (u.pathname.startsWith("/embed/")) vid = u.pathname.replace("/embed/", "").split("/")[0];
+      else if (u.pathname.startsWith("/shorts/")) vid = u.pathname.replace("/shorts/", "").split("/")[0];
+      else if (u.pathname.startsWith("/v/")) vid = u.pathname.replace("/v/", "").split("/")[0];
+    }
+    if (/^[a-zA-Z0-9_-]{6,}$/.test(vid)) return `https://www.youtube.com/embed/${vid}`;
+    return raw;
+  } catch { return raw; }
+}
+
 function CourseEditor({ initial, onClose, onSaved }: { initial: TrainingCourse | null; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const [title, setTitle] = useState(initial?.title || "");
@@ -159,13 +183,14 @@ function CourseEditor({ initial, onClose, onSaved }: { initial: TrainingCourse |
 
   const save = async () => {
     if (!title.trim()) { toast.error("제목 필수"); return; }
+    const normalizedUrl = normalizeYouTubeEmbedUrl(videoUrl);
     setSaving(true);
     try {
       const body = {
         title: title.trim(),
         description,
         video_source_type: "youtube",
-        video_url: videoUrl.trim(),
+        video_url: normalizedUrl,
         duration_min: Number(duration) || 0,
         half_year_credit_hours: Number(credit) || 0,
         target_role: targetRole,
@@ -175,7 +200,11 @@ function CourseEditor({ initial, onClose, onSaved }: { initial: TrainingCourse |
       };
       if (initial) await patchTrainingCourse(initial.id, body);
       else await createTrainingCourse(body);
-      toast.success("저장 완료");
+      if (normalizedUrl && normalizedUrl !== videoUrl.trim()) {
+        toast.success(`저장 완료 (URL 자동 변환됨: embed 형식)`);
+      } else {
+        toast.success("저장 완료");
+      }
       onSaved();
     } catch (e: any) { toast.error(e.message); }
     finally { setSaving(false); }
@@ -195,8 +224,24 @@ function CourseEditor({ initial, onClose, onSaved }: { initial: TrainingCourse |
         <Field label="설명">
           <Input value={description} onChange={(e) => setDescription((e.target as HTMLInputElement).value)} />
         </Field>
-        <Field label="유튜브 임베드 URL (예: https://www.youtube.com/embed/XXXX)">
-          <Input value={videoUrl} onChange={(e) => setVideoUrl((e.target as HTMLInputElement).value)} placeholder="https://www.youtube.com/embed/XXXX" />
+        <Field label="유튜브 URL (watch·youtu.be·embed 어떤 형식이든 자동 변환)">
+          <Input value={videoUrl} onChange={(e) => setVideoUrl((e.target as HTMLInputElement).value)} placeholder="https://www.youtube.com/watch?v=XXXX 또는 https://youtu.be/XXXX" />
+          {videoUrl.trim() && (() => {
+            const norm = normalizeYouTubeEmbedUrl(videoUrl);
+            const isValidEmbed = /^https:\/\/www\.youtube\.com\/embed\/[a-zA-Z0-9_-]{6,}$/.test(norm);
+            if (isValidEmbed) {
+              return (
+                <p className="text-[var(--fs-caption)] text-[var(--success-fg)] mt-1">
+                  ✓ 저장 시 embed 형식으로 변환: <code className="text-[10px]">{norm}</code>
+                </p>
+              );
+            }
+            return (
+              <p className="text-[var(--fs-caption)] text-[var(--danger-fg)] mt-1">
+                ⚠ 유효한 유튜브 URL 아님. iframe 재생 실패 가능.
+              </p>
+            );
+          })()}
         </Field>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Field label="시청 시간(분)">

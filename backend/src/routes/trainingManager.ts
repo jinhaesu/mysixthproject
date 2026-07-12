@@ -9,6 +9,29 @@ const router = Router();
  * 안전보건 P4 관리자 API — 교육 콘텐츠 CRUD + 이수·설문 응답 현황.
  */
 
+/**
+ * 유튜브 URL 정규화 — 서버측 방어. 프론트가 보내는 값 형식과 무관하게 embed 로 저장.
+ * watch?v=X · youtu.be/X · shorts/X · embed/X → https://www.youtube.com/embed/X
+ */
+function normalizeYouTubeEmbedUrl(input: string): string {
+  const raw = (input || '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\./, '');
+    let vid = '';
+    if (host === 'youtu.be') vid = u.pathname.replace(/^\//, '').split('/')[0];
+    else if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+      if (u.pathname === '/watch') vid = u.searchParams.get('v') || '';
+      else if (u.pathname.startsWith('/embed/')) vid = u.pathname.replace('/embed/', '').split('/')[0];
+      else if (u.pathname.startsWith('/shorts/')) vid = u.pathname.replace('/shorts/', '').split('/')[0];
+      else if (u.pathname.startsWith('/v/')) vid = u.pathname.replace('/v/', '').split('/')[0];
+    }
+    if (/^[a-zA-Z0-9_-]{6,}$/.test(vid)) return `https://www.youtube.com/embed/${vid}`;
+    return raw;
+  } catch { return raw; }
+}
+
 // ── 교육 콘텐츠 마스터 CRUD ────────────────────────────────────
 router.get('/training-master', async (_req: Request, res: Response) => {
   try {
@@ -30,12 +53,13 @@ router.post('/training-master', async (req: Request, res: Response) => {
     const { title, description, video_source_type, video_url, duration_min,
             half_year_credit_hours, target_role, category, active, sort_order } = req.body || {};
     if (!title) { res.status(400).json({ error: 'title 필요' }); return; }
+    const normalizedVideoUrl = normalizeYouTubeEmbedUrl(video_url || '');
     const r = await dbRun(
       `INSERT INTO training_courses
          (title, description, video_source_type, video_url, duration_min,
           half_year_credit_hours, target_role, category, active, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      title, description || '', video_source_type || 'youtube', video_url || '',
+      title, description || '', video_source_type || 'youtube', normalizedVideoUrl,
       Number(duration_min) || 0, Number(half_year_credit_hours) || 0,
       target_role || 'production', category || 'safety',
       active === 0 ? 0 : 1, Number(sort_order) || 0
@@ -65,7 +89,11 @@ router.patch('/training-master/:id', async (req: Request, res: Response) => {
       category: 'category', active: 'active', sort_order: 'sort_order',
     };
     for (const [k, col] of Object.entries(map)) {
-      if (b[k] !== undefined) { sets.push(`${col} = ?`); params.push(b[k]); }
+      if (b[k] !== undefined) {
+        sets.push(`${col} = ?`);
+        // video_url 은 서버측에서도 embed 형태로 정규화
+        params.push(k === 'video_url' ? normalizeYouTubeEmbedUrl(b[k]) : b[k]);
+      }
     }
     if (!sets.length) { res.status(400).json({ error: '변경사항 없음' }); return; }
     sets.push('updated_at = NOW()');

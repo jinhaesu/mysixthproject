@@ -89,6 +89,20 @@ router.get('/:token/health/certificate', async (req: Request, res: Response) => 
     const token = req.params.token as string;
     const employee = await loadEmployeeByToken(token);
     if (!employee) { res.status(403).json({ error: '접근 권한이 없습니다.' }); return; }
+    const gated = isHealthCertRequired(employee.department);
+    // 대상 아니면 아래 필드는 조회 스킵 — 홈 카드 미표시 판단만 하면 됨
+    if (!gated) {
+      res.json({
+        employee: { name: employee.name, department: employee.department, team: employee.team, role: employee.role },
+        gated: false,
+        message: '보건증은 식품 직접 취급자(생산팀)만 대상입니다.',
+        today: getKSTDate(),
+        certificate: null,
+        days_until_expiry: null,
+        status_hint: 'valid',
+      });
+      return;
+    }
     const cert = await dbGet(
       `SELECT id, cert_type, issue_date, expiry_date, cert_photo_url, status, updated_at
          FROM health_certificates
@@ -109,6 +123,7 @@ router.get('/:token/health/certificate', async (req: Request, res: Response) => 
     }
     res.json({
       employee: { name: employee.name, department: employee.department, team: employee.team, role: employee.role },
+      gated: true,
       today,
       certificate: cert,
       days_until_expiry: daysLeft,
@@ -178,7 +193,8 @@ export default router;
  * - 유효한 보건증이 없으면 'health_cert_missing'
  * - 만료임박(D-30 이내, 오늘 포함) 또는 이미 만료면 'health_cert_expired'
  * - 그 외 null (통과)
- * NB: 카페·사무직도 식품업 필수 규제라 대상 포함.
+ * NB: 식품위생법상 식품 직접 취급자만 대상. 물류·사무·카페 매장 서비스는 제외.
+ *     회사 실정: 생산팀만 필수. 부서명이 '생산' 으로 시작하는 근로자만 대상.
  */
 export async function checkHealthCertGate(employeeId: number): Promise<'health_cert_missing' | 'health_cert_expired' | null> {
   const cert = await dbGet(
@@ -193,4 +209,20 @@ export async function checkHealthCertGate(employeeId: number): Promise<'health_c
   const diffDays = Math.round((exp.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
   if (diffDays < 30) return 'health_cert_expired';
   return null;
+}
+
+/**
+ * 보건증 게이팅 대상 판정 — 식품 직접 취급자만.
+ * 회사 실정 반영:
+ *   - 생산팀(제조·포장): 필수 (식품 직접 취급)
+ *   - 물류팀(운송·창고): 제외 (완제품만 취급, 식품 접촉 없음)
+ *   - 사무직: 제외
+ *   - 카페(매장): 제외 (매장별 별도 관리, 이 시스템 대상 아님)
+ */
+export function isHealthCertRequired(department: string | null | undefined): boolean {
+  const dep = (department || '').trim();
+  if (!dep) return false;
+  if (dep.startsWith('생산')) return true;
+  // 그 외 물류·사무·카페 및 미분류는 대상 아님
+  return false;
 }

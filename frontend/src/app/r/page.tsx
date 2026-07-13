@@ -564,8 +564,9 @@ function RegularContent() {
     postcheck_ok?: boolean | null;
   } | null>(null);
 
-  // 보건증 상태 (P3)
+  // 보건증 상태 (P3) — gated=false 이면 대상 아님(물류·사무·카페) → 카드 미표시
   const [healthCert, setHealthCert] = useState<{
+    gated?: boolean;
     days_until_expiry: number | null;
     status_hint: "none" | "valid" | "warning" | "urgent" | "expired";
     certificate: { expiry_date: string } | null;
@@ -1219,15 +1220,17 @@ function RegularContent() {
                 />
               )}
 
-              {/* 보건증 */}
-              <TaskCard
-                href={`/r/health-cert?token=${token}`}
-                icon={ShieldAlert}
-                title={certTitle}
-                subtitle={certSub}
-                chipStatus={certCritical ? "urgent" : certWarning ? "warning" : certDone ? "done" : "info"}
-                tone={certCritical ? "danger" : certWarning ? "warning" : certDone ? "success" : "info"}
-              />
+              {/* 보건증 — 식품 직접 취급자(생산팀)만 표시. 물류·사무·카페 제외 */}
+              {healthCert?.gated !== false && (
+                <TaskCard
+                  href={`/r/health-cert?token=${token}`}
+                  icon={ShieldAlert}
+                  title={certTitle}
+                  subtitle={certSub}
+                  chipStatus={certCritical ? "urgent" : certWarning ? "warning" : certDone ? "done" : "info"}
+                  tone={certCritical ? "danger" : certWarning ? "warning" : certDone ? "success" : "info"}
+                />
+              )}
 
               {/* 건강진단 안내 — 대상자만 표시 (예정 있음 or 이력 있음) */}
               {checkupStatus && (checkupStatus.pending_count > 0 || checkupStatus.last_received_at) && (

@@ -4,7 +4,7 @@ import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
 import safetyPublicRouter, { isSafetyGatedEmployee } from './safetyPublic';
-import { checkHealthCertGate } from './healthPublic';
+import { checkHealthCertGate, isHealthCertRequired } from './healthPublic';
 import { checkTrainingSurveyGate } from './trainingPublic';
 
 const router = Router();
@@ -846,18 +846,21 @@ router.post('/:token/clock-in', async (req: Request, res: Response) => {
       }
     }
 
-    // 보건 P3 — 보건증 만료 D-30 이내(또는 미보유) 게이팅. 식품업 필수라 카페·사무직도 대상.
-    const healthGate = await checkHealthCertGate(employee.id);
-    if (healthGate) {
-      res.status(409).json({
-        error: healthGate === 'health_cert_missing'
-          ? '유효한 보건증이 없습니다. 보건증을 발급받아 등록해 주세요.'
-          : '보건증 만료가 임박했거나 만료되었습니다. 갱신 후 등록해 주세요.',
-        code: 'SAFETY_TASK_INCOMPLETE',
-        pending: [healthGate],
-        gate: 'clock-in',
-      });
-      return;
+    // 보건 P3 — 보건증 만료 D-30 이내(또는 미보유) 게이팅.
+    // 식품위생법상 식품 직접 취급자만 대상. 회사 실정: 생산팀만 필수. 물류·사무·카페 제외.
+    if (isHealthCertRequired(employee.department)) {
+      const healthGate = await checkHealthCertGate(employee.id);
+      if (healthGate) {
+        res.status(409).json({
+          error: healthGate === 'health_cert_missing'
+            ? '유효한 보건증이 없습니다. 보건증을 발급받아 등록해 주세요.'
+            : '보건증 만료가 임박했거나 만료되었습니다. 갱신 후 등록해 주세요.',
+          code: 'SAFETY_TASK_INCOMPLETE',
+          pending: [healthGate],
+          gate: 'clock-in',
+        });
+        return;
+      }
     }
 
     await dbRun(`
@@ -962,18 +965,21 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
       }
     }
 
-    // 보건 P3 — 보건증 만료 D-30 이내(또는 미보유) 게이팅. 식품업 필수라 카페·사무직도 대상.
-    const healthGateOut = await checkHealthCertGate(employee.id);
-    if (healthGateOut) {
-      res.status(409).json({
-        error: healthGateOut === 'health_cert_missing'
-          ? '유효한 보건증이 없습니다. 보건증을 발급받아 등록해 주세요.'
-          : '보건증 만료가 임박했거나 만료되었습니다. 갱신 후 등록해 주세요.',
-        code: 'SAFETY_TASK_INCOMPLETE',
-        pending: [healthGateOut],
-        gate: 'clock-out',
-      });
-      return;
+    // 보건 P3 — 보건증 만료 D-30 이내(또는 미보유) 게이팅.
+    // 식품위생법상 식품 직접 취급자만 대상. 회사 실정: 생산팀만 필수. 물류·사무·카페 제외.
+    if (isHealthCertRequired(employee.department)) {
+      const healthGateOut = await checkHealthCertGate(employee.id);
+      if (healthGateOut) {
+        res.status(409).json({
+          error: healthGateOut === 'health_cert_missing'
+            ? '유효한 보건증이 없습니다. 보건증을 발급받아 등록해 주세요.'
+            : '보건증 만료가 임박했거나 만료되었습니다. 갱신 후 등록해 주세요.',
+          code: 'SAFETY_TASK_INCOMPLETE',
+          pending: [healthGateOut],
+          gate: 'clock-out',
+        });
+        return;
+      }
     }
 
     // 안전보건 P4 — 반기 마감 D-14 이내 필수 교육·설문 미이수 게이팅 (clock-out 만).

@@ -949,10 +949,19 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
     }
 
     // 안전보건 P1 — 퇴근 전 셀프체크(postcheck) 게이팅.
+    // FIX: attendance.date(clock-in businessday) 와 오늘 businessDate 둘 중 하나라도
+    //      postcheck 존재하면 통과. 야간조가 07:00 경계 넘어 퇴근할 때 무한 루프 방지.
+    //      예: 어제 20:00 clock-in → attendance.date="2026-07-13"
+    //          오늘 07:30 postcheck 제출 시 task_date="2026-07-14" 저장됨
+    //          이전 로직은 "2026-07-13"으로만 검색 → 매치 실패 → 셀프체크 페이지로 계속 튕김.
     if (await isSafetyGatedEmployee(employee.department)) {
+      const todayBusinessDate = getBusinessDate();
       const post = await dbGet(
-        `SELECT id FROM worker_safety_task_log WHERE employee_id = ? AND task_type = 'postcheck' AND task_date = ?`,
-        employee.id, attendance.date
+        `SELECT id FROM worker_safety_task_log
+          WHERE employee_id = ? AND task_type = 'postcheck'
+            AND task_date IN (?, ?)
+          ORDER BY completed_at DESC LIMIT 1`,
+        employee.id, attendance.date, todayBusinessDate
       );
       if (!post) {
         res.status(409).json({

@@ -107,7 +107,10 @@ function SafetyCheckContent() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "제출 실패");
       setSubmitDone(true);
-      setTimeout(() => router.push(`/r?token=${token}`), 1500);
+      // 홈으로 하드 리로드 — router.push 는 client-side navigation 이라
+      // 이미 mount 된 홈 컴포넌트의 useEffect 가 재실행 안 돼 safetyStatus 가 stale 유지.
+      // 하드 리로드로 최신 safety/status·attendance 상태 반영.
+      setTimeout(() => { window.location.href = `/r?token=${token}`; }, 1500);
     } catch (e: any) {
       alert(e.message);
     } finally {

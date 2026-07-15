@@ -185,11 +185,15 @@ export default function SettlementDispatchPage() {
 
   const calcEmp = (r: any, idx: number) => {
     const rate = rates[idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate);
-    const otHours = floor30(r.overtime_hours);
     const holHours = floor30(r.holiday_pay_hours || 0);
+    const otRawHours = floor30(r.overtime_hours);
+    // 백엔드 recalc가 휴일 근무를 overtime_hours 로 밀어넣기 때문에 holiday_pay_hours 와
+    // overtime_hours 가 동일한 휴일 근무 시간을 중복 보유한다. 휴일수당 1.5x 로만 지급하고
+    // 연장수당 계산에서는 그만큼 차감해 이중 반영을 막는다. (근기법 §56②)
+    const otPayHours = Math.max(0, otRawHours - holHours);
     const nightHours = floor30(r.night_hours || 0);
     const basePay = Math.round(r.regular_hours * rate);
-    const overtimePay = Math.round(otHours * rate * 1.5);
+    const overtimePay = Math.round(otPayHours * rate * 1.5);
     const holidayPay = Math.round(holHours * rate * 1.5);
     const nightPay = Math.round(nightHours * rate * 1.5);
     const whPay = Math.round(r.weekly_holiday_hours * rate);
@@ -206,7 +210,7 @@ export default function SettlementDispatchPage() {
     const fee = checkedEmps.has(idx) ? Math.round(sub * feeRate / 100) : 0;
     const bv = sub + fee;
     const vat = Math.round(bv * 0.1);
-    return { rate, basePay, overtimePay, nightPay, whPay, grossPay, meal, net, np, hi, ia, ei, ltc, ins, fee, bv, vat, total: bv + vat };
+    return { rate, otPayHours, basePay, overtimePay, holidayPay, nightPay, whPay, grossPay, meal, net, np, hi, ia, ei, ltc, ins, fee, bv, vat, total: bv + vat };
   };
 
   const onRateChange = (idx: number, workerId: number | null, value: string) => {
@@ -232,7 +236,7 @@ export default function SettlementDispatchPage() {
   const results = data?.results || [];
   const rows = results.map((r: any, i: number) => ({ ...r, idx: i, ...calcEmp(r, i) }));
   const totals: any = {};
-  const numKeys = ['work_days','regular_hours','overtime_hours','night_hours','weekly_holiday_hours','basePay','overtimePay','nightPay','whPay','grossPay','meal','net','np','hi','ia','ei','ltc','ins','fee','bv','vat','total'];
+  const numKeys = ['work_days','regular_hours','overtime_hours','otPayHours','night_hours','weekly_holiday_hours','basePay','overtimePay','holidayPay','nightPay','whPay','grossPay','meal','net','np','hi','ia','ei','ltc','ins','fee','bv','vat','total'];
   numKeys.forEach(k => { totals[k] = rows.reduce((s: number, r: any) => s + (r[k] || 0), 0); });
 
   if (!authorized) return <SessionPasswordGate title="파견 정산 접근" onVerified={() => setAuthorized(true)} />;
@@ -251,7 +255,7 @@ export default function SettlementDispatchPage() {
               leadingIcon={<Download size={14} />}
               onClick={() => {
                 const header = ['이름','소속','시급','근무일','기본h','연장h','야간h','주휴h','기본급','연장수당','야간수당','주휴수당','급여계','식대공제','국민연금','건강보험','산재보험','고용보험','장기요양','보험계','수수료','VAT','최종액'];
-                const csvRows = rows.map((r: any) => [r.name,r.department||r.workplace||'',r.rate||0,r.work_days,r.regular_hours,r.overtime_hours,r.night_hours||0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.np,r.hi,r.ia,r.ei,r.ltc,r.ins,r.fee,r.vat,r.total]);
+                const csvRows = rows.map((r: any) => [r.name,r.department||r.workplace||'',r.rate||0,r.work_days,r.regular_hours,(r.otPayHours ?? r.overtime_hours),r.night_hours||0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.nightPay,r.whPay,r.grossPay,r.meal,r.np,r.hi,r.ia,r.ei,r.ltc,r.ins,r.fee,r.vat,r.total]);
                 const csv = [header,...csvRows].map(r => r.join(',')).join('\n');
                 const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
                 const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`파견정산_${yearMonth}.csv`; a.click(); URL.revokeObjectURL(url);
@@ -380,7 +384,7 @@ export default function SettlementDispatchPage() {
                     </TD>
                     <TD numeric>{r.work_days}</TD>
                     <TD numeric>{r.regular_hours}</TD>
-                    <TD numeric className="text-[var(--warning-fg)]">{r.overtime_hours}</TD>
+                    <TD numeric className="text-[var(--warning-fg)]" title="휴일 근무 시간은 별도 휴일수당(1.5x)으로 지급됩니다 — 여기서는 평일 연장분만 표시">{(r.otPayHours ?? r.overtime_hours).toFixed(1)}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{(r.night_hours || 0).toFixed(1)}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{r.weekly_holiday_hours}</TD>
                     <TD numeric>{fmt.format(r.basePay)}</TD>
@@ -409,7 +413,7 @@ export default function SettlementDispatchPage() {
                   <TD className="text-[var(--info-fg)]" colSpan={4}>합계 ({rows.length}명)</TD>
                   <TD numeric>{totals.work_days}</TD>
                   <TD numeric>{(totals.regular_hours || 0).toFixed(1)}</TD>
-                  <TD numeric>{(totals.overtime_hours || 0).toFixed(1)}</TD>
+                  <TD numeric>{(totals.otPayHours || 0).toFixed(1)}</TD>
                   <TD numeric>{(totals.night_hours || 0).toFixed(1)}</TD>
                   <TD numeric>{totals.weekly_holiday_hours || 0}</TD>
                   <TD numeric>{fmt.format(totals.basePay)}</TD>

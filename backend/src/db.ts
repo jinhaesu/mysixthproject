@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.38.0';
+  const SCHEMA_VERSION = 'schema-v2.39.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -2324,6 +2324,44 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE cdpa_review_items ADD COLUMN IF NOT EXISTS auto_status TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE cdpa_review_items ADD COLUMN IF NOT EXISTS auto_status_summary JSONB DEFAULT '{}'::jsonb"); } catch {}
   try { await pool.query("ALTER TABLE cdpa_review_items ADD COLUMN IF NOT EXISTS module_link TEXT DEFAULT ''"); } catch {}
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.39.0 — 알바(사업소득) 정산 서버 영속 + 월 마감
+  //  alba_settlement_state: 월별 마감 상태 (open/closed)
+  //  alba_settlement_line : 월별·인원별 조정(+/-) 금액 · 식대공제 저장
+  //   (년월+이름 복합키. 기본급 자체는 매번 근태 원장에서 재계산되므로
+  //    저장할 필요 없음. 사용자가 조정한 값만 보존.)
+  // ═══════════════════════════════════════════════════════════════
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS alba_settlement_state (
+        year_month TEXT PRIMARY KEY,
+        status TEXT NOT NULL DEFAULT 'open',
+        closed_at TIMESTAMPTZ,
+        closed_by TEXT DEFAULT '',
+        reopened_at TIMESTAMPTZ,
+        reopened_by TEXT DEFAULT '',
+        note TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch (e: any) { console.error('[v2.39.0] alba_settlement_state:', e.message); }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS alba_settlement_line (
+        id BIGSERIAL PRIMARY KEY,
+        year_month TEXT NOT NULL,
+        employee_name TEXT NOT NULL,
+        adjust_amount INTEGER NOT NULL DEFAULT 0,
+        meal_deduction INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by TEXT DEFAULT '',
+        UNIQUE(year_month, employee_name)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_alba_settlement_line_ym ON alba_settlement_line(year_month)`);
+  } catch (e: any) { console.error('[v2.39.0] alba_settlement_line:', e.message); }
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}

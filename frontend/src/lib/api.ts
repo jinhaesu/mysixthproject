@@ -2789,3 +2789,54 @@ export async function getPolicyCompliance(id: number) {
     `/api/policy-manager/documents/${id}/compliance`
   );
 }
+
+// ─── 알바(사업소득) 정산 서버 영속 + 마감 ────────────────────────────
+export interface AlbaSettlementState {
+  year_month: string;
+  status: 'open' | 'closed';
+  closed_at: string | null;
+  closed_by: string;
+  reopened_at: string | null;
+  reopened_by: string;
+  note: string;
+}
+export interface AlbaSettlementLine {
+  employee_name: string;
+  adjust_amount: number;
+  meal_deduction: number;
+  updated_at: string | null;
+  updated_by: string;
+}
+export interface AlbaSettlementResponse {
+  year_month: string;
+  state: AlbaSettlementState;
+  lines: AlbaSettlementLine[];
+}
+
+export async function getAlbaSettlement(yearMonth: string) {
+  return fetchAPI<AlbaSettlementResponse>(`/api/settlement/alba/${yearMonth}`);
+}
+
+export async function saveAlbaSettlementLine(
+  yearMonth: string,
+  body: { employee_name: string; adjust_amount?: number; meal_deduction?: number }
+) {
+  return fetchAPI<{ success: true; year_month: string; employee_name: string; adjust_amount: number; meal_deduction: number }>(
+    `/api/settlement/alba/${yearMonth}/line`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+}
+
+export async function closeAlbaSettlement(yearMonth: string, note?: string) {
+  return fetchAPI<{ success: true; state: AlbaSettlementState }>(
+    `/api/settlement/alba/${yearMonth}/close`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: note || '' }) }
+  );
+}
+
+export async function reopenAlbaSettlement(yearMonth: string, note?: string) {
+  return fetchAPI<{ success: true; state: AlbaSettlementState }>(
+    `/api/settlement/alba/${yearMonth}/reopen`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: note || '' }) }
+  );
+}

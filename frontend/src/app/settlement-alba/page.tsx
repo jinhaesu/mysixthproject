@@ -2,8 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Download, Users } from "lucide-react";
-import { getConfirmedList, getWorkersLite, updateWorkerHourlyRate, bulkWorkerHourlyRate } from "@/lib/api";
+import { Calculator, Download, Users, Lock, Unlock } from "lucide-react";
+import {
+  getConfirmedList, getWorkersLite, updateWorkerHourlyRate, bulkWorkerHourlyRate,
+  getAlbaSettlement, saveAlbaSettlementLine, closeAlbaSettlement, reopenAlbaSettlement,
+  type AlbaSettlementState,
+} from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import ChartCard from "@/components/charts/ChartCard";
@@ -48,10 +52,12 @@ export default function SettlementAlbaPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [hourlyRate, setHourlyRate] = usePersistedState<number>("sa_hourlyRate", 11000);
-  // 식대공제: { "yyyy-mm|이름": 금액 } 형태로 월별·인원별 보존
-  const [mealDeductionsByKey, setMealDeductionsByKey] = usePersistedState<Record<string, number>>("sa_mealDeductionsByKey", {});
-  // 조정(+/-): 급여계 산정 후 내부 결산과의 차이를 수동 보정. 월별·인원별 보존.
-  const [adjustmentsByKey, setAdjustmentsByKey] = usePersistedState<Record<string, number>>("sa_adjustmentsByKey", {});
+  // 서버 저장 상태: 식대공제·조정(+/-)·마감상태를 년월별로 관리
+  const [settlementState, setSettlementState] = useState<AlbaSettlementState | null>(null);
+  const [linesByName, setLinesByName] = useState<Record<string, { adjust: number; meal: number }>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const lineTimers = useRef<Record<string, any>>({});
+  const isClosed = settlementState?.status === 'closed';
   // 직원별 시급(로컬) — workerByIdentity 매칭으로 worker.hourly_rate 초기화. 편집 시 600ms debounce 자동저장.
   const [rates, setRates] = useState<Record<number, number>>({});
   const rateTimers = useRef<Record<number, any>>({});
@@ -59,10 +65,22 @@ export default function SettlementAlbaPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [workersResp, confList] = await Promise.all([
+      const [workersResp, confList, settlement] = await Promise.all([
         getWorkersLite().catch(() => ({ workers: [] })),
         getConfirmedList(yearMonth, ''),
+        getAlbaSettlement(yearMonth).catch(() => null),
       ]);
+      if (settlement) {
+        setSettlementState(settlement.state);
+        const map: Record<string, { adjust: number; meal: number }> = {};
+        for (const ln of settlement.lines || []) {
+          map[ln.employee_name] = { adjust: ln.adjust_amount || 0, meal: ln.meal_deduction || 0 };
+        }
+        setLinesByName(map);
+      } else {
+        setSettlementState({ year_month: yearMonth, status: 'open', closed_at: null, closed_by: '', reopened_at: null, reopened_by: '', note: '' });
+        setLinesByName({});
+      }
       const workersList = (workersResp as any).workers || (workersResp as any) || [];
       const catMap = new Map<string, string>();
       const workerByIdentity = new Map<string, any>();
@@ -161,34 +179,64 @@ export default function SettlementAlbaPage() {
         initRates[i] = r.hourly_rate > 0 ? r.hourly_rate : hourlyRate;
       });
       setRates(initRates);
-      // 식대공제는 sessionStorage 영속값 그대로 유지 (mealDeductionsByKey)
+      // 식대공제·조정(+/-)은 서버(alba_settlement_line)에서 로드됨
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
   }, [yearMonth, hourlyRate]);
 
   useEffect(() => { if (authorized) load(); }, [load, authorized]);
 
-  const mealKey = (name: string) => `${yearMonth}|${name || ''}`;
-  const getMeal = (name: string) => mealDeductionsByKey[mealKey(name)] || 0;
+  const getMeal = (name: string) => linesByName[name]?.meal || 0;
+  const getAdjust = (name: string) => linesByName[name]?.adjust || 0;
+
+  const scheduleLineSave = useCallback((name: string, adjust: number, meal: number) => {
+    if (lineTimers.current[name]) clearTimeout(lineTimers.current[name]);
+    lineTimers.current[name] = setTimeout(async () => {
+      setSaving(s => ({ ...s, [name]: true }));
+      try {
+        await saveAlbaSettlementLine(yearMonth, { employee_name: name, adjust_amount: adjust, meal_deduction: meal });
+      } catch (e: any) {
+        toast.error(`저장 실패 (${name}): ${e.message || e}`);
+      } finally {
+        setSaving(s => { const n = { ...s }; delete n[name]; return n; });
+      }
+    }, 500);
+  }, [yearMonth, toast]);
+
   const setMeal = (name: string, value: number) => {
-    const k = mealKey(name);
-    setMealDeductionsByKey(prev => {
-      const next = { ...prev };
-      if (value > 0) next[k] = value;
-      else delete next[k];
-      return next;
-    });
+    if (isClosed) { toast.error('마감된 월은 편집할 수 없습니다.'); return; }
+    const v = Math.max(0, Math.trunc(value || 0));
+    const cur = linesByName[name] || { adjust: 0, meal: 0 };
+    const next = { adjust: cur.adjust, meal: v };
+    setLinesByName(prev => ({ ...prev, [name]: next }));
+    scheduleLineSave(name, next.adjust, next.meal);
   };
 
-  const getAdjust = (name: string) => adjustmentsByKey[mealKey(name)] || 0;
   const setAdjust = (name: string, value: number) => {
-    const k = mealKey(name);
-    setAdjustmentsByKey(prev => {
-      const next = { ...prev };
-      if (value !== 0) next[k] = value;
-      else delete next[k];
-      return next;
-    });
+    if (isClosed) { toast.error('마감된 월은 편집할 수 없습니다.'); return; }
+    const v = Math.trunc(value || 0);
+    const cur = linesByName[name] || { adjust: 0, meal: 0 };
+    const next = { adjust: v, meal: cur.meal };
+    setLinesByName(prev => ({ ...prev, [name]: next }));
+    scheduleLineSave(name, next.adjust, next.meal);
+  };
+
+  const handleClose = async () => {
+    if (!confirm(`${yearMonth} 알바(사업소득) 정산을 마감할까요?\n마감 후에는 조정·식대공제 값이 잠깁니다. (관리자가 재개할 수 있음)`)) return;
+    try {
+      const r = await closeAlbaSettlement(yearMonth);
+      setSettlementState(r.state);
+      toast.success(`${yearMonth} 마감 완료`);
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const handleReopen = async () => {
+    if (!confirm(`${yearMonth} 정산 마감을 재개할까요?\n(감사 기록에 재개 시각·계정이 남습니다)`)) return;
+    try {
+      const r = await reopenAlbaSettlement(yearMonth);
+      setSettlementState(r.state);
+      toast.success(`${yearMonth} 마감 재개 완료`);
+    } catch (e: any) { toast.error(e.message); }
   };
 
   const calcEmp = (r: any, idx: number) => {
@@ -262,13 +310,34 @@ export default function SettlementAlbaPage() {
         title="알바(사업소득) 정산관리"
         description="수당 계산: 시급×1.5배 | 30분 내림 | 주5일 이하 휴일→수당없음 | 공휴일→휴일수당 | 야간(22~06)→연장 | 소득세3.3%+지방세0.33%"
         actions={
-          rows.length > 0 ? (
-            <Button variant="secondary" size="sm" leadingIcon={<Download size={14} />} onClick={handleExcel}>
-              엑셀 다운로드
-            </Button>
-          ) : undefined
+          <div className="flex gap-2 items-center">
+            {isClosed ? (
+              <>
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded bg-[var(--danger-bg)] text-[var(--danger-fg)] border border-[var(--danger-border)]" title={`${settlementState?.closed_at?.slice(0,16).replace('T',' ')} · ${settlementState?.closed_by || '-'}`}>
+                  <Lock size={12} /> 마감됨
+                </span>
+                <Button variant="secondary" size="sm" leadingIcon={<Unlock size={14} />} onClick={handleReopen}>마감 재개</Button>
+              </>
+            ) : (
+              rows.length > 0 && (
+                <Button variant="primary" size="sm" leadingIcon={<Lock size={14} />} onClick={handleClose}>월 마감</Button>
+              )
+            )}
+            {rows.length > 0 && (
+              <Button variant="secondary" size="sm" leadingIcon={<Download size={14} />} onClick={handleExcel}>
+                엑셀 다운로드
+              </Button>
+            )}
+          </div>
         }
       />
+      {isClosed && (
+        <div className="p-3 rounded-[var(--r-md)] bg-[var(--danger-bg)] border border-[var(--danger-border)] text-[var(--danger-fg)] text-[12px]">
+          <b>{yearMonth}</b> 정산이 마감되었습니다 — 조정·식대공제 입력이 잠겼습니다.
+          {settlementState?.closed_at && <> · 마감: {settlementState.closed_at.slice(0,16).replace('T',' ')}</>}
+          {settlementState?.closed_by && <> ({settlementState.closed_by})</>}
+        </div>
+      )}
 
       <Toolbar>
         <Field label="연월">
@@ -276,8 +345,8 @@ export default function SettlementAlbaPage() {
         </Field>
         <Field label="시급 일괄 설정 (원)">
           <div className="flex gap-1.5 items-center">
-            <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" />
-            <Button size="sm" variant="secondary" onClick={handleBulkApply} title="알바 카테고리 전체 직원 시급을 일괄 변경 (DB 저장)">전체 적용</Button>
+            <Input type="number" inputSize="sm" value={hourlyRate} onChange={e => setHourlyRate(parseInt(e.target.value) || 0)} className="w-28" disabled={isClosed} />
+            <Button size="sm" variant="secondary" onClick={handleBulkApply} title="알바 카테고리 전체 직원 시급을 일괄 변경 (DB 저장)" disabled={isClosed}>전체 적용</Button>
           </div>
         </Field>
         <div className="text-[var(--fs-caption)] text-[var(--text-3)] pb-1">개별 시급은 표 안에서 직접 편집 (자동 저장)</div>
@@ -383,10 +452,11 @@ export default function SettlementAlbaPage() {
                     <TD className="p-0.5">
                       <input
                         type="number"
-                        className="w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none"
+                        className="w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none disabled:opacity-60"
                         value={rates[r.idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate)}
                         onChange={e => onRateChange(r.idx, r.worker_id, e.target.value)}
-                        title="이 직원의 시급 — 자동저장 (worker_id 매칭된 경우만)"
+                        disabled={isClosed}
+                        title={isClosed ? "마감된 월은 편집 불가" : "이 직원의 시급 — 자동저장 (worker_id 매칭된 경우만)"}
                       />
                     </TD>
                     <TD numeric>{r.regular_hours}</TD>
@@ -402,17 +472,19 @@ export default function SettlementAlbaPage() {
                     <TD className="p-0.5">
                       <input
                         type="number"
-                        className={`w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none ${r.adjust > 0 ? 'text-[var(--success-fg)]' : r.adjust < 0 ? 'text-[var(--danger-fg)]' : ''}`}
+                        className={`w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none disabled:opacity-60 ${r.adjust > 0 ? 'text-[var(--success-fg)]' : r.adjust < 0 ? 'text-[var(--danger-fg)]' : ''}`}
                         value={r.adjust || ''}
                         onChange={e => setAdjust(r.name, parseInt((e.target.value || '').replace(/[^0-9\-]/g, ''), 10) || 0)}
                         placeholder="0"
-                        title="+/- 조정 금액 (예: -5000, 12000). 급여계에 가산됨."
+                        disabled={isClosed}
+                        title={isClosed ? "마감된 월은 편집 불가" : `+/- 조정 금액 (예: -5000, 12000). 급여계에 가산됨.${saving[r.name] ? ' · 저장 중...' : ''}`}
                       />
                     </TD>
                     <TD numeric emphasis title={r.adjust !== 0 ? `원본 ${fmt.format(r.rawPay)} + 조정 ${r.adjust > 0 ? '+' : ''}${fmt.format(r.adjust)}` : undefined}>{fmt.format(r.grossPay)}</TD>
                     <TD>
                       <Input type="number" inputSize="sm" value={getMeal(r.name) || ''} onChange={e => setMeal(r.name, parseInt(e.target.value) || 0)}
-                        className="w-full text-right" placeholder="0" />
+                        className="w-full text-right" placeholder="0" disabled={isClosed}
+                        title={isClosed ? "마감된 월은 편집 불가" : (saving[r.name] ? '저장 중...' : '식대공제 — 자동저장')} />
                     </TD>
                     <TD numeric className="text-[var(--danger-fg)]">{fmt.format(r.incomeTax)}</TD>
                     <TD numeric className="text-[var(--danger-fg)]">{fmt.format(r.localTax)}</TD>

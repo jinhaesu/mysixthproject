@@ -50,6 +50,8 @@ export default function SettlementAlbaPage() {
   const [hourlyRate, setHourlyRate] = usePersistedState<number>("sa_hourlyRate", 11000);
   // 식대공제: { "yyyy-mm|이름": 금액 } 형태로 월별·인원별 보존
   const [mealDeductionsByKey, setMealDeductionsByKey] = usePersistedState<Record<string, number>>("sa_mealDeductionsByKey", {});
+  // 조정(+/-): 급여계 산정 후 내부 결산과의 차이를 수동 보정. 월별·인원별 보존.
+  const [adjustmentsByKey, setAdjustmentsByKey] = usePersistedState<Record<string, number>>("sa_adjustmentsByKey", {});
   // 직원별 시급(로컬) — workerByIdentity 매칭으로 worker.hourly_rate 초기화. 편집 시 600ms debounce 자동저장.
   const [rates, setRates] = useState<Record<number, number>>({});
   const rateTimers = useRef<Record<number, any>>({});
@@ -178,6 +180,17 @@ export default function SettlementAlbaPage() {
     });
   };
 
+  const getAdjust = (name: string) => adjustmentsByKey[mealKey(name)] || 0;
+  const setAdjust = (name: string, value: number) => {
+    const k = mealKey(name);
+    setAdjustmentsByKey(prev => {
+      const next = { ...prev };
+      if (value !== 0) next[k] = value;
+      else delete next[k];
+      return next;
+    });
+  };
+
   const calcEmp = (r: any, idx: number) => {
     const floor30 = (h: number) => Math.floor(h * 2) / 2;
     const rate = rates[idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate);
@@ -193,13 +206,15 @@ export default function SettlementAlbaPage() {
     const holidayPay = Math.round(holHours * rate * 1.5);
     const nightPay = Math.round(nightHours * rate * 1.5);
     const whPay = Math.round(r.weekly_holiday_hours * rate);
-    const grossPay = basePay + overtimePay + holidayPay + nightPay + whPay;
+    const rawPay = basePay + overtimePay + holidayPay + nightPay + whPay;
+    const adjust = getAdjust(r.name);
+    const grossPay = rawPay + adjust;
     const meal = getMeal(r.name);
     const netBeforeTax = grossPay - meal;
     const incomeTax = Math.round(netBeforeTax * 0.033);
     const localTax = Math.round(netBeforeTax * 0.0033);
     const netPay = netBeforeTax - incomeTax - localTax;
-    return { rate, otPayHours, basePay, overtimePay, holidayPay, nightPay, whPay, grossPay, meal, netBeforeTax, incomeTax, localTax, netPay };
+    return { rate, otPayHours, basePay, overtimePay, holidayPay, nightPay, whPay, rawPay, adjust, grossPay, meal, netBeforeTax, incomeTax, localTax, netPay };
   };
 
   const onRateChange = (idx: number, workerId: number | null, value: string) => {
@@ -225,13 +240,13 @@ export default function SettlementAlbaPage() {
   const results = data?.results || [];
   const rows = results.map((r: any, i: number) => ({ ...r, idx: i, ...calcEmp(r, i) }));
   const totals: any = {};
-  ['work_days','regular_hours','overtime_hours','otPayHours','night_hours','holiday_pay_hours','weekly_holiday_hours','basePay','overtimePay','holidayPay','nightPay','whPay','grossPay','meal','incomeTax','localTax','netPay'].forEach(k => {
+  ['work_days','regular_hours','overtime_hours','otPayHours','night_hours','holiday_pay_hours','weekly_holiday_hours','basePay','overtimePay','holidayPay','nightPay','whPay','rawPay','adjust','grossPay','meal','incomeTax','localTax','netPay'].forEach(k => {
     totals[k] = rows.reduce((s: number, r: any) => s + (r[k] || 0), 0);
   });
 
   const handleExcel = () => {
-    const header = ['이름','소속','연락처','은행','계좌번호','근무일','시급','기본h','연장h','야간h','휴일h','주휴h','기본급','연장수당','휴일수당','야간수당','주휴수당','급여계','식대공제','소득세(3.3%)','지방세(0.33%)','실지급'];
-    const csvRows = rows.map((r: any) => [r.name,r.department || r.workplace || '',r.phone,r.bank_name,r.bank_account,r.work_days,r.rate || 0,r.regular_hours,(r.otPayHours ?? r.overtime_hours),r.night_hours || 0,r.holiday_pay_hours || 0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.holidayPay,r.nightPay,r.whPay,r.grossPay,r.meal,r.incomeTax,r.localTax,r.netPay]);
+    const header = ['이름','소속','연락처','은행','계좌번호','근무일','시급','기본h','연장h','야간h','휴일h','주휴h','기본급','연장수당','휴일수당','야간수당','주휴수당','조정(+/-)','급여계','식대공제','소득세(3.3%)','지방세(0.33%)','실지급'];
+    const csvRows = rows.map((r: any) => [r.name,r.department || r.workplace || '',r.phone,r.bank_name,r.bank_account,r.work_days,r.rate || 0,r.regular_hours,(r.otPayHours ?? r.overtime_hours),r.night_hours || 0,r.holiday_pay_hours || 0,r.weekly_holiday_hours,r.basePay,r.overtimePay,r.holidayPay,r.nightPay,r.whPay,r.adjust || 0,r.grossPay,r.meal,r.incomeTax,r.localTax,r.netPay]);
     const csv = [header, ...csvRows].map(r => r.join(',')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -322,6 +337,7 @@ export default function SettlementAlbaPage() {
                 <col className="w-[65px]" />
                 <col className="w-[65px]" />
                 <col className="w-[65px]" />
+                <col className="w-[75px]" />
                 <col className="w-[70px]" />
                 <col className="w-[65px]" />
                 <col className="w-[60px]" />
@@ -347,6 +363,7 @@ export default function SettlementAlbaPage() {
                   <TH numeric>휴일수당</TH>
                   <TH numeric>야간수당</TH>
                   <TH numeric>주휴수당</TH>
+                  <TH numeric title="내부 결산과 차이 나는 금액을 +/- 로 보정합니다. 급여계에 가산되고 소득세·지방세도 이 값 기준으로 재계산됩니다.">조정(+/-)</TH>
                   <TH numeric>급여계</TH>
                   <TH numeric>식대공제</TH>
                   <TH numeric>소득세</TH>
@@ -382,7 +399,17 @@ export default function SettlementAlbaPage() {
                     <TD numeric className="text-[var(--warning-fg)]">{fmt.format(r.holidayPay)}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.nightPay)}</TD>
                     <TD numeric className="text-[var(--brand-400)]">{fmt.format(r.whPay)}</TD>
-                    <TD numeric emphasis>{fmt.format(r.grossPay)}</TD>
+                    <TD className="p-0.5">
+                      <input
+                        type="number"
+                        className={`w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none ${r.adjust > 0 ? 'text-[var(--success-fg)]' : r.adjust < 0 ? 'text-[var(--danger-fg)]' : ''}`}
+                        value={r.adjust || ''}
+                        onChange={e => setAdjust(r.name, parseInt((e.target.value || '').replace(/[^0-9\-]/g, ''), 10) || 0)}
+                        placeholder="0"
+                        title="+/- 조정 금액 (예: -5000, 12000). 급여계에 가산됨."
+                      />
+                    </TD>
+                    <TD numeric emphasis title={r.adjust !== 0 ? `원본 ${fmt.format(r.rawPay)} + 조정 ${r.adjust > 0 ? '+' : ''}${fmt.format(r.adjust)}` : undefined}>{fmt.format(r.grossPay)}</TD>
                     <TD>
                       <Input type="number" inputSize="sm" value={getMeal(r.name) || ''} onChange={e => setMeal(r.name, parseInt(e.target.value) || 0)}
                         className="w-full text-right" placeholder="0" />
@@ -408,6 +435,7 @@ export default function SettlementAlbaPage() {
                   <TD numeric>{fmt.format(totals.holidayPay || 0)}</TD>
                   <TD numeric>{fmt.format(totals.nightPay || 0)}</TD>
                   <TD numeric>{fmt.format(totals.whPay || 0)}</TD>
+                  <TD numeric className={totals.adjust > 0 ? 'text-[var(--success-fg)]' : totals.adjust < 0 ? 'text-[var(--danger-fg)]' : ''}>{totals.adjust > 0 ? '+' : ''}{fmt.format(totals.adjust || 0)}</TD>
                   <TD numeric>{fmt.format(totals.grossPay || 0)}</TD>
                   <TD numeric className="text-[var(--danger-fg)]">{fmt.format(totals.meal || 0)}</TD>
                   <TD numeric>{fmt.format(totals.incomeTax || 0)}</TD>

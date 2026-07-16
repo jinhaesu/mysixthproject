@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Download, Users, Lock, Unlock } from "lucide-react";
+import { Calculator, Download, Users, Lock, Unlock, Upload as UploadIcon } from "lucide-react";
 import {
   getConfirmedList, getWorkersLite, updateWorkerHourlyRate, bulkWorkerHourlyRate,
   getAlbaSettlement, saveAlbaSettlementLine, closeAlbaSettlement, reopenAlbaSettlement,
@@ -239,6 +239,124 @@ export default function SettlementAlbaPage() {
     } catch (e: any) { toast.error(e.message); }
   };
 
+  // CSV 재업로드 — 어제 다운로드한 v2 CSV(조정·식대공제 열 포함)로 서버 값 복원.
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const parseCsv = (text: string): string[][] => {
+    // BOM 제거
+    const t = text.replace(/^﻿/, '');
+    const rows: string[][] = [];
+    // 간단 CSV 파서: 큰따옴표 인용 처리 포함
+    let cur = '', row: string[] = [], inQ = false;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (inQ) {
+        if (ch === '"' && t[i+1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') inQ = false;
+        else cur += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === ',') { row.push(cur); cur = ''; }
+        else if (ch === '\n' || ch === '\r') {
+          if (ch === '\r' && t[i+1] === '\n') i++;
+          row.push(cur); cur = '';
+          if (row.length > 1 || row[0] !== '') rows.push(row);
+          row = [];
+        } else cur += ch;
+      }
+    }
+    if (cur !== '' || row.length > 0) { row.push(cur); rows.push(row); }
+    return rows;
+  };
+
+  const handleCsvImport = async (file: File) => {
+    if (isClosed) { toast.error('마감된 월은 편집할 수 없습니다. 먼저 마감 재개하세요.'); return; }
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length < 2) { toast.error('CSV 데이터 행이 없습니다.'); return; }
+      const header = rows[0].map(s => (s || '').trim());
+      const nameIdx = header.findIndex(h => h === '이름');
+      const adjustIdx = header.findIndex(h => h === '조정(+/-)' || h === '조정');
+      const mealIdx = header.findIndex(h => h === '식대공제');
+      if (nameIdx < 0) { toast.error(`CSV에 '이름' 열이 없습니다. 헤더: ${header.slice(0,5).join(', ')}...`); return; }
+      if (adjustIdx < 0 && mealIdx < 0) { toast.error("CSV에 '조정(+/-)' 또는 '식대공제' 열이 없습니다."); return; }
+
+      const toNum = (s: string): number => {
+        const n = parseInt(String(s || '').replace(/[^0-9\-]/g, ''), 10);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      let ok = 0, skipped = 0, failed = 0;
+      const pendingLines: Record<string, { adjust: number; meal: number }> = { ...linesByName };
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i];
+        const name = (cols[nameIdx] || '').trim();
+        if (!name || name === '합계' || name.startsWith('합계')) { skipped++; continue; }
+        const adj = adjustIdx >= 0 ? toNum(cols[adjustIdx]) : (linesByName[name]?.adjust || 0);
+        const meal = mealIdx >= 0 ? Math.max(0, toNum(cols[mealIdx])) : (linesByName[name]?.meal || 0);
+        try {
+          await saveAlbaSettlementLine(yearMonth, { employee_name: name, adjust_amount: adj, meal_deduction: meal });
+          pendingLines[name] = { adjust: adj, meal };
+          ok++;
+        } catch { failed++; }
+      }
+      setLinesByName(pendingLines);
+      toast.success(`복원 완료 · 저장 ${ok}건${skipped ? ` · 건너뜀 ${skipped}` : ''}${failed ? ` · 실패 ${failed}` : ''}`);
+    } catch (e: any) {
+      toast.error(`CSV 파싱 실패: ${e.message || e}`);
+    } finally {
+      if (csvInputRef.current) csvInputRef.current.value = '';
+    }
+  };
+
+  // 안전장치: 탭 유지된 경우 sessionStorage 잔존값 감지 → 배너로 안내.
+  const [legacyBanner, setLegacyBanner] = useState<{ adjustCount: number; mealCount: number } | null>(null);
+  useEffect(() => {
+    if (!authorized || !settlementState) return;
+    try {
+      const rawAdj = sessionStorage.getItem('ps_sa_adjustmentsByKey');
+      const rawMeal = sessionStorage.getItem('ps_sa_mealDeductionsByKey');
+      if (!rawAdj && !rawMeal) return;
+      const adjMap: Record<string, number> = rawAdj ? JSON.parse(rawAdj) : {};
+      const mealMap: Record<string, number> = rawMeal ? JSON.parse(rawMeal) : {};
+      const prefix = `${yearMonth}|`;
+      const adjustCount = Object.entries(adjMap).filter(([k, v]) => k.startsWith(prefix) && v !== 0).length;
+      const mealCount = Object.entries(mealMap).filter(([k, v]) => k.startsWith(prefix) && v > 0).length;
+      if (adjustCount > 0 || mealCount > 0) setLegacyBanner({ adjustCount, mealCount });
+      else setLegacyBanner(null);
+    } catch {}
+  }, [authorized, yearMonth, settlementState]);
+
+  const handleLegacyRestore = async () => {
+    if (!confirm(`탭에 남은 이전 값을 서버로 이관합니다.\n조정 ${legacyBanner?.adjustCount || 0}건 + 식대공제 ${legacyBanner?.mealCount || 0}건.\n서버에 이미 값이 있는 인원은 덮어씁니다.`)) return;
+    try {
+      const rawAdj = sessionStorage.getItem('ps_sa_adjustmentsByKey');
+      const rawMeal = sessionStorage.getItem('ps_sa_mealDeductionsByKey');
+      const adjMap: Record<string, number> = rawAdj ? JSON.parse(rawAdj) : {};
+      const mealMap: Record<string, number> = rawMeal ? JSON.parse(rawMeal) : {};
+      const prefix = `${yearMonth}|`;
+      const nameSet = new Set<string>();
+      for (const k of Object.keys(adjMap)) if (k.startsWith(prefix)) nameSet.add(k.slice(prefix.length));
+      for (const k of Object.keys(mealMap)) if (k.startsWith(prefix)) nameSet.add(k.slice(prefix.length));
+      const pendingLines: Record<string, { adjust: number; meal: number }> = { ...linesByName };
+      let ok = 0, failed = 0;
+      for (const name of nameSet) {
+        const adj = adjMap[`${prefix}${name}`] || 0;
+        const meal = mealMap[`${prefix}${name}`] || 0;
+        try {
+          await saveAlbaSettlementLine(yearMonth, { employee_name: name, adjust_amount: adj, meal_deduction: meal });
+          pendingLines[name] = { adjust: adj, meal };
+          ok++;
+        } catch { failed++; }
+      }
+      setLinesByName(pendingLines);
+      setLegacyBanner(null);
+      toast.success(`sessionStorage 이관 완료 · ${ok}건${failed ? ` · 실패 ${failed}` : ''}`);
+    } catch (e: any) {
+      toast.error(`이관 실패: ${e.message || e}`);
+    }
+  };
+
   const calcEmp = (r: any, idx: number) => {
     const floor30 = (h: number) => Math.floor(h * 2) / 2;
     const rate = rates[idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate);
@@ -319,18 +437,41 @@ export default function SettlementAlbaPage() {
                 <Button variant="secondary" size="sm" leadingIcon={<Unlock size={14} />} onClick={handleReopen}>마감 재개</Button>
               </>
             ) : (
-              rows.length > 0 && (
-                <Button variant="primary" size="sm" leadingIcon={<Lock size={14} />} onClick={handleClose}>월 마감</Button>
-              )
+              <>
+                <Button variant="secondary" size="sm" leadingIcon={<UploadIcon size={14} />} onClick={() => csvInputRef.current?.click()} title="이전에 다운받은 알바정산 CSV로 조정·식대공제 값을 복원합니다">CSV 복원</Button>
+                {rows.length > 0 && (
+                  <Button variant="primary" size="sm" leadingIcon={<Lock size={14} />} onClick={handleClose}>월 마감</Button>
+                )}
+              </>
             )}
             {rows.length > 0 && (
               <Button variant="secondary" size="sm" leadingIcon={<Download size={14} />} onClick={handleExcel}>
                 엑셀 다운로드
               </Button>
             )}
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvImport(f); }}
+            />
           </div>
         }
       />
+      {legacyBanner && !isClosed && (
+        <div className="p-3 rounded-[var(--r-md)] bg-[var(--warning-bg)] border border-[var(--warning-border)] text-[var(--warning-fg)] text-[12px] flex justify-between items-center gap-2">
+          <div>
+            <b>이전 브라우저 값 감지</b> — 이 탭 sessionStorage에 {yearMonth} 조정 {legacyBanner.adjustCount}건 + 식대공제 {legacyBanner.mealCount}건이 남아있습니다.
+            <br />
+            <span className="text-[11px] opacity-80">어제 값이면 서버로 이관하세요. 이 알림은 이관하거나 다른 월을 열면 사라집니다.</span>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button variant="primary" size="sm" onClick={handleLegacyRestore}>서버로 이관</Button>
+            <Button variant="ghost" size="sm" onClick={() => setLegacyBanner(null)}>닫기</Button>
+          </div>
+        </div>
+      )}
       {isClosed && (
         <div className="p-3 rounded-[var(--r-md)] bg-[var(--danger-bg)] border border-[var(--danger-border)] text-[var(--danger-fg)] text-[12px]">
           <b>{yearMonth}</b> 정산이 마감되었습니다 — 조정·식대공제 입력이 잠겼습니다.

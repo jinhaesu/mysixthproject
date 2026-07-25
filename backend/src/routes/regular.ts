@@ -1532,14 +1532,18 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
         }
         if (np) wIdByPhone.set(np, w.id);
       }
-      const regs = await dbAll("SELECT name, phone, department FROM regular_employees WHERE is_active = 1");
+      // 퇴사자(is_active=0)도 이전 근태 데이터가 남아있으므로 부서 조회에는 포함
+      const regs = await dbAll("SELECT name, phone, department FROM regular_employees ORDER BY is_active DESC, updated_at DESC");
       for (const r of regs as any[]) {
         if (!r.department) continue;
         const np = normalizePhone(r.phone || '');
-        if (np) deptByPhone.set(np, r.department);
+        // 재직자(is_active=1) 를 먼저 순회하므로 setIfAbsent 로 재직자 부서를 우선
+        if (np && !deptByPhone.has(np)) deptByPhone.set(np, r.department);
         if (r.name) {
-          deptByName.set(r.name, r.department);
-          for (const alias of extractKoreanAlias(r.name)) deptByAlias.set(alias, r.department);
+          if (!deptByName.has(r.name)) deptByName.set(r.name, r.department);
+          for (const alias of extractKoreanAlias(r.name)) {
+            if (!deptByAlias.has(alias)) deptByAlias.set(alias, r.department);
+          }
         }
       }
     } catch {}
@@ -1596,12 +1600,21 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
       const identity = canonicalIdentity(r);
       const key = `${identity}|${effType}`;
       if (!empMap.has(key)) {
+        // 확정 시점에 저장된 department 우선, 없으면 workers/regular_employees 조회
+        const savedDept = (r.department || '').toString().trim();
         empMap.set(key, {
           name: r.employee_name, phone: r.employee_phone, type: effType,
-          department: resolveDept(r.employee_name, r.employee_phone),
+          department: savedDept || resolveDept(r.employee_name, r.employee_phone),
           days: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, break_hours: 0, holiday_days: 0,
           records: []
         });
+      } else {
+        // 첫 record 로 emp 를 만든 뒤, 이후 record 에서 부서가 채워진 게 나오면 upgrade
+        const emp = empMap.get(key)!;
+        if (!emp.department) {
+          const savedDept = (r.department || '').toString().trim();
+          if (savedDept) emp.department = savedDept;
+        }
       }
       const emp = empMap.get(key)!;
       emp.days++;

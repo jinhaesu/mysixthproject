@@ -1682,6 +1682,102 @@ router.delete('/confirmed-list/:id', async (req: AuthRequest, res: Response) => 
   }
 });
 
+// POST /api/regular/backfill-confirmed-dept - Backfill confirmed_attendance.department
+// from workers/regular_employees where currently empty.
+// Priority: phone(normalized) → name exact → korean-alias
+router.post('/backfill-confirmed-dept', async (req: AuthRequest, res: Response) => {
+  try {
+    const { year_month, force } = (req.body || {}) as { year_month?: string; force?: boolean };
+    // 대상 필터: 기본은 department 비어있는 행만. force=true 면 전체(덮어씀).
+    // year_month 필터도 옵션.
+    const whereParts: string[] = [];
+    const params: any[] = [];
+    if (!force) whereParts.push("(department IS NULL OR department = '')");
+    if (year_month) { whereParts.push('year_month = ?'); params.push(year_month); }
+    const where = whereParts.length ? 'WHERE ' + whereParts.join(' AND ') : '';
+
+    const targets = await dbAll(`SELECT id, employee_name, employee_phone, department FROM confirmed_attendance ${where}`, ...params) as any[];
+
+    // Build lookup maps (workers 우선, regular_employees 재직자 우선)
+    const deptByPhone = new Map<string, string>();
+    const deptByName = new Map<string, string>();
+    const deptByAlias = new Map<string, string>();
+    const extractKoreanAlias = (name: string): string[] => {
+      const aliases: string[] = [];
+      if (!name) return aliases;
+      const parenMatch = name.match(/\(([^)]+)\)/);
+      const inside = parenMatch ? parenMatch[1].trim() : '';
+      const outside = name.replace(/\([^)]*\)/g, '').trim();
+      const hasKorean = (s: string) => /[가-힣]/.test(s);
+      if (inside && hasKorean(inside) && !hasKorean(outside)) aliases.push(inside);
+      if (outside && hasKorean(outside) && inside && !hasKorean(inside)) aliases.push(outside);
+      return aliases;
+    };
+    const workers = await dbAll('SELECT phone, name_ko, department FROM workers') as any[];
+    for (const w of workers) {
+      if (!w.department) continue;
+      const np = normalizePhone(w.phone || '');
+      if (np) deptByPhone.set(np, w.department);
+      if (w.name_ko) {
+        deptByName.set(w.name_ko, w.department);
+        for (const a of extractKoreanAlias(w.name_ko)) deptByAlias.set(a, w.department);
+      }
+    }
+    const regs = await dbAll('SELECT name, phone, department FROM regular_employees ORDER BY is_active DESC, updated_at DESC') as any[];
+    for (const r of regs) {
+      if (!r.department) continue;
+      const np = normalizePhone(r.phone || '');
+      if (np && !deptByPhone.has(np)) deptByPhone.set(np, r.department);
+      if (r.name) {
+        if (!deptByName.has(r.name)) deptByName.set(r.name, r.department);
+        for (const a of extractKoreanAlias(r.name)) {
+          if (!deptByAlias.has(a)) deptByAlias.set(a, r.department);
+        }
+      }
+    }
+    const resolve = (name: string, phone: string): string => {
+      const np = normalizePhone(phone || '');
+      if (np) { const d = deptByPhone.get(np); if (d) return d; }
+      if (name) {
+        const d = deptByName.get(name); if (d) return d;
+        const a = deptByAlias.get(name); if (a) return a;
+        for (const alias of extractKoreanAlias(name)) {
+          const da = deptByName.get(alias) || deptByAlias.get(alias);
+          if (da) return da;
+        }
+      }
+      return '';
+    };
+
+    let updated = 0;
+    const unresolved: Array<{ name: string; phone: string; count: number }> = [];
+    const unresolvedMap = new Map<string, { name: string; phone: string; count: number }>();
+    for (const t of targets) {
+      const d = resolve(t.employee_name, t.employee_phone);
+      if (d) {
+        await dbRun('UPDATE confirmed_attendance SET department = ? WHERE id = ?', d, t.id);
+        updated++;
+      } else {
+        const k = `${t.employee_name}|${t.employee_phone}`;
+        const cur = unresolvedMap.get(k);
+        if (cur) cur.count++;
+        else unresolvedMap.set(k, { name: t.employee_name, phone: t.employee_phone, count: 1 });
+      }
+    }
+    unresolved.push(...unresolvedMap.values());
+
+    res.json({
+      total_scanned: targets.length,
+      updated,
+      unresolved_workers: unresolved.length,
+      unresolved: unresolved.slice(0, 100),
+    });
+  } catch (error: any) {
+    console.error('POST /backfill-confirmed-dept error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/regular/recalc-confirmed - Recalculate all confirmed records with clock-in ceil30 + clock-out floor30
 router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
   try {

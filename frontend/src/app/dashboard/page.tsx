@@ -35,6 +35,8 @@ interface SummaryRow {
   weekly_holiday_hours?: number;    // 주휴수당 시간 (qualifying weeks × 8)
   // 직원별 worker.hourly_rate로 settlement-alba와 동일 산식 적용한 gross_pay 합 (사업소득/파견 전용)
   salary?: number;
+  // 부서 '-' 그룹에 어떤 직원이 들어갔는지 추적 (진단용)
+  unresolved_members?: Array<{ name: string; phone: string; hours: number; days: number }>;
 }
 
 interface DailyRow {
@@ -339,6 +341,16 @@ function DashboardContent() {
           row.overtime_hours += emp.overtime_hours || 0;
           row.night_hours += emp.night_hours || 0;
           row.total_hours += (emp.regular_hours || 0) + floor30g(emp.overtime_hours || 0) + (emp.night_hours || 0);
+          // 부서 '-' 그룹에 속한 직원 추적
+          if (!dept) {
+            if (!row.unresolved_members) row.unresolved_members = [];
+            row.unresolved_members.push({
+              name: emp.name || '(no name)',
+              phone: emp.phone || '',
+              hours: Math.round(((emp.regular_hours || 0) + floor30g(emp.overtime_hours || 0) + (emp.night_hours || 0)) * 10) / 10,
+              days: emp.days || 0,
+            });
+          }
           const { holidayPayHours, weeklyHolidayHours } = calcEmpHolidayHours(emp);
           row.holiday_pay_hours = (row.holiday_pay_hours || 0) + holidayPayHours;
           row.weekly_holiday_hours = (row.weekly_holiday_hours || 0) + weeklyHolidayHours;
@@ -904,10 +916,19 @@ function DashboardContent() {
                       <tbody>
                         {groups.map((g, gi) => {
                           const fragment: React.ReactNode[] = [];
+                          const unresolvedInGroup = g.rows.flatMap(r => r.unresolved_members || []);
+                          const isUnresolvedGroup = !g.department && unresolvedInGroup.length > 0;
+                          const memberList = unresolvedInGroup.map(m => `${m.name}${m.phone ? ' ('+m.phone+')' : ''}: ${m.hours}h/${m.days}일`).join('\n');
                           g.rows.forEach((r, ri) => {
                             fragment.push(
                               <tr key={`r-${gi}-${ri}`} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/40 transition-colors">
-                                {ri === 0 && <td className="px-3 py-2 font-medium text-[var(--text-1)]" rowSpan={g.rows.length}>{r.department || "-"}</td>}
+                                {ri === 0 && (
+                                  <td className={`px-3 py-2 font-medium ${isUnresolvedGroup ? 'text-[var(--danger-fg)] cursor-help' : 'text-[var(--text-1)]'}`}
+                                      rowSpan={g.rows.length}
+                                      title={isUnresolvedGroup ? `부서 미매칭 ${unresolvedInGroup.length}명:\n${memberList}\n\n→ /manage 에서 '확정근태 부서 채우기' 실행 또는 workers DB 등록/부서 확인` : undefined}>
+                                    {r.department || (isUnresolvedGroup ? `- (미매칭 ${unresolvedInGroup.length}명 ⓘ)` : '-')}
+                                  </td>
+                                )}
                                 {ri === 0 && <td className="px-3 py-2 text-[var(--text-2)]" rowSpan={g.rows.length}>{r.workplace || "-"}</td>}
                                 <td className="px-3 py-2 text-[var(--text-2)]">{r.category || "-"}</td>
                                 <td className="px-3 py-2 text-[var(--text-2)]">{r.shift}</td>

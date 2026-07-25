@@ -227,26 +227,58 @@ function DashboardContent() {
 
       // workers DB lookup map — emp.department 비었을 때 fallback (이슈 #4)
       // + 직원별 hourly_rate 적용을 위한 worker lookup (정산관리 합계와 일치시킬 목적)
+      // 이름 alias(괄호 안 한글): 'AHMAD FATA(파타)' → '파타' 도 매칭
       const workersList = (workersResp as any).workers || (workersResp as any) || [];
       const deptByIdentity = new Map<string, string>();
       const workerByIdentity = new Map<string, any>();
+      const extractKoreanAlias = (name: string): string[] => {
+        const aliases: string[] = [];
+        if (!name) return aliases;
+        const parenMatch = name.match(/\(([^)]+)\)/);
+        const inside = parenMatch ? parenMatch[1].trim() : '';
+        const outside = name.replace(/\([^)]*\)/g, '').trim();
+        const hasKorean = (s: string) => /[가-힣]/.test(s);
+        if (inside && hasKorean(inside) && !hasKorean(outside)) aliases.push(inside);
+        if (outside && hasKorean(outside) && inside && !hasKorean(inside)) aliases.push(outside);
+        return aliases;
+      };
       for (const w of workersList) {
         const np = normalizePhone(w.phone || '');
         if (w.department) {
           if (np) deptByIdentity.set(np, w.department);
-          if (w.name_ko) deptByIdentity.set(w.name_ko, w.department);
+          if (w.name_ko) {
+            deptByIdentity.set(w.name_ko, w.department);
+            for (const alias of extractKoreanAlias(w.name_ko)) deptByIdentity.set(alias, w.department);
+          }
         }
         if (np) workerByIdentity.set(np, w);
-        if (w.name_ko) workerByIdentity.set(w.name_ko, w);
+        if (w.name_ko) {
+          workerByIdentity.set(w.name_ko, w);
+          for (const alias of extractKoreanAlias(w.name_ko)) workerByIdentity.set(alias, w);
+        }
       }
       const lookupDept = (emp: any): string => {
         if (emp.department) return emp.department;
         const np = normalizePhone(emp.phone || '');
-        return deptByIdentity.get(np) || deptByIdentity.get(emp.name) || '';
+        if (np) { const d = deptByIdentity.get(np); if (d) return d; }
+        if (emp.name) {
+          const d = deptByIdentity.get(emp.name); if (d) return d;
+          for (const alias of extractKoreanAlias(emp.name)) {
+            const da = deptByIdentity.get(alias); if (da) return da;
+          }
+        }
+        return '';
       };
       const lookupWorker = (emp: any): any => {
         const np = normalizePhone(emp.phone || '');
-        return workerByIdentity.get(np) || workerByIdentity.get(emp.name) || {};
+        if (np) { const w = workerByIdentity.get(np); if (w) return w; }
+        if (emp.name) {
+          const w = workerByIdentity.get(emp.name); if (w) return w;
+          for (const alias of extractKoreanAlias(emp.name)) {
+            const wa = workerByIdentity.get(alias); if (wa) return wa;
+          }
+        }
+        return {};
       };
 
       const parseRow = (r: any) => ({ ...r, total_hours: parseFloat(r.total_hours) || 0, regular_hours: parseFloat(r.regular_hours) || 0, overtime_hours: parseFloat(r.overtime_hours) || 0, night_hours: parseFloat(r.night_hours) || 0, attendance_count: parseInt(r.attendance_count) || 0, unique_workers: parseInt(r.unique_workers) || 0, annual_leave_days: parseInt(r.annual_leave_days) || 0 });

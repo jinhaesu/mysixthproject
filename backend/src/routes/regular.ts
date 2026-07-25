@@ -1493,16 +1493,38 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
 
     const records = await dbAll(`SELECT * FROM confirmed_attendance ${where} ORDER BY employee_name, date`, ...params);
 
-    // Look up departments + worker categories + worker IDs (phone 기준만)
-    // NOTE: 이름 괄호 suffix('수빈(HO THI BICH)')는 별개 사람일 수 있어 병합 금지.
-    const deptMap = new Map<string, string>();
+    // Look up departments + worker categories + worker IDs
+    // 부서 매칭 우선순위: phone(normalize) → name exact → name alias(괄호 안 한글 substring)
+    // NOTE: 이름 괄호 suffix('수빈(HO THI BICH)')는 별개 사람일 수 있어 병합 금지 —
+    //       단, 부서 조회에 한해 alias 매칭 허용 (동일부서 배정 가정, 문제 시 phone 매칭이 우선).
+    const deptByPhone = new Map<string, string>();
+    const deptByName = new Map<string, string>();
+    const deptByAlias = new Map<string, string>();
     const catMap = new Map<string, string>();
     const wIdByPhone = new Map<string, number>();
+    // 괄호 안 한글 substring 추출: 'AHMAD FATA(파타)' → '파타', '수빈(HO THI BICH)' → '수빈'
+    const extractKoreanAlias = (name: string): string[] => {
+      const aliases: string[] = [];
+      if (!name) return aliases;
+      const parenMatch = name.match(/\(([^)]+)\)/);
+      const inside = parenMatch ? parenMatch[1].trim() : '';
+      const outside = name.replace(/\([^)]*\)/g, '').trim();
+      const hasKorean = (s: string) => /[가-힣]/.test(s);
+      if (inside && hasKorean(inside) && !hasKorean(outside)) aliases.push(inside);
+      if (outside && hasKorean(outside) && inside && !hasKorean(inside)) aliases.push(outside);
+      return aliases;
+    };
     try {
       const workers = await dbAll("SELECT id, name_ko, phone, department, category FROM workers");
       for (const w of workers as any[]) {
         const np = normalizePhone(w.phone || '');
-        if (w.name_ko) deptMap.set(w.name_ko, w.department || '');
+        if (w.department) {
+          if (np) deptByPhone.set(np, w.department);
+          if (w.name_ko) {
+            deptByName.set(w.name_ko, w.department);
+            for (const alias of extractKoreanAlias(w.name_ko)) deptByAlias.set(alias, w.department);
+          }
+        }
         if (w.category) {
           if (np) catMap.set(np, w.category);
           if (w.phone) catMap.set(w.phone, w.category);
@@ -1510,9 +1532,35 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
         }
         if (np) wIdByPhone.set(np, w.id);
       }
-      const regs = await dbAll("SELECT name, department FROM regular_employees WHERE is_active = 1");
-      for (const r of regs as any[]) { if (r.name) deptMap.set(r.name, r.department || ''); }
+      const regs = await dbAll("SELECT name, phone, department FROM regular_employees WHERE is_active = 1");
+      for (const r of regs as any[]) {
+        if (!r.department) continue;
+        const np = normalizePhone(r.phone || '');
+        if (np) deptByPhone.set(np, r.department);
+        if (r.name) {
+          deptByName.set(r.name, r.department);
+          for (const alias of extractKoreanAlias(r.name)) deptByAlias.set(alias, r.department);
+        }
+      }
     } catch {}
+    const resolveDept = (name: string, phone: string): string => {
+      const np = normalizePhone(phone || '');
+      if (np) {
+        const d = deptByPhone.get(np);
+        if (d) return d;
+      }
+      if (name) {
+        const d = deptByName.get(name);
+        if (d) return d;
+        const a = deptByAlias.get(name);
+        if (a) return a;
+        for (const alias of extractKoreanAlias(name)) {
+          const da = deptByName.get(alias) || deptByAlias.get(alias);
+          if (da) return da;
+        }
+      }
+      return '';
+    };
 
     // Effective type: 명시값 있으면 그대로 사용, 빈 값만 workers.category로 fallback
     // '정규직' 등 명시값은 자동 재분류 안 함
@@ -1550,7 +1598,7 @@ router.get('/confirmed-list', async (req: AuthRequest, res: Response) => {
       if (!empMap.has(key)) {
         empMap.set(key, {
           name: r.employee_name, phone: r.employee_phone, type: effType,
-          department: deptMap.get(r.employee_name) || '',
+          department: resolveDept(r.employee_name, r.employee_phone),
           days: 0, regular_hours: 0, overtime_hours: 0, night_hours: 0, break_hours: 0, holiday_days: 0,
           records: []
         });

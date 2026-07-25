@@ -66,6 +66,17 @@ export default function SettlementDispatchPage() {
       const workersList = (workersResp as any).workers || (workersResp as any) || [];
       const catMap = new Map<string, string>();
       const workerByIdentity = new Map<string, any>();
+      const extractKoreanAlias = (name: string): string[] => {
+        const aliases: string[] = [];
+        if (!name) return aliases;
+        const parenMatch = name.match(/\(([^)]+)\)/);
+        const inside = parenMatch ? parenMatch[1].trim() : '';
+        const outside = name.replace(/\([^)]*\)/g, '').trim();
+        const hasKorean = (s: string) => /[가-힣]/.test(s);
+        if (inside && hasKorean(inside) && !hasKorean(outside)) aliases.push(inside);
+        if (outside && hasKorean(outside) && inside && !hasKorean(inside)) aliases.push(outside);
+        return aliases;
+      };
       for (const w of workersList) {
         const np = normalizePhone(w.phone || '');
         if (w.category) {
@@ -74,8 +85,22 @@ export default function SettlementDispatchPage() {
           if (w.name_ko) catMap.set(w.name_ko, w.category);
         }
         if (np) workerByIdentity.set(np, w);
-        if (w.name_ko) workerByIdentity.set(w.name_ko, w);
+        if (w.name_ko) {
+          workerByIdentity.set(w.name_ko, w);
+          for (const alias of extractKoreanAlias(w.name_ko)) workerByIdentity.set(alias, w);
+        }
       }
+      const lookupWorker = (name: string, phone: string): any => {
+        const np = normalizePhone(phone || '');
+        if (np) { const w = workerByIdentity.get(np); if (w) return w; }
+        if (name) {
+          const w = workerByIdentity.get(name); if (w) return w;
+          for (const alias of extractKoreanAlias(name)) {
+            const wa = workerByIdentity.get(alias); if (wa) return wa;
+          }
+        }
+        return {};
+      };
 
       const empMap = new Map<string, any>();
       for (const e of (confList || [])) {
@@ -90,7 +115,7 @@ export default function SettlementDispatchPage() {
           if (effType !== '파견') continue;
           const identity = `n:${r.employee_name || ''}`;
           if (!empMap.has(identity)) {
-            const worker = workerByIdentity.get(normalizePhone(r.employee_phone || '')) || workerByIdentity.get(r.employee_name) || {};
+            const worker = lookupWorker(r.employee_name || '', r.employee_phone || '');
             empMap.set(identity, {
               name: r.employee_name,
               phone: r.employee_phone || '',

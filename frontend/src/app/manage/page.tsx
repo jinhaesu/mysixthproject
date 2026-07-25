@@ -136,6 +136,42 @@ export default function ManagePage() {
             </Button>
           </div>
         </Card>
+
+        <Card tone="ghost" className="border-[var(--info-border)] bg-[var(--info-bg)]">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Tags size={18} className="text-[var(--info-fg)] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[var(--fs-body)] font-semibold text-[var(--info-fg)]">확정근태 부서 일괄 채우기 (대시보드 소계 '-' 해결)</p>
+                <p className="text-[var(--fs-caption)] text-[var(--info-fg)] mt-0.5 opacity-80">
+                  파견·알바 확정근태 중 부서가 비어있는 행을 근무자DB(phone/이름) 기준으로 자동 채웁니다. 매칭 실패자는 결과 알림에 나옵니다.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem('token');
+                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/backfill-confirmed-dept`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({}),
+                  });
+                  const body = await res.json();
+                  let msg = `대상 ${body.total_scanned}건 중 ${body.updated}건 부서 채움`;
+                  if (body.unresolved_workers > 0) {
+                    const names = (body.unresolved || []).map((u: any) => u.name || u.phone).slice(0, 10).join(', ');
+                    msg += ` | 미매칭 ${body.unresolved_workers}명: ${names}${body.unresolved_workers > 10 ? ' 외' : ''}`;
+                  }
+                  toast.success(msg);
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            >
+              부서 채우기
+            </Button>
+          </div>
+        </Card>
       </div>
 
       <Section title="업로드 기록">

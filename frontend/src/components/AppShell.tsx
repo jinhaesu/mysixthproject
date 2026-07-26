@@ -10,6 +10,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 // 이전에 includes 정확일치를 사용해 /r 하위 서브페이지들이 관리자 사이드바로 렌더되던 보안 결함 수정.
 const PUBLIC_PREFIXES = [
   "/login",
+  "/sso",
   "/s",
   "/r",
   "/report",

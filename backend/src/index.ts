@@ -53,8 +53,20 @@ const PORT = process.env.PORT || 4000;
 app.use(compression({ threshold: 1024 }));
 
 // Middleware - CORS
+// 통합 SSO: aisystem.nuldam.com 프론트 → Railway 백엔드 /api/auth/sso 는 cross-origin POST.
+// 중앙 인증 허브(auth.nuldam.com) + 앱 도메인(aisystem.nuldam.com) 을 명시적으로 허용.
+// 기존 동작(모든 origin 반사 허용)은 유지 — additive, 기존 클라이언트 비파괴.
+const SSO_ALLOWED_ORIGINS = new Set([
+  'https://aisystem.nuldam.com',
+  'https://auth.nuldam.com',
+]);
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // origin 없음(same-origin/서버-서버) 또는 SSO 명시 허용 목록 → 허용.
+    if (!origin || SSO_ALLOWED_ORIGINS.has(origin)) return callback(null, true);
+    // 그 외 origin 도 기존과 동일하게 반사 허용 (비파괴).
+    return callback(null, true);
+  },
   credentials: true,
 }));
 // MCP routes — must mount BEFORE express.json() so SSEServerTransport can

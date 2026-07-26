@@ -347,6 +347,16 @@ router.post('/sso', async (req: Request, res: Response) => {
       return;
     }
 
+    // 접근 권한 게이트 — 허브 관리자 콘솔에서 aisystem 'access' 메뉴 권한을 부여받은
+    // 사용자(레벨 무관) 또는 super-admin(super===true)만 진입 허용. 그 외에는 403 으로 차단.
+    const isSuper = payload.super === true;
+    const hasAccess = !!(payload.perms && payload.perms.access);
+    if (!isSuper && !hasAccess) {
+      console.warn(`[auth.sso] DENY email=${email} (aisystem access 권한 없음)`);
+      res.status(403).json({ error: '이 시스템에 대한 접근 권한이 없습니다. 관리자에게 문의하세요.' });
+      return;
+    }
+
     // 이 백엔드는 stateless (user 테이블 없음) — OTP verify 와 동일하게 자체 auth 토큰 재발급.
     // type:'auth' 필수 (requireAuth / /me 가 이 값을 검사).
     const appToken = jwt.sign(

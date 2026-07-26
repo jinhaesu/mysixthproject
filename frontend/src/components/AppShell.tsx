@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import NuldamSystemBar from "@/components/NuldamSystemBar";
 import { ToastProvider } from "@/components/ui/Toast";
 
 // 근로자·외부 사용자용 공개 페이지 prefix.
@@ -30,8 +31,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isPublicPage) return <ToastProvider>{children}</ToastProvider>;
 
+  // /sso 콜백 페이지는 인증 셸이지만 통합 시스템 바를 노출하지 않는다.
+  const isSsoPage = pathname === "/sso" || pathname.startsWith("/sso/");
+
   return (
     <ToastProvider>
+      {!isSsoPage && <NuldamSystemBar current="aisystem" />}
       <div className="flex min-h-screen bg-[var(--bg-canvas)]">
         <Sidebar />
         <main className="flex-1 ml-64 min-w-0">

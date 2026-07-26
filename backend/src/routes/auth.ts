@@ -2,10 +2,20 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { Resend } from 'resend';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'attendance-management-secret-key';
+
+// ============================================================================
+// 회사 계정 SSO (중앙 인증 허브) — 기존 OTP 로그인과 완전히 독립적으로 동작(ADDITIVE).
+// 허브가 발급한 RS256 JWT 를 JWKS 로 검증한 뒤, 이 앱의 자체 auth 토큰을 재발급.
+// JWKS 세트는 모듈 로드 시 1회 생성(내부적으로 캐싱/자동 rotation 처리).
+// ============================================================================
+const SSO_ISSUER = 'https://auth.nuldam.com';
+const SSO_AUDIENCE = 'aisystem';
+const ssoJwks = createRemoteJWKSet(new URL('https://auth-api.nuldam.com/.well-known/jwks.json'));
 
 function hashCode(code: string): string {
   return crypto.createHash('sha256').update(code).digest('hex');
@@ -306,6 +316,53 @@ router.post('/mcp-token', (req: Request, res: Response) => {
     res.json({ token: mcpToken, expires: '365 days' });
   } catch {
     res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+  }
+});
+
+// POST /api/auth/sso - 회사 계정 SSO 로그인 (허브 발급 RS256 JWT 검증)
+router.post('/sso', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({ error: 'SSO 토큰이 필요합니다.' });
+      return;
+    }
+
+    let payload: any;
+    try {
+      const verified = await jwtVerify(token, ssoJwks, {
+        issuer: SSO_ISSUER,
+        audience: SSO_AUDIENCE,
+      });
+      payload = verified.payload;
+    } catch (err: any) {
+      console.warn(`[auth.sso] verify failed: ${err?.message || err}`);
+      res.status(401).json({ error: 'SSO 인증에 실패했습니다. 다시 시도해주세요.' });
+      return;
+    }
+
+    const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+    if (!email) {
+      res.status(401).json({ error: 'SSO 토큰에 이메일 정보가 없습니다.' });
+      return;
+    }
+
+    // 이 백엔드는 stateless (user 테이블 없음) — OTP verify 와 동일하게 자체 auth 토큰 재발급.
+    // type:'auth' 필수 (requireAuth / /me 가 이 값을 검사).
+    const appToken = jwt.sign(
+      { email, type: 'auth' },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log(`[auth.sso] OK email=${email}`);
+    res.json({
+      token: appToken,
+      user: { email },
+    });
+  } catch (error: any) {
+    console.error('SSO error:', error);
+    res.status(500).json({ error: 'SSO 처리 중 오류가 발생했습니다.' });
   }
 });
 

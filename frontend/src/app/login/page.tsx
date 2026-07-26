@@ -142,6 +142,26 @@ export default function LoginPage() {
               >
                 {loading ? "발송 중..." : "인증 코드 발송"}
               </Button>
+
+              {/* 회사 계정 SSO — 중앙 인증 허브로 이동 (기존 OTP 로그인과 별개) */}
+              <div className="flex items-center gap-3 py-1">
+                <div className="h-px flex-1 bg-[var(--border-1)]" />
+                <span className="text-[var(--fs-caption)] text-[var(--text-4)]">또는</span>
+                <div className="h-px flex-1 bg-[var(--border-1)]" />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                className="w-full"
+                onClick={() => {
+                  window.location.href =
+                    "https://auth.nuldam.com/authorize?app=aisystem&return=" +
+                    encodeURIComponent("https://aisystem.nuldam.com/sso");
+                }}
+              >
+                회사 계정으로 로그인
+              </Button>
             </form>
           ) : (
             <form onSubmit={handleVerifyCode} className="space-y-5">

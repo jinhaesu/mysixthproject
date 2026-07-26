@@ -3,5 +3,15 @@
   "cleanUrls": true,
   "redirects": [
     { "source": "/attendance/:path*", "destination": "/:path*", "permanent": false }
+  ],
+  "headers": [
+    {
+      "source": "/login",
+      "headers": [{ "key": "Cache-Control", "value": "no-store, must-revalidate" }]
+    },
+    {
+      "source": "/sso",
+      "headers": [{ "key": "Cache-Control", "value": "no-store, must-revalidate" }]
+    }
   ]
 }

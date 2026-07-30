@@ -24,7 +24,7 @@ export function useAuth() {
 }
 
 // SECURITY: 공개 페이지 판정은 prefix startsWith 로. /r/hazard-report 같은 서브 페이지도 반드시 포함.
-const PUBLIC_PREFIXES = ["/login", "/s", "/r", "/report", "/report-regular", "/contract", "/regular-contract", "/resignation-letter", "/onboarding-info", "/cafe-contract"];
+const PUBLIC_PREFIXES = ["/login", "/sso", "/s", "/r", "/report", "/report-regular", "/contract", "/regular-contract", "/resignation-letter", "/onboarding-info", "/cafe-contract"];
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }

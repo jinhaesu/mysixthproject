@@ -9,7 +9,7 @@ const VARIANT: Record<Variant, string> = {
   primary:   "bg-[var(--brand-500)] hover:bg-[var(--brand-600)] active:bg-[var(--brand-700)] text-white border-transparent",
   secondary: "bg-[var(--bg-2)] hover:bg-[var(--bg-3)] text-[var(--text-1)] border-[var(--border-2)]",
   ghost:     "bg-transparent hover:bg-[var(--bg-2)] text-[var(--text-2)] border-transparent",
-  danger:    "bg-[var(--danger-bg)] hover:bg-[#F8717125] text-[var(--danger-fg)] border-[var(--danger-border)]",
+  danger:    "bg-[var(--danger-bg)] hover:bg-[var(--danger-fg)]/15 text-[var(--danger-fg)] border-[var(--danger-border)]",
   outline:   "bg-transparent hover:bg-[var(--bg-2)] text-[var(--text-1)] border-[var(--border-2)]",
 };
 

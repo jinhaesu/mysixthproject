@@ -620,7 +620,7 @@ export default function RegularManagePage() {
                   </thead>
                   <tbody>
                     {employees.filter((emp) => !empSearch || emp.name.includes(empSearch) || emp.phone.includes(empSearch)).map((emp) => (
-                      <tr key={emp.id} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/500">
+                      <tr key={emp.id} className="border-b border-[var(--border-1)] hover:bg-[var(--bg-2)]/50">
                         <td className="px-4 py-3">
                           <input
                             type="checkbox"

@@ -2304,7 +2304,7 @@ function ShiftsTab() {
                 {unassigned.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5">
                     {unassigned.map((e: any) => (
-                      <div key={e.id} className="flex items-center gap-2 bg-[var(--warning-fg)]/10 rounded-lg px-2.5 py-2 border border-orange-100">
+                      <div key={e.id} className="flex items-center gap-2 bg-[var(--warning-fg)]/10 rounded-lg px-2.5 py-2 border border-[var(--warning-border)]">
                         <div className="w-6 h-6 rounded-full bg-[var(--warning-fg)]/20 flex items-center justify-center text-[10px] font-bold text-[var(--warning-fg)]">
                           {(e.name || '?')[0]}
                         </div>

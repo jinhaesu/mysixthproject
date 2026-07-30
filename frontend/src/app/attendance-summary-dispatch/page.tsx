@@ -545,7 +545,7 @@ export default function AttendanceSummaryDispatchPage() {
                             <tr key={date} className={isDayConfirmed ? 'bg-[var(--success-fg)]/10' : isHolidayW ? 'bg-[var(--danger-fg)]/10' : isPlannedOnly ? 'bg-[var(--info-fg)]/5' : isAnomaly ? 'bg-[var(--danger-fg)]/10' : 'bg-[var(--bg-1)]'}>
                               <td className="py-1.5 px-3">
                                 {isDayConfirmed ? (
-                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                  <CheckCircle2 className="w-4 h-4 text-[var(--success-fg)]" />
                                 ) : (
                                   <input type="checkbox" checked={checkedRows.has(key)}
                                     onChange={e => { const n = new Set(checkedRows); if (e.target.checked) n.add(key); else n.delete(key); setCheckedRows(n); }}
@@ -553,7 +553,7 @@ export default function AttendanceSummaryDispatchPage() {
                                 )}
                               </td>
                               <td className="py-1.5 px-3 text-[var(--text-2)]">{date.slice(5)}{isDayConfirmed && <span className="ml-1 text-[9px] text-[var(--success-fg)]">확정</span>}{isHolidayW && !isDayConfirmed && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[var(--danger-fg)]/15 text-[var(--danger-fg)]">휴일근무</span>}{isPlannedOnly && !isDayConfirmed && <span className="ml-1 px-1 py-0.5 rounded text-[9px] font-medium bg-[var(--info-fg)]/15 text-[var(--brand-400)]">계획만</span>}</td>
-                              <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-[var(--danger-fg)] font-bold' : dowNum === 6 ? 'text-blue-500 font-bold' : 'text-[var(--text-3)]'}`}>{dow}</td>
+                              <td className={`py-1.5 px-3 ${dowNum === 0 ? 'text-[var(--danger-fg)] font-bold' : dowNum === 6 ? 'text-[var(--info-fg)] font-bold' : 'text-[var(--text-3)]'}`}>{dow}</td>
                               <td className="py-1.5 px-3 text-[var(--brand-400)]">{plannedIn}</td>
                               <td className="py-1.5 px-3 text-[var(--brand-400)]">{plannedOut}</td>
                               <td className={`py-1.5 px-3 ${isAnomaly ? 'text-[var(--danger-fg)] font-bold' : 'text-[var(--success-fg)]'}`}>{actualIn}</td>

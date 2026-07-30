@@ -22,12 +22,14 @@ export const SEMANTIC_COLORS = {
   net:       '#10B981',  // 실지급 — deeper emerald
 };
 
+// Theme-aware — Recharts SVG accepts CSS var() references for fill/stroke,
+// so these follow the light/dark tokens defined in globals.css automatically.
 export const AXIS_STYLE = {
   fontSize: 11,
-  fill: '#8A8F98',
+  fill: 'var(--text-3)',
 };
 
-export const GRID_STROKE = '#1F2226';
+export const GRID_STROKE = 'var(--border-1)';
 
 // Linear-style gradient pairs for area/bar fills (premium look).
 export const CHART_GRADIENTS = {

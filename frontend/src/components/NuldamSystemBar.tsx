@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const SYS = [
   { key: "hub", label: "Nuldam Auth Home", url: "https://auth.nuldam.com" },
@@ -48,6 +49,9 @@ export default function NuldamSystemBar({ current }: { current: string }) {
             style={{padding:"4px 10px",borderRadius:6,flexShrink:0,marginRight: isHub ? 8 : 0,color:"#52525b",cursor:"not-allowed",fontWeight:500}}>{s.label} 🔒</span>
         );
       })}
+      <div style={{marginLeft:"auto",flexShrink:0,paddingLeft:8}}>
+        <ThemeToggle />
+      </div>
     </div>
   );
 }

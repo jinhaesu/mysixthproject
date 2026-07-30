@@ -143,6 +143,86 @@
   --color-accent-hover: var(--brand-400);
 }
 
+/* ───────────────────────────────────────────────────────────
+   Light theme — Linear-style light palette.
+   Activated via <html data-theme="light">. Dark tokens above
+   remain the default (no attribute / data-theme="dark").
+   ─────────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  /* Surfaces (low → high) */
+  --bg-canvas: #FFFFFF;
+  --bg-0: #FFFFFF;
+  --bg-1: #F6F7F8;
+  --bg-2: #EEF0F2;
+  --bg-3: #E4E7EA;
+  --bg-overlay: rgba(255, 255, 255, 0.72);
+
+  /* Text */
+  --text-1: #0B0C0D;
+  --text-2: #3B4046;
+  --text-3: #6A7078;
+  --text-4: #9AA1A9;
+
+  /* Borders */
+  --border-1: #E6E8EB;
+  --border-2: #D7DADF;
+  --border-3: #C6CAD1;
+  --border-focus: #5E6AD2;
+
+  /* Semantic intents (tuned for white bg — darker fg, light tint bg) */
+  --success-fg:  #15803D;
+  --success-bg:  rgba(21, 128, 61, 0.08);
+  --success-border: rgba(21, 128, 61, 0.24);
+
+  --warning-fg:  #B45309;
+  --warning-bg:  rgba(180, 83, 9, 0.08);
+  --warning-border: rgba(180, 83, 9, 0.24);
+
+  --danger-fg:   #DC2626;
+  --danger-bg:   rgba(220, 38, 38, 0.08);
+  --danger-border: rgba(220, 38, 38, 0.24);
+
+  --info-fg:     #2563EB;
+  --info-bg:     rgba(37, 99, 235, 0.08);
+  --info-border: rgba(37, 99, 235, 0.24);
+
+  /* Chart palette — slightly deepened so lines/bars stay legible on white */
+  --chart-1: #5E6AD2;
+  --chart-2: #15803D;
+  --chart-3: #B45309;
+  --chart-4: #DC2626;
+  --chart-5: #9333EA;
+  --chart-6: #0891B2;
+  --chart-7: #EA580C;
+  --chart-8: #64748B;
+
+  /* Elevation — tuned for light surfaces (soft, low-contrast) */
+  --elev-1: 0 1px 0 rgba(255,255,255,0.6), 0 1px 2px rgba(15,17,20,0.06);
+  --elev-2: 0 1px 0 rgba(255,255,255,0.6), 0 4px 8px -2px rgba(15,17,20,0.08), 0 2px 4px rgba(15,17,20,0.05);
+  --elev-3: 0 1px 0 rgba(255,255,255,0.6), 0 12px 24px -6px rgba(15,17,20,0.10), 0 4px 8px rgba(15,17,20,0.06);
+  --elev-pop: 0 24px 48px -12px rgba(15,17,20,0.18), 0 8px 16px -4px rgba(15,17,20,0.10);
+
+  /* Compatibility aliases (legacy code still uses these) */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-1);
+  --color-bg-level-0: var(--bg-canvas);
+  --color-bg-level-1: var(--bg-1);
+  --color-bg-level-2: var(--bg-2);
+  --color-bg-secondary: var(--bg-3);
+  --color-bg-tertiary: var(--bg-3);
+  --color-bg-quaternary: #DDE1E5;
+  --color-text-primary: var(--text-1);
+  --color-text-secondary: var(--text-2);
+  --color-text-tertiary: var(--text-3);
+  --color-text-quaternary: var(--text-4);
+  --color-border-primary: var(--border-1);
+  --color-border-secondary: var(--border-2);
+  --color-border-tertiary: var(--border-3);
+  --color-brand-bg: var(--brand-500);
+  --color-link-primary: #4A55BD;
+  --color-accent-hover: var(--brand-600);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -157,6 +237,10 @@ html {
   font-size: 14px;
   color-scheme: dark;
   text-rendering: optimizeLegibility;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
 }
 
 body {
@@ -185,6 +269,13 @@ body::before {
     radial-gradient(80% 60% at 18% -10%, rgba(94,106,210,0.08), transparent 60%),
     radial-gradient(60% 60% at 92% 110%, rgba(99,102,241,0.05), transparent 60%);
   z-index: -1;
+}
+
+/* Light theme: much subtler ambient tint so it doesn't muddy the white canvas */
+html[data-theme="light"] body::before {
+  background:
+    radial-gradient(80% 60% at 18% -10%, rgba(94,106,210,0.05), transparent 60%),
+    radial-gradient(60% 60% at 92% 110%, rgba(99,102,241,0.03), transparent 60%);
 }
 
 /* Tabular numerals for stats and tables */

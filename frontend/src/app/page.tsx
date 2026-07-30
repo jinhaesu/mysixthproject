@@ -22,7 +22,8 @@ import {
 
 const DEPT_COLORS: Record<string, string> = {
   '물류': CHART_COLORS[0], '생산2층': CHART_COLORS[6], '생산3층': CHART_COLORS[1],
-  '생산 야간': CHART_COLORS[4], '물류 야간': CHART_COLORS[5], '기타': CHART_COLORS[7],
+  '생산 야간(2층)': CHART_COLORS[4], '생산 야간(3층)': CHART_COLORS[2],
+  '생산 야간': CHART_COLORS[3], '물류 야간': CHART_COLORS[5], '기타': CHART_COLORS[7],
 };
 function getDeptColor(dept: string) { return DEPT_COLORS[dept] || CHART_COLORS[7]; }
 const fmt = (n: number) => Math.round(n * 10) / 10;

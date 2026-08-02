@@ -153,7 +153,7 @@ export async function analyzeAttendance(records: AttendanceRecord[]): Promise<An
       : '';
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-fable-5',
       max_tokens: 1500,
       messages: [{
         role: 'user',

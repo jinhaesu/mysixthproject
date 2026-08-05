@@ -116,6 +116,7 @@ setInterval(() => {
 
 // POST /api/auth/send-code
 router.post('/send-code', async (req: Request, res: Response) => {
+  return res.status(403).json({ error: '이메일 코드 로그인은 비활성화되었습니다. 회사 Google 계정(SSO)으로 로그인하세요.' });
   try {
     const { email } = req.body;
     const ip = clientIp(req);
@@ -130,7 +131,9 @@ router.post('/send-code', async (req: Request, res: Response) => {
     // 1) IP rate limit — 브루트포스/이메일 추측 방어
     const ipCheck = checkRate(ipBuckets, ip, IP_WINDOW_MS, IP_LIMIT, IP_BLOCK_MS);
     if (!ipCheck.ok) {
+      // @ts-expect-error dead code below permanent 403 guard — TS drops union narrowing for unreachable code
       console.warn(`[auth.send-code] IP RL blocked ip=${ip} email=${normalizedEmail} retry=${ipCheck.retryAfterSec}s`);
+      // @ts-expect-error dead code below permanent 403 guard — TS drops union narrowing for unreachable code
       res.status(429).json({ error: `요청이 너무 잦습니다. ${ipCheck.retryAfterSec}초 후 다시 시도해주세요.` });
       return;
     }
@@ -138,7 +141,9 @@ router.post('/send-code', async (req: Request, res: Response) => {
     // 2) Email rate limit — 동일 이메일 1분 1회
     const emailCheck = checkRate(emailBuckets, normalizedEmail, EMAIL_WINDOW_MS, EMAIL_LIMIT, EMAIL_BLOCK_MS);
     if (!emailCheck.ok) {
+      // @ts-expect-error dead code below permanent 403 guard — TS drops union narrowing for unreachable code
       console.warn(`[auth.send-code] email RL blocked ip=${ip} email=${normalizedEmail} retry=${emailCheck.retryAfterSec}s`);
+      // @ts-expect-error dead code below permanent 403 guard — TS drops union narrowing for unreachable code
       res.status(429).json({ error: `같은 이메일로 너무 자주 요청했습니다. ${emailCheck.retryAfterSec}초 후 다시 시도해주세요.` });
       return;
     }
@@ -192,6 +197,7 @@ router.post('/send-code', async (req: Request, res: Response) => {
 
     if (sendError) {
       console.error('Resend API error:', sendError);
+      // @ts-expect-error dead code below permanent 403 guard — TS drops null narrowing for unreachable code
       res.status(500).json({ error: `이메일 발송 실패: ${sendError.message}` });
       return;
     }
@@ -206,6 +212,7 @@ router.post('/send-code', async (req: Request, res: Response) => {
 
 // POST /api/auth/verify
 router.post('/verify', (req: Request, res: Response) => {
+  return res.status(403).json({ error: '이메일 코드 로그인은 비활성화되었습니다. 회사 Google 계정(SSO)으로 로그인하세요.' });
   try {
     const { challengeToken, code } = req.body;
     const ip = clientIp(req);
@@ -218,7 +225,9 @@ router.post('/verify', (req: Request, res: Response) => {
     // IP rate limit (verify 도 동일 정책 — 브루트포스 OTP 코드 방어)
     const ipCheck = checkRate(ipBuckets, ip, IP_WINDOW_MS, IP_LIMIT * 2, IP_BLOCK_MS);
     if (!ipCheck.ok) {
+      // @ts-expect-error dead code below permanent 403 guard — TS drops union narrowing for unreachable code
       console.warn(`[auth.verify] IP RL blocked ip=${ip} retry=${ipCheck.retryAfterSec}s`);
+      // @ts-expect-error dead code below permanent 403 guard — TS drops union narrowing for unreachable code
       res.status(429).json({ error: `요청이 너무 잦습니다. ${ipCheck.retryAfterSec}초 후 다시 시도해주세요.` });
       return;
     }

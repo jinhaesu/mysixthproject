@@ -1825,6 +1825,98 @@ router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/regular/apply-substitute-workday - 대체근무 처리
+// 특정 부서·일자에 근무한 사람들을 "원 소정근로일 대체 근무"로 재분류:
+//   1) worked_date confirmed_attendance record 재계산 (평일 취급, holiday 프리미엄 제거)
+//   2) original_date 에 대체휴무 dummy record INSERT (없을 때만) → 결근 계산에서 제외됨
+// Body: { department?: string, worked_date: string, original_date: string, year_month?: string, employee_type?: string }
+router.post('/apply-substitute-workday', async (req: AuthRequest, res: Response) => {
+  try {
+    const { department, worked_date, original_date, year_month, employee_type } = (req.body || {}) as {
+      department?: string; worked_date: string; original_date: string; year_month?: string; employee_type?: string;
+    };
+    if (!worked_date || !original_date) {
+      res.status(400).json({ error: 'worked_date, original_date 필요' });
+      return;
+    }
+    const ym = year_month || worked_date.slice(0, 7);
+    const empType = employee_type || '정규직';
+
+    // 대상 records: worked_date 에 확정 근태 있는 사람들 (부서 필터 옵션)
+    const whereParts: string[] = ['date = ?', 'year_month = ?', 'employee_type = ?'];
+    const params: any[] = [worked_date, ym, empType];
+    if (department) { whereParts.push('department = ?'); params.push(department); }
+    const targets = await dbAll(`SELECT * FROM confirmed_attendance WHERE ${whereParts.join(' AND ')}`, ...params) as any[];
+
+    let recalcedCount = 0;
+    let dummyInsertedCount = 0;
+    const affectedEmployees: Array<{ name: string; phone: string }> = [];
+
+    for (const r of targets) {
+      // (1) worked_date record 를 평일로 재계산
+      if (r.confirmed_clock_in && r.confirmed_clock_out) {
+        const [h1, m1] = r.confirmed_clock_in.split(':').map(Number);
+        const [h2, m2] = r.confirmed_clock_out.split(':').map(Number);
+        if (!isNaN(h1) && !isNaN(h2)) {
+          const startMin = Math.ceil((h1 * 60 + (m1 || 0)) / 30) * 30;
+          let endMin = Math.floor((h2 * 60 + (m2 || 0)) / 30) * 30;
+          if (endMin <= startMin) endMin += 1440;
+          const totalH = (endMin - startMin) / 60;
+          const parsedBreak = parseFloat(r.break_hours);
+          const breakH = !isNaN(parsedBreak) ? parsedBreak : (totalH >= 8 ? 1 : totalH >= 4 ? 0.5 : 0);
+          const workH = Math.max(totalH - breakH, 0);
+          let nightMin = 0;
+          for (let min = startMin; min < endMin; min++) {
+            const h = Math.floor(min / 60) % 24;
+            if (h >= 22 || h < 6) nightMin++;
+          }
+          const nightH = Math.round(nightMin / 60 * 10) / 10;
+          const dayWork = Math.max(workH - nightH, 0);
+          // 평일 취급 (isHoliday=false 강제)
+          const regularH = Math.round(Math.min(dayWork, 8) * 10) / 10;
+          const overtimeH = Math.round(Math.max(dayWork - 8, 0) * 10) / 10;
+          const newMemo = ((r.memo || '') + ` [대체근무 · 원 소정: ${original_date}]`).trim();
+          await dbRun(
+            'UPDATE confirmed_attendance SET regular_hours = ?, overtime_hours = ?, night_hours = ?, holiday_work = 0, memo = ? WHERE id = ?',
+            regularH, overtimeH, nightH, newMemo, r.id
+          );
+          recalcedCount++;
+        }
+      }
+
+      // (2) original_date 에 dummy 대체휴무 record INSERT (없을 때만)
+      const existing = await dbGet(
+        'SELECT id FROM confirmed_attendance WHERE employee_type = ? AND employee_name = ? AND date = ?',
+        empType, r.employee_name, original_date
+      );
+      if (!existing) {
+        await dbRun(
+          `INSERT INTO confirmed_attendance
+             (employee_type, employee_name, employee_phone, date, confirmed_clock_in, confirmed_clock_out,
+              source, regular_hours, overtime_hours, night_hours, break_hours, holiday_work, memo, year_month, department)
+           VALUES (?, ?, ?, ?, '대체휴무', '대체휴무', 'substitute', 8, 0, 0, 0, 0, ?, ?, ?)`,
+          empType, r.employee_name, r.employee_phone || '', original_date,
+          `대체휴무 (${worked_date} 근무로 대체)`,
+          ym, r.department || department || ''
+        );
+        dummyInsertedCount++;
+      }
+      affectedEmployees.push({ name: r.employee_name, phone: r.employee_phone || '' });
+    }
+
+    res.json({
+      success: true,
+      worked_date, original_date, department: department || '(전체)',
+      recalced: recalcedCount,
+      dummy_inserted: dummyInsertedCount,
+      affected: affectedEmployees,
+    });
+  } catch (error: any) {
+    console.error('POST /apply-substitute-workday error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/regular/vacation-dates - Get approved vacation dates for a month
 router.get('/vacation-dates', async (req: AuthRequest, res: Response) => {
   try {

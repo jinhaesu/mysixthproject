@@ -218,7 +218,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.39.0';
+  const SCHEMA_VERSION = 'schema-v2.40.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -762,6 +762,41 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE confirmed_attendance ADD COLUMN IF NOT EXISTS department TEXT DEFAULT ''"); } catch {}
   try { await pool.query("CREATE INDEX IF NOT EXISTS idx_confirmed_year_month ON confirmed_attendance(year_month, employee_type)"); } catch {}
   try { await pool.query("CREATE INDEX IF NOT EXISTS idx_confirmed_employee_name ON confirmed_attendance(employee_name)"); } catch {}
+
+  // employment_periods (재입사 이력 관리 — 한 사람의 여러 근속기간을 별도 row 로 관리)
+  // 마이그레이션: regular_employees.hire_date/resign_date 값을 각 인원의 첫 period 로 seed.
+  // payroll-calc 는 hire_date/resign_date 를 계속 사용 (period 는 UI/이력 추적 목적).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS employment_periods (
+        id SERIAL PRIMARY KEY,
+        employee_type TEXT NOT NULL DEFAULT 'regular',
+        employee_ref_id INTEGER NOT NULL,
+        period_start DATE NOT NULL,
+        period_end DATE,
+        reason_start TEXT DEFAULT '입사',
+        reason_end TEXT DEFAULT '',
+        note TEXT DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_employment_periods_ref ON employment_periods(employee_type, employee_ref_id, period_start)');
+    // seed: 기존 regular_employees hire/resign 을 첫 period 로 채우기 (없을 때만)
+    await pool.query(`
+      INSERT INTO employment_periods (employee_type, employee_ref_id, period_start, period_end, reason_start, reason_end, note)
+      SELECT 'regular', re.id, re.hire_date::date,
+             CASE WHEN COALESCE(re.resign_date,'') <> '' THEN re.resign_date::date ELSE NULL END,
+             '입사', CASE WHEN COALESCE(re.resign_date,'') <> '' THEN '자진퇴사(추정)' ELSE '' END,
+             'auto-seeded from regular_employees.hire_date/resign_date'
+      FROM regular_employees re
+      WHERE re.hire_date IS NOT NULL AND re.hire_date <> ''
+        AND NOT EXISTS (
+          SELECT 1 FROM employment_periods ep
+          WHERE ep.employee_type = 'regular' AND ep.employee_ref_id = re.id
+        )
+    `);
+  } catch (e) { console.warn('employment_periods migration warn:', (e as any)?.message || e); }
 
   // Regular employee salary settings
   try {
@@ -2505,7 +2540,7 @@ export function getBusinessDate(now?: Date): string {
 // ===== Korean Public Holidays =====
 const KOREAN_HOLIDAYS: Record<number, string[]> = {
   2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
-  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-01','2026-05-05','2026-05-24','2026-05-25','2026-06-03','2026-06-06','2026-07-17','2026-08-15','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-09','2026-12-25'],
+  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-05-01','2026-05-05','2026-05-24','2026-05-25','2026-06-03','2026-06-06','2026-07-17','2026-08-15','2026-08-17','2026-09-24','2026-09-25','2026-09-26','2026-09-28','2026-10-03','2026-10-05','2026-10-09','2026-12-25'],
   2027: ['2027-01-01','2027-02-05','2027-02-06','2027-02-07','2027-03-01','2027-05-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-10-03','2027-10-09','2027-10-14','2027-10-15','2027-10-16','2027-12-25'],
 };
 

@@ -2110,17 +2110,68 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       ORDER BY employee_name, date
     `, yearMonth) as any[];
 
-    // 직원의 hire_date 맵 (phone-norm 기반) — confirmed_attendance 의 입사일 이전 records 제외용.
-    // 예: 4/15 입사자에게 4/8 records 가 있으면 actualWorkDays 부풀려져 결근 산정 왜곡됨.
+    // 직원의 근속 기간 맵 (phone-norm 기반) — 재입사 이력 관리 지원.
+    // employment_periods 우선, 없으면 regular_employees.hire_date fallback.
     const norm = (p: string) => (p || '').replace(/[-\s]/g, '').trim();
+    // Date → 'YYYY-MM-DD' 정규화. pg는 DATE 컬럼을 JS Date 로 리턴하므로 문자열 비교 위해 필수.
+    const toYMD = (v: any): string | null => {
+      if (!v) return null;
+      if (typeof v === 'string') return v.slice(0, 10);
+      if (v instanceof Date) {
+        // KST 로 offset 없이 로컬 날짜 그대로 (DB 저장 date 는 timezone naive)
+        const y = v.getFullYear();
+        const m = String(v.getMonth() + 1).padStart(2, '0');
+        const d = String(v.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      return String(v).slice(0, 10);
+    };
+    type Period = { start: string; end: string | null };
+    const periodsByPhone = new Map<string, Period[]>();
+    const periodsByName = new Map<string, Period[]>();
+    try {
+      const periodsRows = await dbAll(`
+        SELECT ep.employee_ref_id, ep.period_start, ep.period_end,
+               re.name, re.phone
+        FROM employment_periods ep
+        JOIN regular_employees re ON ep.employee_ref_id = re.id
+        WHERE ep.employee_type = 'regular'
+      `) as any[];
+      for (const p of periodsRows) {
+        const s = toYMD(p.period_start);
+        const e = toYMD(p.period_end);
+        if (!s) continue;
+        const period: Period = { start: s, end: e };
+        const np = norm(p.phone || '');
+        if (np) {
+          if (!periodsByPhone.has(np)) periodsByPhone.set(np, []);
+          periodsByPhone.get(np)!.push(period);
+        }
+        if (p.name) {
+          if (!periodsByName.has(p.name)) periodsByName.set(p.name, []);
+          periodsByName.get(p.name)!.push(period);
+        }
+      }
+    } catch (e) {
+      console.warn('employment_periods 조회 실패, hire_date fallback 사용:', (e as any)?.message || e);
+    }
     const hireMap = new Map<string, string>();
     const empHireRows = await dbAll(`SELECT phone, name, hire_date FROM regular_employees WHERE is_active = 1 OR (resign_date != '' AND resign_date >= ?)`, `${yearMonth}-01`) as any[];
     for (const r of empHireRows) {
       if (!r.hire_date) continue;
       const np = norm(r.phone);
-      if (np) hireMap.set(np, r.hire_date);
-      if (r.name) hireMap.set(`name:${r.name}`, r.hire_date);
+      const hd = toYMD(r.hire_date) || String(r.hire_date);
+      if (np) hireMap.set(np, hd);
+      if (r.name) hireMap.set(`name:${r.name}`, hd);
     }
+    const getPeriods = (name: string, phone: string): Period[] | undefined => {
+      const np = norm(phone || '');
+      return (np && periodsByPhone.get(np)) || periodsByName.get(name);
+    };
+    const isInAnyPeriod = (date: string, periods?: Period[]): boolean => {
+      if (!periods || periods.length === 0) return true;
+      return periods.some(p => date >= p.start && (!p.end || date <= p.end));
+    };
 
     // Group by employee. Use phone as canonical key when available, fallback to name.
     // This merges records that arrived under different name spellings for the same person
@@ -2128,10 +2179,15 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     const keyFor = (rec: any) => norm(rec.employee_phone) || rec.employee_name;
     const empMap = new Map<string, { employee_name: string; employee_phone: string; total_regular: number; total_overtime: number; total_night: number; work_days: number; holiday_days: number; holiday_hours: number }>();
     for (const rec of allRecords) {
-      // 입사일 이전 records 는 카운트에서 제외 (출근 일수 부풀려짐 방지)
-      const np = norm(rec.employee_phone);
-      const empHire = (np && hireMap.get(np)) || hireMap.get(`name:${rec.employee_name}`);
-      if (empHire && rec.date < empHire) continue;
+      // 근속기간 필터: employment_periods 우선, 없으면 hire_date fallback
+      const periods = getPeriods(rec.employee_name, rec.employee_phone);
+      if (periods && periods.length > 0) {
+        if (!isInAnyPeriod(rec.date, periods)) continue;
+      } else {
+        const np = norm(rec.employee_phone);
+        const empHire = (np && hireMap.get(np)) || hireMap.get(`name:${rec.employee_name}`);
+        if (empHire && rec.date < empHire) continue;
+      }
 
       const key = keyFor(rec);
       if (!empMap.has(key)) {
@@ -2226,6 +2282,12 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       LEFT JOIN regular_payroll_adjustments adj ON re.id = adj.employee_id AND adj.year_month = ?
       WHERE re.is_active = 1
          OR (COALESCE(re.resign_date, '') <> '' AND re.resign_date >= ?)
+         OR EXISTS (
+           SELECT 1 FROM employment_periods ep
+           WHERE ep.employee_type = 'regular' AND ep.employee_ref_id = re.id
+             AND ep.period_start <= ?
+             AND (ep.period_end IS NULL OR ep.period_end >= ?)
+         )
          OR (
            COALESCE(re.resign_date, '') = ''
            AND EXISTS (
@@ -2240,7 +2302,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
                )
            )
          )
-    `, yearMonth, monthStart, yearMonth) as any[];
+    `, yearMonth, monthStart, monthEnd, monthStart, yearMonth) as any[];
 
     // resign_date fallback — regular_employees.resign_date 가 비어있는 직원에 대해
     // employee_offboardings 에서 보강. ref_id → name → phone 정규화 순으로 매칭.
@@ -2316,8 +2378,16 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const holidayPay = Math.round(holidayHours * hourlyRate * 1.5);
 
       // 소정근로일 계산
-      const hireDate = sal.hire_date || '';
-      const resignDate = sal.resign_date || '';
+      // employment_periods 우선: 해당 월(monthStart~monthEnd)과 겹치는 period 의 start/end 를 hire/resign 대용으로 사용.
+      // sal.hire_date/sal.resign_date 는 문자열 또는 Date. toYMD 로 정규화.
+      const salPeriods = getPeriods(sal.name, sal.phone);
+      const activePeriod = salPeriods && salPeriods.find(p =>
+        p.start <= monthEnd && (!p.end || p.end >= monthStart)
+      );
+      const hireDate = activePeriod ? activePeriod.start : (toYMD(sal.hire_date) || '');
+      const resignDate = activePeriod && activePeriod.end
+        ? activePeriod.end
+        : (toYMD(sal.resign_date) || '');
       const todayStr = getKSTDate();
       const cutoffDate = todayStr < monthEnd ? todayStr : monthEnd;
 

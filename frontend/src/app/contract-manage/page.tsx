@@ -204,7 +204,13 @@ function ContractManageInner() {
       // Backend returns { employee: {...}, contracts: [...] }
       setHistoryItems(Array.isArray(data) ? data : data.contracts || []);
       if (!Array.isArray(data) && data.employee?.name) {
-        setHistoryEmployee((prev) => prev ? { ...prev, name: data.employee.name } : prev);
+        // name 이 이미 같으면 setState 를 아예 호출하지 않아 참조 유지 → useCallback 재생성 방지
+        // (이전 버그: 매번 새 객체를 만들어 historyEmployee dependency 변경 → 무한 loop → 화면 깜빡)
+        setHistoryEmployee((prev) => {
+          if (!prev) return prev;
+          if (prev.name === data.employee.name) return prev;
+          return { ...prev, name: data.employee.name };
+        });
       }
     } catch (e: any) {
       toast.error(e.message || "이력을 불러올 수 없습니다.");

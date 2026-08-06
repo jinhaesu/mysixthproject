@@ -1825,6 +1825,77 @@ router.post('/recalc-confirmed', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ============================================================================
+// 재입사 이력 관리 (employment_periods)
+// ============================================================================
+
+// GET /api/regular/employment-periods?employee_id=X
+router.get('/employment-periods', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_id } = req.query as Record<string, string>;
+    if (!employee_id) { res.status(400).json({ error: 'employee_id 필요' }); return; }
+    const rows = await dbAll(
+      `SELECT * FROM employment_periods
+       WHERE employee_type = 'regular' AND employee_ref_id = ?
+       ORDER BY period_start`,
+      parseInt(employee_id)
+    );
+    res.json(rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/employment-periods
+// Body: { employee_id, period_start, period_end?, reason_start?, reason_end?, note? }
+router.post('/employment-periods', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_id, period_start, period_end, reason_start, reason_end, note } = req.body as any;
+    if (!employee_id || !period_start) { res.status(400).json({ error: 'employee_id, period_start 필요' }); return; }
+    const result = await dbRun(
+      `INSERT INTO employment_periods
+         (employee_type, employee_ref_id, period_start, period_end, reason_start, reason_end, note)
+       VALUES ('regular', ?, ?, ?, ?, ?, ?)`,
+      parseInt(employee_id), period_start,
+      period_end || null,
+      reason_start || '재입사',
+      reason_end || '',
+      note || ''
+    );
+    res.json({ success: true, id: result.lastInsertRowid });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT /api/regular/employment-periods/:id
+router.put('/employment-periods/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { period_start, period_end, reason_start, reason_end, note } = req.body as any;
+    await dbRun(
+      `UPDATE employment_periods
+         SET period_start = ?, period_end = ?, reason_start = ?, reason_end = ?, note = ?, updated_at = NOW()
+       WHERE id = ?`,
+      period_start, period_end || null,
+      reason_start || '', reason_end || '', note || '',
+      req.params.id
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/regular/employment-periods/:id
+router.delete('/employment-periods/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    await dbRun('DELETE FROM employment_periods WHERE id = ?', req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/regular/apply-substitute-workday - 대체근무 처리
 // 특정 부서·일자에 근무한 사람들을 "원 소정근로일 대체 근무"로 재분류:
 //   1) worked_date confirmed_attendance record 재계산 (평일 취급, holiday 프리미엄 제거)

@@ -174,6 +174,8 @@ export default function ManagePage() {
         </Card>
 
         <SubstituteWorkdayCard />
+
+        <DuplicateEmployeeCard />
       </div>
 
       <Section title="업로드 기록">
@@ -337,6 +339,109 @@ function SubstituteWorkdayCard() {
           <Button variant="primary" size="sm" onClick={handleApply} loading={loading}>대체근무 적용</Button>
         </div>
       </div>
+    </Card>
+  );
+}
+
+function DuplicateEmployeeCard() {
+  const toast = useToast();
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [merging, setMerging] = useState<string | null>(null);
+
+  const scan = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/duplicate-candidates`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json();
+      if (!res.ok) { toast.error(body.error || '스캔 실패'); return; }
+      setCandidates(body.pairs || []);
+      setScanned(true);
+      toast.success(`${body.total}쌍 발견`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const doMerge = async (pair: any) => {
+    // 어느 쪽이 canonical? 활성인 쪽을 into 로. 둘 다 활성/퇴사면 오래된(id 작은) 것을 into.
+    const [a, b] = [pair.a, pair.b];
+    const intoIsA = (a.is_active === 1 && b.is_active === 0) || (a.is_active === b.is_active && a.id < b.id);
+    const into = intoIsA ? a : b;
+    const from = intoIsA ? b : a;
+    const rehire = prompt(
+      `병합: from #${from.id} "${from.name}" → into #${into.id} "${into.name}"\n\n` +
+      `재입사일 (YYYY-MM-DD, 비우면 재입사 처리 X):`,
+      new Date().toISOString().slice(0, 10)
+    );
+    if (rehire === null) return;
+    if (rehire && !/^\d{4}-\d{2}-\d{2}$/.test(rehire)) { toast.error("YYYY-MM-DD 형식 필요"); return; }
+    const reason = rehire ? (prompt("이전 퇴사 사유:", "자진퇴사") || "") : "";
+    if (!confirm(`이 병합을 진행합니다:\n\n#${from.id} 삭제, #${into.id} 로 통합${rehire ? `\n재입사일: ${rehire}` : ''}\n\n계속?`)) return;
+    setMerging(`${from.id}_${into.id}`);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ from_id: from.id, into_id: into.id, rehire_date: rehire || undefined, prev_resign_reason: reason }),
+      });
+      const body = await res.json();
+      if (!res.ok) { toast.error(body.error || '병합 실패'); return; }
+      toast.success(`병합 완료: ${body.log?.join(' | ') || 'ok'}`);
+      await scan();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setMerging(null); }
+  };
+
+  return (
+    <Card tone="ghost" className="border-[var(--info-border)] bg-[var(--info-bg)]">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
+        <div className="flex items-start gap-3">
+          <Tags size={18} className="text-[var(--info-fg)] shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[var(--fs-body)] font-semibold text-[var(--info-fg)]">정규직 이름 중복 스캔 (재입사·재등록 인원 통합)</p>
+            <p className="text-[var(--fs-caption)] text-[var(--info-fg)] mt-0.5 opacity-80">
+              이름이 유사한 (예: '정연화' vs '정연화(F-4)') 다른 phone 인 entries 를 찾아 병합 후보로 제시. phone 정규화 후 동일이면 confidence=high.
+            </p>
+          </div>
+        </div>
+        <Button variant="primary" size="sm" onClick={scan} loading={loading}>스캔 실행</Button>
+      </div>
+      {scanned && candidates.length === 0 && (
+        <div className="text-[var(--fs-caption)] text-[var(--success-fg)] pl-8">✓ 중복 후보 없음. 데이터 깔끔합니다.</div>
+      )}
+      {candidates.length > 0 && (
+        <div className="space-y-2 pl-8">
+          {candidates.map((pair, i) => (
+            <div key={i} className="p-3 rounded bg-[var(--bg-1)] border border-[var(--border-2)] flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex-1 text-xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge tone={pair.confidence === 'high' ? 'danger' : 'warning'} size="xs">{pair.confidence}</Badge>
+                  <span className="text-[var(--text-3)]">{pair.reason}</span>
+                </div>
+                <div className="text-[var(--text-1)]">
+                  <strong>#{pair.a.id}</strong> "{pair.a.name}" ({pair.a.phone}) {pair.a.department} · {pair.a.is_active === 1 ? '재직' : '퇴사'} hire={pair.a.hire_date || '-'} resign={pair.a.resign_date || '-'}
+                </div>
+                <div className="text-[var(--text-1)]">
+                  <strong>#{pair.b.id}</strong> "{pair.b.name}" ({pair.b.phone}) {pair.b.department} · {pair.b.is_active === 1 ? '재직' : '퇴사'} hire={pair.b.hire_date || '-'} resign={pair.b.resign_date || '-'}
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => doMerge(pair)}
+                loading={merging === `${pair.a.id}_${pair.b.id}` || merging === `${pair.b.id}_${pair.a.id}`}
+              >
+                병합
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

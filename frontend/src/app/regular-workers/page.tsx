@@ -910,14 +910,43 @@ export default function RegularWorkersPage() {
                           <span className="text-[var(--warning-fg)] font-medium">⚠ 유령상태 (퇴사관리에서 재등록 필요)</span>
                         )}
                       </div>
-                      <a
-                        href={`/offboarding?search=${encodeURIComponent(editingEmployee.name)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11.5px] px-2 py-1 rounded border border-[var(--border-2)] hover:bg-[var(--bg-2)] text-[var(--text-2)] whitespace-nowrap"
-                      >
-                        퇴사관리 열기 →
-                      </a>
+                      <div className="flex items-center gap-2">
+                        {inactive && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const rehireDate = prompt(`${editingEmployee.name} 재입사 처리\n\n재입사일 (YYYY-MM-DD):`, new Date().toISOString().slice(0, 10));
+                              if (!rehireDate || !/^\d{4}-\d{2}-\d{2}$/.test(rehireDate)) { toast.error("YYYY-MM-DD 형식 필요"); return; }
+                              const reason = prompt("이전 퇴사 사유 (선택):", "자진퇴사") || "";
+                              try {
+                                const token = localStorage.getItem('token');
+                                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/rehire`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                  body: JSON.stringify({ employee_id: editingEmployee.id, rehire_date: rehireDate, prev_resign_reason: reason }),
+                                });
+                                const body = await res.json();
+                                if (!res.ok) { toast.error(body.error || '재입사 처리 실패'); return; }
+                                toast.success(`${body.name} 재입사 처리 완료 (${body.rehire_date}). 이전 근속 ${body.previous_periods_closed}건 종료.`);
+                                setShowModal(false);
+                                loadEmployees();
+                                loadResigned();
+                              } catch (e: any) { toast.error(e.message); }
+                            }}
+                            className="text-[11.5px] px-2 py-1 rounded bg-[var(--success-bg)] text-[var(--success-fg)] hover:bg-[var(--success-border)] whitespace-nowrap font-medium"
+                          >
+                            재입사 처리
+                          </button>
+                        )}
+                        <a
+                          href={`/offboarding?search=${encodeURIComponent(editingEmployee.name)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11.5px] px-2 py-1 rounded border border-[var(--border-2)] hover:bg-[var(--bg-2)] text-[var(--text-2)] whitespace-nowrap"
+                        >
+                          퇴사관리 열기 →
+                        </a>
+                      </div>
                     </div>
                   </Field>
                 );

@@ -1896,6 +1896,217 @@ router.delete('/employment-periods/:id', async (req: AuthRequest, res: Response)
   }
 });
 
+// POST /api/regular/rehire — 재입사 처리 (한 번에 hire/resign/period 정리)
+// Body: { employee_id, rehire_date, prev_resign_date?, prev_resign_reason?, note? }
+// 처리:
+//   1. 기존 period 중 아직 종료 안 됐고 rehire_date 이전인 것 → prev_resign_date 로 종료 처리
+//   2. 새 period INSERT (period_start = rehire_date, reason_start='재입사')
+//   3. regular_employees UPDATE: is_active=1, resign_date=NULL, hire_date=rehire_date
+router.post('/rehire', async (req: AuthRequest, res: Response) => {
+  try {
+    const { employee_id, rehire_date, prev_resign_date, prev_resign_reason, note } = req.body as any;
+    if (!employee_id || !rehire_date) { res.status(400).json({ error: 'employee_id, rehire_date 필요' }); return; }
+
+    const emp = await dbGet('SELECT id, name, hire_date, resign_date, is_active FROM regular_employees WHERE id = ?', employee_id) as any;
+    if (!emp) { res.status(404).json({ error: '직원 없음' }); return; }
+
+    // 1. 기존 employment_periods 중 아직 종료 안 됐고 rehire_date 이전 시작인 것 종료 처리
+    const openPeriods = await dbAll(
+      `SELECT id, period_start FROM employment_periods
+       WHERE employee_type='regular' AND employee_ref_id = ?
+         AND period_end IS NULL AND period_start < ?`,
+      employee_id, rehire_date
+    ) as any[];
+    const resignDateForPrev = prev_resign_date || emp.resign_date || null;
+    for (const op of openPeriods) {
+      await dbRun(
+        `UPDATE employment_periods
+           SET period_end = ?, reason_end = ?, updated_at = NOW()
+         WHERE id = ?`,
+        resignDateForPrev, prev_resign_reason || '자진퇴사', op.id
+      );
+    }
+
+    // 만약 employment_periods 자체가 없으면 (신규 인원인데 재입사 API 호출) seed
+    const anyPeriod = await dbGet(
+      `SELECT id FROM employment_periods WHERE employee_type='regular' AND employee_ref_id = ?`,
+      employee_id
+    );
+    if (!anyPeriod && emp.hire_date) {
+      await dbRun(
+        `INSERT INTO employment_periods (employee_type, employee_ref_id, period_start, period_end, reason_start, reason_end, note)
+         VALUES ('regular', ?, ?, ?, '입사', ?, 'auto-seed on rehire API')`,
+        employee_id, emp.hire_date, resignDateForPrev, prev_resign_reason || '자진퇴사'
+      );
+    }
+
+    // 2. 새 재입사 period INSERT
+    await dbRun(
+      `INSERT INTO employment_periods (employee_type, employee_ref_id, period_start, period_end, reason_start, reason_end, note)
+       VALUES ('regular', ?, ?, NULL, '재입사', '', ?)`,
+      employee_id, rehire_date, note || ''
+    );
+
+    // 3. regular_employees UPDATE
+    await dbRun(
+      `UPDATE regular_employees
+         SET is_active = 1, resign_date = NULL, hire_date = ?, updated_at = NOW()
+       WHERE id = ?`,
+      rehire_date, employee_id
+    );
+
+    res.json({
+      success: true,
+      employee_id,
+      name: emp.name,
+      rehire_date,
+      previous_periods_closed: openPeriods.length,
+    });
+  } catch (error: any) {
+    console.error('POST /rehire error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/regular/duplicate-candidates — 정규직 이름 유사 다른 phone 인 병합 후보 리스트
+router.get('/duplicate-candidates', async (_req: AuthRequest, res: Response) => {
+  try {
+    const all = await dbAll('SELECT id, name, phone, department, is_active, hire_date, resign_date FROM regular_employees ORDER BY id') as any[];
+    const norm = (p: string) => (p || '').replace(/[-\s]/g, '').trim();
+    const stripParen = (s: string) => (s || '').replace(/\([^)]*\)/g, '').trim();
+    const pairs: any[] = [];
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i], b = all[j];
+        const aBase = stripParen(a.name), bBase = stripParen(b.name);
+        if (!aBase || !bBase) continue;
+        // 이름 base 가 같고 phone 정규화 후 같으면 (하이픈 차이) or 이름 base 같고 phone 다르면 후보
+        const namesRelated = aBase === bBase || aBase === b.name || bBase === a.name;
+        if (!namesRelated) continue;
+        const phoneMatch = norm(a.phone) === norm(b.phone);
+        pairs.push({
+          a: { id: a.id, name: a.name, phone: a.phone, department: a.department, is_active: a.is_active, hire_date: a.hire_date, resign_date: a.resign_date },
+          b: { id: b.id, name: b.name, phone: b.phone, department: b.department, is_active: b.is_active, hire_date: b.hire_date, resign_date: b.resign_date },
+          confidence: phoneMatch ? 'high' : 'medium',
+          reason: phoneMatch ? '이름 유사 + phone 정규화 후 동일' : '이름 유사 (phone 다름)',
+        });
+      }
+    }
+    res.json({ total: pairs.length, pairs });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/merge — 두 정규직 entry 병합 (from → into)
+// Body: { from_id, into_id, rehire_date?, prev_resign_reason? }
+// 처리:
+//   1. from 의 참조 데이터 (attendance/contracts/etc) 를 into 로 이관 or 삭제 (중복)
+//   2. from 삭제
+//   3. into 를 재입사 처리 (rehire_date 있으면)
+router.post('/merge', async (req: AuthRequest, res: Response) => {
+  try {
+    const { from_id, into_id, rehire_date, prev_resign_reason } = req.body as any;
+    if (!from_id || !into_id) { res.status(400).json({ error: 'from_id, into_id 필요' }); return; }
+    if (from_id === into_id) { res.status(400).json({ error: 'from_id === into_id 불가' }); return; }
+
+    const from = await dbGet('SELECT * FROM regular_employees WHERE id = ?', from_id) as any;
+    const into = await dbGet('SELECT * FROM regular_employees WHERE id = ?', into_id) as any;
+    if (!from || !into) { res.status(404).json({ error: 'from/into 직원 없음' }); return; }
+
+    const log: string[] = [];
+
+    // 1. regular_attendance: from → into 이관 (UNIQUE(employee_id, date) 충돌 시 from 것 삭제)
+    const raConflicts = await dbAll(
+      `SELECT ra_from.id as from_id FROM regular_attendance ra_from
+       WHERE ra_from.employee_id = ?
+         AND EXISTS (SELECT 1 FROM regular_attendance ra_into WHERE ra_into.employee_id = ? AND ra_into.date = ra_from.date)`,
+      from_id, into_id
+    ) as any[];
+    for (const c of raConflicts) await dbRun('DELETE FROM regular_attendance WHERE id = ?', c.from_id);
+    const ra = await dbRun('UPDATE regular_attendance SET employee_id = ? WHERE employee_id = ?', into_id, from_id);
+    log.push(`regular_attendance: ${ra.changes}건 이관 (충돌 ${raConflicts.length}건 삭제)`);
+
+    // 2. regular_labor_contracts: from → into
+    const lc = await dbRun('UPDATE regular_labor_contracts SET employee_id = ? WHERE employee_id = ?', into_id, from_id);
+    log.push(`regular_labor_contracts: ${lc.changes}건 이관`);
+
+    // 3. regular_shift_assignments: from → into (UNIQUE(shift_id, employee_id) 충돌 시 from 것 삭제)
+    const saConflicts = await dbAll(
+      `SELECT sa_from.id as from_id FROM regular_shift_assignments sa_from
+       WHERE sa_from.employee_id = ?
+         AND EXISTS (SELECT 1 FROM regular_shift_assignments sa_into WHERE sa_into.employee_id = ? AND sa_into.shift_id = sa_from.shift_id)`,
+      from_id, into_id
+    ) as any[];
+    for (const c of saConflicts) await dbRun('DELETE FROM regular_shift_assignments WHERE id = ?', c.from_id);
+    const sa = await dbRun('UPDATE regular_shift_assignments SET employee_id = ? WHERE employee_id = ?', into_id, from_id);
+    log.push(`regular_shift_assignments: ${sa.changes}건 이관 (충돌 ${saConflicts.length}건 삭제)`);
+
+    // 4. regular_salary_settings: into 에 이미 있으면 from 것 삭제, 없으면 이관
+    const ssInto = await dbGet('SELECT id FROM regular_salary_settings WHERE employee_id = ?', into_id) as any;
+    if (ssInto) {
+      const del = await dbRun('DELETE FROM regular_salary_settings WHERE employee_id = ?', from_id);
+      log.push(`regular_salary_settings: from 것 삭제 ${del.changes}건 (into 에 이미 있음)`);
+    } else {
+      const upd = await dbRun('UPDATE regular_salary_settings SET employee_id = ? WHERE employee_id = ?', into_id, from_id);
+      log.push(`regular_salary_settings: ${upd.changes}건 이관`);
+    }
+
+    // 5. regular_vacation_balances: same logic (year UNIQUE 가능성)
+    const vbFrom = await dbAll('SELECT id, year FROM regular_vacation_balances WHERE employee_id = ?', from_id) as any[];
+    for (const vf of vbFrom) {
+      const vbInto = await dbGet('SELECT id FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', into_id, vf.year);
+      if (vbInto) await dbRun('DELETE FROM regular_vacation_balances WHERE id = ?', vf.id);
+      else await dbRun('UPDATE regular_vacation_balances SET employee_id = ? WHERE id = ?', into_id, vf.id);
+    }
+    log.push(`regular_vacation_balances: ${vbFrom.length}건 처리`);
+
+    // 6. employee_loans / payroll_adjustments / vacation_requests: 이관
+    for (const t of ['employee_loans', 'regular_payroll_adjustments', 'regular_vacation_requests']) {
+      const r = await dbRun(`UPDATE ${t} SET employee_id = ? WHERE employee_id = ?`, into_id, from_id);
+      if (r.changes > 0) log.push(`${t}: ${r.changes}건 이관`);
+    }
+
+    // 7. employment_periods: from 것 삭제 (into 것으로 재구성 예정)
+    await dbRun("DELETE FROM employment_periods WHERE employee_type='regular' AND employee_ref_id = ?", from_id);
+
+    // 8. from 삭제
+    await dbRun('DELETE FROM regular_employees WHERE id = ?', from_id);
+    log.push(`from #${from_id} (${from.name}) 삭제`);
+
+    // 9. 재입사 처리 (rehire_date 있으면)
+    if (rehire_date) {
+      // 기존 into periods 정리
+      await dbRun("DELETE FROM employment_periods WHERE employee_type='regular' AND employee_ref_id = ?", into_id);
+      // Period 1: from.hire_date ~ from.resign_date (첫 근속)
+      if (from.hire_date) {
+        await dbRun(
+          `INSERT INTO employment_periods (employee_type, employee_ref_id, period_start, period_end, reason_start, reason_end, note)
+           VALUES ('regular', ?, ?, ?, '입사', ?, '병합: 첫 근속 (구 #${from_id})')`,
+          into_id, from.hire_date, from.resign_date || null, prev_resign_reason || '자진퇴사'
+        );
+      }
+      // Period 2: rehire_date ~ 재직중
+      await dbRun(
+        `INSERT INTO employment_periods (employee_type, employee_ref_id, period_start, period_end, reason_start, reason_end, note)
+         VALUES ('regular', ?, ?, NULL, '재입사', '', '병합: 재입사')`,
+        into_id, rehire_date
+      );
+      // into 업데이트
+      await dbRun(
+        `UPDATE regular_employees SET is_active = 1, resign_date = NULL, hire_date = ?, updated_at = NOW() WHERE id = ?`,
+        rehire_date, into_id
+      );
+      log.push(`재입사 처리: Period 1 (${from.hire_date}~${from.resign_date || '?'}), Period 2 (${rehire_date}~재직중)`);
+    }
+
+    res.json({ success: true, from_id, into_id, log });
+  } catch (error: any) {
+    console.error('POST /merge error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/regular/apply-substitute-workday - 대체근무 처리
 // 특정 부서·일자에 근무한 사람들을 "원 소정근로일 대체 근무"로 재분류:
 //   1) worked_date confirmed_attendance record 재계산 (평일 취급, holiday 프리미엄 제거)

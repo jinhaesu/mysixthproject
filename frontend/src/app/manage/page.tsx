@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { getUploads, deleteUpload } from "@/lib/api";
 import type { Upload, AnalysisResult } from "@/types/attendance";
-import { Trash2, FileSpreadsheet, AlertTriangle, ChevronDown, ChevronUp, Database, RefreshCw, Tags } from "lucide-react";
+import { Trash2, FileSpreadsheet, AlertTriangle, ChevronDown, ChevronUp, Database, RefreshCw, Tags, CalendarSync } from "lucide-react";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import {
   PageHeader, Card, CardHeader, Section, Button, Badge, CenterSpinner,
-  EmptyState, useToast,
+  EmptyState, useToast, Input, Select, Field,
 } from "@/components/ui";
 
 export default function ManagePage() {
@@ -172,6 +172,8 @@ export default function ManagePage() {
             </Button>
           </div>
         </Card>
+
+        <SubstituteWorkdayCard />
       </div>
 
       <Section title="업로드 기록">
@@ -267,5 +269,74 @@ export default function ManagePage() {
         )}
       </Section>
     </>
+  );
+}
+
+function SubstituteWorkdayCard() {
+  const toast = useToast();
+  const [department, setDepartment] = useState("물류");
+  const [workedDate, setWorkedDate] = useState("2026-07-19");
+  const [originalDate, setOriginalDate] = useState("2026-07-16");
+  const [loading, setLoading] = useState(false);
+
+  const handleApply = async () => {
+    if (!workedDate || !originalDate) { toast.error("근무일·원 소정일을 입력해주세요."); return; }
+    if (!confirm(`${department || '(전체 부서)'} · ${workedDate} 근무를 ${originalDate} 대체근무로 처리합니다.\n\n- 해당 부서·근무일 확정근태 records 를 평일 기준으로 재계산 (휴일 프리미엄 제거)\n- 원 소정일 (${originalDate}) 에 대체휴무 dummy record 삽입 (결근 계산 제외 목적)\n\n계속 진행할까요?`)) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/regular/apply-substitute-workday`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          department: department || undefined,
+          worked_date: workedDate,
+          original_date: originalDate,
+          year_month: workedDate.slice(0, 7),
+          employee_type: '정규직',
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) { toast.error(body.error || '실패'); return; }
+      const names = (body.affected || []).map((a: any) => a.name).slice(0, 10).join(', ');
+      toast.success(`재계산 ${body.recalced}건, 대체휴무 ${body.dummy_inserted}건 삽입 | ${body.affected?.length || 0}명: ${names}${(body.affected?.length || 0) > 10 ? ' 외' : ''}`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <Card tone="ghost" className="border-[var(--warning-border)] bg-[var(--warning-bg)]">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-3">
+          <CalendarSync size={18} className="text-[var(--warning-fg)] shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[var(--fs-body)] font-semibold text-[var(--warning-fg)]">대체근무 처리 (부서·근무일 → 원 소정일 shift)</p>
+            <p className="text-[var(--fs-caption)] text-[var(--warning-fg)] mt-0.5 opacity-80">
+              특정 부서가 휴일에 근무한 것을 원래 평일 소정근로일 대체로 재분류합니다. (예: 물류 7/19 근무 → 7/16 대체)<br/>
+              · 근무일 records 평일 재계산 (휴일 프리미엄 제거) · 원 소정일에 대체휴무 dummy record 삽입 (결근 계산 제외 목적)
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="부서">
+            <Select value={department} onChange={e => setDepartment(e.target.value)} inputSize="sm" className="w-32">
+              <option value="">(전체)</option>
+              <option value="물류">물류</option>
+              <option value="생산2층">생산2층</option>
+              <option value="생산3층">생산3층</option>
+              <option value="생산 야간(2층)">생산 야간(2층)</option>
+              <option value="생산 야간(3층)">생산 야간(3층)</option>
+              <option value="물류 야간">물류 야간</option>
+            </Select>
+          </Field>
+          <Field label="근무일 (휴일)">
+            <Input type="date" value={workedDate} onChange={e => setWorkedDate(e.target.value)} inputSize="sm" className="w-36" />
+          </Field>
+          <Field label="원 소정일 (평일)">
+            <Input type="date" value={originalDate} onChange={e => setOriginalDate(e.target.value)} inputSize="sm" className="w-36" />
+          </Field>
+          <Button variant="primary" size="sm" onClick={handleApply} loading={loading}>대체근무 적용</Button>
+        </div>
+      </div>
+    </Card>
   );
 }

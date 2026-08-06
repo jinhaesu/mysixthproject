@@ -2037,12 +2037,13 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     const confirmedWithVacation = Array.from(empMap.values());
 
     // Get salary settings
-    // 포함 조건:
+    // 포함 조건 (해당 월 payroll 대상):
     //   1) 활성 직원 (is_active=1)
     //   2) 해당 월 1일 이후 퇴사자 (resign_date >= monthStart) — 5월에 퇴사한 사람은 5월 화면에 표시.
-    //      그 이전 퇴사자(예: 4월 입사·퇴사 콴/파타)는 5월에 표시 안 함.
-    //   3) 데이터 이상 안전망: is_active=0 + resign_date 비어있어도 그 월 confirmed_attendance 있으면 포함.
-    //      → 동기화 누락 케이스는 db.ts startup migration 으로 backfill 됨.
+    //      그 이전 퇴사자(예: 5월 퇴사자를 7월 payroll에서 조회)는 표시 안 함.
+    //   3) 데이터 이상 안전망: resign_date 가 비어있는 사람만 confirmed_attendance 존재 시 포함.
+    //      resign_date 가 있으면 그것을 신뢰하고 EXISTS 우회 금지 — 이전 월 퇴사자가
+    //      스테일한 이후 월 confirmed_attendance record 때문에 재등장하는 것을 방지.
     const salaries = await dbAll(`
       SELECT re.id as employee_id, re.name, re.phone, re.department, re.team, re.hire_date,
              COALESCE(re.resign_date, '') as resign_date,
@@ -2062,16 +2063,19 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       LEFT JOIN regular_payroll_adjustments adj ON re.id = adj.employee_id AND adj.year_month = ?
       WHERE re.is_active = 1
          OR (COALESCE(re.resign_date, '') <> '' AND re.resign_date >= ?)
-         OR EXISTS (
-           SELECT 1 FROM confirmed_attendance ca
-           WHERE ca.year_month = ?
-             AND ca.employee_type = '정규직'
-             AND (
-               (re.phone IS NOT NULL AND re.phone <> ''
-                AND REGEXP_REPLACE(COALESCE(ca.employee_phone, ''), '[-\\s]', '', 'g')
-                  = REGEXP_REPLACE(re.phone, '[-\\s]', '', 'g'))
-               OR ca.employee_name = re.name
-             )
+         OR (
+           COALESCE(re.resign_date, '') = ''
+           AND EXISTS (
+             SELECT 1 FROM confirmed_attendance ca
+             WHERE ca.year_month = ?
+               AND ca.employee_type = '정규직'
+               AND (
+                 (re.phone IS NOT NULL AND re.phone <> ''
+                  AND REGEXP_REPLACE(COALESCE(ca.employee_phone, ''), '[-\\s]', '', 'g')
+                    = REGEXP_REPLACE(re.phone, '[-\\s]', '', 'g'))
+                 OR ca.employee_name = re.name
+               )
+           )
          )
     `, yearMonth, monthStart, yearMonth) as any[];
 
@@ -2111,6 +2115,15 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Fallback 로 채워진 resign_date 기준 재필터:
+    // offboardings 에는 5월 퇴사 기록이 있는데 regular_employees.resign_date 가 비어서
+    // EXISTS 안전망으로 뽑힌 케이스 → 이제 fallback 으로 실제 퇴사일 알았으니 배제.
+    const salariesFiltered = salaries.filter((sal: any) => {
+      const rd = (sal.resign_date || '').trim();
+      if (!rd) return true; // 여전히 미상 → 유지 (안전)
+      return rd >= monthStart; // 이번 월 이후 퇴사만 표시
+    });
+
     // 마감 여부 먼저 확인 (마감 전이면 기본급 전액, 마감 후면 결근 차감)
     const closingCheck = await dbGet('SELECT * FROM payroll_closing WHERE year_month = ?', yearMonth) as any;
     const payrollClosed = !!closingCheck;
@@ -2126,7 +2139,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
 
     const results = [];
     const daysInMonth = lastDay;
-    for (const sal of salaries) {
+    for (const sal of salariesFiltered) {
       // Match by phone first (canonical), fallback to name. Handles confirmed_attendance
       // records that arrived under different name spellings for the same employee.
       const salPhone = norm(sal.phone);

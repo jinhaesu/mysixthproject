@@ -1350,7 +1350,14 @@ router.get('/attendance-summary', async (req: AuthRequest, res: Response) => {
     const endDate = `${year}-${month.padStart(2,'0')}-${lastDay}`;
 
     // Batch queries instead of N+1 per employee
-    const employees = await dbAll('SELECT id, name, phone, department, team FROM regular_employees WHERE is_active = 1 ORDER BY department, team, name') as any[];
+    // hire_date > 조회 월 말인 미래 입사자는 리스트에서 배제 (예: 8월 입사자를 7월 근태 요약에서 제외)
+    const employees = await dbAll(
+      `SELECT id, name, phone, department, team FROM regular_employees
+       WHERE is_active = 1
+         AND (hire_date IS NULL OR hire_date = '' OR hire_date <= ?)
+       ORDER BY department, team, name`,
+      endDate
+    ) as any[];
 
     // All attendance for the month in one query
     const allActuals = await dbAll(
@@ -2468,10 +2475,13 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
 
     // Get salary settings
     // 포함 조건 (해당 월 payroll 대상):
-    //   1) 활성 직원 (is_active=1)
+    //   1) 활성 직원 (is_active=1) 중 hire_date 가 해당 월 말 이전인 사람.
+    //      8월 입사자를 7월 payroll 리스트에서 배제.
     //   2) 해당 월 1일 이후 퇴사자 (resign_date >= monthStart) — 5월에 퇴사한 사람은 5월 화면에 표시.
     //      그 이전 퇴사자(예: 5월 퇴사자를 7월 payroll에서 조회)는 표시 안 함.
-    //   3) 데이터 이상 안전망: resign_date 가 비어있는 사람만 confirmed_attendance 존재 시 포함.
+    //      (퇴사자는 이미 정의상 이번 월 이전 입사이므로 hire_date 체크 불필요)
+    //   3) employment_periods 로 해당 월과 겹치는 근속기간이 있으면 포함 — 재입사자 대응.
+    //   4) 데이터 이상 안전망: resign_date 가 비어있는 사람만 confirmed_attendance 존재 시 포함.
     //      resign_date 가 있으면 그것을 신뢰하고 EXISTS 우회 금지 — 이전 월 퇴사자가
     //      스테일한 이후 월 confirmed_attendance record 때문에 재등장하는 것을 방지.
     const salaries = await dbAll(`
@@ -2491,7 +2501,8 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       FROM regular_employees re
       LEFT JOIN regular_salary_settings ss ON re.id = ss.employee_id
       LEFT JOIN regular_payroll_adjustments adj ON re.id = adj.employee_id AND adj.year_month = ?
-      WHERE re.is_active = 1
+      WHERE (re.is_active = 1
+             AND (re.hire_date IS NULL OR re.hire_date = '' OR re.hire_date <= ?))
          OR (COALESCE(re.resign_date, '') <> '' AND re.resign_date >= ?)
          OR EXISTS (
            SELECT 1 FROM employment_periods ep
@@ -2513,7 +2524,7 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
                )
            )
          )
-    `, yearMonth, monthStart, monthEnd, monthStart, yearMonth) as any[];
+    `, yearMonth, monthEnd, monthStart, monthEnd, monthStart, yearMonth) as any[];
 
     // resign_date fallback — regular_employees.resign_date 가 비어있는 직원에 대해
     // employee_offboardings 에서 보강. ref_id → name → phone 정규화 순으로 매칭.
@@ -2554,10 +2565,23 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     // Fallback 로 채워진 resign_date 기준 재필터:
     // offboardings 에는 5월 퇴사 기록이 있는데 regular_employees.resign_date 가 비어서
     // EXISTS 안전망으로 뽑힌 케이스 → 이제 fallback 으로 실제 퇴사일 알았으니 배제.
+    // 추가 방어망: hire_date 가 이번 월 이후인 사람 배제.
+    //   - 재입사자는 salPeriods 로 activePeriod.start 를 hire_date 로 재계산하므로,
+    //     이 필터는 regular_employees.hire_date 만 본다 (재입사 case 는 periods 있음).
+    //   - periods 도 없고 hire_date 도 미래인 사람만 배제 → 재입사 흐름 훼손 없음.
     const salariesFiltered = salaries.filter((sal: any) => {
       const rd = (sal.resign_date || '').trim();
-      if (!rd) return true; // 여전히 미상 → 유지 (안전)
-      return rd >= monthStart; // 이번 월 이후 퇴사만 표시
+      if (rd && rd < monthStart) return false; // 이번 월 이전 퇴사자 배제
+      // hire_date 필터: periods 가 있으면 periods 가 진실, 없으면 regular_employees.hire_date 로 판단
+      const salPeriods = getPeriods(sal.name, sal.phone);
+      if (salPeriods && salPeriods.length > 0) {
+        // 재입사 등 근속기간이 여럿 → 이번 월과 겹치는 period 하나라도 있어야 표시
+        const overlap = salPeriods.some(p => p.start <= monthEnd && (!p.end || p.end >= monthStart));
+        return overlap;
+      }
+      const hd = toYMD(sal.hire_date);
+      if (hd && hd > monthEnd) return false; // 미래 입사자 배제
+      return true;
     });
 
     // 마감 여부 먼저 확인 (마감 전이면 기본급 전액, 마감 후면 결근 차감)

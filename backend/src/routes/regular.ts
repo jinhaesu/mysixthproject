@@ -1977,9 +1977,14 @@ router.post('/rehire', async (req: AuthRequest, res: Response) => {
     );
 
     // 3. regular_employees UPDATE
+    // resigned_at 도 NULL 로 정리해야 프론트 activeEmployees 필터에서 유령상태로 안 빠짐.
     await dbRun(
       `UPDATE regular_employees
-         SET is_active = 1, resign_date = NULL, hire_date = ?, updated_at = NOW()
+         SET is_active = 1,
+             resign_date = NULL,
+             resigned_at = NULL,
+             hire_date = ?,
+             updated_at = NOW()
        WHERE id = ?`,
       rehire_date, employee_id
     );
@@ -2121,9 +2126,9 @@ router.post('/merge', async (req: AuthRequest, res: Response) => {
          VALUES ('regular', ?, ?, NULL, '재입사', '', '병합: 재입사')`,
         into_id, rehire_date
       );
-      // into 업데이트
+      // into 업데이트 (resigned_at 도 NULL 로 정리해야 유령상태 방지)
       await dbRun(
-        `UPDATE regular_employees SET is_active = 1, resign_date = NULL, hire_date = ?, updated_at = NOW() WHERE id = ?`,
+        `UPDATE regular_employees SET is_active = 1, resign_date = NULL, resigned_at = NULL, hire_date = ?, updated_at = NOW() WHERE id = ?`,
         rehire_date, into_id
       );
       log.push(`재입사 처리: Period 1 (${from.hire_date}~${from.resign_date || '?'}), Period 2 (${rehire_date}~재직중)`);

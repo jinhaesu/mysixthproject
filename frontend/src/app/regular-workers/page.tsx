@@ -489,9 +489,10 @@ export default function RegularWorkersPage() {
 
       {/* Table */}
       {(() => {
-        const activeEmployees = employees.filter(
-          (e) => e.is_active !== 0 && !e.resign_date && !e.resigned_at
-        );
+        // is_active 를 단일 truth 로 사용. resign_date/resigned_at 은
+        // 재입사자·과거 이력용이므로 이중 필터하지 않음 (유령상태 발생 시
+        // 리스트에는 정상 표시되고 편집 모달에서 경고로 감지).
+        const activeEmployees = employees.filter(e => e.is_active !== 0);
 
         if (loading) {
           return (

@@ -79,7 +79,29 @@ router.get('/employees', async (req: AuthRequest, res: Response) => {
       ${where}
       ORDER BY re.is_active DESC, re.hire_date DESC NULLS LAST, re.name
       LIMIT ? OFFSET ?
-    `, ...params, limitNum, offset);
+    `, ...params, limitNum, offset) as any[];
+
+    // employment_periods bulk join — 각 직원 row 에 periods 배열 embed.
+    // 재입사·최초입사·이력 UI 표기를 위해 사용.
+    if (employees.length > 0) {
+      const ids = employees.map(e => e.id);
+      const periods = await dbAll(
+        `SELECT id, employee_ref_id, period_start, period_end, reason_start, reason_end, note
+           FROM employment_periods
+          WHERE employee_type = 'regular' AND employee_ref_id = ANY(?::int[])
+          ORDER BY employee_ref_id, period_start`,
+        ids
+      ) as any[];
+      const byEmp = new Map<number, any[]>();
+      for (const p of periods) {
+        const arr = byEmp.get(p.employee_ref_id) || [];
+        arr.push(p);
+        byEmp.set(p.employee_ref_id, arr);
+      }
+      for (const emp of employees) {
+        emp.periods = byEmp.get(emp.id) || [];
+      }
+    }
 
     res.json({
       employees,

@@ -65,6 +65,17 @@ interface Employee {
   resign_date?: string | null;
   resigned_at?: string | null;
   is_active?: number;
+  periods?: EmploymentPeriod[];
+}
+
+interface EmploymentPeriod {
+  id: number;
+  employee_ref_id: number;
+  period_start: string | null;
+  period_end: string | null;
+  reason_start?: string | null;
+  reason_end?: string | null;
+  note?: string | null;
 }
 
 interface Pagination {
@@ -521,8 +532,30 @@ export default function RegularWorkersPage() {
                     <td className="px-4 py-3 font-medium text-[var(--text-1)]">
                       {emp.name}
                       {emp.is_active === 0 && <Badge tone="danger" size="xs" className="ml-1">퇴사자</Badge>}
+                      {emp.periods && emp.periods.length > 1 && (
+                        <Badge tone="info" size="xs" className="ml-1">재입사 {emp.periods.length}회</Badge>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-3)] text-xs tabular">{emp.hire_date || "-"}</td>
+                    <td className="px-4 py-3 text-[var(--text-3)] text-xs tabular">
+                      {(() => {
+                        const firstHire = emp.periods && emp.periods.length > 0
+                          ? formatDate(emp.periods[0].period_start)
+                          : (emp.hire_date ? formatDate(emp.hire_date) : "-");
+                        const currentStart = emp.periods && emp.periods.length > 1 && emp.is_active === 1
+                          ? formatDate(emp.periods[emp.periods.length - 1].period_start)
+                          : null;
+                        return (
+                          <div className="leading-tight">
+                            <div>{firstHire}</div>
+                            {currentStart && (
+                              <div className="text-[10px] text-[var(--info-fg)] mt-0.5">
+                                현: {currentStart}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-[var(--text-2)] tabular">{emp.phone}</td>
                     <td className="px-4 py-3 text-[var(--text-2)]">{emp.department || "-"}</td>
                     <td className="px-4 py-3 text-[var(--text-2)]">{emp.team || "-"}</td>
@@ -889,6 +922,40 @@ export default function RegularWorkersPage() {
                   maxLength={14}
                 />
               </Field>
+
+              {/* 근속기간 이력 (employment_periods) — 재입사자·복직자 이력 표시. */}
+              {editingEmployee && editingEmployee.periods && editingEmployee.periods.length > 0 && (
+                <Field label="근속기간 이력" hint="입사·퇴사·재입사가 발생할 때마다 자동 기록됩니다.">
+                  <div className="space-y-1.5">
+                    {editingEmployee.periods.map((p, idx) => {
+                      const s = formatDate(p.period_start);
+                      const e = p.period_end ? formatDate(p.period_end) : null;
+                      const isCurrent = !p.period_end;
+                      const isFirst = idx === 0;
+                      const label = isFirst ? '최초 입사' : `${idx + 1}차 입사`;
+                      return (
+                        <div key={p.id} className="flex items-center gap-2 flex-wrap p-2 rounded-[var(--r-sm)] bg-[var(--bg-0)] border border-[var(--border-2)] text-xs">
+                          <span className={`px-1.5 py-0.5 rounded font-medium ${isCurrent ? 'bg-[var(--success-bg)] text-[var(--success-fg)]' : 'bg-[var(--bg-2)] text-[var(--text-2)]'}`}>
+                            {label}
+                          </span>
+                          <span className="tabular text-[var(--text-1)]">
+                            {s} ~ {e || <span className="text-[var(--success-fg)] font-medium">재직중</span>}
+                          </span>
+                          {p.reason_start && (
+                            <span className="text-[var(--text-3)]">시작: {p.reason_start}</span>
+                          )}
+                          {p.reason_end && (
+                            <span className="text-[var(--text-3)]">종료: {p.reason_end}</span>
+                          )}
+                          {p.note && (
+                            <span className="text-[var(--text-4)] italic">· {p.note}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Field>
+              )}
 
               {/* 퇴사관리 상태 (read-only). 퇴사일 편집은 /offboarding 에서만.
                   유령상태(활성=X + 퇴사일=? / 활성=O + 퇴사일=O) 감지 시 경고 표시. */}

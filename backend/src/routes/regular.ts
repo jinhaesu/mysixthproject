@@ -2582,6 +2582,13 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         }
       }
       for (const sal of emptyResignSalaries) {
+        // 재입사자 방어: employment_periods 에 현재 진행중(period_end IS NULL) 이 있으면
+        // offboardings 의 옛 퇴사일로 덮어쓰지 않는다.
+        // 이 방어망이 없으면 정연화·티늉 같은 재입사자가 첫 근속 퇴사일로 채워져
+        // 이후 monthStart 필터에서 배제되는 버그가 재발한다.
+        const salPeriods = getPeriods(sal.name, sal.phone);
+        if (salPeriods && salPeriods.some(p => !p.end)) continue;
+
         let r = offbByRefId.get(sal.employee_id);
         if (!r && sal.name) r = offbByName.get(sal.name);
         if (!r && sal.phone) r = offbByPhone.get(norm(sal.phone));
@@ -2598,16 +2605,13 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     //   - periods 도 없고 hire_date 도 미래인 사람만 배제 → 재입사 흐름 훼손 없음.
     const salariesFiltered = salaries.filter((sal: any) => {
       const rd = (sal.resign_date || '').trim();
-      if (rd && rd < monthStart) return false; // 이번 월 이전 퇴사자 배제
-      // hire_date 필터: periods 가 있으면 periods 가 진실, 없으면 regular_employees.hire_date 로 판단
+      if (rd && rd < monthStart) return false;
       const salPeriods = getPeriods(sal.name, sal.phone);
       if (salPeriods && salPeriods.length > 0) {
-        // 재입사 등 근속기간이 여럿 → 이번 월과 겹치는 period 하나라도 있어야 표시
-        const overlap = salPeriods.some(p => p.start <= monthEnd && (!p.end || p.end >= monthStart));
-        return overlap;
+        return salPeriods.some(p => p.start <= monthEnd && (!p.end || p.end >= monthStart));
       }
       const hd = toYMD(sal.hire_date);
-      if (hd && hd > monthEnd) return false; // 미래 입사자 배제
+      if (hd && hd > monthEnd) return false;
       return true;
     });
 

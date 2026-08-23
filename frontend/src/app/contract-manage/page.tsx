@@ -38,7 +38,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 async function authHeader(): Promise<Record<string, string>> {
   try {
-    const t = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null;
+    const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
     return t ? { Authorization: `Bearer ${t}` } : {};
   } catch { return {}; }
 }

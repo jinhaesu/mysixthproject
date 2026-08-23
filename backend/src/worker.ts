@@ -44,5 +44,19 @@ const shutdown = async (signal: string) => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-// Worker 는 HTTP 서버 없음. 그냥 process 유지.
+// Cloud Run 은 컨테이너가 PORT 를 반드시 listen 해야 함 (Railway 는 불필요).
+// 헬스체크 전용 최소 HTTP 서버.
+import http from 'http';
+const PORT = Number(process.env.PORT || 8080);
+http.createServer((req, res) => {
+  if (req.url === '/api/health' || req.url === '/health' || req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', role: 'worker', ts: new Date().toISOString() }));
+    return;
+  }
+  res.writeHead(404); res.end();
+}).listen(PORT, () => {
+  console.log(`[Worker] Health server listening on ${PORT}`);
+});
+
 console.log('[Worker] Ready, running background timers');

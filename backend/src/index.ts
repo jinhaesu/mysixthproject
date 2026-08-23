@@ -142,6 +142,9 @@ app.use('/api/contractor', requireAuth, contractorRoutes);
 // 안전보건 P7A — 방침·규정 문서 관리 (§4-1)
 app.use('/api/policy-manager', requireAuth, policyManagerRoutes);
 app.use('/api/regular-public', policyPublicRoutes);  // no auth (근로자 token)
+// 취업규칙 공개 조회용 별칭 마운트 — GET /api/policy-public/rulebook(/history) 는
+// 토큰이 필요 없는 전사 공개 문서이므로 policyPublicRoutes 를 이 접두사로도 노출한다.
+app.use('/api/policy-public', policyPublicRoutes);  // no auth
 
 // 알바(사업소득) 정산 서버 영속 + 월 마감
 app.use('/api/settlement', requireAuth, settlementAlbaRoutes);

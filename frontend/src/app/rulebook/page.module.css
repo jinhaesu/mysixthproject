@@ -1,0 +1,138 @@
+/* 취업규칙 본문(content_html)은 백엔드가 내려주는 원본 HTML을 그대로 주입한다.
+   여기서는 .rulebook 스코프 안의 태그 셀렉터로만 타이포그래피를 잡아준다
+   (백엔드 HTML에 class 를 강제할 수 없으므로 순수 태그 셀렉터 위주). */
+
+.rulebook {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-1);
+  word-break: keep-all;
+}
+
+.rulebook h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+  margin: 0 0 20px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--border-2);
+}
+
+.rulebook h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-1);
+  margin: 32px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.rulebook h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--brand-400);
+  margin: 20px 0 8px;
+}
+
+.rulebook h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 14px 0 6px;
+}
+
+.rulebook p {
+  margin: 0 0 10px;
+  color: var(--text-1);
+}
+
+.rulebook article,
+.rulebook section {
+  margin-bottom: 20px;
+}
+
+.rulebook ul,
+.rulebook ol {
+  margin: 8px 0 14px;
+  padding-left: 22px;
+}
+
+.rulebook li {
+  margin-bottom: 4px;
+}
+
+.rulebook ol.circled {
+  list-style: none;
+  padding-left: 0;
+  counter-reset: circled-counter;
+}
+
+.rulebook ol.circled > li {
+  counter-increment: circled-counter;
+  position: relative;
+  padding-left: 26px;
+  margin-bottom: 6px;
+}
+
+.rulebook ol.circled > li::before {
+  content: counter(circled-counter);
+  position: absolute;
+  left: 0;
+  top: 0.5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.rulebook table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 18px;
+  font-size: 13px;
+}
+
+.rulebook th,
+.rulebook td {
+  border: 1px solid var(--border-2);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.rulebook th {
+  background: var(--bg-0);
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+.rulebook strong,
+.rulebook b {
+  color: var(--text-1);
+  font-weight: 700;
+}
+
+.rulebook a {
+  color: var(--brand-400);
+  text-decoration: underline;
+}
+
+.rulebook blockquote {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--brand-500);
+  background: var(--bg-0);
+  color: var(--text-2);
+}
+
+.rulebook hr {
+  border: none;
+  border-top: 1px solid var(--border-1);
+  margin: 24px 0;
+}

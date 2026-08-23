@@ -67,6 +67,7 @@ function pg$(sql: string): string {
   let i = 0;
   return sql.replace(/\?/g, () => `$${++i}`);
 }
+export { pg$ };
 
 // Supavisor 가 idle 백엔드 정리 시 클라이언트는 EDBHANDLEREXITED / connection closed 받음.
 // 이건 정상 동작이지만 그 순간 진행 중인 쿼리는 한 번 실패. 따라서 재시도해서 사용자에게는 투명하게.
@@ -218,7 +219,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.40.0';
+  const SCHEMA_VERSION = 'schema-v2.41.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1030,6 +1031,66 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_duties TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_days TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS break_time TEXT DEFAULT ''"); } catch {}
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.41.0 — 전자계약 감사증적(audit-trail) 인프라
+  // 3개 계약 플로우(정규직 regular_labor_contracts / 알바·카페 labor_contracts) 공통 컬럼.
+  // Feature 1: 양측(근로자/사용자) 서명 메타데이터.
+  // Feature 2: 서명 시점 문서 스냅샷 HTML + SHA-256 해시.
+  // Feature 4: RFC3161 TSA(freetsa.org) 타임스탬프.
+  // Feature 5: 버전 번호 + 개정 이력(parent/superseded).
+  // ═══════════════════════════════════════════════════════════════
+  for (const t of ['regular_labor_contracts', 'labor_contracts']) {
+    // Feature 1 — 양측 서명 메타데이터
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS worker_signed_at TIMESTAMPTZ`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS worker_signed_ip TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS worker_signed_ua TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS employer_signed_at TIMESTAMPTZ`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS employer_signed_ip TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS employer_signed_ua TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS employer_signed_by INTEGER`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS employer_signed_by_email TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS employer_signed_name TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS employer_signature_data TEXT DEFAULT ''`); } catch {}
+    // Feature 2 — 문서 스냅샷 + 해시
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS document_snapshot_html TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS document_hash TEXT DEFAULT ''`); } catch {}
+    // Feature 4 — RFC3161 TSA
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS tsa_token TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS tsa_server TEXT DEFAULT ''`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS tsa_signed_time TIMESTAMPTZ`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS tsa_status TEXT DEFAULT ''`); } catch {}
+    // Feature 5 — 버전/개정 이력
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS document_version INTEGER DEFAULT 1`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS parent_contract_id INTEGER`); } catch {}
+    try { await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS superseded_by INTEGER`); } catch {}
+  }
+
+  // Feature 3 — 감사 로그 테이블 (모든 계약 이벤트 append-only 기록)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contract_audit_logs (
+        id SERIAL PRIMARY KEY,
+        contract_kind TEXT NOT NULL,        -- 'regular' | 'alba' | 'cafe'
+        contract_id INTEGER NOT NULL,
+        event TEXT NOT NULL,                -- 'created' | 'sms_sent' | 'link_opened' | 'worker_signed' | 'employer_signed' | 'amended' | 'resent' | 'tsa_stamped' | 'tsa_failed' | 'downloaded' | 'legacy_uploaded'
+        actor_type TEXT NOT NULL DEFAULT 'system',  -- 'worker' | 'employer' | 'system'
+        actor_id INTEGER,
+        actor_email TEXT DEFAULT '',
+        actor_name TEXT DEFAULT '',
+        client_ip TEXT DEFAULT '',
+        user_agent TEXT DEFAULT '',
+        document_hash TEXT DEFAULT '',
+        document_version INTEGER,
+        metadata JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_contract_audit_lookup ON contract_audit_logs(contract_kind, contract_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_contract_audit_created ON contract_audit_logs(created_at DESC)');
+  } catch (err) {
+    console.error('contract_audit_logs table init error:', err);
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // v2.27.0 — 안전보건관리 시스템 P1 (근로자 매일 셀프체크 + 게이팅)

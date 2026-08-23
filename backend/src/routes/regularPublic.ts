@@ -6,6 +6,8 @@ import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '
 import safetyPublicRouter, { isSafetyGatedEmployee } from './safetyPublic';
 import { checkHealthCertGate, isHealthCertRequired } from './healthPublic';
 import { checkTrainingSurveyGate } from './trainingPublic';
+import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
+import { stampInline } from '../lib/tsa';
 
 const router = Router();
 
@@ -291,6 +293,10 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
       WHERE rlc.token = ?
     `, token) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    await logAudit({
+      kind: 'regular', contractId: contract.id, event: 'link_opened', actorType: 'worker',
+      actorName: contract.worker_name, clientIp: clientIp(req), userAgent: userAgent(req),
+    });
     // Storage path 가 있는 필드 → signed URL 로 *_data 자리에 덮어쓰기
     await expandBlobUrls(contract, [
       { data: 'bank_slip_data',       path: 'bank_slip_path' },
@@ -346,6 +352,11 @@ router.post('/contract/:token/update-info', async (req: Request, res: Response) 
     if (cClauses.length > 0) {
       cParams.push(token);
       await dbRun(`UPDATE regular_labor_contracts SET ${cClauses.join(', ')} WHERE token = ?`, ...cParams);
+      // Feature 5: update-info 는 버전을 올리지 않음 — 'amended' 이벤트만 기록.
+      await logAudit({
+        kind: 'regular', contractId: contract.id, event: 'amended', actorType: 'worker',
+        clientIp: clientIp(req), userAgent: userAgent(req),
+      });
     }
 
     // Propagate to regular_employees (only if currently empty)
@@ -452,6 +463,27 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
       `UPDATE regular_labor_contracts SET ${contractUpdateClauses.join(', ')} WHERE token = ?`,
       ...contractParams
     );
+
+    // Feature 1/2/3/4 — 근로자 서명 감사증적: IP/UA 기록 → 스냅샷+해시 생성 → 감사로그 → TSA 타임스탬프
+    const signIp = clientIp(req);
+    const signUa = userAgent(req);
+    await dbRun(
+      `UPDATE regular_labor_contracts SET worker_signed_at = NOW(), worker_signed_ip = ?, worker_signed_ua = ? WHERE token = ?`,
+      signIp, signUa, token,
+    );
+    const freshContract = await dbGet('SELECT * FROM regular_labor_contracts WHERE id = ?', contract.id) as any;
+    const contractHash = sha256(canonicalizeContract(freshContract));
+    const contractSnapshot = renderSnapshotHtml(freshContract, 'regular');
+    await dbRun(
+      'UPDATE regular_labor_contracts SET document_hash = ?, document_snapshot_html = ? WHERE id = ?',
+      contractHash, contractSnapshot, contract.id,
+    );
+    await logAudit({
+      kind: 'regular', contractId: contract.id, event: 'worker_signed', actorType: 'worker',
+      actorName: freshContract.worker_name, clientIp: signIp, userAgent: signUa,
+      documentHash: contractHash, documentVersion: freshContract.document_version,
+    });
+    await stampInline('regular', contract.id, contractHash);
 
     // Propagate new fields to regular_employees (only non-empty values, don't overwrite existing)
     if (contract.employee_id) {

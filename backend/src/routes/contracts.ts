@@ -9,6 +9,11 @@ import crypto from 'crypto';
 import { dbGet, dbAll, dbRun, normalizePhone } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { uploadBase64, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
+import {
+  logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml, contractTable,
+  type ContractKind,
+} from '../lib/contractAudit';
+import { stampInline } from '../lib/tsa';
 
 /**
  * legacy 스캔 파일 base64 → Storage 분기.
@@ -485,6 +490,113 @@ router.post('/upload-legacy', async (req: AuthRequest, res: Response) => {
     res.json({ ok: true, contract_id: result.lastInsertRowid });
   } catch (error: any) {
     console.error('POST /api/contracts/upload-legacy error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/contracts/:id/employer-sign?kind=alba|cafe (also accepted in body)
+// 알바·카페 labor_contracts row 에 대한 사용자(회사) 서명.
+// ---------------------------------------------------------------------------
+router.post('/:id/employer-sign', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (!id) { res.status(400).json({ error: '유효하지 않은 id 입니다.' }); return; }
+
+    const { signature_data, signer_name, kind } = req.body as {
+      signature_data?: string; signer_name?: string; kind?: string;
+    };
+    const resolvedKind = kind || (req.query.kind as string) || '';
+    if (resolvedKind !== 'alba' && resolvedKind !== 'cafe') {
+      res.status(400).json({ error: "kind 는 'alba' 또는 'cafe' 여야 합니다." });
+      return;
+    }
+    if (!signature_data || !signer_name) {
+      res.status(400).json({ error: '서명 이미지와 서명자 이름은 필수입니다.' });
+      return;
+    }
+
+    const contract = await dbGet('SELECT id, status, worker_name, document_version FROM labor_contracts WHERE id = ?', id) as any;
+    if (!contract) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
+    if (contract.status !== 'signed') {
+      res.status(400).json({ error: '근로자가 먼저 서명해야 사용자 서명이 가능합니다.' });
+      return;
+    }
+
+    const ip = clientIp(req);
+    const ua = userAgent(req);
+    const email = req.user?.email || '';
+
+    await dbRun(
+      `UPDATE labor_contracts
+       SET employer_signed_at = NOW(), employer_signed_ip = ?, employer_signed_ua = ?,
+           employer_signed_by_email = ?, employer_signed_name = ?, employer_signature_data = ?
+       WHERE id = ?`,
+      ip, ua, email, signer_name, signature_data, id,
+    );
+
+    const freshContract = await dbGet('SELECT * FROM labor_contracts WHERE id = ?', id) as any;
+    const contractHash = sha256(canonicalizeContract(freshContract));
+    const contractSnapshot = renderSnapshotHtml(freshContract, resolvedKind as ContractKind);
+    await dbRun(
+      'UPDATE labor_contracts SET document_hash = ?, document_snapshot_html = ? WHERE id = ?',
+      contractHash, contractSnapshot, id,
+    );
+    await logAudit({
+      kind: resolvedKind as ContractKind, contractId: id, event: 'employer_signed', actorType: 'employer',
+      actorEmail: email, actorName: signer_name, clientIp: ip, userAgent: ua,
+      documentHash: contractHash, documentVersion: freshContract.document_version,
+    });
+    await stampInline(resolvedKind as ContractKind, id, contractHash);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('POST /api/contracts/:id/employer-sign error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/contracts/audit/:kind/:id
+// 계약서 요약(대용량 blob 제외) + 감사로그 이벤트 목록.
+// ---------------------------------------------------------------------------
+router.get('/audit/:kind/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const kindParam = req.params.kind as string;
+    if (kindParam !== 'regular' && kindParam !== 'alba' && kindParam !== 'cafe') {
+      res.status(400).json({ error: "kind 는 'regular'|'alba'|'cafe' 중 하나여야 합니다." });
+      return;
+    }
+    const kind = kindParam as ContractKind;
+    const id = parseInt(req.params.id as string, 10);
+    if (!id) { res.status(400).json({ error: '유효하지 않은 id 입니다.' }); return; }
+
+    const table = contractTable(kind);
+    const extraWhere = kind === 'cafe' ? " AND worker_type = 'cafe_alba'"
+      : kind === 'alba' ? " AND worker_type = 'alba'"
+      : '';
+    const row = await dbGet(`SELECT * FROM ${table} WHERE id = ?${extraWhere}`, id) as any;
+    if (!row) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
+
+    // 대용량 blob 컬럼 제외 — hash/version/tsa 등 감사 관련 필드는 그대로 유지.
+    const BLOB_FIELDS = new Set([
+      'signature_data', 'consent_signature_data', 'employer_signature_data',
+      'document_snapshot_html', 'scanned_file_data', 'bank_slip_data', 'foreign_id_card_data',
+    ]);
+    const contract: Record<string, any> = { has_document_snapshot: !!row.document_snapshot_html };
+    for (const [k, v] of Object.entries(row)) {
+      if (BLOB_FIELDS.has(k)) continue;
+      contract[k] = v;
+    }
+
+    const events = await dbAll(
+      `SELECT * FROM contract_audit_logs WHERE contract_kind = ? AND contract_id = ? ORDER BY created_at DESC`,
+      kind, id,
+    );
+
+    res.json({ contract, events });
+  } catch (error: any) {
+    console.error('GET /api/contracts/audit/:kind/:id error:', error);
     res.status(500).json({ error: error.message });
   }
 });

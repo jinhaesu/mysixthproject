@@ -5,6 +5,8 @@ import { dbGet, dbRun, dbAll, getKSTDate, normalizePhone, getFrontendUrl, pool }
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms, sendSurveyMessage } from '../services/smsService';
 import { expandWeekSchedule, type WeekSchedule } from '../services/scheduleHelper';
+import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
+import { stampInline } from '../lib/tsa';
 
 const TOKEN_EXPIRY_HOURS = 24;
 
@@ -158,12 +160,21 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
 
     const token = crypto.randomBytes(16).toString('hex');
 
+    // Feature 5 — (phone, store_name) 기준 이전 카페 계약이 있으면 버전 증가 + parent 연결.
+    const priorCafe = await dbGet(
+      `SELECT id, document_version FROM labor_contracts WHERE phone = ? AND store_name = ? AND worker_type = 'cafe_alba' ORDER BY created_at DESC LIMIT 1`,
+      normalized, store_name,
+    ) as any;
+    const version = priorCafe ? (Number(priorCafe.document_version || 1) + 1) : 1;
+    const parentId = priorCafe ? Number(priorCafe.id) : null;
+
     const result = await dbRun(
       `INSERT INTO labor_contracts (
         phone, worker_name, worker_type, contract_start, contract_end,
         address, signature_data, sms_sent, token, status,
-        store_name, work_time_start, work_time_end, work_days, hourly_rate
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        store_name, work_time_start, work_time_end, work_days, hourly_rate,
+        document_version, parent_contract_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       normalized,
       worker_name,
       'cafe_alba',
@@ -179,7 +190,19 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
       work_time_end,
       work_days,
       rate,
+      version,
+      parentId,
     );
+    const contractId = Number(result.lastInsertRowid);
+
+    if (parentId) {
+      await dbRun('UPDATE labor_contracts SET superseded_by = ? WHERE id = ?', contractId, parentId);
+      await logAudit({ kind: 'cafe', contractId: parentId, event: 'resent', actorType: 'system' });
+    }
+    await logAudit({
+      kind: 'cafe', contractId, event: 'created', actorType: 'system', actorName: worker_name,
+      documentVersion: version,
+    });
 
     const url = getFrontendUrl(`/cafe-contract?token=${token}`);
     const message =
@@ -191,13 +214,14 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
     const smsResult = await sendGeneralSms(normalized, message);
 
     if (smsResult.success) {
-      await dbRun('UPDATE labor_contracts SET sms_sent = 1 WHERE id = ?', result.lastInsertRowid);
+      await dbRun('UPDATE labor_contracts SET sms_sent = 1 WHERE id = ?', contractId);
+      await logAudit({ kind: 'cafe', contractId, event: 'sms_sent', actorType: 'system' });
     }
 
     res.json({
       success: smsResult.success,
       error: smsResult.error,
-      contract_id: result.lastInsertRowid,
+      contract_id: contractId,
       url,
     });
   } catch (error: any) {
@@ -535,6 +559,10 @@ publicRouter.get('/:token', async (req: Request, res: Response) => {
       res.status(404).json({ error: '계약서를 찾을 수 없습니다.' });
       return;
     }
+    await logAudit({
+      kind: 'cafe', contractId: contract.id, event: 'link_opened', actorType: 'worker',
+      actorName: contract.worker_name, clientIp: clientIp(req), userAgent: userAgent(req),
+    });
     const storeAddress = CAFE_STORE_ADDRESSES[contract.store_name] || '';
     res.json({ ...contract, store_address: storeAddress });
   } catch (error: any) {
@@ -597,6 +625,27 @@ publicRouter.post('/:token/sign', async (req: Request, res: Response) => {
       consent_signature_data,
       token,
     );
+
+    // Feature 1/2/3/4 — 근로자 서명 감사증적
+    const signIp = clientIp(req);
+    const signUa = userAgent(req);
+    await dbRun(
+      `UPDATE labor_contracts SET worker_signed_at = NOW(), worker_signed_ip = ?, worker_signed_ua = ? WHERE token = ?`,
+      signIp, signUa, token,
+    );
+    const freshContract = await dbGet('SELECT * FROM labor_contracts WHERE id = ?', contract.id) as any;
+    const contractHash = sha256(canonicalizeContract(freshContract));
+    const contractSnapshot = renderSnapshotHtml(freshContract, 'cafe');
+    await dbRun(
+      'UPDATE labor_contracts SET document_hash = ?, document_snapshot_html = ? WHERE id = ?',
+      contractHash, contractSnapshot, contract.id,
+    );
+    await logAudit({
+      kind: 'cafe', contractId: contract.id, event: 'worker_signed', actorType: 'worker',
+      actorName: contract.worker_name, clientIp: signIp, userAgent: signUa,
+      documentHash: contractHash, documentVersion: freshContract.document_version,
+    });
+    await stampInline('cafe', contract.id, contractHash);
 
     const viewUrl = getFrontendUrl(`/cafe-contract?token=${token}`);
     const msg =

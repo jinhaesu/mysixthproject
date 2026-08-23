@@ -32,7 +32,45 @@ import {
   TD,
   useToast,
 } from "@/components/ui";
-import { Search, FileText, History, Paperclip } from "lucide-react";
+import { Search, FileText, History, Paperclip, ShieldCheck } from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
+async function authHeader(): Promise<Record<string, string>> {
+  try {
+    const t = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null;
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch { return {}; }
+}
+
+async function fetchAudit(kind: 'regular' | 'alba' | 'cafe', id: number) {
+  const h = await authHeader();
+  const r = await fetch(`${API_URL}/api/contracts/audit/${kind}/${id}`, { headers: h });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(b.error || `HTTP ${r.status}`);
+  return b as { contract: Record<string, any>; events: any[] };
+}
+
+function resolveKind(item: { employee_type: string; contract?: any }): 'regular' | 'alba' | 'cafe' {
+  if (item.employee_type === 'regular') return 'regular';
+  if (item.contract?.worker_type === 'cafe_alba' || item.contract?.store_name) return 'cafe';
+  return 'alba';
+}
+
+const EVENT_LABEL: Record<string, string> = {
+  created: '생성', sms_sent: 'SMS 발송', link_opened: '링크 열람',
+  worker_signed: '근로자 서명', employer_signed: '사업주 서명',
+  amended: '정보 수정', resent: '재발송(supersede)',
+  tsa_stamped: 'TSA 인증', tsa_failed: 'TSA 실패',
+  downloaded: '다운로드', legacy_uploaded: '스캔 업로드',
+};
+const EVENT_TONE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand'> = {
+  created: 'info', sms_sent: 'brand', link_opened: 'neutral',
+  worker_signed: 'success', employer_signed: 'success',
+  amended: 'warning', resent: 'warning',
+  tsa_stamped: 'success', tsa_failed: 'danger',
+  downloaded: 'neutral', legacy_uploaded: 'info',
+};
 
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -152,6 +190,34 @@ function ContractManageInner() {
   });
 
   const [viewModal, setViewModal] = useState<ViewModalItem | null>(null);
+  const [auditModal, setAuditModal] = useState<{
+    open: boolean;
+    loading: boolean;
+    error?: string;
+    label: string;
+    contract?: Record<string, any>;
+    events?: any[];
+  }>({ open: false, loading: false, label: '' });
+
+  const openAudit = async (item: ContractItem) => {
+    const c = item.contract;
+    if (!c?.id) { toast.info('감사이력 조회 대상이 없습니다 (계약 id 없음).'); return; }
+    const kind = resolveKind(item);
+    setAuditModal({ open: true, loading: true, label: `${item.employee_name} · #${c.id}` });
+    try {
+      const data = await fetchAudit(kind, c.id);
+      setAuditModal({
+        open: true, loading: false,
+        label: `${item.employee_name} · #${c.id} (${kind})`,
+        contract: data.contract, events: data.events,
+      });
+    } catch (e: any) {
+      setAuditModal({
+        open: true, loading: false, error: e.message || '조회 실패',
+        label: `${item.employee_name} · #${c.id}`,
+      });
+    }
+  };
 
   // Legacy contract attach state
   const [attachTarget, setAttachTarget] = useState<ContractItem | null>(null);
@@ -435,6 +501,13 @@ function ContractManageInner() {
                           보기
                         </Button>
                         <Button variant="ghost" size="xs" onClick={() => handleHistoryFromRow(item)}>이력</Button>
+                        <Button
+                          variant="ghost" size="xs"
+                          onClick={(e) => { e.stopPropagation(); openAudit(item); }}
+                          title="감사이력 (서명·발송·해시·TSA 등)"
+                        >
+                          <ShieldCheck size={12} className="inline mr-0.5" />감사
+                        </Button>
                       </div>
                     </TD>
                   </TR>
@@ -731,6 +804,66 @@ function ContractManageInner() {
             </p>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={auditModal.open}
+        onClose={() => setAuditModal({ open: false, loading: false, label: '' })}
+        title={`감사이력 · ${auditModal.label}`}
+        size="lg"
+      >
+        {auditModal.loading ? (
+          <div className="p-6 text-center text-[var(--text-3)]">불러오는 중...</div>
+        ) : auditModal.error ? (
+          <div className="p-4 text-[var(--danger-fg)]">{auditModal.error}</div>
+        ) : auditModal.contract ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div><span className="text-[var(--text-4)]">문서 버전 </span><b>v{auditModal.contract.document_version || 1}</b>{auditModal.contract.parent_contract_id && <span className="text-[var(--text-4)]"> (parent #{auditModal.contract.parent_contract_id})</span>}</div>
+              <div><span className="text-[var(--text-4)]">supersede </span>{auditModal.contract.superseded_by ? <Badge tone="warning" size="xs">→ #{auditModal.contract.superseded_by}</Badge> : <span className="text-[var(--text-4)]">현재 유효</span>}</div>
+              <div><span className="text-[var(--text-4)]">문서 해시 </span><code className="text-[10px] break-all">{auditModal.contract.document_hash || '(미생성)'}</code></div>
+              <div><span className="text-[var(--text-4)]">스냅샷 </span>{auditModal.contract.has_document_snapshot ? <Badge tone="success" size="xs">보존됨</Badge> : <span className="text-[var(--text-4)]">없음</span>}</div>
+              <div><span className="text-[var(--text-4)]">TSA 상태 </span>{auditModal.contract.tsa_status === 'ok' ? <Badge tone="success" size="xs">✓ RFC3161 인증</Badge> : auditModal.contract.tsa_status === 'failed' ? <Badge tone="danger" size="xs">실패</Badge> : auditModal.contract.tsa_status === 'pending' ? <Badge tone="warning" size="xs">대기</Badge> : <span className="text-[var(--text-4)]">-</span>}</div>
+              <div><span className="text-[var(--text-4)]">TSA 서버 </span><span className="text-[11px]">{auditModal.contract.tsa_server || '-'}</span></div>
+              <div><span className="text-[var(--text-4)]">근로자 서명 </span>{auditModal.contract.worker_signed_at ? <><Badge tone="success" size="xs">서명</Badge> <span className="text-[10px] text-[var(--text-4)]">{new Date(auditModal.contract.worker_signed_at).toLocaleString('ko-KR')}</span></> : <span className="text-[var(--text-4)]">미서명</span>}{auditModal.contract.worker_signed_ip && <span className="text-[10px] text-[var(--text-4)]"> IP {auditModal.contract.worker_signed_ip}</span>}</div>
+              <div><span className="text-[var(--text-4)]">사업주 서명 </span>{auditModal.contract.employer_signed_at ? <><Badge tone="success" size="xs">서명</Badge> <span className="text-[10px] text-[var(--text-4)]">{new Date(auditModal.contract.employer_signed_at).toLocaleString('ko-KR')}</span></> : <span className="text-[var(--text-4)]">미서명</span>}{auditModal.contract.employer_signed_by_email && <div className="text-[10px] text-[var(--text-4)]">by {auditModal.contract.employer_signed_by_email}</div>}</div>
+            </div>
+
+            <div>
+              <div className="text-[13px] font-semibold mb-2">이벤트 로그 <span className="text-[var(--text-4)] font-normal">({auditModal.events?.length || 0}건)</span></div>
+              <div className="overflow-y-auto max-h-[400px] border border-[var(--border-2)] rounded-md">
+                <table className="w-full text-[11.5px]">
+                  <thead className="sticky top-0 bg-[var(--bg-2)] border-b border-[var(--border-2)]">
+                    <tr>
+                      <th className="text-left px-2 py-1.5">시각</th>
+                      <th className="text-left px-2 py-1.5">이벤트</th>
+                      <th className="text-left px-2 py-1.5">Actor</th>
+                      <th className="text-left px-2 py-1.5">IP</th>
+                      <th className="text-left px-2 py-1.5">UA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(auditModal.events || []).map((e: any) => (
+                      <tr key={e.id} className="border-t border-[var(--border-1)]">
+                        <td className="px-2 py-1 tabular text-[var(--text-3)]">{new Date(e.created_at).toLocaleString('ko-KR')}</td>
+                        <td className="px-2 py-1"><Badge tone={EVENT_TONE[e.event] || 'neutral'} size="xs">{EVENT_LABEL[e.event] || e.event}</Badge></td>
+                        <td className="px-2 py-1"><div className="text-[var(--text-2)]">{e.actor_name || e.actor_type}</div>{e.actor_email && <div className="text-[10px] text-[var(--text-4)]">{e.actor_email}</div>}</td>
+                        <td className="px-2 py-1 text-[var(--text-3)]">{e.client_ip || '-'}</td>
+                        <td className="px-2 py-1 text-[var(--text-4)] truncate max-w-[200px]" title={e.user_agent}>{e.user_agent || '-'}</td>
+                      </tr>
+                    ))}
+                    {(auditModal.events || []).length === 0 && (
+                      <tr><td colSpan={5} className="text-center py-4 text-[var(--text-4)]">이벤트 없음</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <p className="text-[10.5px] text-[var(--text-4)] bg-[var(--info-bg)] border border-[var(--info-border)] rounded p-2">
+              ※ 감사이력은 노동청·분쟁 시 전자계약 신빙성 입증 자료로 사용됩니다. 서명 시각·IP·UA·문서 해시·RFC3161 타임스탬프가 자동 기록됩니다.
+            </p>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

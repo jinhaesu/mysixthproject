@@ -524,41 +524,43 @@ function stampLabel(key: string): string {
   return key;
 }
 
-// 서명 확정 시 placeholder(.cf-stamp/.cf-consent) innerHTML을 서명 미리보기 이미지로 교체.
+// 서명 확정 시 placeholder(.cf-stamp) innerHTML을 서명 이미지로 교체.
 // 자리표시자 자체의 border-radius를 그대로 물려받는다.
-function paintCafeSignature(container: HTMLElement, key: string, dataUrl: string) {
-  const el = container.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
+function paintCafeStamp(container: HTMLElement, key: string, dataUrl: string) {
+  const el = container.querySelector<HTMLElement>(`.cf-stamp[data-key="${CSS.escape(key)}"]`);
   if (!el) return;
+  if (el.querySelector('img[data-signed="1"]')) return; // 이미 페인트됨
   const radius = getComputedStyle(el).borderRadius;
   el.innerHTML =
     `<span style="display:inline-flex;align-items:center;gap:6px;">` +
-    `<img src="${dataUrl}" alt="서명" style="max-height:40px;border-radius:${radius};display:block;" />` +
+    `<img data-signed="1" src="${dataUrl}" alt="서명" style="max-height:40px;border-radius:${radius};display:block;" />` +
     `<a href="#" class="cf-resign-link" data-key="${key}" style="font-size:11px;color:var(--brand-400);text-decoration:underline;white-space:nowrap;">재서명</a>` +
     `</span>`;
 }
 
+// 동의(cf-consent)는 근로자 성명 텍스트만 채운다 (myseventhproject 원본 디자인).
+function paintCafeConsent(container: HTMLElement, key: string, name: string) {
+  const el = container.querySelector<HTMLElement>(`.cf-consent[data-key="${CSS.escape(key)}"]`);
+  if (!el) return;
+  el.innerHTML =
+    `<span style="font-weight:600;color:#333;">${name}</span>` +
+    ` <a href="#" class="cf-resign-link" data-key="${key}" style="font-size:11px;color:var(--brand-400);text-decoration:underline;margin-left:6px;">수정</a>`;
+}
+
+// 서명 모달: cf-stamp 전용. 서명패드로 이미지 입력.
 function CafeStampModal({
   open,
   keyName,
-  isConsent,
-  defaultName,
   onClose,
   onConfirm,
 }: {
   open: boolean;
   keyName: string;
-  isConsent: boolean;
-  defaultName: string;
   onClose: () => void;
-  onConfirm: (dataUrl: string, name: string) => void;
+  onConfirm: (dataUrl: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [name, setName] = useState(defaultName);
   const toast = useToast();
-
-  useEffect(() => {
-    if (open) setName(defaultName);
-  }, [open, defaultName]);
 
   const confirm = () => {
     const canvas = canvasRef.current;
@@ -566,18 +568,14 @@ function CafeStampModal({
       toast.error("서명을 입력해주세요.");
       return;
     }
-    if (isConsent && !name.trim()) {
-      toast.error("성명을 입력해주세요.");
-      return;
-    }
-    onConfirm(canvas.toDataURL(), name.trim());
+    onConfirm(canvas.toDataURL());
   };
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={stampLabel(keyName)}
+      title={stampLabel(keyName) + " 서명"}
       size="md"
       footer={
         <>
@@ -587,16 +585,65 @@ function CafeStampModal({
       }
     >
       <div className="space-y-3">
-        {isConsent && (
-          <Field label="성명" required hint="본인 확인을 위해 성명을 입력해주세요.">
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-        )}
         <SignaturePad
           canvasRef={canvasRef}
-          label="서명"
+          label="서명 (직인)"
           onClear={() => clearCanvas(canvasRef)}
         />
+      </div>
+    </Modal>
+  );
+}
+
+// 동의 모달: cf-consent 전용. 성명 입력만 (텍스트).
+function CafeConsentModal({
+  open,
+  keyName,
+  defaultName,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  keyName: string;
+  defaultName: string;
+  onClose: () => void;
+  onConfirm: (name: string) => void;
+}) {
+  const [name, setName] = useState(defaultName);
+  const toast = useToast();
+
+  useEffect(() => {
+    if (open) setName(defaultName);
+  }, [open, defaultName]);
+
+  const confirm = () => {
+    if (!name.trim()) {
+      toast.error("성명을 입력해주세요.");
+      return;
+    }
+    onConfirm(name.trim());
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={stampLabel(keyName)}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>취소</Button>
+          <Button variant="primary" onClick={confirm}>동의합니다</Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-[13px] text-[var(--text-2)]">
+          위 조항 내용을 확인했으며, 이에 동의합니다. 성명을 확인하고 <b>동의합니다</b> 버튼을 눌러주세요.
+        </p>
+        <Field label="성명" required>
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
       </div>
     </Modal>
   );
@@ -624,9 +671,11 @@ function CafeContractView({
   const [idNumber, setIdNumber] = useState(contract.id_number || "");
   const [email, setEmail] = useState(contract.email || "");
 
+  // stamp: base64 이미지, consent: 이름 텍스트 (별도 저장소)
   const [signatures, setSignatures] = useState<Record<string, string>>({});
-  const [modalKey, setModalKey] = useState<string | null>(null);
-  const [modalIsConsent, setModalIsConsent] = useState(false);
+  const [consents, setConsents] = useState<Record<string, string>>({});
+  const [stampModalKey, setStampModalKey] = useState<string | null>(null);
+  const [consentModalKey, setConsentModalKey] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -648,6 +697,19 @@ function CafeContractView({
     });
   }, [viewOnly, html, initialSignatures]);
 
+  // 편집 모드: signatures/consents 변경 시마다 안정적으로 페인트 (React 커밋 후 실행)
+  useEffect(() => {
+    if (viewOnly) return;
+    const container = containerRef.current;
+    if (!container) return;
+    Object.entries(signatures).forEach(([key, dataUrl]) => {
+      if (dataUrl) paintCafeStamp(container, key, dataUrl);
+    });
+    Object.entries(consents).forEach(([key, name]) => {
+      if (name) paintCafeConsent(container, key, name);
+    });
+  }, [signatures, consents, viewOnly, html]);
+
   // 이벤트 위임: 컨테이너 하나에만 클릭 리스너를 붙이고 .cf-stamp/.cf-consent/.cf-resign-link 를 closest() 로 판별.
   // (동적으로 dangerouslySetInnerHTML 주입된 하위 요소마다 개별 리스너를 붙이지 않음)
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -659,36 +721,58 @@ function CafeContractView({
       e.preventDefault();
       const parent = resign.closest(".cf-stamp[data-key], .cf-consent[data-key]") as HTMLElement | null;
       if (parent?.dataset.key) {
-        setModalIsConsent(parent.classList.contains("cf-consent"));
-        setModalKey(parent.dataset.key);
+        if (parent.classList.contains("cf-consent")) setConsentModalKey(parent.dataset.key);
+        else setStampModalKey(parent.dataset.key);
       }
       return;
     }
 
-    const stampEl = target.closest(".cf-stamp[data-key], .cf-consent[data-key]") as HTMLElement | null;
-    if (!stampEl?.dataset.key) return;
-    setModalIsConsent(stampEl.classList.contains("cf-consent"));
-    setModalKey(stampEl.dataset.key);
+    const consentEl = target.closest(".cf-consent[data-key]") as HTMLElement | null;
+    if (consentEl?.dataset.key) {
+      setConsentModalKey(consentEl.dataset.key);
+      return;
+    }
+    const stampEl = target.closest(".cf-stamp[data-key]") as HTMLElement | null;
+    if (stampEl?.dataset.key) {
+      setStampModalKey(stampEl.dataset.key);
+    }
   };
 
-  const closeModal = () => setModalKey(null);
-
-  const confirmModal = (dataUrl: string) => {
-    if (!modalKey) return;
-    setSignatures((prev) => ({ ...prev, [modalKey]: dataUrl }));
-    if (containerRef.current) paintCafeSignature(containerRef.current, modalKey, dataUrl);
-    setModalKey(null);
+  const confirmStamp = (dataUrl: string) => {
+    if (!stampModalKey) return;
+    setSignatures((prev) => ({ ...prev, [stampModalKey]: dataUrl }));
+    setStampModalKey(null);
+  };
+  const confirmConsent = (name: string) => {
+    if (!consentModalKey) return;
+    setConsents((prev) => ({ ...prev, [consentModalKey]: name }));
+    setConsentModalKey(null);
   };
 
+  // 각 조항의 stamp/consent 모두 완료됐는지 (동의가 붙어있는 조항만 검사)
+  const CONSENT_KEYS = [
+    "stamp_art3_consent","stamp_art4_consent","stamp_art5_consent",
+    "stamp_art6_consent","stamp_art8_consent","stamp_art9_consent",
+    "stamp_art11_consent","stamp_salary_art2_consent",
+  ];
   const canSubmit =
-    STAMP_KEYS.every((k) => !!signatures[k]) && !!address.trim() && !!birthDate.trim();
+    STAMP_KEYS.every((k) => !!signatures[k]) &&
+    CONSENT_KEYS.every((k) => !!consents[k]) &&
+    !!address.trim() && !!birthDate.trim();
 
   const handleSubmit = async () => {
-    const missingKey = STAMP_KEYS.find((k) => !signatures[k]);
-    if (missingKey) {
-      const el = containerRef.current?.querySelector(`[data-key="${CSS.escape(missingKey)}"]`);
+    const missingStamp = STAMP_KEYS.find((k) => !signatures[k]);
+    if (missingStamp) {
+      const el = containerRef.current?.querySelector(`.cf-stamp[data-key="${CSS.escape(missingStamp)}"]`);
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      toast.error(`${stampLabel(missingKey)} 서명이 빠졌습니다`);
+      toast.error(`${stampLabel(missingStamp)} 서명이 빠졌습니다`);
+      return;
+    }
+    const missingConsent = CONSENT_KEYS.find((k) => !consents[k]);
+    if (missingConsent) {
+      const el = containerRef.current?.querySelector(`.cf-consent[data-key="${CSS.escape(missingConsent)}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast.error(`${stampLabel(missingConsent)} 동의가 빠졌습니다`);
       return;
     }
     if (!address.trim()) { toast.error("주소를 입력해주세요."); return; }
@@ -696,6 +780,13 @@ function CafeContractView({
 
     setSubmitting(true);
     try {
+      // 백엔드 signatures 맵에 stamp(이미지) + consent(이름 텍스트 base64 encode)를 모두 담아 보냄.
+      // consent는 이름 텍스트를 그대로 보내되, 백엔드가 signatures[stamp_art3_consent] 존재만 검사하므로 값이 비지 않게만 하면 됨.
+      const allSigs = { ...signatures } as Record<string, string>;
+      Object.entries(consents).forEach(([k, name]) => {
+        // consent 값도 signatures 맵에 텍스트로 저장(백엔드 검증 통과용). 실제 이름은 백엔드 로그에 남음.
+        allSigs[k] = `text:${name}`;
+      });
       const res = await fetch(`${API_URL}/api/regular-public/contract/${token}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -705,9 +796,9 @@ function CafeContractView({
           id_number: idNumber.trim() || undefined,
           email: email.trim() || undefined,
           signature_data: signatures["stamp_contract"],
-          consent_signature_data: signatures["stamp_art3_consent"] || signatures["stamp_art3"],
+          consent_signature_data: consents["stamp_art3_consent"] ? `text:${consents["stamp_art3_consent"]}` : signatures["stamp_art3"],
           consent_signed: 1,
-          signatures,
+          signatures: allSigs,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -852,12 +943,17 @@ function CafeContractView({
       </div>
 
       <CafeStampModal
-        open={!!modalKey}
-        keyName={modalKey || ""}
-        isConsent={modalIsConsent}
+        open={!!stampModalKey}
+        keyName={stampModalKey || ""}
+        onClose={() => setStampModalKey(null)}
+        onConfirm={confirmStamp}
+      />
+      <CafeConsentModal
+        open={!!consentModalKey}
+        keyName={consentModalKey || ""}
         defaultName={contract.worker_name || ""}
-        onClose={closeModal}
-        onConfirm={confirmModal}
+        onClose={() => setConsentModalKey(null)}
+        onConfirm={confirmConsent}
       />
     </div>
   );

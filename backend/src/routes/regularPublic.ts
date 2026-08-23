@@ -264,6 +264,7 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
       SELECT rlc.id, rlc.employee_id, rlc.phone,
              rlc.worker_name, rlc.worker_name as name,
              rlc.contract_start, rlc.contract_end, rlc.status, rlc.token,
+             rlc.superseded_by,
              rlc.sms_sent, rlc.created_at, rlc.created_at as updated_at, rlc.work_start_date,
              rlc.position_title, rlc.annual_salary, rlc.base_pay, rlc.meal_allowance,
              rlc.other_allowance, rlc.pay_day, rlc.work_hours, rlc.work_place,
@@ -294,6 +295,13 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
       WHERE rlc.token = ?
     `, token) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    if (contract.superseded_by) {
+      res.status(410).json({
+        error: '이 계약서는 새 계약서로 교체되었습니다. 최신 계약서 링크로 접속해주세요.',
+        superseded: true,
+      });
+      return;
+    }
     await logAudit({
       kind: 'regular', contractId: contract.id, event: 'link_opened', actorType: 'worker',
       actorName: contract.worker_name, clientIp: clientIp(req), userAgent: userAgent(req),
@@ -331,11 +339,19 @@ router.get('/contract/:token/html', async (req: Request, res: Response) => {
               COALESCE(rulebook_url, '') as rulebook_url,
               COALESCE(company_stamp_url, '') as company_stamp_url,
               COALESCE(signatures, '{}'::jsonb) as signatures,
+              superseded_by,
               address, birth_date
        FROM regular_labor_contracts WHERE token = ?`,
       token,
     ) as any;
     if (!row) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    if (row.superseded_by) {
+      res.status(410).json({
+        error: '이 계약서는 새 계약서로 교체되었습니다. 최신 계약서 링크로 접속해주세요.',
+        superseded: true,
+      });
+      return;
+    }
 
     if (row.contract_kind !== 'cafe') {
       res.status(400).json({ error: 'not_cafe_contract' });
@@ -390,8 +406,12 @@ router.post('/contract/:token/update-info', async (req: Request, res: Response) 
       bank_name, bank_account,
     } = req.body || {};
 
-    const contract = await dbGet('SELECT id, employee_id, phone FROM regular_labor_contracts WHERE token = ?', token) as any;
+    const contract = await dbGet('SELECT id, employee_id, phone, superseded_by FROM regular_labor_contracts WHERE token = ?', token) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    if (contract.superseded_by) {
+      res.status(410).json({ error: '이 계약서는 새 계약서로 교체되었습니다.', superseded: true });
+      return;
+    }
 
     // Build dynamic UPDATE for regular_labor_contracts (only non-empty fields)
     const cClauses: string[] = [];
@@ -495,11 +515,19 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
               sms_sent, created_at, updated_at, work_start_date,
               position_title, annual_salary, base_pay, meal_allowance, other_allowance,
               pay_day, work_hours, work_place, department, email, nationality,
-              visa_type, visa_expiry, COALESCE(contract_kind, 'production') as contract_kind
+              visa_type, visa_expiry, COALESCE(contract_kind, 'production') as contract_kind,
+              superseded_by
        FROM regular_labor_contracts WHERE token = ?`,
       token
     ) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+    if (contract.superseded_by) {
+      res.status(410).json({
+        error: '이 계약서는 새 계약서로 교체되었습니다. 최신 계약서 링크로 접속해주세요.',
+        superseded: true,
+      });
+      return;
+    }
     if (contract.status === 'signed') { res.status(400).json({ error: '이미 서명된 계약서입니다.' }); return; }
 
     const isCafe = contract.contract_kind === 'cafe';

@@ -550,13 +550,17 @@ publicRouter.get('/:token', async (req: Request, res: Response) => {
       `SELECT id, phone, worker_name, store_name, work_time_start, work_time_end,
               work_days, hourly_rate, contract_start, contract_end,
               status, address, birth_date, id_number,
-              signature_data, consent_signature_data
+              signature_data, consent_signature_data, superseded_by
        FROM labor_contracts
        WHERE token = ? AND worker_type = 'cafe_alba'`,
       token,
     ) as any;
     if (!contract) {
       res.status(404).json({ error: '계약서를 찾을 수 없습니다.' });
+      return;
+    }
+    if (contract.superseded_by) {
+      res.status(410).json({ error: '이 계약서는 새 계약서로 교체되었습니다.', superseded: true });
       return;
     }
     await logAudit({
@@ -598,13 +602,17 @@ publicRouter.post('/:token/sign', async (req: Request, res: Response) => {
     }
 
     const contract = await dbGet(
-      `SELECT id, phone, worker_name, store_name, status
+      `SELECT id, phone, worker_name, store_name, status, superseded_by
        FROM labor_contracts
        WHERE token = ? AND worker_type = 'cafe_alba'`,
       token,
     ) as any;
     if (!contract) {
       res.status(404).json({ error: '계약서를 찾을 수 없습니다.' });
+      return;
+    }
+    if (contract.superseded_by) {
+      res.status(410).json({ error: '이 계약서는 새 계약서로 교체되었습니다.', superseded: true });
       return;
     }
     if (contract.status === 'signed') {

@@ -19,53 +19,61 @@ function SignaturePad({
   onClear: () => void;
 }) {
   const isDrawing = useRef(false);
+  const activePointerId = useRef<number | null>(null);
 
-  const getPos = (e: React.TouchEvent | React.MouseEvent, canvas: HTMLCanvasElement) => {
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    if ('touches' in e) {
-      return {
-        x: (e.touches[0].clientX - rect.left) * scaleX,
-        y: (e.touches[0].clientY - rect.top) * scaleY,
-      };
-    }
     return {
-      x: ((e as React.MouseEvent).clientX - rect.left) * scaleX,
-      y: ((e as React.MouseEvent).clientY - rect.top) * scaleY,
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
     };
   };
 
-  const startDrawing = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Pointer capture: even if 손가락/펜/트랙패드가 canvas 밖으로 나가도 계속 그리기
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    activePointerId.current = e.pointerId;
     isDrawing.current = true;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const { x, y } = getPos(e, canvas);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  };
-
-  const draw = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    if (!isDrawing.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const { x, y } = getPos(e, canvas);
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#222';
+    // 단발 클릭도 점으로 남도록 즉시 arc 그리기
+    ctx.beginPath();
+    ctx.arc(x, y, 1, 0, Math.PI * 2);
+    ctx.fillStyle = '#222';
+    ctx.fill();
+    // 후속 이동을 위한 라인 시작
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    if (activePointerId.current !== null && e.pointerId !== activePointerId.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const { x, y } = getPos(e, canvas);
     ctx.lineTo(x, y);
     ctx.stroke();
   };
 
-  const stopDrawing = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
+  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerId.current !== null && e.pointerId !== activePointerId.current) return;
+    const canvas = canvasRef.current;
+    if (canvas) {
+      try { canvas.releasePointerCapture(e.pointerId); } catch {}
+    }
     isDrawing.current = false;
+    activePointerId.current = null;
   };
 
   useEffect(() => {
@@ -93,16 +101,15 @@ function SignaturePad({
           width={480}
           height={120}
           className="w-full cursor-crosshair block bg-white"
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
+          style={{ touchAction: 'none' }}
+          onPointerDown={startDrawing}
+          onPointerMove={draw}
+          onPointerUp={stopDrawing}
+          onPointerCancel={stopDrawing}
+          onPointerLeave={stopDrawing}
         />
       </Card>
-      <p className="text-[var(--fs-caption)] text-[var(--text-4)] mt-1">위 영역에 서명해주세요</p>
+      <p className="text-[var(--fs-caption)] text-[var(--text-4)] mt-1">위 영역에 서명해주세요 (한 번 눌러도 점으로 등록됩니다)</p>
     </div>
   );
 }

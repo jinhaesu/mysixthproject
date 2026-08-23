@@ -147,7 +147,7 @@ export function Field({
   className?: string;
 }) {
   return (
-    <label className={cn("flex flex-col gap-1.5", className)}>
+    <div className={cn("flex flex-col gap-1.5", className)}>
       {label && (
         <span className="text-[12px] font-medium text-[var(--text-2)]">
           {label}
@@ -160,6 +160,6 @@ export function Field({
       ) : hint ? (
         <span className="text-[11.5px] text-[var(--text-3)]">{hint}</span>
       ) : null}
-    </label>
+    </div>
   );
 }

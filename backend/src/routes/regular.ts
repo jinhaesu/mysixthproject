@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend, normalizePhone, getRegularUrl, getFrontendUrl } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms } from '../services/smsService';
+import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
+import { stampInline } from '../lib/tsa';
 
 const router = Router();
 
@@ -1220,14 +1222,32 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
     const resolvedPlace = work_place || (kind === 'cafe' ? (CAFE_STORE_ADDRESSES[deptForKind] || '널담은공간 매장') : '');
     const resolvedHours = work_hours || (kind === 'cafe' ? '' : '09:00~18:00');
 
-    await dbRun(
-      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place, sms_sent, contract_kind, work_duties, work_days, break_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    // Feature 5 — employee_id 기준 이전(만료 아닌) 계약이 있으면 버전 증가 + parent 연결.
+    const priorContract = await dbGet(
+      `SELECT id, document_version FROM regular_labor_contracts WHERE employee_id = ? AND status <> 'expired' ORDER BY created_at DESC LIMIT 1`,
+      employee.id,
+    ) as any;
+    const version = priorContract ? (Number(priorContract.document_version || 1) + 1) : 1;
+    const parentId = priorContract ? Number(priorContract.id) : null;
+
+    const insertResult = await dbRun(
+      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place, sms_sent, contract_kind, work_duties, work_days, break_time, document_version, parent_contract_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       employee.id, employee.phone, employee.name, cStart, cEnd, token,
       wStart, department || employee.department || '', position_title || '사원',
       annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', resolvedHours, resolvedPlace, 0,
-      kind, resolvedDuties, resolvedDays, resolvedBreak
+      kind, resolvedDuties, resolvedDays, resolvedBreak, version, parentId
     );
+    const contractId = Number(insertResult.lastInsertRowid);
+
+    if (parentId) {
+      await dbRun('UPDATE regular_labor_contracts SET superseded_by = ? WHERE id = ?', contractId, parentId);
+      await logAudit({ kind: 'regular', contractId: parentId, event: 'resent', actorType: 'employer', actorEmail: req.user?.email || '' });
+    }
+    await logAudit({
+      kind: 'regular', contractId, event: 'created', actorType: 'employer', actorEmail: req.user?.email || '',
+      actorName: employee.name, documentVersion: version,
+    });
 
     const contractLink = getFrontendUrl(`/regular-contract?token=${token}`);
     const smsHeader = kind === 'cafe' ? '[조인앤조인 카페팀 근로계약서]' : '[조인앤조인 근로계약서]';
@@ -1236,6 +1256,7 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
 
     if (smsResult.success) {
       await dbRun(`UPDATE regular_labor_contracts SET sms_sent = 1 WHERE token = ?`, token);
+      await logAudit({ kind: 'regular', contractId, event: 'sms_sent', actorType: 'system' });
       res.json({ success: true, messageId: smsResult.messageId });
     } else {
       console.error(`[contracts/send] SMS 발송 실패 — employee_id=${employee.id} (${employee.name}) phone=${employee.phone} error=${smsResult.error}`);
@@ -1246,6 +1267,59 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
       });
     }
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/contracts/:id/employer-sign - 사용자(회사) 서명
+// body: { signature_data, signer_name }. 근로자가 먼저 서명(status='signed')한 계약서만 대상.
+router.post('/contracts/:id/employer-sign', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (!id) { res.status(400).json({ error: '유효하지 않은 계약서 id 입니다.' }); return; }
+
+    const { signature_data, signer_name } = req.body as { signature_data?: string; signer_name?: string };
+    if (!signature_data || !signer_name) {
+      res.status(400).json({ error: '서명 이미지와 서명자 이름은 필수입니다.' });
+      return;
+    }
+
+    const contract = await dbGet('SELECT id, status, worker_name, document_version FROM regular_labor_contracts WHERE id = ?', id) as any;
+    if (!contract) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
+    if (contract.status !== 'signed') {
+      res.status(400).json({ error: '근로자가 먼저 서명해야 사용자 서명이 가능합니다.' });
+      return;
+    }
+
+    const ip = clientIp(req);
+    const ua = userAgent(req);
+    const email = req.user?.email || '';
+
+    await dbRun(
+      `UPDATE regular_labor_contracts
+       SET employer_signed_at = NOW(), employer_signed_ip = ?, employer_signed_ua = ?,
+           employer_signed_by_email = ?, employer_signed_name = ?, employer_signature_data = ?
+       WHERE id = ?`,
+      ip, ua, email, signer_name, signature_data, id,
+    );
+
+    const freshContract = await dbGet('SELECT * FROM regular_labor_contracts WHERE id = ?', id) as any;
+    const contractHash = sha256(canonicalizeContract(freshContract));
+    const contractSnapshot = renderSnapshotHtml(freshContract, 'regular');
+    await dbRun(
+      'UPDATE regular_labor_contracts SET document_hash = ?, document_snapshot_html = ? WHERE id = ?',
+      contractHash, contractSnapshot, id,
+    );
+    await logAudit({
+      kind: 'regular', contractId: id, event: 'employer_signed', actorType: 'employer',
+      actorEmail: email, actorName: signer_name, clientIp: ip, userAgent: ua,
+      documentHash: contractHash, documentVersion: freshContract.document_version,
+    });
+    await stampInline('regular', id, contractHash);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('POST /api/regular/contracts/:id/employer-sign error:', error);
     res.status(500).json({ error: error.message });
   }
 });

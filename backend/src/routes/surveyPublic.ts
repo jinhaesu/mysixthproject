@@ -2,10 +2,13 @@ import { Router, Request, Response } from 'express';
 import { dbGet, dbAll, dbRun, getKSTTimestamp, getKSTDate, normalizePhone, getFrontendUrl } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
+import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
+import { stampInline } from '../lib/tsa';
 
 const router = Router();
 
 // POST /api/survey-public/:token/contract - Submit labor contract
+// 알바 플로우는 "생성 + 서명"이 단일 요청 안에서 동시에 일어남 — created + worker_signed 를 함께 기록.
 router.post('/:token/contract', async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
@@ -28,19 +31,62 @@ router.post('/:token/contract', async (req: Request, res: Response) => {
     const endYear = parseInt(today.slice(0, 4)) + 1;
     const endDate = endYear + today.slice(4);
 
+    // Feature 5 — phone 기준 이전 알바 계약이 있으면 버전 증가 + parent 연결.
+    const prior = await dbGet(
+      `SELECT id, document_version FROM labor_contracts WHERE phone = ? AND worker_type = 'alba' ORDER BY created_at DESC LIMIT 1`,
+      request.phone,
+    ) as any;
+    const version = prior ? (Number(prior.document_version || 1) + 1) : 1;
+    const parentId = prior ? Number(prior.id) : null;
+
+    const ip = clientIp(req);
+    const ua = userAgent(req);
+
+    // 생성과 동시에 서명 — worker_signed_at/ip/ua 를 insert 시점에 바로 채움.
     const result = await dbRun(
-      'INSERT INTO labor_contracts (phone, worker_name, worker_type, contract_start, contract_end, address, signature_data, request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      request.phone, worker_name, 'alba', startDate, endDate, address, signature_data, request.id
+      `INSERT INTO labor_contracts
+        (phone, worker_name, worker_type, contract_start, contract_end, address, signature_data, request_id,
+         document_version, parent_contract_id, worker_signed_at, worker_signed_ip, worker_signed_ua)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+      request.phone, worker_name, 'alba', startDate, endDate, address, signature_data, request.id,
+      version, parentId, ip, ua,
     );
+    const contractId = Number(result.lastInsertRowid);
+
+    if (parentId) {
+      await dbRun('UPDATE labor_contracts SET superseded_by = ? WHERE id = ?', contractId, parentId);
+      await logAudit({ kind: 'alba', contractId: parentId, event: 'resent', actorType: 'system' });
+    }
+    await logAudit({
+      kind: 'alba', contractId, event: 'created', actorType: 'worker', actorName: worker_name,
+      clientIp: ip, userAgent: ua, documentVersion: version,
+    });
+
+    // Feature 2/4 — 문서 스냅샷/해시 생성 → 감사로그 → TSA 타임스탬프
+    const freshContract = await dbGet('SELECT * FROM labor_contracts WHERE id = ?', contractId) as any;
+    const contractHash = sha256(canonicalizeContract(freshContract));
+    const contractSnapshot = renderSnapshotHtml(freshContract, 'alba');
+    await dbRun(
+      'UPDATE labor_contracts SET document_hash = ?, document_snapshot_html = ? WHERE id = ?',
+      contractHash, contractSnapshot, contractId,
+    );
+    await logAudit({
+      kind: 'alba', contractId, event: 'worker_signed', actorType: 'worker', actorName: worker_name,
+      clientIp: ip, userAgent: ua, documentHash: contractHash, documentVersion: version,
+    });
+    await stampInline('alba', contractId, contractHash);
 
     // Send contract confirmation SMS to worker
-    const contractLink = getFrontendUrl(`/contract?id=${result.lastInsertRowid}`);
+    const contractLink = getFrontendUrl(`/contract?id=${contractId}`);
     const message = `[조인앤조인 근로계약서]\n${worker_name}님의 단시간 근로자 표준근로계약서가 체결되었습니다.\n계약기간: ${startDate} ~ ${endDate}\n\n계약서 확인: ${contractLink}`;
-    await sendGeneralSms(request.phone, message);
+    const smsResult = await sendGeneralSms(request.phone, message);
 
-    await dbRun('UPDATE labor_contracts SET sms_sent = 1 WHERE id = ?', result.lastInsertRowid);
+    await dbRun('UPDATE labor_contracts SET sms_sent = 1 WHERE id = ?', contractId);
+    if (smsResult.success) {
+      await logAudit({ kind: 'alba', contractId, event: 'sms_sent', actorType: 'system' });
+    }
 
-    res.json({ success: true, contract_id: result.lastInsertRowid, contract_start: startDate, contract_end: endDate });
+    res.json({ success: true, contract_id: contractId, contract_start: startDate, contract_end: endDate });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

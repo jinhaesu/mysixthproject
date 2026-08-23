@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { CheckCircle } from "lucide-react";
-import { Button, Card, CardHeader, CenterSpinner, EmptyState, Field, Input, SectionHeader, SegmentedControl } from "@/components/ui";
+import { Button, Card, CardHeader, CenterSpinner, EmptyState, Field, Input, Modal, SectionHeader, SegmentedControl, useToast } from "@/components/ui";
 import { AlertTriangle } from "lucide-react";
 import { FilePreview } from "@/components/FilePreview";
 
@@ -476,6 +476,386 @@ function _UnusedOnboardingFixForm({ contract, token }: { contract: any; token: s
   );
 }
 
+// ── CAFE branch (contract_kind='cafe') ─────────────────────────────────
+// 백엔드가 완성된 근로계약서 HTML(도장/서명 placeholder 포함)을 내려주면
+// 프런트는 .cf-stamp / .cf-consent 요소에 클릭 서명 UX만 붙인다.
+// 11개 필수 도장 키 — 백엔드 /sign 밸리데이션과 1:1로 맞춰야 함.
+const STAMP_KEYS = [
+  "stamp_art3",
+  "stamp_art4",
+  "stamp_art5",
+  "stamp_art6",
+  "stamp_art8",
+  "stamp_art9",
+  "stamp_art11",
+  "stamp_contract",
+  "stamp_salary_art2",
+  "stamp_salary",
+  "stamp_rulebook",
+] as const;
+
+const STAMP_LABELS: Record<string, string> = {
+  stamp_art3: "제3조",
+  stamp_art4: "제4조",
+  stamp_art5: "제5조",
+  stamp_art6: "제6조",
+  stamp_art8: "제8조",
+  stamp_art9: "제9조",
+  stamp_art11: "제11조",
+  stamp_contract: "근로계약서 서명",
+  stamp_salary_art2: "연봉계약서 제2조",
+  stamp_salary: "연봉계약서 서명",
+  stamp_rulebook: "취업규칙 확인",
+};
+
+function stampLabel(key: string): string {
+  if (STAMP_LABELS[key]) return STAMP_LABELS[key];
+  if (key.endsWith("_consent")) {
+    const base = key.slice(0, -"_consent".length);
+    return `${STAMP_LABELS[base] || base} 동의`;
+  }
+  return key;
+}
+
+// 서명 확정 시 placeholder(.cf-stamp/.cf-consent) innerHTML을 서명 미리보기 이미지로 교체.
+// 자리표시자 자체의 border-radius를 그대로 물려받는다.
+function paintCafeSignature(container: HTMLElement, key: string, dataUrl: string) {
+  const el = container.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
+  if (!el) return;
+  const radius = getComputedStyle(el).borderRadius;
+  el.innerHTML =
+    `<span style="display:inline-flex;align-items:center;gap:6px;">` +
+    `<img src="${dataUrl}" alt="서명" style="max-height:40px;border-radius:${radius};display:block;" />` +
+    `<a href="#" class="cf-resign-link" data-key="${key}" style="font-size:11px;color:var(--brand-400);text-decoration:underline;white-space:nowrap;">재서명</a>` +
+    `</span>`;
+}
+
+function CafeStampModal({
+  open,
+  keyName,
+  isConsent,
+  defaultName,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  keyName: string;
+  isConsent: boolean;
+  defaultName: string;
+  onClose: () => void;
+  onConfirm: (dataUrl: string, name: string) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [name, setName] = useState(defaultName);
+  const toast = useToast();
+
+  useEffect(() => {
+    if (open) setName(defaultName);
+  }, [open, defaultName]);
+
+  const confirm = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || isCanvasBlank(canvas)) {
+      toast.error("서명을 입력해주세요.");
+      return;
+    }
+    if (isConsent && !name.trim()) {
+      toast.error("성명을 입력해주세요.");
+      return;
+    }
+    onConfirm(canvas.toDataURL(), name.trim());
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={stampLabel(keyName)}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>취소</Button>
+          <Button variant="primary" onClick={confirm}>확인</Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {isConsent && (
+          <Field label="성명" required hint="본인 확인을 위해 성명을 입력해주세요.">
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+        )}
+        <SignaturePad
+          canvasRef={canvasRef}
+          label="서명"
+          onClear={() => clearCanvas(canvasRef)}
+        />
+      </div>
+    </Modal>
+  );
+}
+
+function CafeContractView({
+  contract,
+  token,
+  html,
+  initialSignatures,
+  viewOnly,
+}: {
+  contract: any;
+  token: string;
+  html: string;
+  initialSignatures: Record<string, string>;
+  viewOnly: boolean;
+}) {
+  const toast = useToast();
+  const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [address, setAddress] = useState(contract.address || "");
+  const [birthDate, setBirthDate] = useState(contract.birth_date || "");
+  const [idNumber, setIdNumber] = useState(contract.id_number || "");
+  const [email, setEmail] = useState(contract.email || "");
+
+  const [signatures, setSignatures] = useState<Record<string, string>>({});
+  const [modalKey, setModalKey] = useState<string | null>(null);
+  const [modalIsConsent, setModalIsConsent] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  // 열람 모드: 백엔드가 이미 인라인한 서명이 없을 경우를 대비한 방어적 인라인 처리.
+  useEffect(() => {
+    if (!viewOnly) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const nodes = container.querySelectorAll<HTMLElement>(".cf-stamp-signed[data-key]");
+    nodes.forEach((el) => {
+      if (el.querySelector("img")) return; // 이미 백엔드가 인라인한 경우
+      const key = el.dataset.key;
+      if (!key) return;
+      const dataUrl = initialSignatures[key];
+      if (!dataUrl) return;
+      const radius = getComputedStyle(el).borderRadius;
+      el.innerHTML = `<img src="${dataUrl}" alt="서명" style="max-height:40px;border-radius:${radius};display:block;" />`;
+    });
+  }, [viewOnly, html, initialSignatures]);
+
+  // 이벤트 위임: 컨테이너 하나에만 클릭 리스너를 붙이고 .cf-stamp/.cf-consent/.cf-resign-link 를 closest() 로 판별.
+  // (동적으로 dangerouslySetInnerHTML 주입된 하위 요소마다 개별 리스너를 붙이지 않음)
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (viewOnly) return;
+    const target = e.target as HTMLElement;
+
+    const resign = target.closest(".cf-resign-link") as HTMLElement | null;
+    if (resign) {
+      e.preventDefault();
+      const parent = resign.closest(".cf-stamp[data-key], .cf-consent[data-key]") as HTMLElement | null;
+      if (parent?.dataset.key) {
+        setModalIsConsent(parent.classList.contains("cf-consent"));
+        setModalKey(parent.dataset.key);
+      }
+      return;
+    }
+
+    const stampEl = target.closest(".cf-stamp[data-key], .cf-consent[data-key]") as HTMLElement | null;
+    if (!stampEl?.dataset.key) return;
+    setModalIsConsent(stampEl.classList.contains("cf-consent"));
+    setModalKey(stampEl.dataset.key);
+  };
+
+  const closeModal = () => setModalKey(null);
+
+  const confirmModal = (dataUrl: string) => {
+    if (!modalKey) return;
+    setSignatures((prev) => ({ ...prev, [modalKey]: dataUrl }));
+    if (containerRef.current) paintCafeSignature(containerRef.current, modalKey, dataUrl);
+    setModalKey(null);
+  };
+
+  const canSubmit =
+    STAMP_KEYS.every((k) => !!signatures[k]) && !!address.trim() && !!birthDate.trim();
+
+  const handleSubmit = async () => {
+    const missingKey = STAMP_KEYS.find((k) => !signatures[k]);
+    if (missingKey) {
+      const el = containerRef.current?.querySelector(`[data-key="${CSS.escape(missingKey)}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast.error(`${stampLabel(missingKey)} 서명이 빠졌습니다`);
+      return;
+    }
+    if (!address.trim()) { toast.error("주소를 입력해주세요."); return; }
+    if (!birthDate.trim()) { toast.error("생년월일을 입력해주세요."); return; }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_URL}/api/regular-public/contract/${token}/sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          address: address.trim(),
+          birth_date: birthDate.trim(),
+          id_number: idNumber.trim() || undefined,
+          email: email.trim() || undefined,
+          signature_data: signatures["stamp_contract"],
+          consent_signature_data: signatures["stamp_art3_consent"] || signatures["stamp_art3"],
+          consent_signed: 1,
+          signatures,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (Array.isArray(body.missing) && body.missing.length) {
+          toast.error(`서명이 누락되었습니다: ${body.missing.map(stampLabel).join(", ")}`);
+        } else {
+          toast.error(body.error || "제출에 실패했습니다.");
+        }
+        return;
+      }
+      setSubmitted(true);
+    } catch (e: any) {
+      toast.error(e.message || "제출 중 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-canvas)] flex items-center justify-center px-4 py-10 fade-in">
+        <Card padding="lg" className="max-w-md w-full text-center space-y-4 shadow-[var(--elev-2)]">
+          <CheckCircle className="w-10 h-10 mx-auto text-[var(--success-fg)]" />
+          <div>
+            <h1 className="text-[18px] font-semibold text-[var(--text-1)]">근로계약서 제출 완료</h1>
+            <p className="text-[13px] text-[var(--text-3)] mt-1">
+              {contract.worker_name}님, 계약서 제출이 정상적으로 완료되었습니다.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button variant="secondary" className="w-full" onClick={() => router.push("/rulebook")}>
+              취업규칙 다시 보기
+            </Button>
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => router.push(`/regular-contract?token=${encodeURIComponent(token)}&mode=view`)}
+            >
+              제출한 계약서 보기
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-canvas)] py-6 px-4 fade-in">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <Card padding="md" tone="default" className="text-center surface-bevel"
+              style={{ background: 'linear-gradient(135deg, var(--brand-600) 0%, var(--brand-500) 100%)' }}>
+          <h1 className="text-[var(--fs-lg)] font-bold text-white">
+            {viewOnly ? "근로계약서 열람" : "카페 근로계약서 서명"}
+          </h1>
+          <p className="text-[var(--brand-200)] text-[var(--fs-body)] mt-1">
+            {viewOnly
+              ? `${contract.worker_name}님이 서명한 계약서입니다.`
+              : `${contract.worker_name}님, 각 조항의 서명란을 눌러 서명해주세요.`}
+          </p>
+        </Card>
+
+        <Card padding="md" tone="default" className="shadow-[var(--elev-1)] space-y-3">
+          <SectionHeader eyebrow="근로자 정보" title="정보 확인" />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="성명">
+              <Input value={contract.worker_name || ""} readOnly disabled inputSize="md" />
+            </Field>
+            <Field label="연락처">
+              <Input value={contract.phone || ""} readOnly disabled inputSize="md" />
+            </Field>
+          </div>
+          <Field label="생년월일" required={!viewOnly}>
+            <Input
+              type="date"
+              inputSize="md"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              disabled={viewOnly}
+            />
+          </Field>
+          <Field label="주소" required={!viewOnly}>
+            <Input
+              inputSize="md"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="예: 전북 전주시 덕진구 ..."
+              disabled={viewOnly}
+            />
+          </Field>
+          <Field label="신분증번호(주민등록번호)" hint="4대보험 신고 목적으로만 사용됩니다.">
+            <Input
+              inputSize="md"
+              value={idNumber}
+              onChange={(e) => setIdNumber(e.target.value)}
+              placeholder="000000-0000000"
+              disabled={viewOnly}
+            />
+          </Field>
+          <Field label="이메일 (선택)">
+            <Input
+              type="email"
+              inputSize="md"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="example@email.com"
+              disabled={viewOnly}
+            />
+          </Field>
+        </Card>
+
+        <Card padding="md" tone="default" className="shadow-[var(--elev-1)]">
+          <SectionHeader
+            eyebrow="근로계약서"
+            title={viewOnly ? "계약서 본문" : "계약서 본문 — 각 조항의 서명란을 눌러 서명"}
+          />
+          <div
+            ref={containerRef}
+            onClick={handleContainerClick}
+            className="cf-html-container text-[13px] leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </Card>
+
+        {!viewOnly && (
+          <>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleSubmit}
+              loading={submitting}
+              disabled={submitting || !canSubmit}
+              className="w-full"
+            >
+              {submitting ? "제출 중..." : "계약서 제출"}
+            </Button>
+            <p className="text-center text-[var(--fs-caption)] text-[var(--text-4)] pb-4">
+              본 계약서에 서명함으로써 위 내용에 동의하는 것으로 간주됩니다.
+            </p>
+          </>
+        )}
+      </div>
+
+      <CafeStampModal
+        open={!!modalKey}
+        keyName={modalKey || ""}
+        isConsent={modalIsConsent}
+        defaultName={contract.worker_name || ""}
+        onClose={closeModal}
+        onConfirm={confirmModal}
+      />
+    </div>
+  );
+}
+
 function RegularContractContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
@@ -517,6 +897,31 @@ function RegularContractContent() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [token]);
+
+  // contract_kind='cafe' 여부 판별 — /html?mode=... 400 not_cafe_contract 면 기존 레거시 폼 유지.
+  const [cafeCheck, setCafeCheck] = useState<"pending" | "not_cafe" | "ready">("pending");
+  const [cafeHtml, setCafeHtml] = useState("");
+  const [cafeSignatures, setCafeSignatures] = useState<Record<string, string>>({});
+  const [cafeViewOnly, setCafeViewOnly] = useState(false);
+
+  useEffect(() => {
+    if (!contract || !token) return;
+    const desiredMode = contract.status === "signed" || mode === "view" ? "view" : "sign";
+    fetch(`${API_URL}/api/regular-public/contract/${token}/html?mode=${desiredMode}`)
+      .then(async r => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          setCafeCheck("not_cafe");
+          return;
+        }
+        setCafeHtml(body.html || "");
+        setCafeSignatures(body.signatures || {});
+        setCafeViewOnly(desiredMode === "view");
+        setCafeCheck("ready");
+      })
+      .catch(() => setCafeCheck("not_cafe"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contract, token, mode]);
 
   const handleSign = async () => {
     if (!birthDate.trim()) return alert("생년월일을 입력해주세요.");
@@ -590,6 +995,25 @@ function RegularContractContent() {
       </div>
     </div>
   );
+
+  // contract_kind='cafe' 여부 아직 판별 중 — 레거시/카페 어느 쪽으로도 확정 렌더하지 않음.
+  if (cafeCheck === "pending") return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
+      <CenterSpinner />
+    </div>
+  );
+
+  if (cafeCheck === "ready") {
+    return (
+      <CafeContractView
+        contract={contract}
+        token={token}
+        html={cafeHtml}
+        initialSignatures={cafeSignatures}
+        viewOnly={cafeViewOnly}
+      />
+    );
+  }
 
   if (contract.status === 'signed') {
     return (

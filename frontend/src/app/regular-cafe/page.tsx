@@ -17,6 +17,7 @@ import {
   Button,
   Input,
   Select,
+  Textarea,
   Field,
   Modal,
   useToast,
@@ -81,8 +82,14 @@ export default function RegularCafePage() {
     base_pay: "",
     meal_allowance: "",
     other_allowance: "",
+    other_allowance_detail: "",
     annual_salary: "",
     pay_day: "10",
+    job_description: "카페 매장 운영, 음료·베이커리 제조 및 판매, 매장 청결·재고 관리 및 이에 부수하는 업무",
+    monthly_work_hours: "209시간",
+    monthly_total: "",
+    salary_end_date: oneYearLater,
+    rulebook_url: "/rulebook",
   });
   const [sending, setSending] = useState(false);
 
@@ -227,10 +234,16 @@ export default function RegularCafePage() {
         base_pay: form.base_pay,
         meal_allowance: form.meal_allowance,
         other_allowance: form.other_allowance,
+        other_allowance_detail: form.other_allowance_detail || undefined,
         annual_salary: form.annual_salary,
         pay_day: form.pay_day,
         work_place: workPlace,
         contract_kind: "cafe",
+        job_description: form.job_description || undefined,
+        monthly_work_hours: form.monthly_work_hours || undefined,
+        monthly_total: form.monthly_total || form.annual_salary || undefined,
+        salary_end_date: form.salary_end_date || undefined,
+        rulebook_url: form.rulebook_url || "/rulebook",
       });
       toast.success("카페 정규직 근로계약서가 발송되었습니다.");
       setModal(null);
@@ -302,6 +315,14 @@ export default function RegularCafePage() {
             <Link href="/contract-manage" className="text-[13px] text-[var(--brand-400)] hover:underline inline-flex items-center gap-1">
               <FileSignature size={14} /> 계약서 확정 관리
               <ExternalLink size={12} />
+            </Link>
+            <Link
+              href="/rulebook"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[13px] text-[var(--brand-400)] hover:underline inline-flex items-center gap-1"
+            >
+              취업규칙 조회 →
             </Link>
           </div>
         }
@@ -443,13 +464,15 @@ export default function RegularCafePage() {
                   onChange={(e) => {
                     const s = e.target.value;
                     let end = form.contract_end;
+                    let salaryEnd = form.salary_end_date;
                     if (s) {
                       const d = new Date(s);
                       d.setFullYear(d.getFullYear() + 1);
                       d.setDate(d.getDate() - 1);
                       end = d.toLocaleDateString("sv-SE");
+                      salaryEnd = end;
                     }
-                    setForm({ ...form, contract_start: s, contract_end: end });
+                    setForm({ ...form, contract_start: s, contract_end: end, salary_end_date: salaryEnd });
                   }}
                 />
               </Field>
@@ -483,6 +506,30 @@ export default function RegularCafePage() {
                 → {CAFE_STORE_ADDRESSES[form.department] || "-"}
               </p>
             </Field>
+            <Field label="담당 업무" hint="계약서 제2조(담당 업무)에 그대로 표기됩니다.">
+              <Textarea
+                rows={2}
+                value={form.job_description}
+                onChange={(e) => setForm({ ...form, job_description: e.target.value })}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="월간 총 근로시간" hint="예: 209시간">
+                <Input
+                  type="text"
+                  value={form.monthly_work_hours}
+                  onChange={(e) => setForm({ ...form, monthly_work_hours: e.target.value })}
+                  placeholder="예: 209시간"
+                />
+              </Field>
+              <Field label="연봉계약 종료일" hint="기본값: 계약 시작일 + 1년 - 1일">
+                <Input
+                  type="date"
+                  value={form.salary_end_date}
+                  onChange={(e) => setForm({ ...form, salary_end_date: e.target.value })}
+                />
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="직책">
                 <Input
@@ -535,12 +582,30 @@ export default function RegularCafePage() {
                 />
               </Field>
             </div>
-            <Field label="기타수당(선택)">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="기타수당(선택)">
+                <Input
+                  type="text"
+                  value={form.other_allowance}
+                  onChange={(e) => setForm({ ...form, other_allowance: e.target.value })}
+                  placeholder="0 또는 미입력"
+                />
+              </Field>
+              <Field label="기타수당 설명(선택)" hint="예: 직책수당">
+                <Input
+                  type="text"
+                  value={form.other_allowance_detail}
+                  onChange={(e) => setForm({ ...form, other_allowance_detail: e.target.value })}
+                  placeholder="예: 직책수당"
+                />
+              </Field>
+            </div>
+            <Field label="연봉계약서 총계 표시" hint="비워두면 연봉 총액(기본급+식대×12)이 자동으로 사용됩니다.">
               <Input
                 type="text"
-                value={form.other_allowance}
-                onChange={(e) => setForm({ ...form, other_allowance: e.target.value })}
-                placeholder="0 또는 미입력"
+                value={form.monthly_total}
+                onChange={(e) => setForm({ ...form, monthly_total: e.target.value })}
+                placeholder={form.annual_salary ? `${form.annual_salary}원` : "예: 27,600,000원"}
               />
             </Field>
             <div className="p-2.5 rounded-[var(--r-md)] bg-[var(--bg-0)] border border-[var(--border-1)] text-[12px] text-[var(--text-3)]">
@@ -549,6 +614,9 @@ export default function RegularCafePage() {
                 {form.annual_salary ? `${form.annual_salary}원` : "-"}
               </span>
             </div>
+            <Field label="취업규칙 링크" hint="계약서에 삽입되는 취업규칙 조회 링크입니다.">
+              <Input type="text" value={form.rulebook_url} readOnly disabled />
+            </Field>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setModal(null)} disabled={sending}>
                 취소

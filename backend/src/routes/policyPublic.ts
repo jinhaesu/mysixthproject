@@ -175,4 +175,50 @@ router.post('/:token/policy/:id/acknowledge', async (req: Request, res: Response
   }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// GET /api/regular-public/rulebook
+// 취업규칙(사규) 최신 발행본 전문 조회 — 인증 불필요(근로자용 열람).
+// ═══════════════════════════════════════════════════════════════
+router.get('/rulebook', async (_req: Request, res: Response) => {
+  try {
+    const row = await dbGet(
+      `SELECT id, title, version, content_html, effective_from, published_at
+         FROM policy_documents
+        WHERE kind = 'employment_rules' AND status = 'published'
+        ORDER BY effective_from DESC LIMIT 1`
+    ) as any;
+    if (!row) { res.status(404).json({ error: '발행된 취업규칙이 없습니다.' }); return; }
+    res.json({
+      id: row.id,
+      title: row.title,
+      version: row.version,
+      content_html: row.content_html,
+      effective_from: row.effective_from,
+      published_at: row.published_at,
+    });
+  } catch (error: any) {
+    console.error('[policy-public/rulebook]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GET /api/regular-public/rulebook/history
+// 취업규칙 전체 버전 이력 (published/archived/draft 모두) — 인증 불필요.
+// ═══════════════════════════════════════════════════════════════
+router.get('/rulebook/history', async (_req: Request, res: Response) => {
+  try {
+    const rows = await dbAll(
+      `SELECT id, title, version, effective_from, status
+         FROM policy_documents
+        WHERE kind = 'employment_rules'
+        ORDER BY effective_from DESC NULLS LAST, id DESC`
+    );
+    res.json({ history: rows });
+  } catch (error: any) {
+    console.error('[policy-public/rulebook-history]', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

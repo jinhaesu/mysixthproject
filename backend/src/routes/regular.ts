@@ -1178,6 +1178,13 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
       work_duties,       // 카페용 명시 (미입력 시 contract_kind 별 기본값 사용)
       work_days,         // 카페용 명시 (예: '주5일(로테이션)')
       break_time,        // 카페용 명시 (예: '30분 (매장별 관행)')
+      // 카페 정규직 HTML 계약서(연봉계약서/취업규칙) 상세 필드 — production 은 미입력이면 빈 값 유지.
+      job_description,        // 업무내용 (제4조)
+      other_allowance_detail, // 기타 수당 항목명/설명
+      monthly_work_hours,     // 월간 총 시간
+      monthly_total,          // 총계
+      salary_end_date,        // 연봉계약 종료일
+      rulebook_url,           // 취업규칙(사규) 원문 링크 — 미입력 시 admin_settings 기본값 사용 가능(apply-defaults)
     } = req.body;
     const employee = await dbGet(`SELECT ${EMP_COLS_NO_BLOB} FROM regular_employees WHERE id = ?`, employee_id) as any;
     if (!employee) { res.status(404).json({ error: '직원을 찾을 수 없습니다.' }); return; }
@@ -1230,13 +1237,20 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
     const version = priorContract ? (Number(priorContract.document_version || 1) + 1) : 1;
     const parentId = priorContract ? Number(priorContract.id) : null;
 
+    // 카페 정규직 HTML 계약서 필드 — job_description 미입력 시 카페 기본 업무(work_duties)로 대체.
+    const resolvedJobDescription = job_description || (kind === 'cafe' ? resolvedDuties : '');
+    // 연봉계약 종료일 — 미입력 시 계약 종료일(cEnd)과 동일하게.
+    const resolvedSalaryEnd = (salary_end_date && /^\d{4}-\d{2}-\d{2}$/.test(salary_end_date)) ? salary_end_date : cEnd;
+
     const insertResult = await dbRun(
-      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place, sms_sent, contract_kind, work_duties, work_days, break_time, document_version, parent_contract_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO regular_labor_contracts (employee_id, phone, worker_name, contract_start, contract_end, token, work_start_date, department, position_title, annual_salary, base_pay, meal_allowance, other_allowance, pay_day, work_hours, work_place, sms_sent, contract_kind, work_duties, work_days, break_time, document_version, parent_contract_id, job_description, other_allowance_detail, monthly_work_hours, monthly_total, salary_end_date, rulebook_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       employee.id, employee.phone, employee.name, cStart, cEnd, token,
       wStart, department || employee.department || '', position_title || '사원',
       annual_salary || '', base_pay || '', meal_allowance || '', other_allowance || '', pay_day || '10', resolvedHours, resolvedPlace, 0,
-      kind, resolvedDuties, resolvedDays, resolvedBreak, version, parentId
+      kind, resolvedDuties, resolvedDays, resolvedBreak, version, parentId,
+      resolvedJobDescription, other_allowance_detail || '', monthly_work_hours || '', monthly_total || '',
+      resolvedSalaryEnd, rulebook_url || ''
     );
     const contractId = Number(insertResult.lastInsertRowid);
 
@@ -1266,6 +1280,52 @@ router.post('/contracts/send', async (req: AuthRequest, res: Response) => {
         message: 'DB에는 계약서 row 가 생성되었으나 SMS 가 발송되지 않았습니다. SOLAPI 설정·잔액·수신번호를 확인하세요.',
       });
     }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/regular/contracts/:id/apply-defaults - 조직 공통 기본값(취업규칙 링크/회사 인감)을
+// 계약서에 채워넣는다. 이미 값이 있는 필드는 건드리지 않는다(override 금지).
+// admin_settings 키: 'rulebook_url' | 'company_stamp_url'. body: { apply: ('rulebook_url'|'company_stamp_url')[] }
+router.post('/contracts/:id/apply-defaults', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (!id) { res.status(400).json({ error: '유효하지 않은 계약서 id 입니다.' }); return; }
+
+    const { apply } = req.body as { apply?: string[] };
+    const targets = (Array.isArray(apply) ? apply : []).filter((f) => f === 'rulebook_url' || f === 'company_stamp_url');
+    if (targets.length === 0) {
+      res.status(400).json({ error: "apply 배열에 'rulebook_url' 또는 'company_stamp_url' 을 지정해주세요." });
+      return;
+    }
+
+    const contract = await dbGet('SELECT id, rulebook_url, company_stamp_url FROM regular_labor_contracts WHERE id = ?', id) as any;
+    if (!contract) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
+
+    const clauses: string[] = [];
+    const params: any[] = [];
+    const applied: string[] = [];
+    const skipped: string[] = [];
+
+    for (const field of targets) {
+      const current = (contract as any)[field] || '';
+      if (current !== '') { skipped.push(field); continue; }
+      const setting = await dbGet('SELECT value FROM admin_settings WHERE key = ?', field) as any;
+      const defaultValue = setting?.value || '';
+      if (!defaultValue) { skipped.push(field); continue; }
+      clauses.push(`${field} = ?`);
+      params.push(defaultValue);
+      applied.push(field);
+    }
+
+    if (clauses.length > 0) {
+      params.push(id);
+      await dbRun(`UPDATE regular_labor_contracts SET ${clauses.join(', ')} WHERE id = ?`, ...params);
+    }
+
+    const updated = await dbGet('SELECT id, rulebook_url, company_stamp_url FROM regular_labor_contracts WHERE id = ?', id);
+    res.json({ success: true, applied, skipped, contract: updated });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

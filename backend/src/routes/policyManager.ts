@@ -7,12 +7,16 @@ const router = Router();
  * P7A — 안전보건 방침·규정 문서 관리 (중처법 시행령 §4-1).
  * requireAuth 뒤에 마운트.
  *
- * kind:   policy | regulation | manual | goal
+ * kind:   policy | regulation | manual | goal | employment_rules
  * status: draft | published | archived
  * target_role: all | production | cafe | office
+ *
+ * employment_rules(취업규칙) 는 kind 값만 다를 뿐 나머지 CRUD·발행·아카이브
+ * 흐름은 policy/regulation 등과 완전히 동일하게 이 파일의 제네릭 엔드포인트로
+ * 처리된다 (GET/PATCH /documents/:id, POST /documents/:id/publish 등).
  */
 
-const VALID_KINDS = new Set(['policy', 'regulation', 'manual', 'goal']);
+const VALID_KINDS = new Set(['policy', 'regulation', 'manual', 'goal', 'employment_rules']);
 const VALID_TARGET_ROLES = new Set(['all', 'production', 'cafe', 'office']);
 
 // ═══════════════════════════════════════════════════════════════

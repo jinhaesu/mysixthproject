@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import pg from 'pg';
+import { RULEBOOK_V1_HTML, RULEBOOK_V1_META } from './seeds/rulebook-v1';
 
 // Parse BIGINT (INT8) as JavaScript number (for COUNT(*) etc.)
 pg.types.setTypeParser(20, (val: string) => parseInt(val, 10));
@@ -219,7 +220,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.41.0';
+  const SCHEMA_VERSION = 'schema-v2.42.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -1031,6 +1032,20 @@ export async function initializeDB(): Promise<void> {
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_duties TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS work_days TEXT DEFAULT ''"); } catch {}
   try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS break_time TEXT DEFAULT ''"); } catch {}
+
+  // v2.42.0 — 정규직 카페팀(contract_kind='cafe') 근로계약서 HTML 템플릿 포팅.
+  // 연봉계약서 상세 필드 + 취업규칙 열람·안내 확인서(7번째 문서) + 다중 직인(JSONB) 지원.
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS job_description TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS other_allowance_detail TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS monthly_work_hours TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS monthly_total TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS salary_end_date TEXT DEFAULT ''"); } catch {}
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS rulebook_url TEXT DEFAULT ''"); } catch {}
+  // signatures — stamp_key → base64 이미지 맵. 카페 정규직 계약의 다중 직인(11개)을 한 컬럼에 저장.
+  // 기존 signature_data(단일 컬럼)는 하위호환을 위해 유지 — stamp_contract 값을 계속 미러링.
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS signatures JSONB DEFAULT '{}'::jsonb"); } catch {}
+  // company_stamp_url — 조직 공통 인감 이미지. 계약별 override 도 허용(빈 값이면 env/조직설정 fallback).
+  try { await pool.query("ALTER TABLE regular_labor_contracts ADD COLUMN IF NOT EXISTS company_stamp_url TEXT DEFAULT ''"); } catch {}
 
   // ═══════════════════════════════════════════════════════════════
   // v2.41.0 — 전자계약 감사증적(audit-trail) 인프라
@@ -2030,6 +2045,30 @@ export async function initializeDB(): Promise<void> {
     console.log('[safety P7A] Seeded policy_documents (draft)');
   } catch (e: any) {
     console.error('[safety P7A] seed failed:', e.message);
+  }
+
+  // 취업규칙 v1.0 seed — kind='employment_rules', 근로자 전원 대상, 발행 상태로 즉시 게시.
+  // (주)조인앤조인 취업규칙 (제정 2020.06.01) 전문. backend/src/seeds/rulebook-v1.ts 참조.
+  try {
+    const exists = await dbGet(
+      `SELECT id FROM policy_documents WHERE kind = ? AND title = ? LIMIT 1`,
+      'employment_rules', RULEBOOK_V1_META.title
+    );
+    if (!exists) {
+      await pool.query(pg$(`
+        INSERT INTO policy_documents
+          (kind, title, version, content_html, status, effective_from, requires_acknowledgment, target_role)
+        VALUES ('employment_rules', ?, ?, ?, 'published', ?, 1, 'all')
+      `), [
+        RULEBOOK_V1_META.title,
+        RULEBOOK_V1_META.version,
+        RULEBOOK_V1_HTML,
+        RULEBOOK_V1_META.effective_from,
+      ]);
+      console.log('[rulebook] Seeded 취업규칙 v1.0 into policy_documents');
+    }
+  } catch (e) {
+    console.error('[rulebook] seed failed:', e);
   }
 
   // ═══════════════════════════════════════════════════════════════

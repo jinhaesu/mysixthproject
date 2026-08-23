@@ -8,6 +8,7 @@ import { checkHealthCertGate, isHealthCertRequired } from './healthPublic';
 import { checkTrainingSurveyGate } from './trainingPublic';
 import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
 import { stampInline } from '../lib/tsa';
+import { buildRegularCafeContractPage, STAMP_KEYS, type StampKey } from '../templates/regular-cafe-contract';
 
 const router = Router();
 
@@ -309,6 +310,73 @@ router.get('/contract/:token', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/regular-public/contract/:token/html?mode=view|sign
+// 정규직 카페팀(contract_kind='cafe') 전용 — 6종 문서(근로계약서/연봉계약서/비밀유지서약서/
+// 개인정보동의서/경업금지서약서/법정의무교육) + 취업규칙 열람·안내 확인서(7번째 문서)를
+// 하나의 HTML 로 렌더링. cafe 가 아닌 계약은 400 을 반환하고 프런트는 레거시 뷰로 폴백한다.
+router.get('/contract/:token/html', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const mode: 'view' | 'sign' = req.query.mode === 'sign' ? 'sign' : 'view';
+
+    const row = await dbGet(
+      `SELECT id, employee_id, phone, worker_name, contract_start, contract_end, status, token,
+              COALESCE(contract_kind, 'production') as contract_kind,
+              COALESCE(job_description, '') as job_description,
+              annual_salary, base_pay, meal_allowance, other_allowance,
+              COALESCE(other_allowance_detail, '') as other_allowance_detail,
+              COALESCE(monthly_work_hours, '') as monthly_work_hours,
+              COALESCE(monthly_total, '') as monthly_total,
+              COALESCE(salary_end_date, '') as salary_end_date,
+              COALESCE(rulebook_url, '') as rulebook_url,
+              COALESCE(company_stamp_url, '') as company_stamp_url,
+              COALESCE(signatures, '{}'::jsonb) as signatures,
+              address, birth_date
+       FROM regular_labor_contracts WHERE token = ?`,
+      token,
+    ) as any;
+    if (!row) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
+
+    if (row.contract_kind !== 'cafe') {
+      res.status(400).json({ error: 'not_cafe_contract' });
+      return;
+    }
+
+    const admin = {
+      contract_start_date: row.contract_start || '',
+      job_description: row.job_description || '',
+      contract_date: row.contract_start || '',   // for now
+      annual_salary: row.annual_salary || '',
+      base_salary: row.base_pay || '',
+      meal_allowance: row.meal_allowance || '',
+      other_allowance: row.other_allowance || '',
+      other_allowance_detail: row.other_allowance_detail || '',
+      monthly_work_hours: row.monthly_work_hours || '',
+      monthly_total: row.monthly_total || '',
+      salary_start_date: row.contract_start || '',
+      salary_end_date: row.salary_end_date || '',
+      rulebook_url: row.rulebook_url || process.env.RULEBOOK_URL || '/rulebook',
+    };
+    const employee = {
+      employee_name: row.worker_name || '',
+      employee_address: row.address || '',
+      employee_phone: row.phone || '',
+      employee_birthday: row.birth_date || '',
+    };
+    const signatures = (row.signatures || {}) as Partial<Record<StampKey, string>>;
+    const companyStampUrl = row.company_stamp_url || process.env.COMPANY_STAMP_URL || '';
+
+    const html = buildRegularCafeContractPage(
+      admin, employee, signatures, companyStampUrl, mode, row.status, row.worker_name,
+    );
+
+    res.json({ html, signatures, status: row.status });
+  } catch (error: any) {
+    console.error('GET /api/regular-public/contract/:token/html error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/regular-public/contract/:token/update-info
 // Update onboarding-related info fields WITHOUT requiring signature.
 // Allowed even on already-signed contracts. Used by /regular-contract?mode=onboarding-fix.
@@ -418,20 +486,40 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
       address, signature_data, birth_date, id_number, consent_signed, consent_signature_data,
       // New onboarding fields (optional)
       email, nationality, visa_type, visa_expiry, bank_slip_data, foreign_id_card_data,
-    } = req.body;
-    if (!address || !signature_data) { res.status(400).json({ error: '주소와 서명은 필수입니다.' }); return; }
+      // 정규직 카페팀(contract_kind='cafe') 전용 — stamp_key → base64 이미지 맵
+      signatures,
+    } = req.body as { signatures?: Partial<Record<StampKey, string>>; [k: string]: any };
 
     const contract = await dbGet(
       `SELECT id, employee_id, phone, worker_name as name, contract_start, contract_end, status, token,
               sms_sent, created_at, updated_at, work_start_date,
               position_title, annual_salary, base_pay, meal_allowance, other_allowance,
               pay_day, work_hours, work_place, department, email, nationality,
-              visa_type, visa_expiry
+              visa_type, visa_expiry, COALESCE(contract_kind, 'production') as contract_kind
        FROM regular_labor_contracts WHERE token = ?`,
       token
     ) as any;
     if (!contract) { res.status(404).json({ error: '유효하지 않은 링크입니다.' }); return; }
     if (contract.status === 'signed') { res.status(400).json({ error: '이미 서명된 계약서입니다.' }); return; }
+
+    const isCafe = contract.contract_kind === 'cafe';
+
+    // 카페 정규직: 근로계약서/연봉계약서/취업규칙 등 7개 문서에 걸친 11개 직인이 모두 있어야 서명 완료.
+    // stamp_contract, stamp_salary, stamp_rulebook 을 포함해 STAMP_KEYS 전체가 필수.
+    let resolvedSignatureData = signature_data;
+    if (isCafe) {
+      if (!signatures || typeof signatures !== 'object') {
+        res.status(400).json({ error: 'signatures(직인) 정보가 필요합니다.', missing: [...STAMP_KEYS] });
+        return;
+      }
+      const missing = STAMP_KEYS.filter((k) => !signatures[k]);
+      if (missing.length > 0) {
+        res.status(400).json({ error: '아직 서명하지 않은 항목이 있습니다.', missing });
+        return;
+      }
+      resolvedSignatureData = signatures.stamp_contract;
+    }
+    if (!address || !resolvedSignatureData) { res.status(400).json({ error: '주소와 서명은 필수입니다.' }); return; }
 
     // Build SET clauses for new optional fields in regular_labor_contracts
     const contractUpdateClauses: string[] = [
@@ -439,9 +527,13 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
       'consent_signed = ?', 'consent_signature_data = ?', 'status = ?',
     ];
     const contractParams: any[] = [
-      address, signature_data, birth_date || '', id_number || '',
+      address, resolvedSignatureData, birth_date || '', id_number || '',
       consent_signed ? 1 : 0, consent_signature_data || '', 'signed',
     ];
+    if (isCafe) {
+      contractUpdateClauses.push('signatures = ?');
+      contractParams.push(JSON.stringify(signatures));
+    }
     if (email !== undefined)             { contractUpdateClauses.push('email = ?');             contractParams.push(email); }
     if (nationality !== undefined)       { contractUpdateClauses.push('nationality = ?');       contractParams.push(nationality); }
     if (visa_type !== undefined)         { contractUpdateClauses.push('visa_type = ?');         contractParams.push(visa_type); }

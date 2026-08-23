@@ -514,7 +514,7 @@ export default function RegularCafePage() {
               />
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="월간 총 근로시간" hint="예: 209시간">
+              <Field label="월간 총 근로시간" hint="계약서 제6조에 표기 · 세부 시업/종업시각은 매주 스케줄로 사전 협의">
                 <Input
                   type="text"
                   value={form.monthly_work_hours}
@@ -530,6 +530,9 @@ export default function RegularCafePage() {
                 />
               </Field>
             </div>
+            <p className="text-[11px] text-[var(--text-4)] px-1 -mt-1">
+              ※ 카페 정규직은 매주 스케줄로 근무편성 사전 협의합니다. 시업·종업시각 별도 입력란은 없습니다.
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <Field label="직책">
                 <Input

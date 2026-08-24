@@ -25,6 +25,7 @@ export interface ContractAdminFields {
   salary_end_date: string;       // 임금계약 종료일
   rulebook_url: string;          // 취업규칙(사규) 원문 링크
   pay_day: string;               // 임금 지급일 (매월 N일, 근기법 제17조·제43조 제2항)
+  work_start_date: string;       // 입사일 (근속연수 산정 기준)
 }
 
 export interface ContractEmployeeFields {
@@ -58,7 +59,7 @@ export const ADMIN_FIELD_KEYS: (keyof ContractAdminFields)[] = [
   'other_allowance', 'other_allowance_detail',
   'monthly_work_hours', 'monthly_total',
   'salary_start_date', 'salary_end_date',
-  'rulebook_url', 'pay_day',
+  'rulebook_url', 'pay_day', 'work_start_date',
 ];
 
 // 근로자 필드 키 목록
@@ -174,6 +175,7 @@ export function renderRegularCafeContract(
 
     <h2 style="font-size:15px;margin-top:28px;font-weight:bold;">제2조 (근로계약기간)</h2>
     <p>계약기간은 ${a('contract_start_date')} 부터 1년으로 정한다.</p>
+    <p>본 근로자의 입사일은 ${a('work_start_date')}이며, 이 날짜를 근속연수 산정의 기준으로 한다.</p>
     <p>단, 근로계약서에서 종료일에 별고 기입하지 않은 경우에는 기간의 정함이 없는 근로계약을 체결하기로 한다.</p>
     <p>계약 종료 전후 1개월 내에 상호간 추가적인 의견이 없을 경우, 1년씩 연장한다.</p>
     <p>해당 계약은 상호 협의를 통해 임금 재협상 시, 재계약할 수 있다.</p>
@@ -274,6 +276,7 @@ export function renderRegularCafeContract(
             <p>성 &nbsp;명 : ${e('employee_name', '성명')} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${stamp('stamp_contract')}</p>
             <p>주 &nbsp;소 : ${e('employee_address', '주소')}</p>
             <p>연락처 : ${e('employee_phone', '연락처')}</p>
+            <p>입사일 : ${a('work_start_date')}</p>
           </td>
         </tr>
       </table>
@@ -291,6 +294,7 @@ export function renderRegularCafeContract(
       <p>성 명: ${e('employee_name', '성명')}</p>
       <p>생년월일: ${e('employee_birthday', '생년월일')}</p>
       <p>연락처: ${e('employee_phone', '연락처')}</p>
+      <p>입사일: ${a('work_start_date')}</p>
     </div>
 
     <p>1. 상기 본인은 연봉계약서의 상세 내용을 숙지하였으며, 다음과 같이 연봉계약을 체결하는데 동의합니다.</p>

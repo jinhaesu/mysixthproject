@@ -332,6 +332,7 @@ router.get('/contract/:token/html', async (req: Request, res: Response) => {
               COALESCE(contract_kind, 'production') as contract_kind,
               COALESCE(job_description, '') as job_description,
               annual_salary, base_pay, meal_allowance, other_allowance,
+              COALESCE(pay_day, '10') as pay_day,
               COALESCE(other_allowance_detail, '') as other_allowance_detail,
               COALESCE(monthly_work_hours, '') as monthly_work_hours,
               COALESCE(monthly_total, '') as monthly_total,
@@ -372,6 +373,7 @@ router.get('/contract/:token/html', async (req: Request, res: Response) => {
       salary_start_date: row.contract_start || '',
       salary_end_date: row.salary_end_date || '',
       rulebook_url: row.rulebook_url || process.env.RULEBOOK_URL || '/rulebook',
+      pay_day: row.pay_day || '10',
     };
     const employee = {
       employee_name: row.worker_name || '',

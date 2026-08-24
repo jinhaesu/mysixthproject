@@ -24,6 +24,7 @@ export interface ContractAdminFields {
   salary_start_date: string;     // 임금계약 시작일
   salary_end_date: string;       // 임금계약 종료일
   rulebook_url: string;          // 취업규칙(사규) 원문 링크
+  pay_day: string;               // 임금 지급일 (매월 N일, 근기법 제17조·제43조 제2항)
 }
 
 export interface ContractEmployeeFields {
@@ -57,7 +58,7 @@ export const ADMIN_FIELD_KEYS: (keyof ContractAdminFields)[] = [
   'other_allowance', 'other_allowance_detail',
   'monthly_work_hours', 'monthly_total',
   'salary_start_date', 'salary_end_date',
-  'rulebook_url',
+  'rulebook_url', 'pay_day',
 ];
 
 // 근로자 필드 키 목록
@@ -206,8 +207,8 @@ export function renderRegularCafeContract(
     <p>임금은 별도 연봉계약서에 따른다.</p>
 
     <h2 style="font-size:15px;margin-top:28px;font-weight:bold;">제8조 (임금의 지급)</h2>
-    <p>① 월 급여는 매월 1회 지급한다.</p>
-    <p>② 회사는 당월1일부터 당월 말일까지의 근무를 기준으로, 익월 지정된 날짜에 근로자가 지정한 통장으로 세금 등 을 원천징수 한 후 지급한다.</p>
+    <p>① 월 급여는 근로기준법 제17조 및 제43조 제2항에 따라 매월 1회 일정한 날짜에 지급한다.</p>
+    <p>② 회사는 당월 1일부터 당월 말일까지의 근무를 기준으로, 익월 매월 ${a('pay_day')}일에 근로자가 지정한 통장으로 세금 등을 원천징수 한 후 지급한다. (지급일이 휴일인 경우 그 전일에 지급한다)</p>
     <p>③ 퇴사 시 근로자의 임금정산을 위한 행정절차상 사유로 인하여 퇴사일 당일이 아닌 당사의 임금지급일에 지급한다. 이로 인하여 퇴직으로 인한 금품청산이 14일보다 연장 될 수 있으며, 이 경우 근로자의 사전 동의를 득한다.</p>
     ${consentBlock('stamp_art8')}
 
@@ -332,10 +333,10 @@ export function renderRegularCafeContract(
       </tbody>
     </table>
     <p style="margin-top:12px;font-size:13px;color:#555;">※ 시수는 가산한 값을 표기 하였음.</p>
-    <p style="font-size:13px;color:#555;">※ 근로시간과 무관하게 전항에 명시된 법정제수당이외에는 추가로 지급하지 아니한다.</p>
+    <p style="font-size:13px;color:#555;">※ 본 회사는 <strong>포괄임금 방식을 적용하지 아니한다.</strong> 연장·야간·휴일근로는 사전 승인을 원칙으로 하며, 실제 승인된 연장근로시간에 대해서는 통상시급의 1.5배(야간·휴일근로 가산 포함)로 산정하여 별도 지급한다.</p>
     <p style="font-size:13px;color:#555;">※ 당사는 기본적으로 유연 근무제를 비롯하여 다양한 유동적인 근무제도를 운영하고 있습니다.</p>
     <p style="font-size:13px;color:#555;">※ 휴일(주말)근로시간의 경우, 별도로 근로시간 측정과 개별 보고가 필수적이며, 근로시간만큼 지급합니다.</p>
-    <p>※ 상기와 같이 포괄임금제로 근로계약을 체결함에 동의합니다.</p>
+    <p>※ 상기 임금 산정 방식이 포괄임금제가 아님을 확인하며, 근로기준법에 따라 실제 승인된 연장·야간·휴일근로시간에 대해 통상시급의 1.5배로 산정된 수당이 별도 지급됨에 동의합니다.</p>
     ${consentBlock('stamp_salary_art2')}
 
     <h2 style="font-size:15px;margin-top:28px;font-weight:bold;">제3조 (연봉 조정)</h2>

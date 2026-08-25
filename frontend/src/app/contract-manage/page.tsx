@@ -66,53 +66,71 @@ function sanitizeFilename(s: string): string {
   return String(s || 'contract').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
 }
 
-function extractBodyContent(html: string): string {
-  const m = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(html);
-  return m ? m[1] : html;
+function escapeHtml(s: string): string {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-async function htmlToPdfAndDownload(html: string, filename: string): Promise<void> {
-  const mod: any = await import('html2pdf.js');
-  const html2pdf = mod.default || mod;
-
-  // 완전 문서(<!DOCTYPE ...><html>...</html>)면 body 내용만 뽑아내야 innerHTML 파싱이 안 깨짐.
-  const bodyContent = extractBodyContent(html);
-
-  // 뷰포트 내부(0,0)에 두되 z-index/pointer-events 로 사용자 시야에서 감춘다.
-  // 음수 좌표(left:-99999px)는 html2canvas 가 잡지 못해 흰 페이지만 나옴.
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;z-index:-9999;pointer-events:none;';
-  const container = document.createElement('div');
-  container.style.cssText = 'width:794px;min-height:100px;background:#ffffff;color:#000000;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:0;';
-  container.innerHTML = bodyContent;
-  wrapper.appendChild(container);
-  document.body.appendChild(wrapper);
-
-  // 페인트/이미지 로드 완료 대기 (rAF 2회 + 250ms — base64 서명 이미지 디코딩 여유).
-  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-  await new Promise((r) => setTimeout(r, 250));
-
-  try {
-    await html2pdf()
-      .set({
-        margin: [10, 10, 10, 10],
-        filename,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          windowWidth: 794,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-      })
-      .from(container)
-      .save();
-  } finally {
-    document.body.removeChild(wrapper);
+/**
+ * 브라우저 인쇄 다이얼로그로 PDF 저장.
+ * html2canvas 방식은 페이지 나뉨을 못해 잘리고 화질도 이미지화되어 흐림 →
+ * 브라우저 인쇄 엔진에 맡기면 페이지 나뉨 자동, 텍스트는 벡터, 서명 이미지는 원본 그대로.
+ * 사용자는 인쇄 다이얼로그에서 "PDF로 저장" 선택.
+ */
+async function openPrintableFromHtml(html: string, title: string): Promise<void> {
+  const win = window.open('', '_blank', 'width=900,height=1100,noopener=no');
+  if (!win) {
+    throw new Error('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도해주세요.');
   }
+
+  const printStyle = `<style>
+    @media print {
+      @page { size: A4; margin: 12mm; }
+      body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    body { font-family: "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif; }
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    img { max-width: 100%; }
+  </style>`;
+
+  let finalHtml: string;
+  if (/<html[\s>]/i.test(html)) {
+    // 완전 문서(스냅샷) — title 갱신 + 인쇄 스타일 삽입
+    finalHtml = html;
+    if (/<title>/i.test(finalHtml)) {
+      finalHtml = finalHtml.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`);
+    } else if (/<head[^>]*>/i.test(finalHtml)) {
+      finalHtml = finalHtml.replace(/<head[^>]*>/i, (m) => `${m}<title>${escapeHtml(title)}</title>`);
+    }
+    if (/<\/head>/i.test(finalHtml)) {
+      finalHtml = finalHtml.replace(/<\/head>/i, `${printStyle}</head>`);
+    } else {
+      finalHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>${printStyle}</head><body>${html}</body></html>`;
+    }
+  } else {
+    // 부분 HTML — 완전 문서로 감싸기
+    finalHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>${printStyle}</head><body>${html}</body></html>`;
+  }
+
+  win.document.open();
+  win.document.write(finalHtml);
+  win.document.close();
+
+  // 이미지·폰트 로드 완료 후 인쇄 다이얼로그 자동 오픈
+  await new Promise<void>((resolve) => {
+    let fired = false;
+    const trigger = () => {
+      if (fired) return;
+      fired = true;
+      setTimeout(() => {
+        try { win.focus(); win.print(); } catch { /* 무시 */ }
+        resolve();
+      }, 300);
+    };
+    if (win.document.readyState === 'complete') trigger();
+    else win.addEventListener('load', trigger);
+    setTimeout(trigger, 3000); // 안전장치
+  });
 }
 
 function buildAuditPdfHtml(opts: {
@@ -382,9 +400,9 @@ function ContractManageInner() {
     setDownloading('snapshot');
     try {
       const html = await fetchSnapshotHtml(auditModal.kind, auditModal.contractId);
-      const filename = `근로계약서_${sanitizeFilename(auditModal.employeeName)}_#${auditModal.contractId}.pdf`;
-      await htmlToPdfAndDownload(html, filename);
-      toast.success('계약서 PDF 다운로드 완료');
+      const title = `근로계약서_${sanitizeFilename(auditModal.employeeName)}_#${auditModal.contractId}`;
+      await openPrintableFromHtml(html, title);
+      toast.success('인쇄 창에서 "PDF로 저장"을 선택해주세요.');
       // downloaded 이벤트가 서버에 기록되었으므로 감사 데이터 새로고침
       try {
         const data = await fetchAudit(auditModal.kind, auditModal.contractId);
@@ -408,9 +426,9 @@ function ContractManageInner() {
         contract: auditModal.contract,
         events: auditModal.events || [],
       });
-      const filename = `감사이력_${sanitizeFilename(auditModal.employeeName)}_#${auditModal.contractId}.pdf`;
-      await htmlToPdfAndDownload(html, filename);
-      toast.success('감사이력 PDF 다운로드 완료');
+      const title = `감사이력_${sanitizeFilename(auditModal.employeeName)}_#${auditModal.contractId}`;
+      await openPrintableFromHtml(html, title);
+      toast.success('인쇄 창에서 "PDF로 저장"을 선택해주세요.');
     } catch (e: any) {
       toast.error(e.message || '감사이력 다운로드 실패');
     } finally {
@@ -1017,31 +1035,36 @@ function ContractManageInner() {
           <div className="p-4 text-[var(--danger-fg)]">{auditModal.error}</div>
         ) : auditModal.contract ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-2)]">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={downloadSnapshotPdf}
-                disabled={!auditModal.contract.has_document_snapshot || downloading !== null}
-                title={auditModal.contract.has_document_snapshot ? '서명 시점 스냅샷을 PDF로 다운로드' : '스냅샷 없음 — 서명 완료 후 생성됩니다'}
-              >
-                <Download size={14} className="inline mr-1" />
-                {downloading === 'snapshot' ? '생성 중...' : '계약서 PDF 다운로드'}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={downloadAuditPdf}
-                disabled={downloading !== null}
-              >
-                <Download size={14} className="inline mr-1" />
-                {downloading === 'audit' ? '생성 중...' : '감사이력 PDF 다운로드'}
-              </Button>
-              {!auditModal.contract.has_document_snapshot && (
-                <span className="text-[10.5px] text-[var(--text-4)] ml-1">
-                  ※ 서명 완료 전에는 계약서 스냅샷이 아직 없습니다
-                </span>
-              )}
+            <div className="pb-3 border-b border-[var(--border-2)]">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={downloadSnapshotPdf}
+                  disabled={!auditModal.contract.has_document_snapshot || downloading !== null}
+                  title={auditModal.contract.has_document_snapshot ? '서명 시점 스냅샷을 인쇄 창으로 열어 PDF로 저장' : '스냅샷 없음 — 서명 완료 후 생성됩니다'}
+                >
+                  <Download size={14} className="inline mr-1" />
+                  {downloading === 'snapshot' ? '여는 중...' : '계약서 PDF'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={downloadAuditPdf}
+                  disabled={downloading !== null}
+                >
+                  <Download size={14} className="inline mr-1" />
+                  {downloading === 'audit' ? '여는 중...' : '감사이력 PDF'}
+                </Button>
+                {!auditModal.contract.has_document_snapshot && (
+                  <span className="text-[10.5px] text-[var(--text-4)] ml-1">
+                    ※ 서명 완료 전에는 계약서 스냅샷이 아직 없습니다
+                  </span>
+                )}
+              </div>
+              <p className="text-[10.5px] text-[var(--text-4)] mt-1.5">
+                버튼을 누르면 인쇄 창이 열립니다. <b>대상 → "PDF로 저장"</b>을 선택하면 다운로드됩니다.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-[12px]">

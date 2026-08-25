@@ -15,6 +15,7 @@ import {
 } from '../lib/contractAudit';
 import { stampInline } from '../lib/tsa';
 import { buildRegularCafeContractPage, type StampKey } from '../templates/regular-cafe-contract';
+import { COMPANY_STAMP_DATA_URL } from '../assets/companyStamp';
 
 /**
  * legacy 스캔 파일 base64 → Storage 분기.
@@ -668,7 +669,7 @@ router.get('/audit/:kind/:id/snapshot.html', async (req: AuthRequest, res: Respo
         employee_birthday: row.birth_date || '',
       };
       const signatures = (row.signatures || {}) as Partial<Record<StampKey, string>>;
-      const companyStampUrl = row.company_stamp_url || process.env.COMPANY_STAMP_URL || '';
+      const companyStampUrl = row.company_stamp_url || process.env.COMPANY_STAMP_URL || COMPANY_STAMP_DATA_URL;
       html = buildRegularCafeContractPage(
         admin, employee, signatures, companyStampUrl, 'view', row.status, row.worker_name,
       );

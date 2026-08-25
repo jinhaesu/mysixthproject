@@ -9,6 +9,7 @@ import { checkTrainingSurveyGate } from './trainingPublic';
 import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
 import { stampInline } from '../lib/tsa';
 import { buildRegularCafeContractPage, STAMP_KEYS, type StampKey } from '../templates/regular-cafe-contract';
+import { COMPANY_STAMP_DATA_URL } from '../assets/companyStamp';
 
 const router = Router();
 
@@ -384,7 +385,7 @@ router.get('/contract/:token/html', async (req: Request, res: Response) => {
       employee_birthday: row.birth_date || '',
     };
     const signatures = (row.signatures || {}) as Partial<Record<StampKey, string>>;
-    const companyStampUrl = row.company_stamp_url || process.env.COMPANY_STAMP_URL || '';
+    const companyStampUrl = row.company_stamp_url || process.env.COMPANY_STAMP_URL || COMPANY_STAMP_DATA_URL;
 
     const html = buildRegularCafeContractPage(
       admin, employee, signatures, companyStampUrl, mode, row.status, row.worker_name,

@@ -621,7 +621,7 @@ router.get('/audit/:kind/:id/snapshot.html', async (req: AuthRequest, res: Respo
       : kind === 'alba' ? " AND worker_type = 'alba'"
       : '';
     const row = await dbGet(
-      `SELECT id, document_snapshot_html, document_version, worker_name, name FROM ${table} WHERE id = ?${extraWhere}`,
+      `SELECT id, document_snapshot_html, document_version FROM ${table} WHERE id = ?${extraWhere}`,
       id,
     ) as any;
     if (!row) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }

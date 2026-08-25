@@ -601,4 +601,51 @@ router.get('/audit/:kind/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/contracts/audit/:kind/:id/snapshot.html
+// 서명 시점 스냅샷 HTML(document_snapshot_html) 원문 반환. 다운로드 이벤트 감사기록.
+// ---------------------------------------------------------------------------
+router.get('/audit/:kind/:id/snapshot.html', async (req: AuthRequest, res: Response) => {
+  try {
+    const kindParam = req.params.kind as string;
+    if (kindParam !== 'regular' && kindParam !== 'alba' && kindParam !== 'cafe') {
+      res.status(400).json({ error: "kind 는 'regular'|'alba'|'cafe' 중 하나여야 합니다." });
+      return;
+    }
+    const kind = kindParam as ContractKind;
+    const id = parseInt(req.params.id as string, 10);
+    if (!id) { res.status(400).json({ error: '유효하지 않은 id 입니다.' }); return; }
+
+    const table = contractTable(kind);
+    const extraWhere = kind === 'cafe' ? " AND worker_type = 'cafe_alba'"
+      : kind === 'alba' ? " AND worker_type = 'alba'"
+      : '';
+    const row = await dbGet(
+      `SELECT id, document_snapshot_html, document_version, worker_name, name FROM ${table} WHERE id = ?${extraWhere}`,
+      id,
+    ) as any;
+    if (!row) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
+    if (!row.document_snapshot_html) {
+      res.status(404).json({ error: '서명 스냅샷이 아직 생성되지 않았습니다. (서명 완료 후 생성됩니다)' });
+      return;
+    }
+
+    await logAudit({
+      kind, contractId: id, event: 'downloaded',
+      actorType: 'employer',
+      actorEmail: req.user?.email || '',
+      clientIp: clientIp(req), userAgent: userAgent(req),
+      documentVersion: row.document_version ?? null,
+      metadata: { target: 'snapshot_html' },
+    });
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(row.document_snapshot_html);
+  } catch (error: any) {
+    console.error('GET /api/contracts/audit/:kind/:id/snapshot.html error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

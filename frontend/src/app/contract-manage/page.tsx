@@ -32,7 +32,7 @@ import {
   TD,
   useToast,
 } from "@/components/ui";
-import { Search, FileText, History, Paperclip, ShieldCheck } from "lucide-react";
+import { Search, FileText, History, Paperclip, ShieldCheck, Download } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -49,6 +49,133 @@ async function fetchAudit(kind: 'regular' | 'alba' | 'cafe', id: number) {
   const b = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(b.error || `HTTP ${r.status}`);
   return b as { contract: Record<string, any>; events: any[] };
+}
+
+async function fetchSnapshotHtml(kind: 'regular' | 'alba' | 'cafe', id: number): Promise<string> {
+  const h = await authHeader();
+  const r = await fetch(`${API_URL}/api/contracts/audit/${kind}/${id}/snapshot.html`, { headers: h });
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try { const j = await r.json(); if (j.error) msg = j.error; } catch { /* not json */ }
+    throw new Error(msg);
+  }
+  return r.text();
+}
+
+function sanitizeFilename(s: string): string {
+  return String(s || 'contract').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+}
+
+async function htmlToPdfAndDownload(html: string, filename: string): Promise<void> {
+  const mod: any = await import('html2pdf.js');
+  const html2pdf = mod.default || mod;
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;background:#fff;color:#000;';
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  try {
+    await html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+      })
+      .from(container)
+      .save();
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+function buildAuditPdfHtml(opts: {
+  employeeName: string;
+  contractId: number | string;
+  kind: string;
+  contract: Record<string, any>;
+  events: any[];
+}): string {
+  const { employeeName, contractId, kind, contract, events } = opts;
+  const now = new Date().toLocaleString('ko-KR');
+  const kindLabel: Record<string, string> = { regular: '정규직', alba: '알바', cafe: '카페' };
+  const eventLabel: Record<string, string> = {
+    created: '생성', sms_sent: 'SMS 발송', link_opened: '링크 열람',
+    worker_signed: '근로자 서명', employer_signed: '사업주 서명',
+    amended: '정보 수정', resent: '재발송(supersede)',
+    tsa_stamped: 'TSA 인증', tsa_failed: 'TSA 실패',
+    downloaded: '다운로드', legacy_uploaded: '스캔 업로드',
+  };
+  const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const rows = (events || []).map((e: any, idx: number) => `
+    <tr>
+      <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;">${idx + 1}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;white-space:nowrap;">${esc(new Date(e.created_at).toLocaleString('ko-KR'))}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;"><b>${esc(eventLabel[e.event] || e.event)}</b></td>
+      <td style="padding:6px 8px;border:1px solid #ccc;">${esc(e.actor_name || e.actor_type || '-')}${e.actor_email ? `<div style="font-size:10px;color:#666;">${esc(e.actor_email)}</div>` : ''}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-family:monospace;font-size:11px;">${esc(e.client_ip || '-')}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:10px;color:#555;word-break:break-all;">${esc((e.user_agent || '').slice(0, 80))}</td>
+    </tr>`).join('');
+
+  return `
+  <div style="font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#000;padding:20px;">
+    <h1 style="font-size:20px;border-bottom:2px solid #000;padding-bottom:8px;margin:0 0 12px 0;">전자근로계약 감사증적(Audit Trail)</h1>
+    <div style="display:table;width:100%;margin-bottom:16px;font-size:12px;">
+      <div style="display:table-row;">
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;width:20%;font-weight:bold;">근로자</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;width:30%;">${esc(employeeName)}</div>
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;width:20%;font-weight:bold;">계약 ID</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;width:30%;">#${esc(contractId)} (${esc(kindLabel[kind] || kind)})</div>
+      </div>
+      <div style="display:table-row;">
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;font-weight:bold;">문서 버전</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;">v${esc(contract.document_version || 1)}${contract.parent_contract_id ? ` (parent #${esc(contract.parent_contract_id)})` : ''}</div>
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;font-weight:bold;">supersede</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;">${contract.superseded_by ? `→ #${esc(contract.superseded_by)}` : '현재 유효'}</div>
+      </div>
+      <div style="display:table-row;">
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;font-weight:bold;">TSA 상태</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;">${esc(contract.tsa_status || '-')} ${contract.tsa_server ? `<span style="font-size:10px;color:#666;">${esc(contract.tsa_server)}</span>` : ''}</div>
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;font-weight:bold;">스냅샷 보존</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;">${contract.has_document_snapshot ? '✓ 보존됨' : '없음'}</div>
+      </div>
+      <div style="display:table-row;">
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;font-weight:bold;">근로자 서명</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;">${contract.worker_signed_at ? esc(new Date(contract.worker_signed_at).toLocaleString('ko-KR')) : '미서명'}${contract.worker_signed_ip ? ` <span style="font-size:10px;color:#666;">IP ${esc(contract.worker_signed_ip)}</span>` : ''}</div>
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;font-weight:bold;">사업주 서명</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;">${contract.employer_signed_at ? esc(new Date(contract.employer_signed_at).toLocaleString('ko-KR')) : '미서명'}${contract.employer_signed_by_email ? `<div style="font-size:10px;color:#666;">by ${esc(contract.employer_signed_by_email)}</div>` : ''}</div>
+      </div>
+      <div style="display:table-row;">
+        <div style="display:table-cell;padding:4px 8px;background:#f5f5f5;border:1px solid #ccc;font-weight:bold;">문서 해시</div>
+        <div style="display:table-cell;padding:4px 8px;border:1px solid #ccc;font-family:monospace;font-size:10px;word-break:break-all;" colspan="3">${esc(contract.document_hash || '(미생성)')}</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:15px;margin:16px 0 8px 0;border-bottom:1px solid #666;padding-bottom:4px;">이벤트 로그 (총 ${events.length}건)</h2>
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead>
+        <tr style="background:#e8e8e8;">
+          <th style="padding:6px 8px;border:1px solid #ccc;width:5%;">#</th>
+          <th style="padding:6px 8px;border:1px solid #ccc;width:18%;text-align:left;">시각</th>
+          <th style="padding:6px 8px;border:1px solid #ccc;width:15%;text-align:left;">이벤트</th>
+          <th style="padding:6px 8px;border:1px solid #ccc;width:20%;text-align:left;">Actor</th>
+          <th style="padding:6px 8px;border:1px solid #ccc;width:12%;text-align:left;">IP</th>
+          <th style="padding:6px 8px;border:1px solid #ccc;width:30%;text-align:left;">User-Agent</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || '<tr><td colspan="6" style="padding:12px;text-align:center;color:#888;border:1px solid #ccc;">이벤트 없음</td></tr>'}
+      </tbody>
+    </table>
+
+    <div style="margin-top:20px;padding:10px;background:#f9f9f9;border:1px solid #ccc;font-size:10.5px;color:#333;">
+      ※ 본 감사증적은 근로기준법 및 전자문서법에 따른 전자근로계약의 신빙성을 입증하는 자료입니다.<br>
+      ※ 서명 시각·IP·User-Agent·문서 해시(SHA-256)·RFC3161 타임스탬프가 자동 기록됩니다.<br>
+      ※ 발행일시: ${esc(now)} · 조인앤조인 HR 시스템
+    </div>
+  </div>`;
 }
 
 function resolveKind(item: { employee_type: string; contract?: any }): 'regular' | 'alba' | 'cafe' {
@@ -195,27 +322,74 @@ function ContractManageInner() {
     loading: boolean;
     error?: string;
     label: string;
+    kind?: 'regular' | 'alba' | 'cafe';
+    contractId?: number;
+    employeeName?: string;
     contract?: Record<string, any>;
     events?: any[];
   }>({ open: false, loading: false, label: '' });
+  const [downloading, setDownloading] = useState<'snapshot' | 'audit' | null>(null);
 
   const openAudit = async (item: ContractItem) => {
     const c = item.contract;
     if (!c?.id) { toast.info('감사이력 조회 대상이 없습니다 (계약 id 없음).'); return; }
     const kind = resolveKind(item);
-    setAuditModal({ open: true, loading: true, label: `${item.employee_name} · #${c.id}` });
+    setAuditModal({ open: true, loading: true, label: `${item.employee_name} · #${c.id}`, kind, contractId: c.id, employeeName: item.employee_name });
     try {
       const data = await fetchAudit(kind, c.id);
       setAuditModal({
         open: true, loading: false,
         label: `${item.employee_name} · #${c.id} (${kind})`,
+        kind, contractId: c.id, employeeName: item.employee_name,
         contract: data.contract, events: data.events,
       });
     } catch (e: any) {
       setAuditModal({
         open: true, loading: false, error: e.message || '조회 실패',
         label: `${item.employee_name} · #${c.id}`,
+        kind, contractId: c.id, employeeName: item.employee_name,
       });
+    }
+  };
+
+  const downloadSnapshotPdf = async () => {
+    if (!auditModal.kind || !auditModal.contractId || !auditModal.employeeName) return;
+    setDownloading('snapshot');
+    try {
+      const html = await fetchSnapshotHtml(auditModal.kind, auditModal.contractId);
+      const filename = `근로계약서_${sanitizeFilename(auditModal.employeeName)}_#${auditModal.contractId}.pdf`;
+      await htmlToPdfAndDownload(html, filename);
+      toast.success('계약서 PDF 다운로드 완료');
+      // downloaded 이벤트가 서버에 기록되었으므로 감사 데이터 새로고침
+      try {
+        const data = await fetchAudit(auditModal.kind, auditModal.contractId);
+        setAuditModal((prev) => ({ ...prev, contract: data.contract, events: data.events }));
+      } catch { /* 새로고침 실패는 무시 */ }
+    } catch (e: any) {
+      toast.error(e.message || '계약서 다운로드 실패');
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const downloadAuditPdf = async () => {
+    if (!auditModal.kind || !auditModal.contractId || !auditModal.employeeName || !auditModal.contract) return;
+    setDownloading('audit');
+    try {
+      const html = buildAuditPdfHtml({
+        employeeName: auditModal.employeeName,
+        contractId: auditModal.contractId,
+        kind: auditModal.kind,
+        contract: auditModal.contract,
+        events: auditModal.events || [],
+      });
+      const filename = `감사이력_${sanitizeFilename(auditModal.employeeName)}_#${auditModal.contractId}.pdf`;
+      await htmlToPdfAndDownload(html, filename);
+      toast.success('감사이력 PDF 다운로드 완료');
+    } catch (e: any) {
+      toast.error(e.message || '감사이력 다운로드 실패');
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -818,6 +992,33 @@ function ContractManageInner() {
           <div className="p-4 text-[var(--danger-fg)]">{auditModal.error}</div>
         ) : auditModal.contract ? (
           <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-[var(--border-2)]">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={downloadSnapshotPdf}
+                disabled={!auditModal.contract.has_document_snapshot || downloading !== null}
+                title={auditModal.contract.has_document_snapshot ? '서명 시점 스냅샷을 PDF로 다운로드' : '스냅샷 없음 — 서명 완료 후 생성됩니다'}
+              >
+                <Download size={14} className="inline mr-1" />
+                {downloading === 'snapshot' ? '생성 중...' : '계약서 PDF 다운로드'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={downloadAuditPdf}
+                disabled={downloading !== null}
+              >
+                <Download size={14} className="inline mr-1" />
+                {downloading === 'audit' ? '생성 중...' : '감사이력 PDF 다운로드'}
+              </Button>
+              {!auditModal.contract.has_document_snapshot && (
+                <span className="text-[10.5px] text-[var(--text-4)] ml-1">
+                  ※ 서명 완료 전에는 계약서 스냅샷이 아직 없습니다
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3 text-[12px]">
               <div><span className="text-[var(--text-4)]">문서 버전 </span><b>v{auditModal.contract.document_version || 1}</b>{auditModal.contract.parent_contract_id && <span className="text-[var(--text-4)]"> (parent #{auditModal.contract.parent_contract_id})</span>}</div>
               <div><span className="text-[var(--text-4)]">supersede </span>{auditModal.contract.superseded_by ? <Badge tone="warning" size="xs">→ #{auditModal.contract.superseded_by}</Badge> : <span className="text-[var(--text-4)]">현재 유효</span>}</div>

@@ -66,27 +66,52 @@ function sanitizeFilename(s: string): string {
   return String(s || 'contract').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
 }
 
+function extractBodyContent(html: string): string {
+  const m = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(html);
+  return m ? m[1] : html;
+}
+
 async function htmlToPdfAndDownload(html: string, filename: string): Promise<void> {
   const mod: any = await import('html2pdf.js');
   const html2pdf = mod.default || mod;
+
+  // 완전 문서(<!DOCTYPE ...><html>...</html>)면 body 내용만 뽑아내야 innerHTML 파싱이 안 깨짐.
+  const bodyContent = extractBodyContent(html);
+
+  // 뷰포트 내부(0,0)에 두되 z-index/pointer-events 로 사용자 시야에서 감춘다.
+  // 음수 좌표(left:-99999px)는 html2canvas 가 잡지 못해 흰 페이지만 나옴.
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;z-index:-9999;pointer-events:none;';
   const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;background:#fff;color:#000;';
-  container.innerHTML = html;
-  document.body.appendChild(container);
+  container.style.cssText = 'width:794px;min-height:100px;background:#ffffff;color:#000000;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:0;';
+  container.innerHTML = bodyContent;
+  wrapper.appendChild(container);
+  document.body.appendChild(wrapper);
+
+  // 페인트/이미지 로드 완료 대기 (rAF 2회 + 250ms — base64 서명 이미지 디코딩 여유).
+  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  await new Promise((r) => setTimeout(r, 250));
+
   try {
     await html2pdf()
       .set({
         margin: [10, 10, 10, 10],
         filename,
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: 794,
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
       })
       .from(container)
       .save();
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(wrapper);
   }
 }
 

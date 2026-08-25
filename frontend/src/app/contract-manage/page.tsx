@@ -71,31 +71,26 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * 브라우저 인쇄 다이얼로그로 PDF 저장.
- * html2canvas 방식은 페이지 나뉨을 못해 잘리고 화질도 이미지화되어 흐림 →
- * 브라우저 인쇄 엔진에 맡기면 페이지 나뉨 자동, 텍스트는 벡터, 서명 이미지는 원본 그대로.
- * 사용자는 인쇄 다이얼로그에서 "PDF로 저장" 선택.
+ * 숨겨진 iframe 에 완전 문서를 srcdoc 으로 로드한 뒤 iframe.contentWindow.print() 호출.
+ * - 팝업 차단 회피 (새 창이 아닌 iframe)
+ * - 이미지·폰트 로드 완료 대기 후 인쇄 트리거
+ * - 사용자는 인쇄 다이얼로그에서 "PDF로 저장" 선택
  */
 async function openPrintableFromHtml(html: string, title: string): Promise<void> {
-  const win = window.open('', '_blank', 'width=900,height=1100,noopener=no');
-  if (!win) {
-    throw new Error('팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도해주세요.');
-  }
-
   const printStyle = `<style>
     @media print {
       @page { size: A4; margin: 12mm; }
       body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
+    html, body { background: #ffffff; color: #000000; }
     body { font-family: "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif; }
     table { page-break-inside: auto; }
-    tr { page-break-inside: avoid; page-break-after: auto; }
+    tr, .page-break-avoid { page-break-inside: avoid; page-break-after: auto; }
     img { max-width: 100%; }
   </style>`;
 
   let finalHtml: string;
   if (/<html[\s>]/i.test(html)) {
-    // 완전 문서(스냅샷) — title 갱신 + 인쇄 스타일 삽입
     finalHtml = html;
     if (/<title>/i.test(finalHtml)) {
       finalHtml = finalHtml.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(title)}</title>`);
@@ -108,28 +103,47 @@ async function openPrintableFromHtml(html: string, title: string): Promise<void>
       finalHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>${printStyle}</head><body>${html}</body></html>`;
     }
   } else {
-    // 부분 HTML — 완전 문서로 감싸기
     finalHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>${printStyle}</head><body>${html}</body></html>`;
   }
 
-  win.document.open();
-  win.document.write(finalHtml);
-  win.document.close();
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
 
-  // 이미지·폰트 로드 완료 후 인쇄 다이얼로그 자동 오픈
   await new Promise<void>((resolve) => {
     let fired = false;
-    const trigger = () => {
+    const trigger = async () => {
       if (fired) return;
       fired = true;
-      setTimeout(() => {
-        try { win.focus(); win.print(); } catch { /* 무시 */ }
+      try {
+        const doc = iframe.contentDocument;
+        if (doc) {
+          const imgs = Array.from(doc.images);
+          await Promise.all(imgs.map((img) => img.complete && img.naturalWidth > 0
+            ? Promise.resolve()
+            : new Promise<void>((res) => { img.onload = () => res(); img.onerror = () => res(); }),
+          ));
+        }
+        // 페인트 여유
+        await new Promise((r) => setTimeout(r, 200));
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.error('[print] trigger failed', e);
+      } finally {
+        // 인쇄 다이얼로그가 닫힐 시간을 주고 iframe 제거 (60초 후)
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch { /* 이미 제거됨 */ }
+        }, 60000);
         resolve();
-      }, 300);
+      }
     };
-    if (win.document.readyState === 'complete') trigger();
-    else win.addEventListener('load', trigger);
-    setTimeout(trigger, 3000); // 안전장치
+    iframe.addEventListener('load', trigger);
+    // srcdoc 을 나중에 설정 → load 이벤트 확실히 발생
+    iframe.srcdoc = finalHtml;
+    // 안전장치
+    setTimeout(trigger, 5000);
   });
 }
 

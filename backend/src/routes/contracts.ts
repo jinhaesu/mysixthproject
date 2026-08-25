@@ -14,6 +14,7 @@ import {
   type ContractKind,
 } from '../lib/contractAudit';
 import { stampInline } from '../lib/tsa';
+import { buildRegularCafeContractPage, type StampKey } from '../templates/regular-cafe-contract';
 
 /**
  * legacy 스캔 파일 base64 → Storage 분기.
@@ -616,18 +617,77 @@ router.get('/audit/:kind/:id/snapshot.html', async (req: AuthRequest, res: Respo
     const id = parseInt(req.params.id as string, 10);
     if (!id) { res.status(400).json({ error: '유효하지 않은 id 입니다.' }); return; }
 
-    const table = contractTable(kind);
-    const extraWhere = kind === 'cafe' ? " AND worker_type = 'cafe_alba'"
-      : kind === 'alba' ? " AND worker_type = 'alba'"
-      : '';
-    const row = await dbGet(
-      `SELECT id, document_snapshot_html, document_version FROM ${table} WHERE id = ?${extraWhere}`,
-      id,
-    ) as any;
-    if (!row) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
-    if (!row.document_snapshot_html) {
-      res.status(404).json({ error: '서명 스냅샷이 아직 생성되지 않았습니다. (서명 완료 후 생성됩니다)' });
-      return;
+    let html: string | null = null;
+    let docVersion: number | null = null;
+
+    if (kind === 'regular') {
+      // 정규직 카페 계약서: buildRegularCafeContractPage 로 실시간 정식 서식 렌더 (서명 이미지 포함, view 모드).
+      const row = await dbGet(
+        `SELECT id, employee_id, phone, worker_name, contract_start, contract_end, status,
+                COALESCE(contract_kind, 'production') as contract_kind,
+                COALESCE(job_description, '') as job_description,
+                COALESCE(work_start_date, contract_start) as work_start_date,
+                annual_salary, base_pay, meal_allowance, other_allowance,
+                COALESCE(pay_day, '10') as pay_day,
+                COALESCE(other_allowance_detail, '') as other_allowance_detail,
+                COALESCE(monthly_work_hours, '') as monthly_work_hours,
+                COALESCE(monthly_total, '') as monthly_total,
+                COALESCE(salary_end_date, '') as salary_end_date,
+                COALESCE(rulebook_url, '') as rulebook_url,
+                COALESCE(company_stamp_url, '') as company_stamp_url,
+                COALESCE(signatures, '{}'::jsonb) as signatures,
+                document_version, address, birth_date
+         FROM regular_labor_contracts WHERE id = ?`, id) as any;
+      if (!row) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
+      if (row.contract_kind !== 'cafe') {
+        res.status(400).json({ error: '이 계약서 종류는 아직 PDF 출력을 지원하지 않습니다.' });
+        return;
+      }
+
+      const admin = {
+        contract_start_date: row.contract_start || '',
+        job_description: row.job_description || '',
+        contract_date: row.contract_start || '',
+        annual_salary: row.annual_salary || '',
+        base_salary: row.base_pay || '',
+        meal_allowance: row.meal_allowance || '',
+        other_allowance: row.other_allowance || '',
+        other_allowance_detail: row.other_allowance_detail || '',
+        monthly_work_hours: row.monthly_work_hours || '',
+        monthly_total: row.monthly_total || '',
+        salary_start_date: row.contract_start || '',
+        salary_end_date: row.salary_end_date || '',
+        rulebook_url: row.rulebook_url || process.env.RULEBOOK_URL || '/rulebook',
+        pay_day: row.pay_day || '10',
+        work_start_date: row.work_start_date || row.contract_start || '',
+      };
+      const employee = {
+        employee_name: row.worker_name || '',
+        employee_address: row.address || '',
+        employee_phone: row.phone || '',
+        employee_birthday: row.birth_date || '',
+      };
+      const signatures = (row.signatures || {}) as Partial<Record<StampKey, string>>;
+      const companyStampUrl = row.company_stamp_url || process.env.COMPANY_STAMP_URL || '';
+      html = buildRegularCafeContractPage(
+        admin, employee, signatures, companyStampUrl, 'view', row.status, row.worker_name,
+      );
+      docVersion = row.document_version ?? null;
+    } else {
+      // 알바/카페: 정식 서식 재렌더 미구현 → 기존 스냅샷 fallback
+      const table = contractTable(kind);
+      const extraWhere = kind === 'cafe' ? " AND worker_type = 'cafe_alba'" : " AND worker_type = 'alba'";
+      const row = await dbGet(
+        `SELECT id, document_snapshot_html, document_version FROM ${table} WHERE id = ?${extraWhere}`,
+        id,
+      ) as any;
+      if (!row) { res.status(404).json({ error: '계약서를 찾을 수 없습니다.' }); return; }
+      if (!row.document_snapshot_html) {
+        res.status(404).json({ error: '서명 스냅샷이 아직 생성되지 않았습니다. (서명 완료 후 생성됩니다)' });
+        return;
+      }
+      html = row.document_snapshot_html;
+      docVersion = row.document_version ?? null;
     }
 
     await logAudit({
@@ -635,13 +695,13 @@ router.get('/audit/:kind/:id/snapshot.html', async (req: AuthRequest, res: Respo
       actorType: 'employer',
       actorEmail: req.user?.email || '',
       clientIp: clientIp(req), userAgent: userAgent(req),
-      documentVersion: row.document_version ?? null,
+      documentVersion: docVersion,
       metadata: { target: 'snapshot_html' },
     });
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'private, no-store');
-    res.send(row.document_snapshot_html);
+    res.send(html);
   } catch (error: any) {
     console.error('GET /api/contracts/audit/:kind/:id/snapshot.html error:', error);
     res.status(500).json({ error: error.message });

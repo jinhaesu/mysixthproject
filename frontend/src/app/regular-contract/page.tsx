@@ -1146,7 +1146,15 @@ function RegularContractContent() {
                     <p className="font-bold text-[var(--info-fg)] text-[var(--fs-caption)] mb-1">(사업주)</p>
                     <p className="text-[var(--fs-caption)]">사업체명: (주)조인앤조인</p>
                     <p className="text-[var(--fs-caption)]">주소: 전북특별자치도 전주시 덕진구 기린대로 458</p>
-                    <p className="text-[var(--fs-caption)]">대표자: 진해수 (인)</p>
+                    <p className="text-[var(--fs-caption)] flex items-center gap-1 flex-wrap">
+                      대표자: 진해수
+                      <img
+                        src="/joinandjoin-stamp.png"
+                        alt="조인앤조인 법인 도장"
+                        className="inline-block align-middle"
+                        style={{ height: '32px', width: 'auto' }}
+                      />
+                    </p>
                   </div>
                   <div className="bg-[var(--success-bg)] rounded-[var(--r-md)] p-3 border border-[var(--success-border)]">
                     <p className="font-bold text-[var(--success-fg)] text-[var(--fs-caption)] mb-1">(근로자)</p>
@@ -1246,7 +1254,15 @@ function RegularContractContent() {
           <div className="bg-[var(--info-bg)] rounded-[var(--r-md)] p-3 text-[var(--fs-caption)] text-[var(--info-fg)] border border-[var(--info-border)]">
             <p className="font-bold">(사업주) (주)조인앤조인</p>
             <p>주소: 전북특별자치도 전주시 덕진구 기린대로 458</p>
-            <p>대표자: 진해수 (인)</p>
+            <p className="flex items-center gap-1 flex-wrap">
+              대표자: 진해수
+              <img
+                src="/joinandjoin-stamp.png"
+                alt="조인앤조인 법인 도장"
+                className="inline-block align-middle"
+                style={{ height: '32px', width: 'auto' }}
+              />
+            </p>
           </div>
 
           <div className="space-y-3">

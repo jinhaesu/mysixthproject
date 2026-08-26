@@ -10,6 +10,7 @@ import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnap
 import { stampInline } from '../lib/tsa';
 import { buildRegularCafeContractPage, STAMP_KEYS, type StampKey } from '../templates/regular-cafe-contract';
 import { COMPANY_STAMP_DATA_URL } from '../assets/companyStamp';
+import { autoEmployerSign } from '../lib/autoEmployerSign';
 
 const router = Router();
 
@@ -609,6 +610,9 @@ router.post('/contract/:token/sign', async (req: Request, res: Response) => {
       documentHash: contractHash, documentVersion: freshContract.document_version,
     });
     await stampInline('regular', contract.id, contractHash);
+
+    // 근로자 서명 완료 → 사업주(대표이사) 자동 서명 (조인앤조인 법인 도장)
+    await autoEmployerSign('regular', contract.id, signIp, signUa);
 
     // Propagate new fields to regular_employees (only non-empty values, don't overwrite existing)
     if (contract.employee_id) {

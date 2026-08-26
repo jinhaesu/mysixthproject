@@ -7,6 +7,7 @@ import { sendGeneralSms, sendSurveyMessage } from '../services/smsService';
 import { expandWeekSchedule, type WeekSchedule } from '../services/scheduleHelper';
 import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
 import { stampInline } from '../lib/tsa';
+import { autoEmployerSign } from '../lib/autoEmployerSign';
 
 const TOKEN_EXPIRY_HOURS = 24;
 
@@ -654,6 +655,9 @@ publicRouter.post('/:token/sign', async (req: Request, res: Response) => {
       documentHash: contractHash, documentVersion: freshContract.document_version,
     });
     await stampInline('cafe', contract.id, contractHash);
+
+    // 근로자 서명 완료 → 사업주(대표이사) 자동 서명 (조인앤조인 법인 도장)
+    await autoEmployerSign('cafe', contract.id, signIp, signUa);
 
     const viewUrl = getFrontendUrl(`/cafe-contract?token=${token}`);
     const msg =

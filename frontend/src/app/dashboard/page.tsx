@@ -7,7 +7,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { Calendar, DollarSign, BarChart3, ChevronLeft, ChevronRight, AlertTriangle, Info, RefreshCw } from "lucide-react";
-import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList, getSalarySettings, getWorkersLite } from "@/lib/api";
+import { getReportSummary, getReportDaily, getAttendanceAnomalies, getConfirmedList, getSalarySettings, getWorkersLite, getPayrollCalc } from "@/lib/api";
 import {
   PageHeader, Card, CardHeader, Badge, Button, Tabs, SkeletonCard, EmptyState, CenterSpinner, Section,
 } from "@/components/ui";
@@ -193,6 +193,12 @@ function DashboardContent() {
   const [salaryData, setSalaryData] = useState<any[]>([]); // 정규직 기본급 데이터
   const [revenue, setRevenue] = useState(0);
   const [targetRatio, setTargetRatio] = useState(30);
+
+  // 정규직 급여관리 확정/실시간 계산 결과 (dashboard 급여추정 탭이 급여관리와 동일한 소스를 사용하도록)
+  // payrollCur = { year_month, is_closed, closed_at, is_paid, paid_at, results:[{gross_pay, net_pay, department, ...}] }
+  const [payrollCur, setPayrollCur] = useState<any | null>(null);
+  const [payrollPrev, setPayrollPrev] = useState<any | null>(null);
+  const [payroll2Ago, setPayroll2Ago] = useState<any | null>(null);
 
   const [forceRefresh, setForceRefresh] = useState(0);
   const fetchData = useCallback(async () => {
@@ -493,6 +499,26 @@ function DashboardContent() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // 정규직: 급여관리 payroll-calc를 3개월치 로드해서 대시보드 급여추정 탭이 급여관리와 동일한 값을 표시
+  useEffect(() => {
+    if (!isRegular) { setPayrollCur(null); setPayrollPrev(null); setPayroll2Ago(null); return; }
+    const ym = `${year}-${String(month).padStart(2, '0')}`;
+    const [py, pm] = getPrevYearMonth(year, month);
+    const pym = `${py}-${String(pm).padStart(2, '0')}`;
+    const [tay, tam] = getPrevYearMonth(py, pm);
+    const taym = `${tay}-${String(tam).padStart(2, '0')}`;
+    (async () => {
+      const [c, p, ta] = await Promise.all([
+        getPayrollCalc(ym).catch(() => null),
+        getPayrollCalc(pym).catch(() => null),
+        getPayrollCalc(taym).catch(() => null),
+      ]);
+      setPayrollCur(c);
+      setPayrollPrev(p);
+      setPayroll2Ago(ta);
+    })();
+  }, [isRegular, year, month, forceRefresh]);
+
   const prevMonth = () => { if (month === 1) { setYear(y => y - 1); setMonth(12); } else setMonth(m => m - 1); };
   const nextMonth = () => { if (month === 12) { setYear(y => y + 1); setMonth(1); } else setMonth(m => m + 1); };
   const refreshData = () => { delete _dashCache[`dash-${dashboardType}-${year}-${month}`]; setForceRefresh(f => f + 1); };
@@ -601,21 +627,36 @@ function DashboardContent() {
 
   // 사업소득/파견: row.salary 가 이미 주휴수당 포함이라 calcWHBonus 추가 안 함 (이중계산 방지)
   // 정규직: calcWHBonus 는 isRegular 일 때 0 반환하므로 사용 안 함
-  const curSalary = useMemo(() =>
-    calcSalary(summaryData?.current || [], dayRatioFor(year, month)),
-    [summaryData, calcSalary, year, month, dayRatioFor]);
+
+  // 정규직: 급여관리 payroll-calc 총액(gross_pay 합계) — 확정/미확정 여부와 무관하게 급여관리와 동일한 소스
+  const payrollCurGross = useMemo(() =>
+    isRegular && payrollCur?.results ? payrollCur.results.reduce((s: number, r: any) => s + (Number(r.gross_pay) || 0), 0) : 0,
+    [isRegular, payrollCur]);
+  const payrollPrevGross = useMemo(() =>
+    isRegular && payrollPrev?.results ? payrollPrev.results.reduce((s: number, r: any) => s + (Number(r.gross_pay) || 0), 0) : 0,
+    [isRegular, payrollPrev]);
+  const payroll2AgoGross = useMemo(() =>
+    isRegular && payroll2Ago?.results ? payroll2Ago.results.reduce((s: number, r: any) => s + (Number(r.gross_pay) || 0), 0) : 0,
+    [isRegular, payroll2Ago]);
+
+  const curSalary = useMemo(() => {
+    if (isRegular && payrollCur?.results?.length) return payrollCurGross;
+    return calcSalary(summaryData?.current || [], dayRatioFor(year, month));
+  }, [isRegular, payrollCur, payrollCurGross, summaryData, calcSalary, year, month, dayRatioFor]);
   const prevSalary = useMemo(() => {
+    if (isRegular && payrollPrev?.results?.length) return payrollPrevGross;
     const py = summaryData?.prevYear ?? year;
     const pm = summaryData?.prevMonth ?? month;
     return calcSalary(summaryData?.previous || [], dayRatioFor(py, pm));
-  }, [summaryData, calcSalary, year, month, dayRatioFor]);
-  const twoMonthsAgoSalary = useMemo(() =>
-    calcSalary(twoMonthsAgoData, 1.0),
-    [twoMonthsAgoData, calcSalary]);
+  }, [isRegular, payrollPrev, payrollPrevGross, summaryData, calcSalary, year, month, dayRatioFor]);
+  const twoMonthsAgoSalary = useMemo(() => {
+    if (isRegular && payroll2Ago?.results?.length) return payroll2AgoGross;
+    return calcSalary(twoMonthsAgoData, 1.0);
+  }, [isRegular, payroll2Ago, payroll2AgoGross, twoMonthsAgoData, calcSalary]);
 
   // Salary breakdown by category + shift for detailed comparison
   const salaryBreakdown = useMemo(() => {
-    const compute = (rows: SummaryRow[], dayRatio: number) => {
+    const compute = (rows: SummaryRow[], dayRatio: number, regularGross?: number) => {
       const map = new Map<string, { regular_hours: number; overtime_hours: number; salary: number }>();
       for (const r of rows) {
         const n = normCat(r.category);
@@ -625,9 +666,8 @@ function DashboardContent() {
         const otH = floor30g(r.overtime_hours);
         let sal: number;
         if (isRegular) {
-          // 정규직: 연장(1.5) + 야간 가산(0.5) — 기본급은 아래에서 일괄 합산 (이슈 #2)
-          const regRate = rates["정규직"] || 10030;
-          sal = otH * regRate * 1.5 + (r.night_hours || 0) * regRate * 0.5;
+          // 정규직: 시간 정보만 집계하고 salary는 아래 payroll-calc 값으로 일괄 대체
+          sal = 0;
         } else {
           // 파견/알바: toSummaryRows 에서 직원별 worker.hourly_rate 로 계산한 row.salary 사용
           //   regular×rate + ot×1.5 + night×1.5 + holiday×1.5 + wh×1 (정산관리 산식)
@@ -639,33 +679,53 @@ function DashboardContent() {
           salary: prev.salary + sal,
         });
       }
-      // 정규직: 기본급 일할 합계를 "정규직 주간" row 에 합산 (이슈 #2)
-      // 기본급이 있으면 미퇴사로 보고 매달 기본 포함
-      if (isRegular && salaryData.length > 0) {
-        let basePaySum = 0;
-        for (const s of salaryData) {
-          const mp = parseFloat(s.base_pay || 0) + parseFloat(s.meal_allowance || 0) + parseFloat(s.bonus || 0) + parseFloat(s.position_allowance || 0) + parseFloat(s.other_allowance || 0);
-          basePaySum += mp * dayRatio;
+      if (isRegular) {
+        // 정규직: 급여관리 payroll-calc gross_pay 총액을 "정규직 주간" row에 일괄 합산 (급여관리와 동일한 값)
+        // regularGross가 없으면 (payroll-calc 실패 시) 기존 dayRatio 기반 fallback 사용
+        let totalSal: number;
+        if (regularGross !== undefined && regularGross > 0) {
+          totalSal = regularGross;
+        } else {
+          let basePaySum = 0;
+          for (const s of salaryData) {
+            const mp = parseFloat(s.base_pay || 0) + parseFloat(s.meal_allowance || 0) + parseFloat(s.bonus || 0) + parseFloat(s.position_allowance || 0) + parseFloat(s.other_allowance || 0);
+            basePaySum += mp * dayRatio;
+          }
+          let otSalSum = 0;
+          for (const r of rows) {
+            const otH = floor30g(r.overtime_hours);
+            const regRate = rates["정규직"] || 10030;
+            otSalSum += otH * regRate * 1.5 + (r.night_hours || 0) * regRate * 0.5;
+          }
+          totalSal = basePaySum + otSalSum;
         }
         const dayKey = `정규직|주간`;
         const existing = map.get(dayKey) || { regular_hours: 0, overtime_hours: 0, salary: 0 };
-        map.set(dayKey, { ...existing, salary: existing.salary + basePaySum });
+        map.set(dayKey, { ...existing, salary: totalSal });
       }
       return map;
     };
     const py = summaryData?.prevYear ?? year;
     const pm = summaryData?.prevMonth ?? month;
     return {
-      current: compute(summaryData?.current || [], dayRatioFor(year, month)),
-      previous: compute(summaryData?.previous || [], dayRatioFor(py, pm)),
+      current: compute(summaryData?.current || [], dayRatioFor(year, month), isRegular ? payrollCurGross : undefined),
+      previous: compute(summaryData?.previous || [], dayRatioFor(py, pm), isRegular ? payrollPrevGross : undefined),
     };
-  }, [summaryData, isRegular, rates, salaryData, year, month, dayRatioFor]);
+  }, [summaryData, isRegular, rates, salaryData, year, month, dayRatioFor, payrollCurGross, payrollPrevGross]);
 
   const deptSalary = useMemo(() => {
-    if (!summaryData) return [];
     const map = new Map<string, number>();
+    if (isRegular && payrollCur?.results?.length) {
+      // 정규직: 급여관리 payroll-calc의 부서별 gross_pay 집계 (급여관리와 동일한 값)
+      for (const r of payrollCur.results) {
+        const dept = r.department || "미분류";
+        map.set(dept, (map.get(dept) || 0) + (Number(r.gross_pay) || 0));
+      }
+      return Array.from(map.entries()).map(([dept, cost]) => ({ dept, cost }));
+    }
+    if (!summaryData) return [];
     if (isRegular) {
-      // 정규직: 부서별 기본급 합계 + 연장수당 + 야간가산
+      // 정규직 fallback: payroll-calc 실패 시 기본급 dayRatio + 연장수당 + 야간가산
       const dayRatio = dayRatioFor(year, month);
       for (const s of salaryData) {
         const dept = s.department || "미분류";
@@ -687,7 +747,7 @@ function DashboardContent() {
       }
     }
     return Array.from(map.entries()).map(([dept, cost]) => ({ dept, cost }));
-  }, [summaryData, isRegular, year, month, salaryData, rates, dayRatioFor]);
+  }, [summaryData, isRegular, year, month, salaryData, rates, dayRatioFor, payrollCur]);
 
   // 3-month trend data for chart
   const threeMonthTrend = useMemo(() => {
@@ -1026,6 +1086,33 @@ function DashboardContent() {
           {/* ============ TAB 2: 급여 추정 ============ */}
           {activeTab === "salary" && (
             <div className="space-y-6">
+              {isRegular && payrollCur && (
+                payrollCur.is_closed ? (
+                  <div className="p-4 rounded-[var(--r-md)] bg-[var(--success-bg)] border border-[var(--success-border)]">
+                    <div className="font-semibold text-[var(--success-fg)]">
+                      ✅ {year}년 {month}월 급여 확정 완료
+                    </div>
+                    <div className="text-[var(--fs-body)] text-[var(--text-2)] mt-1">
+                      마감일: {payrollCur.closed_at ? new Date(payrollCur.closed_at).toLocaleString('ko-KR') : '-'}
+                      {payrollCur.is_paid && payrollCur.paid_at && ` · 지급 완료: ${new Date(payrollCur.paid_at).toLocaleString('ko-KR')}`}
+                      <br/>아래 급여 총액은 <b>급여관리 &gt; 급여계산</b> 확정본과 동일한 값(총지급액 gross)입니다.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-[var(--r-md)] bg-[var(--warning-bg)] border border-[var(--warning-border)] flex items-start gap-3">
+                    <AlertTriangle size={20} className="text-[var(--warning-fg)] mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-[var(--warning-fg)]">
+                        ⚠️ {year}년 {month}월 급여 미확정 (실시간 추정)
+                      </div>
+                      <div className="text-[var(--fs-body)] text-[var(--text-2)] mt-1">
+                        현재 근태·조정액 기준으로 <b>급여관리와 동일한 산식</b>으로 실시간 계산한 값입니다. 근태·조정이 아직 마감되지 않았으므로 최종 실지급액과 다를 수 있습니다.
+                        <br/>확정: <b>급여관리 &gt; 급여계산 &gt; [월마감]</b> 처리 시 여기에 <b>✅ 확정</b> 배지가 표시됩니다.
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
               <Card>
                 <CardHeader title="고용형태별 단가 설정" />
                 <div className="overflow-x-auto mt-4">
@@ -1189,11 +1276,17 @@ function DashboardContent() {
               {/* Salary summary cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card tone="ghost" className="border-[var(--brand-500)]/30 bg-[var(--brand-500)]/10 flex items-center justify-between">
-                  <span className="text-[var(--fs-body)] font-medium text-[var(--text-2)]">당월 추정급여</span>
+                  <span className="text-[var(--fs-body)] font-medium text-[var(--text-2)]">
+                    당월 {isRegular && payrollCur?.is_closed ? '확정급여' : '추정급여'}
+                    {isRegular && payrollCur?.is_closed && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-[var(--success-bg)] text-[var(--success-fg)] border border-[var(--success-border)]">확정</span>}
+                  </span>
                   <span className="text-xl font-bold text-[var(--brand-400)] tabular">{fmtWon(curSalary)}원</span>
                 </Card>
                 <Card className="flex items-center justify-between">
-                  <span className="text-[var(--fs-body)] font-medium text-[var(--text-2)]">전월 추정급여</span>
+                  <span className="text-[var(--fs-body)] font-medium text-[var(--text-2)]">
+                    전월 {isRegular && payrollPrev?.is_closed ? '확정급여' : '추정급여'}
+                    {isRegular && payrollPrev?.is_closed && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-[var(--success-bg)] text-[var(--success-fg)] border border-[var(--success-border)]">확정</span>}
+                  </span>
                   <span className="text-xl font-bold text-[var(--text-3)] tabular">{fmtWon(prevSalary)}원</span>
                 </Card>
                 <Card tone="ghost" className={`flex items-center justify-between ${curSalary - prevSalary > 0 ? "border-[var(--danger-border)] bg-[var(--danger-bg)]" : "border-[var(--success-border)] bg-[var(--success-bg)]"}`}>

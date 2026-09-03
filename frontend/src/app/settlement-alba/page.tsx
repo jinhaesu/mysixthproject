@@ -2,11 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Download, Users, Lock, Unlock, Upload as UploadIcon } from "lucide-react";
+import { Calculator, Download, Users, Lock, Unlock, Upload as UploadIcon, Send, CheckCircle2, XCircle, Clock } from "lucide-react";
 import {
   getConfirmedList, getWorkersLite, updateWorkerHourlyRate, bulkWorkerHourlyRate,
   getAlbaSettlement, saveAlbaSettlementLine, closeAlbaSettlement, reopenAlbaSettlement,
-  type AlbaSettlementState,
+  sendAlbaPayslips, getAlbaPayslipLog,
+  type AlbaSettlementState, type AlbaPayslipLogRow,
 } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
@@ -61,6 +62,11 @@ export default function SettlementAlbaPage() {
   // 직원별 시급(로컬) — workerByIdentity 매칭으로 worker.hourly_rate 초기화. 편집 시 600ms debounce 자동저장.
   const [rates, setRates] = useState<Record<number, number>>({});
   const rateTimers = useRef<Record<number, any>>({});
+  // 급여명세서 발송 — 마감 후에만 활성화. 선택 상태·발송중·결과 모달·이력.
+  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ total: number; sent: number; failed: number; results: Array<{ employee_name: string; phone: string; status: string; error?: string }> } | null>(null);
+  const [payslipLog, setPayslipLog] = useState<Record<string, AlbaPayslipLogRow> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -211,6 +217,19 @@ export default function SettlementAlbaPage() {
 
   useEffect(() => { if (authorized) load(); }, [load, authorized]);
 
+  // 년월 변경 시 선택 초기화
+  useEffect(() => { setSelectedNames(new Set()); setSendResult(null); }, [yearMonth]);
+
+  // 마감된 월이면 발송 이력 로드 (인원별 최신 상태 배지 표시용)
+  const loadPayslipLog = useCallback(async () => {
+    if (!isClosed) { setPayslipLog(null); return; }
+    try {
+      const r = await getAlbaPayslipLog(yearMonth);
+      setPayslipLog(r.last_by_name || {});
+    } catch { setPayslipLog(null); }
+  }, [isClosed, yearMonth]);
+  useEffect(() => { if (authorized) loadPayslipLog(); }, [authorized, loadPayslipLog]);
+
   const getMeal = (name: string) => linesByName[name]?.meal || 0;
   const getAdjust = (name: string) => linesByName[name]?.adjust || 0;
 
@@ -262,6 +281,75 @@ export default function SettlementAlbaPage() {
       setSettlementState(r.state);
       toast.success(`${yearMonth} 마감 재개 완료`);
     } catch (e: any) { toast.error(e.message); }
+  };
+
+  const toggleSelect = (name: string) => {
+    setSelectedNames(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+  const toggleSelectAll = (all: any[]) => {
+    setSelectedNames(prev => {
+      const eligible = all.filter(r => (r.phone || '').replace(/[-\s]/g, '').length >= 9).map(r => r.name);
+      if (eligible.every(n => prev.has(n)) && eligible.length > 0) return new Set();
+      return new Set(eligible);
+    });
+  };
+
+  const handleSendPayslips = async (rowsToSend: any[]) => {
+    if (!isClosed) { toast.error('먼저 [월 마감]을 눌러주세요. 마감 후에만 발송 가능합니다.'); return; }
+    const targets = rowsToSend.filter(r => selectedNames.has(r.name));
+    if (targets.length === 0) { toast.error('발송할 인원을 체크해주세요.'); return; }
+    const noPhone = targets.filter(r => (r.phone || '').replace(/[-\s]/g, '').length < 9);
+    if (noPhone.length === targets.length) { toast.error('선택된 인원 모두 휴대폰 번호가 없거나 형식이 잘못됐습니다.'); return; }
+    const msg = noPhone.length > 0
+      ? `선택된 ${targets.length}명 중 ${targets.length - noPhone.length}명에게 급여명세서 SMS를 발송합니다.\n(휴대폰 번호 없는 ${noPhone.length}명은 건너뜁니다)\n\n계속할까요?`
+      : `선택된 ${targets.length}명에게 급여명세서 SMS를 발송합니다.\n\n계속할까요?`;
+    if (!confirm(msg)) return;
+
+    setSending(true);
+    setSendResult(null);
+    try {
+      const payload = targets.map(r => ({
+        employee_name: r.name,
+        phone: r.phone || '',
+        department: r.department || '',
+        workplace: r.workplace || '',
+        bank_name: r.bank_name || '',
+        bank_account: r.bank_account || '',
+        work_days: r.work_days || 0,
+        hourly_rate: r.rate || 0,
+        regular_hours: r.regular_hours || 0,
+        overtime_hours: r.overtime_hours || 0,
+        night_hours: r.night_hours || 0,
+        holiday_pay_hours: r.holiday_pay_hours || 0,
+        weekly_holiday_hours: r.weekly_holiday_hours || 0,
+        basePay: r.basePay || 0,
+        overtimePay: r.overtimePay || 0,
+        holidayPay: r.holidayPay || 0,
+        nightPay: r.nightPay || 0,
+        whPay: r.whPay || 0,
+        adjust: r.adjust || 0,
+        grossPay: r.grossPay || 0,
+        meal: r.meal || 0,
+        incomeTax: r.incomeTax || 0,
+        localTax: r.localTax || 0,
+        netPay: r.netPay || 0,
+      }));
+      const r = await sendAlbaPayslips(yearMonth, payload);
+      setSendResult({ total: r.total, sent: r.sent, failed: r.failed, results: r.results });
+      if (r.failed === 0) toast.success(`급여명세서 ${r.sent}건 발송 완료`);
+      else if (r.sent === 0) toast.error(`발송 실패 ${r.failed}건 — 결과 창을 확인하세요`);
+      else toast.success(`발송 ${r.sent}건 · 실패 ${r.failed}건 — 결과 창을 확인하세요`);
+      setSelectedNames(new Set());
+      loadPayslipLog();
+    } catch (e: any) {
+      toast.error(`발송 실패: ${e.message || e}`);
+    } finally {
+      setSending(false);
+    }
   };
 
   // CSV 재업로드 — 어제 다운로드한 v2 CSV(조정·식대공제 열 포함)로 서버 값 복원.
@@ -446,6 +534,53 @@ export default function SettlementAlbaPage() {
 
   return (
     <div className="min-w-0 space-y-4 fade-in">
+      {sendResult && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSendResult(null)}>
+          <div className="bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded-[var(--r-lg)] shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[var(--border-1)]">
+              <div className="text-[var(--fs-h5)] font-semibold flex items-center gap-2">
+                <Send size={16} /> 급여명세서 발송 결과
+              </div>
+              <div className="text-[var(--fs-body)] text-[var(--text-2)] mt-1">
+                전체 <b>{sendResult.total}</b>명 중 발송 성공 <b className="text-[var(--success-fg)]">{sendResult.sent}</b>건 · 실패 <b className="text-[var(--danger-fg)]">{sendResult.failed}</b>건
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 p-2">
+              <table className="w-full text-[11px]">
+                <thead className="text-[var(--text-3)] text-left">
+                  <tr>
+                    <th className="p-1.5">상태</th>
+                    <th className="p-1.5">이름</th>
+                    <th className="p-1.5">번호</th>
+                    <th className="p-1.5">사유</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sendResult.results.map((r, i) => (
+                    <tr key={i} className="border-t border-[var(--border-1)]">
+                      <td className="p-1.5">
+                        {r.status === 'sent' ? (
+                          <span className="inline-flex items-center gap-1 text-[var(--success-fg)]"><CheckCircle2 size={12} />발송</span>
+                        ) : r.status === 'failed' ? (
+                          <span className="inline-flex items-center gap-1 text-[var(--danger-fg)]"><XCircle size={12} />실패</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[var(--text-4)]"><Clock size={12} />건너뜀</span>
+                        )}
+                      </td>
+                      <td className="p-1.5 font-medium">{r.employee_name}</td>
+                      <td className="p-1.5 font-mono text-[10px] text-[var(--text-3)]">{r.phone || '-'}</td>
+                      <td className="p-1.5 text-[var(--text-3)] text-[10px]">{r.error || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-3 border-t border-[var(--border-1)] flex justify-end gap-2">
+              <Button variant="primary" size="sm" onClick={() => setSendResult(null)}>확인</Button>
+            </div>
+          </div>
+        </div>
+      )}
       <PageHeader
         eyebrow="정산"
         title="알바(사업소득) 정산관리"
@@ -458,6 +593,18 @@ export default function SettlementAlbaPage() {
                   <Lock size={12} /> 마감됨
                 </span>
                 <Button variant="secondary" size="sm" leadingIcon={<Unlock size={14} />} onClick={handleReopen}>마감 재개</Button>
+                {rows.length > 0 && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    leadingIcon={<Send size={14} />}
+                    onClick={() => handleSendPayslips(rows)}
+                    disabled={sending || selectedNames.size === 0}
+                    title={selectedNames.size === 0 ? "먼저 리스트에서 발송할 인원을 체크하세요" : `선택된 ${selectedNames.size}명에게 SMS 발송`}
+                  >
+                    {sending ? '발송 중…' : `급여명세서 발송${selectedNames.size > 0 ? ` (${selectedNames.size})` : ''}`}
+                  </Button>
+                )}
               </>
             ) : (
               <>
@@ -553,6 +700,7 @@ export default function SettlementAlbaPage() {
           <div className="overflow-x-auto">
             <Table className="text-[10px] table-fixed">
               <colgroup>
+                {isClosed && <col className="w-[32px]" />}
                 <col className="w-[70px]" />
                 <col className="w-[80px]" />
                 <col className="w-[55px]" />
@@ -579,6 +727,20 @@ export default function SettlementAlbaPage() {
               </colgroup>
               <THead>
                 <TR>
+                  {isClosed && (
+                    <TH className="text-center">
+                      <input
+                        type="checkbox"
+                        aria-label="전체 선택"
+                        title="휴대폰 번호가 있는 인원 전체 선택/해제"
+                        checked={(() => {
+                          const eligible = rows.filter((r: any) => (r.phone || '').replace(/[-\s]/g, '').length >= 9);
+                          return eligible.length > 0 && eligible.every((r: any) => selectedNames.has(r.name));
+                        })()}
+                        onChange={() => toggleSelectAll(rows)}
+                      />
+                    </TH>
+                  )}
                   <TH>이름</TH>
                   <TH>소속</TH>
                   <TH>은행</TH>
@@ -605,9 +767,37 @@ export default function SettlementAlbaPage() {
                 </TR>
               </THead>
               <TBody>
-                {rows.map((r: any) => (
+                {rows.map((r: any) => {
+                  const phoneOk = (r.phone || '').replace(/[-\s]/g, '').length >= 9;
+                  const logRow = payslipLog?.[r.name];
+                  return (
                   <TR key={r.idx}>
-                    <TD emphasis className="truncate">{r.name}</TD>
+                    {isClosed && (
+                      <TD className="text-center p-0.5">
+                        <input
+                          type="checkbox"
+                          aria-label={`${r.name} 선택`}
+                          disabled={!phoneOk}
+                          checked={selectedNames.has(r.name)}
+                          onChange={() => toggleSelect(r.name)}
+                          title={!phoneOk ? "휴대폰 번호 없음 — 발송 불가" : (logRow ? `최근 발송: ${logRow.status} · ${(logRow.sent_at||'').slice(0,16).replace('T',' ')}` : "발송 대상 선택")}
+                        />
+                      </TD>
+                    )}
+                    <TD emphasis className="truncate">
+                      <span className="inline-flex items-center gap-1">
+                        {r.name}
+                        {isClosed && logRow && (
+                          logRow.status === 'sent' ? (
+                            <CheckCircle2 size={11} className="text-[var(--success-fg)]" aria-label="발송됨" />
+                          ) : logRow.status === 'failed' ? (
+                            <XCircle size={11} className="text-[var(--danger-fg)]" aria-label="발송 실패" />
+                          ) : (
+                            <Clock size={11} className="text-[var(--text-4)]" aria-label="건너뜀" />
+                          )
+                        )}
+                      </span>
+                    </TD>
                     <TD muted className="truncate" title={`${r.department || ''} ${r.workplace || ''}`.trim() || '-'}>{r.department || r.workplace || '-'}</TD>
                     <TD muted className="truncate">{r.bank_name || '-'}</TD>
                     <TD muted className="font-mono text-[9px] truncate">{r.bank_account || '-'}</TD>
@@ -654,11 +844,12 @@ export default function SettlementAlbaPage() {
                     <TD numeric className="text-[var(--danger-fg)]">{fmt.format(r.localTax)}</TD>
                     <TD numeric emphasis className="text-[var(--success-fg)]">{fmt.format(r.netPay)}</TD>
                   </TR>
-                ))}
+                  );
+                })}
               </TBody>
               <tfoot>
                 <TR className="bg-[var(--warning-bg)] border-t-2 border-[var(--warning-border)] font-bold text-[10px]">
-                  <TD colSpan={5} className="text-[var(--text-2)]">합계 ({rows.length}명)</TD>
+                  <TD colSpan={isClosed ? 6 : 5} className="text-[var(--text-2)]">합계 ({rows.length}명){isClosed && selectedNames.size > 0 ? ` · 선택 ${selectedNames.size}명` : ''}</TD>
                   <TD numeric>{totals.work_days}</TD>
                   <TD numeric className="text-[var(--text-4)]">-</TD>
                   <TD numeric>{(totals.regular_hours || 0).toFixed(1)}</TD>

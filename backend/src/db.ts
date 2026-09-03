@@ -220,7 +220,7 @@ export async function initializeDB(): Promise<void> {
   // 동시 SELECT 가 대기됨. schema_migrations 에 이번 버전 키가 있으면 전체 스키마 마이그 SKIP.
   // 새 컬럼/테이블 추가 시 SCHEMA_VERSION 만 올리면 다음 부팅에 재실행.
   try { await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`); } catch {}
-  const SCHEMA_VERSION = 'schema-v2.42.0';
+  const SCHEMA_VERSION = 'schema-v2.43.0';
   const check = await pool.query('SELECT 1 FROM schema_migrations WHERE id = $1', [SCHEMA_VERSION]);
   if (check.rowCount && check.rowCount > 0) {
     console.log(`Schema already migrated (${SCHEMA_VERSION}), skipping ALTER block`);
@@ -2497,6 +2497,30 @@ export async function initializeDB(): Promise<void> {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_alba_settlement_line_ym ON alba_settlement_line(year_month)`);
   } catch (e: any) { console.error('[v2.39.0] alba_settlement_line:', e.message); }
+
+  // ═══════════════════════════════════════════════════════════════
+  // v2.43.0 — 알바(사업소득) 급여명세서 SMS 발송 이력
+  //  마감(closed) 상태에서만 발송 가능. 재발송 허용. 이력은 감사/재확인용.
+  // ═══════════════════════════════════════════════════════════════
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS alba_payslip_send_log (
+        id BIGSERIAL PRIMARY KEY,
+        year_month TEXT NOT NULL,
+        employee_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        message_text TEXT NOT NULL,
+        message_length INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL,
+        error TEXT DEFAULT '',
+        provider_message_id TEXT DEFAULT '',
+        sent_at TIMESTAMPTZ DEFAULT NOW(),
+        sent_by TEXT DEFAULT ''
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_alba_payslip_send_log_ym ON alba_payslip_send_log(year_month)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_alba_payslip_send_log_name ON alba_payslip_send_log(year_month, employee_name)`);
+  } catch (e: any) { console.error('[v2.43.0] alba_payslip_send_log:', e.message); }
 
   // 마이그레이션 완료 표시 — 다음 부팅부터 스키마 ALTER 블록 SKIP
   try { await pool.query('INSERT INTO schema_migrations (id) VALUES ($1) ON CONFLICT DO NOTHING', [SCHEMA_VERSION]); } catch {}

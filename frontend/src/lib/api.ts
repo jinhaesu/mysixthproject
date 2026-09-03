@@ -2840,3 +2840,69 @@ export async function reopenAlbaSettlement(yearMonth: string, note?: string) {
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: note || '' }) }
   );
 }
+
+// 알바(사업소득) 급여명세서 SMS 발송
+// 마감(closed) 상태에서만 허용. 프론트가 이미 계산·표시 중인 정산 라인을 그대로 전송.
+export interface AlbaPayslipEmployee {
+  employee_name: string;
+  phone: string;
+  department?: string;
+  workplace?: string;
+  bank_name?: string;
+  bank_account?: string;
+  work_days?: number;
+  hourly_rate?: number;
+  regular_hours?: number;
+  overtime_hours?: number;
+  night_hours?: number;
+  holiday_pay_hours?: number;
+  weekly_holiday_hours?: number;
+  basePay?: number;
+  overtimePay?: number;
+  holidayPay?: number;
+  nightPay?: number;
+  whPay?: number;
+  adjust?: number;
+  grossPay?: number;
+  meal?: number;
+  incomeTax?: number;
+  localTax?: number;
+  netPay?: number;
+}
+
+export interface AlbaPayslipSendResult {
+  success: true;
+  year_month: string;
+  total: number;
+  sent: number;
+  failed: number;
+  results: Array<{ employee_name: string; phone: string; status: 'sent' | 'failed' | 'skipped'; error?: string; message_length: number }>;
+}
+
+export async function sendAlbaPayslips(yearMonth: string, employees: AlbaPayslipEmployee[]) {
+  return fetchAPI<AlbaPayslipSendResult>(
+    `/api/settlement/alba/${yearMonth}/send-payslips`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employees }) }
+  );
+}
+
+export interface AlbaPayslipLogRow {
+  id: number;
+  employee_name: string;
+  phone: string;
+  message_length: number;
+  status: 'sent' | 'failed' | 'skipped';
+  error: string;
+  sent_at: string;
+  sent_by: string;
+}
+
+export async function getAlbaPayslipLog(yearMonth: string) {
+  return fetchAPI<{
+    year_month: string;
+    total: number;
+    logs: AlbaPayslipLogRow[];
+    last_by_name: Record<string, AlbaPayslipLogRow>;
+    last_success_by_name: Record<string, AlbaPayslipLogRow>;
+  }>(`/api/settlement/alba/${yearMonth}/payslip-log`);
+}

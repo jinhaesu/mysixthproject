@@ -367,8 +367,8 @@ export default function PayrollCalcPage() {
                   <tr key={i} className="hover:bg-[var(--bg-2)]/40 transition-colors whitespace-nowrap">
                     <td className="py-1.5 px-2 font-medium text-[var(--text-1)] sticky left-0 bg-[var(--bg-1)] z-10">{r.name}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)]">{r.department} {r.team}</td>
-                    <td className="py-1.5 px-2 text-[var(--text-3)] text-[9px]">{r.hire_date ? r.hire_date.slice(5) : '-'}</td>
-                    <td className="py-1.5 px-2 text-[9px]">{r.resign_date ? <span className="text-[var(--danger-fg)]">{r.resign_date.slice(5)}</span> : <span className="text-[var(--text-4)]">-</span>}</td>
+                    <td className="py-1.5 px-2 text-[var(--text-3)] text-[9px]">{r.hire_date ? r.hire_date.slice(2) : '-'}</td>
+                    <td className="py-1.5 px-2 text-[9px]">{r.resign_date ? <span className="text-[var(--danger-fg)]">{r.resign_date.slice(2)}</span> : <span className="text-[var(--text-4)]">-</span>}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)] text-[9px]">{r.bank_name || '-'}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)] font-mono text-[9px]">{r.bank_account || '-'}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)] font-mono text-[9px]">{r.id_number || '-'}</td>

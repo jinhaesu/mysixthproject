@@ -103,6 +103,10 @@ function formatDate(s?: string | null): string {
   const m = String(s).match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : "-";
 }
+function formatDateShort(s?: string | null): string {
+  const d = formatDate(s);
+  return d === "-" ? "-" : d.slice(2);
+}
 function calcTenure(hire?: string | null, resign?: string | null): string {
   const h = formatDate(hire), r = formatDate(resign);
   if (h === "-" || r === "-") return "-";
@@ -743,8 +747,8 @@ export default function RegularWorkersPage() {
                           <td className="px-4 py-3 font-medium text-[var(--text-1)]">{e.name}</td>
                           <td className="px-4 py-3 text-[var(--text-3)] tabular">{e.phone}</td>
                           <td className="px-4 py-3 text-[var(--text-3)]">{e.department}{e.team ? ` / ${e.team}` : ""}</td>
-                          <td className="px-4 py-3 text-[var(--text-3)] tabular">{formatDate(e.hire_date)}</td>
-                          <td className="px-4 py-3 text-[var(--text-3)] tabular">{formatDate(e.resign_date || e.resigned_at)}</td>
+                          <td className="px-4 py-3 text-[var(--text-3)] tabular">{formatDateShort(e.hire_date)}</td>
+                          <td className="px-4 py-3 text-[var(--text-3)] tabular">{formatDateShort(e.resign_date || e.resigned_at)}</td>
                           <td className="px-4 py-3 text-[var(--text-3)]">{calcTenure(e.hire_date, e.resign_date || e.resigned_at)}</td>
                           <td className="px-4 py-3 text-right">
                             <Button variant="ghost" size="xs" onClick={() => router.push("/offboarding")}>퇴사 처리 보기</Button>

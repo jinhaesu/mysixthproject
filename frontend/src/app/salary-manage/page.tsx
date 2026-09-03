@@ -8,6 +8,12 @@ import { PageHeader, Card, Button, Input, SkeletonCard, useToast } from "@/compo
 
 const fmt = new Intl.NumberFormat('ko-KR');
 
+function fmtDateShort(s?: string | null): string {
+  if (!s) return '-';
+  const m = String(s).match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0].slice(2) : '-';
+}
+
 export default function SalaryManagePage() {
   const toast = useToast();
   const [authorized, setAuthorized] = useState(false);
@@ -78,7 +84,7 @@ export default function SalaryManagePage() {
                   <tr key={e.employee_id} className="hover:bg-[var(--bg-2)]/40 transition-colors">
                     <td className="py-2.5 px-3 font-medium text-[var(--text-1)]">{e.name}</td>
                     <td className="py-2.5 px-3 text-[var(--text-3)] text-[var(--fs-caption)]">{e.department} {e.team}</td>
-                    <td className="py-2.5 px-3 text-[var(--text-3)] text-[var(--fs-caption)]">{e.hire_date || '-'}</td>
+                    <td className="py-2.5 px-3 text-[var(--text-3)] text-[var(--fs-caption)]">{fmtDateShort(e.hire_date)}</td>
                     {editingId === e.employee_id ? (
                       <>
                         {['base_pay','meal_allowance','bonus','position_allowance','other_allowance','overtime_hourly_rate'].map(f => (

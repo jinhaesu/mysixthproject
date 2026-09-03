@@ -127,6 +127,12 @@ const emptyOrgForm = {
   leader_role: LEADER_ROLES[0],
 };
 
+function fmtDateShort(s?: string | null): string {
+  if (!s) return '-';
+  const m = String(s).match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0].slice(2) : '-';
+}
+
 export default function RegularManagePage() {
   const toast = useToast();
   const [tab, setTab] = usePersistedState<Tab>("rm_tab", "employees");
@@ -638,7 +644,7 @@ export default function RegularManagePage() {
                             {emp.role}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-[var(--text-2)] text-xs tabular">{(emp as any).hire_date || "-"}</td>
+                        <td className="px-4 py-3 text-[var(--text-2)] text-xs tabular">{fmtDateShort((emp as any).hire_date)}</td>
                         <td className="px-4 py-3 text-[var(--text-2)] text-xs">{(emp as any).bank_name || "-"}</td>
                         <td className="px-4 py-3 text-[var(--text-2)] text-xs font-mono tabular">{(emp as any).bank_account || "-"}</td>
                         <td className="px-4 py-3 text-[var(--text-2)] text-xs">{(emp as any).id_number ? "●●●●●●-●●●●●●●" : "-"}</td>
@@ -717,8 +723,8 @@ export default function RegularManagePage() {
                           <td className="px-4 py-2.5 text-[var(--text-3)]">{e.phone}</td>
                           <td className="px-4 py-2.5 text-[var(--text-3)]">{e.department}</td>
                           <td className="px-4 py-2.5 text-[var(--text-3)]">{e.team}</td>
-                          <td className="px-4 py-2.5 text-[var(--text-3)] text-xs">{e.hire_date || '-'}</td>
-                          <td className="px-4 py-2.5 text-[var(--warning-fg)] font-medium text-xs">{e.resign_date}</td>
+                          <td className="px-4 py-2.5 text-[var(--text-3)] text-xs">{fmtDateShort(e.hire_date)}</td>
+                          <td className="px-4 py-2.5 text-[var(--warning-fg)] font-medium text-xs">{fmtDateShort(e.resign_date)}</td>
                         </tr>
                       ))}
                     </tbody>

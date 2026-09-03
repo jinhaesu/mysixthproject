@@ -66,6 +66,12 @@ function sanitizeFilename(s: string): string {
   return String(s || 'contract').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
 }
 
+function fmtDateShort(s?: string | null): string {
+  if (!s) return '-';
+  const m = String(s).match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0].slice(2) : '-';
+}
+
 function escapeHtml(s: string): string {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -669,7 +675,7 @@ function ContractManageInner() {
                     <TD emphasis>{item.employee_name}</TD>
                     <TD muted>{item.employee_phone}</TD>
                     <TD muted>{item.department || "-"}</TD>
-                    <TD muted>{item.hire_date || "-"}</TD>
+                    <TD muted>{fmtDateShort(item.hire_date)}</TD>
                     <TD muted>
                       {c?.contract_start && c?.contract_end
                         ? `${c.contract_start} ~ ${c.contract_end}`

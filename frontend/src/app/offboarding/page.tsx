@@ -101,6 +101,10 @@ function formatDate(s?: string | null): string {
   const m = String(s).match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : "-";
 }
+function formatDateShort(s?: string | null): string {
+  const d = formatDate(s);
+  return d === "-" ? "-" : d.slice(2);
+}
 
 function dBadgeTone(days: number | undefined | null): "success" | "warning" | "danger" {
   if (days == null) return "neutral" as any;
@@ -482,8 +486,8 @@ export default function OffboardingPage() {
                         <TD emphasis>{item.employee_name || "-"}</TD>
                         <TD muted>{item.employee_phone || "-"}</TD>
                         <TD muted>{item.department || "-"}</TD>
-                        <TD muted>{formatDate(item.hire_date)}</TD>
-                        <TD muted>{item.resign_date || "-"}</TD>
+                        <TD muted>{formatDateShort(item.hire_date)}</TD>
+                        <TD muted>{formatDateShort(item.resign_date)}</TD>
                         <TD muted>{item.loss_date || "-"}</TD>
                         <TD>
                           {item.days_to_loss_deadline != null ? (
@@ -628,8 +632,8 @@ export default function OffboardingPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Stat label="이름" value={localDetail.employee_name || "-"} tone="neutral" />
               <Stat label="부서/팀" value={localDetail.department || "-"} tone="neutral" />
-              <Stat label="입사일" value={localDetail.hire_date || "-"} tone="neutral" />
-              <Stat label="퇴직일" value={localDetail.resign_date || "-"} tone="warning" />
+              <Stat label="입사일" value={formatDateShort(localDetail.hire_date)} tone="neutral" />
+              <Stat label="퇴직일" value={formatDateShort(localDetail.resign_date)} tone="warning" />
             </div>
 
             <div className="rounded-[var(--r-md)] border border-[var(--warning-border)] bg-[var(--warning-bg)] p-3">

@@ -396,7 +396,7 @@ function DetailModal({
                 {detail.nationality === "FOREIGN" && <Badge tone="violet" size="sm">외국인</Badge>}
               </div>
               <p className="text-[var(--fs-body)] text-[var(--text-3)]">
-                입사일: {detail.hire_date ?? "-"} · {detail.department ?? ""}{detail.team ? " / " + detail.team : ""}
+                입사일: {fmtDateShort(detail.hire_date)} · {detail.department ?? ""}{detail.team ? " / " + detail.team : ""}
               </p>
             </div>
             <div className="text-right min-w-[100px]">
@@ -905,7 +905,7 @@ function ListTab({
               {item.department ?? "-"}
               {item.team ? ` / ${item.team}` : ""}
             </TD>
-            <TD muted>{item.hire_date ?? "-"}</TD>
+            <TD muted>{fmtDateShort(item.hire_date)}</TD>
             <TD>
               {item.has_signed_contract ? (
                 <Badge tone="success" size="xs">서명완료</Badge>
@@ -1025,6 +1025,12 @@ function ListTab({
 }
 
 // ── Main Page ────────────────────────────────────────────────────
+function fmtDateShort(s?: string | null): string {
+  if (!s) return '-';
+  const m = String(s).match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0].slice(2) : '-';
+}
+
 export default function OnboardingPage() {
   const [authorized, setAuthorized] = useState(false);
 

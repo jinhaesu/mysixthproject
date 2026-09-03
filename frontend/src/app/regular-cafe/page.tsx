@@ -56,6 +56,12 @@ interface ContractSummary {
 // 부서가 아직 '카페(...)'로 세팅되지 않은 사람(예: 전서현이 임시로 생산부서로 등록된 경우)도 잡히도록.
 const CAFE_NAME_WHITELIST = ["황금빛", "신아름누리", "전서현"];
 
+function fmtDateShort(s?: string | null): string {
+  if (!s) return '-';
+  const m = String(s).match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0].slice(2) : '-';
+}
+
 export default function RegularCafePage() {
   const toast = useToast();
 
@@ -403,7 +409,7 @@ export default function RegularCafePage() {
                       <td className="px-3 py-2 text-[var(--text-2)]">
                         {emp.department || <span className="text-[var(--warning-fg)]">미지정</span>}
                       </td>
-                      <td className="px-3 py-2 tabular text-[var(--text-2)]">{emp.hire_date || "-"}</td>
+                      <td className="px-3 py-2 tabular text-[var(--text-2)]">{fmtDateShort(emp.hire_date)}</td>
                       <td className="px-3 py-2">{renderContractBadge(emp.id)}</td>
                       <td className="px-3 py-2">
                         {isResigned ? (

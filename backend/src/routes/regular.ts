@@ -2737,13 +2737,17 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
     //   - 재입사자는 salPeriods 로 activePeriod.start 를 hire_date 로 재계산하므로,
     //     이 필터는 regular_employees.hire_date 만 본다 (재입사 case 는 periods 있음).
     //   - periods 도 없고 hire_date 도 미래인 사람만 배제 → 재입사 흐름 훼손 없음.
+    //
+    // ⚠️ 재입사자 방어: employment_periods 를 resign_date 필터보다 먼저 판정.
+    //   regular_employees.resign_date 에 첫 퇴사일(예: 2026-07-20)이 남아있는
+    //   재입사자(티늉)가 rd < monthStart 컷으로 배제되던 버그 수정.
     const salariesFiltered = salaries.filter((sal: any) => {
-      const rd = (sal.resign_date || '').trim();
-      if (rd && rd < monthStart) return false;
       const salPeriods = getPeriods(sal.name, sal.phone);
       if (salPeriods && salPeriods.length > 0) {
         return salPeriods.some(p => p.start <= monthEnd && (!p.end || p.end >= monthStart));
       }
+      const rd = (sal.resign_date || '').trim();
+      if (rd && rd < monthStart) return false;
       const hd = toYMD(sal.hire_date);
       if (hd && hd > monthEnd) return false;
       return true;

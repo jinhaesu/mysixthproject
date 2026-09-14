@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { usePersistedState } from "@/lib/usePersistedState";
-import { Calculator, Download, Users, Lock, Unlock, Upload as UploadIcon, Send, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Calculator, Download, Users, Lock, Unlock, Upload as UploadIcon, Send, CheckCircle2, XCircle, Clock, UserPlus, AlertTriangle } from "lucide-react";
 import {
   getConfirmedList, getWorkersLite, updateWorkerHourlyRate, bulkWorkerHourlyRate,
   getAlbaSettlement, saveAlbaSettlementLine, closeAlbaSettlement, reopenAlbaSettlement,
-  sendAlbaPayslips, getAlbaPayslipLog,
+  sendAlbaPayslips, getAlbaPayslipLog, createWorker,
   type AlbaSettlementState, type AlbaPayslipLogRow,
 } from "@/lib/api";
 import SessionPasswordGate from "@/components/SessionPasswordGate";
@@ -67,6 +67,17 @@ export default function SettlementAlbaPage() {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ total: number; sent: number; failed: number; results: Array<{ employee_name: string; phone: string; status: string; error?: string }> } | null>(null);
   const [payslipLog, setPayslipLog] = useState<Record<string, AlbaPayslipLogRow> | null>(null);
+  // 근무자 DB 미등록 인원 등록 모달
+  const [registerModal, setRegisterModal] = useState<null | {
+    name: string;
+    phone: string;
+    department: string;
+    bank_name: string;
+    bank_account: string;
+    id_number: string;
+    hourly_rate: number;
+    submitting: boolean;
+  }>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -505,6 +516,54 @@ export default function SettlementAlbaPage() {
     }, 600);
   };
 
+  const openRegisterModal = (r: any) => {
+    setRegisterModal({
+      name: r.name || '',
+      phone: r.phone || '',
+      department: r.department || r.workplace || '',
+      bank_name: '',
+      bank_account: '',
+      id_number: '',
+      hourly_rate: rates[r.idx] ?? hourlyRate,
+      submitting: false,
+    });
+  };
+
+  const handleRegisterWorker = async () => {
+    if (!registerModal) return;
+    const m = registerModal;
+    if (!m.phone || m.phone.replace(/[-\s]/g, '').length < 9) {
+      toast.error('연락처가 필요합니다.');
+      return;
+    }
+    setRegisterModal({ ...m, submitting: true });
+    try {
+      const created: any = await createWorker({
+        phone: m.phone,
+        name_ko: m.name,
+        name_en: '',
+        bank_name: m.bank_name,
+        bank_account: m.bank_account,
+        id_number: m.id_number,
+        emergency_contact: '',
+        category: '알바',
+        division: '',
+        department: m.department,
+        workplace: m.department,
+        memo: '알바 정산관리에서 즉시 등록',
+      });
+      if (m.hourly_rate > 0 && created?.id) {
+        try { await updateWorkerHourlyRate(created.id, m.hourly_rate); } catch {}
+      }
+      toast.success(`${m.name} 근무자 DB 등록 완료`);
+      setRegisterModal(null);
+      load();
+    } catch (e: any) {
+      toast.error(`등록 실패: ${e.message || e}`);
+      setRegisterModal({ ...m, submitting: false });
+    }
+  };
+
   const handleBulkApply = async () => {
     if (!confirm(`알바(사업소득) 카테고리 전체 시급을 ${fmt.format(hourlyRate)}원으로 일괄 적용합니다. 진행할까요?`)) return;
     try {
@@ -534,6 +593,55 @@ export default function SettlementAlbaPage() {
 
   return (
     <div className="min-w-0 space-y-4 fade-in">
+      {registerModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !registerModal.submitting && setRegisterModal(null)}>
+          <div className="bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded-[var(--r-lg)] shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[var(--border-1)]">
+              <div className="text-[var(--fs-h5)] font-semibold flex items-center gap-2">
+                <UserPlus size={16} /> 근무자 DB 등록
+              </div>
+              <div className="text-[var(--fs-caption)] text-[var(--text-3)] mt-1">
+                근태에서 잡힌 인원을 근무자 DB(카테고리: 알바)에 등록합니다. 등록 후 소속·계좌·시급이 정산 리스트에 자동 반영됩니다.
+              </div>
+            </div>
+            <div className="p-4 space-y-3">
+              <Field label="이름">
+                <Input inputSize="sm" value={registerModal.name} onChange={e => setRegisterModal(m => m && ({ ...m, name: e.target.value }))} />
+              </Field>
+              <Field label="연락처 (필수)">
+                <Input inputSize="sm" value={registerModal.phone} onChange={e => setRegisterModal(m => m && ({ ...m, phone: e.target.value }))} placeholder="010-0000-0000" />
+              </Field>
+              <Field label="소속 (부서/지점)">
+                <Input inputSize="sm" value={registerModal.department} onChange={e => setRegisterModal(m => m && ({ ...m, department: e.target.value }))} placeholder="예: 카페(행궁동)" />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="은행">
+                  <Input inputSize="sm" value={registerModal.bank_name} onChange={e => setRegisterModal(m => m && ({ ...m, bank_name: e.target.value }))} placeholder="예: 국민" />
+                </Field>
+                <Field label="계좌번호">
+                  <Input inputSize="sm" value={registerModal.bank_account} onChange={e => setRegisterModal(m => m && ({ ...m, bank_account: e.target.value }))} placeholder="숫자만" />
+                </Field>
+              </div>
+              <Field label="주민번호 (선택)">
+                <Input inputSize="sm" value={registerModal.id_number} onChange={e => setRegisterModal(m => m && ({ ...m, id_number: e.target.value }))} placeholder="000000-0000000 (원천세 신고용)" />
+              </Field>
+              <Field label="시급 (원)">
+                <Input
+                  type="number"
+                  inputSize="sm"
+                  value={registerModal.hourly_rate || ''}
+                  onChange={e => setRegisterModal(m => m && ({ ...m, hourly_rate: parseInt(e.target.value) || 0 }))}
+                  placeholder={String(hourlyRate)}
+                />
+              </Field>
+            </div>
+            <div className="p-3 border-t border-[var(--border-1)] flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setRegisterModal(null)} disabled={registerModal.submitting}>취소</Button>
+              <Button variant="primary" size="sm" leadingIcon={<UserPlus size={14} />} onClick={handleRegisterWorker} loading={registerModal.submitting}>등록</Button>
+            </div>
+          </div>
+        </div>
+      )}
       {sendResult && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSendResult(null)}>
           <div className="bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded-[var(--r-lg)] shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -629,6 +737,19 @@ export default function SettlementAlbaPage() {
           </div>
         }
       />
+      {!isClosed && rows.some((r: any) => !r.worker_id) && (
+        <div className="p-3 rounded-[var(--r-md)] bg-[var(--danger-bg)] border border-[var(--danger-border)] text-[var(--danger-fg)] text-[12px] flex justify-between items-center gap-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} />
+            <span>
+              <b>근무자 DB 미등록 인원 {rows.filter((r: any) => !r.worker_id).length}명</b> — 소속·은행·계좌·시급 저장이 불가합니다. 이름 옆 <b>[미등록]</b> 배지를 눌러 즉시 등록하세요.
+            </span>
+          </div>
+          <span className="text-[11px] opacity-80 shrink-0">
+            {rows.filter((r: any) => !r.worker_id).map((r: any) => r.name).join(', ')}
+          </span>
+        </div>
+      )}
       {legacyBanner && !isClosed && (
         <div className="p-3 rounded-[var(--r-md)] bg-[var(--warning-bg)] border border-[var(--warning-border)] text-[var(--warning-fg)] text-[12px] flex justify-between items-center gap-2">
           <div>
@@ -787,6 +908,21 @@ export default function SettlementAlbaPage() {
                     <TD emphasis className="truncate">
                       <span className="inline-flex items-center gap-1">
                         {r.name}
+                        {!r.worker_id && !isClosed && (
+                          <button
+                            type="button"
+                            onClick={() => openRegisterModal(r)}
+                            className="inline-flex items-center gap-0.5 px-1 py-[1px] text-[8px] font-semibold rounded bg-[var(--danger-bg)] text-[var(--danger-fg)] border border-[var(--danger-border)] hover:opacity-80"
+                            title="이 인원은 근무자 DB에 없습니다. 클릭하여 즉시 등록 (소속·계좌·시급 함께 저장)"
+                          >
+                            <AlertTriangle size={9} /> 미등록
+                          </button>
+                        )}
+                        {!r.worker_id && isClosed && (
+                          <span className="inline-flex items-center gap-0.5 px-1 py-[1px] text-[8px] font-semibold rounded bg-[var(--danger-bg)] text-[var(--danger-fg)] border border-[var(--danger-border)]" title="근무자 DB 미등록 (마감 상태에서는 편집 불가)">
+                            <AlertTriangle size={9} /> 미등록
+                          </span>
+                        )}
                         {isClosed && logRow && (
                           logRow.status === 'sent' ? (
                             <CheckCircle2 size={11} className="text-[var(--success-fg)]" aria-label="발송됨" />
@@ -806,11 +942,11 @@ export default function SettlementAlbaPage() {
                     <TD className="p-0.5">
                       <input
                         type="number"
-                        className="w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border border-[var(--border-1)] rounded focus:border-[var(--brand-500)] focus:outline-none disabled:opacity-60"
+                        className={`w-full px-1 py-1 text-right text-[10px] tabular bg-[var(--bg-canvas)] border rounded focus:border-[var(--brand-500)] focus:outline-none disabled:opacity-60 ${!r.worker_id ? 'border-[var(--danger-border)]' : 'border-[var(--border-1)]'}`}
                         value={rates[r.idx] ?? (r.hourly_rate > 0 ? r.hourly_rate : hourlyRate)}
                         onChange={e => onRateChange(r.idx, r.worker_id, e.target.value)}
                         disabled={isClosed}
-                        title={isClosed ? "마감된 월은 편집 불가" : "이 직원의 시급 — 자동저장 (worker_id 매칭된 경우만)"}
+                        title={isClosed ? "마감된 월은 편집 불가" : !r.worker_id ? "근무자 DB 미등록 — 이름 옆 [미등록] 배지를 눌러 먼저 등록해야 시급이 저장됩니다." : "이 직원의 시급 — 자동저장"}
                       />
                     </TD>
                     <TD numeric>{r.regular_hours}</TD>

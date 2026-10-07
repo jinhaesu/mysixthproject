@@ -2788,6 +2788,11 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
       const activePeriod = salPeriods && salPeriods.find(p =>
         p.start <= monthEnd && (!p.end || p.end >= monthStart)
       );
+      // 재입사 여부: periods 2개 이상이고, 현재 활성 period 가 첫 period 이후일 때.
+      // activePeriod.start 기준으로 그 전에 끝난(=period.end 가 activePeriod.start 이전) period 가 있으면 재입사.
+      const isRehire = !!(activePeriod && salPeriods && salPeriods.some(p =>
+        p.end && p.end < activePeriod.start
+      ));
       const hireDate = activePeriod ? activePeriod.start : (toYMD(sal.hire_date) || '');
       const resignDate = activePeriod && activePeriod.end
         ? activePeriod.end
@@ -2901,6 +2906,8 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
         employee_id: sal.employee_id,
         name: sal.name, phone: sal.phone, department: sal.department, team: sal.team,
         hire_date: sal.hire_date || '', resign_date: resignDate,
+        is_rehire: isRehire,
+        active_period_start: activePeriod ? activePeriod.start : '',
         bank_name: sal.bank_name || '', bank_account: sal.bank_account || '', id_number: sal.id_number || '',
         base_pay_full: parseFloat(sal.base_pay), base_pay: basePay,
         meal_allowance_full: parseFloat(sal.meal_allowance), meal_allowance: mealAllowance,

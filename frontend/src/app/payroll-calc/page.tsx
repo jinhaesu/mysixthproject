@@ -367,7 +367,19 @@ export default function PayrollCalcPage() {
                   <tr key={i} className="hover:bg-[var(--bg-2)]/40 transition-colors whitespace-nowrap">
                     <td className="py-1.5 px-2 font-medium text-[var(--text-1)] sticky left-0 bg-[var(--bg-1)] z-10">{r.name}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)]">{r.department} {r.team}</td>
-                    <td className="py-1.5 px-2 text-[var(--text-3)] text-[9px]">{r.hire_date ? r.hire_date.slice(2) : '-'}</td>
+                    <td className="py-1.5 px-2 text-[var(--text-3)] text-[9px]">
+                      {r.is_rehire && r.active_period_start ? (
+                        <span className="inline-flex flex-col leading-tight">
+                          <span className="inline-flex items-center gap-0.5">
+                            <span className="px-1 py-[1px] text-[7px] font-semibold rounded bg-[var(--brand-500)]/20 text-[var(--brand-400)] border border-[var(--brand-500)]/40" title={`재입사일 ${r.active_period_start} · 최초입사 ${r.hire_date}`}>재입사</span>
+                            <span>{r.active_period_start.slice(2)}</span>
+                          </span>
+                          <span className="text-[7px] text-[var(--text-4)]">최초 {r.hire_date ? r.hire_date.slice(2) : '-'}</span>
+                        </span>
+                      ) : (
+                        r.hire_date ? r.hire_date.slice(2) : '-'
+                      )}
+                    </td>
                     <td className="py-1.5 px-2 text-[9px]">{r.resign_date ? <span className="text-[var(--danger-fg)]">{r.resign_date.slice(2)}</span> : <span className="text-[var(--text-4)]">-</span>}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)] text-[9px]">{r.bank_name || '-'}</td>
                     <td className="py-1.5 px-2 text-[var(--text-3)] font-mono text-[9px]">{r.bank_account || '-'}</td>

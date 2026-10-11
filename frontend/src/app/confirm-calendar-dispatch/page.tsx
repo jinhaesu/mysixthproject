@@ -73,19 +73,29 @@ const _confirmedCache: Record<string, { data: any[]; time: number }> = {};
 const ceil30Min = (min: number) => Math.ceil(min / 30) * 30;
 const floor30Min = (min: number) => Math.floor(min / 30) * 30;
 
+// 근태 종합요약(파견/알바) calcHoursFromTimes 와 동일 규칙:
+// 22:00~06:00 구간은 야간으로 분리하고, 기본/연장은 나머지(주간) 시간에서만 계산.
+// (이전엔 야간 분리 없이 night_hours=0 으로 확정돼 야간조가 '기본'으로 올라감)
 function calcHours(clockIn: string, clockOut: string) {
-  if (!clockIn || !clockOut) return { regular: 0, overtime: 0 };
+  if (!clockIn || !clockOut) return { regular: 0, overtime: 0, night: 0 };
   const [h1, m1] = clockIn.split(":").map(Number);
   const [h2, m2] = clockOut.split(":").map(Number);
-  if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0 };
+  if (isNaN(h1) || isNaN(h2)) return { regular: 0, overtime: 0, night: 0 };
   const startMin = ceil30Min(h1 * 60 + (m1 || 0));
   let endMin = floor30Min(h2 * 60 + (m2 || 0));
   if (endMin <= startMin) endMin += 1440;
-  const totalH = (endMin - startMin) / 60 - 1; // 1h break
-  const workH = Math.max(totalH, 0);
+  const workH = Math.max((endMin - startMin) / 60 - 1, 0); // 1h break
+  let nightMin = 0;
+  for (let min = startMin; min < endMin; min++) {
+    const h = Math.floor((min % 1440) / 60);
+    if (h >= 22 || h < 6) nightMin++;
+  }
+  const night = Math.round(nightMin / 60 * 10) / 10;
+  const dayWork = Math.max(workH - night, 0);
   return {
-    regular: Math.min(workH, 8),
-    overtime: Math.max(workH - 8, 0),
+    regular: Math.min(dayWork, 8),
+    overtime: Math.max(dayWork - 8, 0),
+    night,
   };
 }
 
@@ -309,7 +319,7 @@ export default function ConfirmCalendarDispatchPage() {
       try {
         const clockIn = useSource === "planned" && entry.plannedClockIn ? entry.plannedClockIn : (entry.actualClockIn || entry.clockIn);
         const clockOut = useSource === "planned" && entry.plannedClockOut ? entry.plannedClockOut : (entry.actualClockOut || entry.clockOut);
-        const { regular, overtime } = calcHours(clockIn, clockOut);
+        const { regular, overtime, night } = calcHours(clockIn, clockOut);
         const record = {
           employee_type: entry.emp.type || "파견",
           employee_name: entry.emp.name,
@@ -321,7 +331,7 @@ export default function ConfirmCalendarDispatchPage() {
           source: useSource,
           regular_hours: Math.round(regular * 10) / 10,
           overtime_hours: Math.round(overtime * 10) / 10,
-          night_hours: 0,
+          night_hours: night,
           break_hours: 1,
           year_month: yearMonth,
         };
@@ -363,7 +373,7 @@ export default function ConfirmCalendarDispatchPage() {
         if (confirmedId) {
           await deleteConfirmedRecord(confirmedId);
         } else {
-          const { regular, overtime } = calcHours(clockIn, clockOut);
+          const { regular, overtime, night } = calcHours(clockIn, clockOut);
           await confirmAttendance([{
             employee_type: emp.type || "파견",
             employee_name: emp.name,
@@ -375,7 +385,7 @@ export default function ConfirmCalendarDispatchPage() {
             source,
             regular_hours: Math.round(regular * 10) / 10,
             overtime_hours: Math.round(overtime * 10) / 10,
-            night_hours: 0,
+            night_hours: night,
             break_hours: 1,
             year_month: yearMonth,
           }]);

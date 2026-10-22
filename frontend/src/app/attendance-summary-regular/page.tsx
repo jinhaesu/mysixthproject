@@ -10,18 +10,8 @@ import { getAttendanceSummaryRegular, confirmAttendance, getConfirmedList, delet
 import { bumpRegularDataVersion } from "@/lib/dataSignal";
 import { PageHeader, Badge, Button, Input, Select, Field, Card, EmptyState, CenterSpinner, useToast } from "@/components/ui";
 
-// Korean public holidays
-const HOLIDAYS: Record<number, string[]> = {
-  2025: ['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-03-01','2025-05-01','2025-05-05','2025-05-06','2025-06-06','2025-08-15','2025-10-03','2025-10-05','2025-10-06','2025-10-07','2025-10-09','2025-12-25'],
-  2026: ['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02','2026-05-01','2026-05-05','2026-05-24','2026-05-25','2026-06-03','2026-06-06','2026-07-17','2026-08-15','2026-08-17','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-05','2026-10-09','2026-12-25'],
-  2027: ['2027-01-01','2027-02-05','2027-02-06','2027-02-07','2027-03-01','2027-05-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-10-03','2027-10-09','2027-10-14','2027-10-15','2027-10-16','2027-12-25'],
-};
-function isHolidayOrWeekend(dateStr: string): boolean {
-  const d = new Date(dateStr + 'T00:00:00+09:00');
-  const dow = d.getDay();
-  if (dow === 0 || dow === 6) return true;
-  return (HOLIDAYS[d.getFullYear()] || []).includes(dateStr);
-}
+// Korean public holidays + 휴가 기간 → 소정근로일(월~금, 공휴일 제외) 전개
+import { isHolidayOrWeekend, leaveWorkdays } from "@/lib/holidays";
 
 function isHalfLeaveType(t?: string): boolean {
   if (!t) return false;
@@ -64,13 +54,8 @@ export default function AttendanceSummaryRegularPage() {
       const vacations = await getRegularVacations({ status: 'approved' });
       const map: Record<string, { type: string; status: string }> = {};
       for (const v of (vacations || [])) {
-        const start = new Date(v.start_date + 'T00:00:00+09:00');
-        const end = new Date(v.end_date + 'T00:00:00+09:00');
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          const dateStr = `${y}-${m}-${day}`;
+        // 주말·공휴일은 휴가 기간 안에 있어도 연차 일수/유급 8h 로 보지 않음
+        for (const dateStr of leaveWorkdays(v.start_date, v.end_date)) {
           map[`${v.employee_name}|${dateStr}`] = { type: v.type || '연차', status: 'approved' };
         }
       }

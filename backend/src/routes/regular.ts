@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend, normalizePhone, getRegularUrl, getFrontendUrl } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend, leaveWorkdays, eachDateInRange, normalizePhone, getRegularUrl, getFrontendUrl } from '../db';
 import { AuthRequest } from '../middleware/auth';
 import { sendGeneralSms } from '../services/smsService';
 import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
@@ -664,12 +664,23 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
     const isPublicLeave = reqType.includes('공가'); // 공가/오전공가/오후공가
     const isFullDay = reqType === '연차' || reqType === '공가';
 
+    // 종일 휴가 일수 = 기간 중 소정근로일(월~금, 공휴일 제외) 수. 주말·공휴일은 차감하지 않는다.
+    // (구버전 신청 화면은 달력일수를 보냈으므로 승인 시점에 재산정해 저장)
+    let deductDays = Number(request.days) || 0;
+    if (isFullDay) {
+      const wd = leaveWorkdays(request.start_date, request.end_date).length;
+      if (wd > 0 && wd !== deductDays) {
+        deductDays = wd;
+        await dbRun('UPDATE regular_vacation_requests SET days = ?, updated_at = NOW() WHERE id = ?', wd, id);
+      }
+    }
+
     // Update used_days in balance — 공가는 연차 잔여에서 차감하지 않음
     if (!isPublicLeave) {
       const year = parseInt(request.start_date.slice(0, 4));
       const balance = await dbGet('SELECT * FROM regular_vacation_balances WHERE employee_id = ? AND year = ?', request.employee_id, year) as any;
       if (balance) {
-        await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', request.days, balance.id);
+        await dbRun('UPDATE regular_vacation_balances SET used_days = used_days + ?, updated_at = NOW() WHERE id = ?', deductDays, balance.id);
       }
     }
 
@@ -677,11 +688,8 @@ router.put('/vacations/:id/approve', async (req: AuthRequest, res: Response) => 
     if (isFullDay) {
       const emp = await dbGet('SELECT name, phone, department FROM regular_employees WHERE id = ?', request.employee_id) as any;
       if (emp) {
-        const start = new Date(request.start_date + 'T00:00:00+09:00');
-        const end = new Date(request.end_date + 'T00:00:00+09:00');
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-          if (isHolidayOrWeekend(dateStr)) continue;
+        // TZ-safe 순회 (UTC 서버에서 하루 앞당겨 기록되던 버그 수정)
+        for (const dateStr of leaveWorkdays(request.start_date, request.end_date)) {
           const ym = dateStr.slice(0, 7);
           try {
             await dbRun(`
@@ -736,10 +744,7 @@ router.put('/vacations/:id/reject', async (req: AuthRequest, res: Response) => {
       if (isFullDay) {
         const emp = await dbGet('SELECT name FROM regular_employees WHERE id = ?', request.employee_id) as any;
         if (emp) {
-          const start = new Date(request.start_date + 'T00:00:00+09:00');
-          const end = new Date(request.end_date + 'T00:00:00+09:00');
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          for (const dateStr of eachDateInRange(request.start_date, request.end_date)) {
             try {
               await dbRun(
                 `DELETE FROM confirmed_attendance WHERE employee_type = '정규직' AND employee_name = ? AND date = ? AND source = 'vacation'`,
@@ -2611,13 +2616,11 @@ router.get('/payroll-calc', async (req: AuthRequest, res: Response) => {
 
     for (const vac of approvedVacations) {
       // Iterate each calendar day in the vacation that falls within the payroll month
-      const vacStart = new Date(Math.max(new Date(vac.start_date).getTime(), new Date(monthStart).getTime()));
-      const vacEnd = new Date(Math.min(new Date(vac.end_date).getTime(), new Date(monthEnd).getTime()));
+      const vacStart = vac.start_date > monthStart ? vac.start_date : monthStart;
+      const vacEnd = vac.end_date < monthEnd ? vac.end_date : monthEnd;
       const vacKey = norm(vac.employee_phone) || vac.employee_name;
-      for (let d = new Date(vacStart); d <= vacEnd; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().slice(0, 10);
-        // Skip weekends and holidays — vacation on those days doesn't need to count as worked
-        if (isHolidayOrWeekend(dateStr)) continue;
+      // 주말·공휴일은 휴가 기간 안이어도 유급 8h 인정 대상 아님 (leaveWorkdays 가 제외)
+      for (const dateStr of leaveWorkdays(vacStart, vacEnd)) {
         // Skip dates that already have a confirmed attendance record (match by phone if possible)
         const alreadyCounted = allRecords.some((r: any) => keyFor(r) === vacKey && r.date === dateStr);
         if (alreadyCounted) continue;

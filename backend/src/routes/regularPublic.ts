@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, getBusinessDate, normalizePhone, getFrontendUrl } from '../db';
+import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, getBusinessDate, normalizePhone, getFrontendUrl, leaveWorkdays } from '../db';
 import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 import { uploadBase64, getSignedUrl, isStorageEnabled, shouldUseStorage } from '../services/fileStorage';
@@ -101,10 +101,10 @@ router.get('/_health', async (_req: Request, res: Response) => {
 router.post('/:token/vacation', async (req: Request, res: Response) => {
   try {
     const token = req.params.token as string;
-    const { start_date, end_date, days, reason, type } = req.body;
+    const { start_date, end_date, reason, type } = req.body;
 
-    if (!start_date || !end_date || !days) {
-      res.status(400).json({ error: '휴가 시작일, 종료일, 일수는 필수입니다.' });
+    if (!start_date || !end_date) {
+      res.status(400).json({ error: '휴가 시작일, 종료일은 필수입니다.' });
       return;
     }
 
@@ -117,6 +117,27 @@ router.post('/:token/vacation', async (req: Request, res: Response) => {
     const reqType = type || '연차';
     // 공가(민방위/예비군/투표 등 법정 유급 공가)는 연차 잔여에서 차감하지 않음 → 잔여 검증 생략
     const isPublicLeave = reqType.includes('공가');
+    const isHalfType = reqType.startsWith('오전') || reqType.startsWith('오후');
+
+    // 일수는 서버에서 산정 — 주말·공휴일은 휴가 기간 안에 있어도 연차 일수에서 제외 (소정근로일 기준)
+    let days: number;
+    if (isHalfType) {
+      if (leaveWorkdays(start_date, start_date).length === 0) {
+        res.status(400).json({ error: '주말·공휴일에는 반차를 신청할 수 없습니다.' });
+        return;
+      }
+      days = 0.5;
+    } else {
+      if (end_date < start_date) {
+        res.status(400).json({ error: '종료일이 시작일보다 빠릅니다.' });
+        return;
+      }
+      days = leaveWorkdays(start_date, end_date).length;
+      if (days === 0) {
+        res.status(400).json({ error: '선택한 기간이 모두 주말·공휴일입니다. (주말·공휴일은 연차 차감 대상이 아닙니다)' });
+        return;
+      }
+    }
 
     if (!isPublicLeave) {
       // Check remaining balance (연차/반차만)
@@ -131,7 +152,7 @@ router.post('/:token/vacation', async (req: Request, res: Response) => {
       ) as any;
       const pendingDays = parseFloat(pendingResult?.pending_days || 0);
 
-      if (parseFloat(days) > (remaining - pendingDays)) {
+      if (days > (remaining - pendingDays)) {
         res.status(400).json({ error: `잔여 휴가가 부족합니다. (잔여: ${remaining - pendingDays}일)` });
         return;
       }

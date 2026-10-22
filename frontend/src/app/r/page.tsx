@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { leaveWorkdays } from "@/lib/holidays";
 import {
   MapPin,
   Clock,
@@ -731,10 +732,8 @@ function RegularContent() {
       setVacEndDate(vacStartDate);
       setVacDays("0.5");
     } else if (vacStartDate && vacEndDate) {
-      const start = new Date(vacStartDate);
-      const end = new Date(vacEndDate);
-      const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      if (diff > 0) setVacDays(String(diff));
+      // 주말·공휴일은 연차 일수에서 제외 (소정근로일 = 월~금, 공휴일 제외). 서버도 동일 기준으로 재산정.
+      setVacDays(String(leaveWorkdays(vacStartDate, vacEndDate).length));
     }
   }, [vacStartDate, vacEndDate, vacType]);
 
@@ -2013,9 +2012,11 @@ function RegularContent() {
                       </div>
                       <div>
                         <label className="block text-[var(--fs-body)] font-medium text-[var(--text-2)] mb-1">{isFullDay ? '일수' : '사용 일수'}</label>
-                        <input type="number" step="0.5" min="0.5" value={vacDays} readOnly={!isFullDay}
-                          onChange={(e) => setVacDays(e.target.value)}
-                          className={`w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] focus:outline-none focus:border-[var(--brand-500)] tabular ${!isFullDay ? 'bg-[var(--bg-0)]' : 'bg-[var(--bg-2)]'}`} />
+                        <input type="number" step="0.5" min="0" value={vacDays} readOnly
+                          className="w-full px-3 py-2.5 border border-[var(--border-2)] rounded-[var(--r-md)] text-[var(--fs-base)] text-[var(--text-1)] focus:outline-none tabular bg-[var(--bg-0)]" />
+                        {isFullDay && (
+                          <p className="mt-1 text-[var(--fs-caption)] text-[var(--text-3)]">주말·공휴일은 제외하고 계산됩니다 (Weekends/holidays not counted)</p>
+                        )}
                       </div>
                     </>
                   );

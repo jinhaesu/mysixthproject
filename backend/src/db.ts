@@ -2683,6 +2683,30 @@ export function isHolidayOrWeekend(dateStr: string): boolean {
   return holidays.includes(dateStr);
 }
 
+/**
+ * YYYY-MM-DD 범위의 각 날짜(양끝 포함)를 서버 TZ 와 무관하게 나열.
+ * (Cloud Run 은 UTC — `new Date('…T00:00:00+09:00').getDate()` 식 순회는 하루씩 밀린다.)
+ */
+export function eachDateInRange(startStr: string, endStr: string): string[] {
+  const s = String(startStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const e = String(endStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!s || !e) return [];
+  const out: string[] = [];
+  const endT = Date.UTC(+e[1], +e[2] - 1, +e[3]);
+  for (let t = Date.UTC(+s[1], +s[2] - 1, +s[3]); t <= endT && out.length < 400; t += 86400000) {
+    out.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+/**
+ * 휴가 기간 중 연차로 차감·인정되는 날짜 = 소정근로일(월~금, 공휴일 제외).
+ * 주말·공휴일은 휴가 기간 안에 있어도 연차 일수/유급 8h 에 포함하지 않는다.
+ */
+export function leaveWorkdays(startStr: string, endStr: string): string[] {
+  return eachDateInRange(startStr, endStr).filter(d => !isHolidayOrWeekend(d));
+}
+
 export function isKoreanHoliday(dateStr: string): boolean {
   const year = parseInt(dateStr.slice(0, 4));
   const holidays = KOREAN_HOLIDAYS[year] || [];

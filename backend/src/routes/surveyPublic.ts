@@ -4,6 +4,8 @@ import { isWithinRadius, calculateDistance } from '../services/gpsService';
 import { sendGeneralSms } from '../services/smsService';
 import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
 import { stampInline } from '../lib/tsa';
+import { linkSig, reportLinkPurpose, contractLinkPurpose } from '../lib/secrets';
+import { linkOrRoleAllowed } from '../middleware/auth';
 
 const router = Router();
 
@@ -77,7 +79,7 @@ router.post('/:token/contract', async (req: Request, res: Response) => {
     await stampInline('alba', contractId, contractHash);
 
     // Send contract confirmation SMS to worker
-    const contractLink = getFrontendUrl(`/contract?id=${contractId}`);
+    const contractLink = getFrontendUrl(`/contract?id=${contractId}&sig=${linkSig(contractLinkPurpose(contractId))}`);
     const message = `[조인앤조인 근로계약서]\n${worker_name}님의 단시간 근로자 표준근로계약서가 체결되었습니다.\n계약기간: ${startDate} ~ ${endDate}\n\n계약서 확인: ${contractLink}`;
     const smsResult = await sendGeneralSms(request.phone, message);
 
@@ -114,7 +116,16 @@ router.get('/:token/contract', async (req: Request, res: Response) => {
 router.get('/contract/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const contract = await dbGet('SELECT * FROM labor_contracts WHERE id = ?', id) as any;
+    // 2026-10-24: 순번 id 만으로 남의 계약서(주민번호·주소·서명)를 열람하던 구멍 차단.
+    // 문자 링크의 서명(sig) 또는 급여·개인정보 권한 로그인 토큰이 있어야 한다.
+    if (!/^\d+$/.test(String(id)) || !linkOrRoleAllowed(req, contractLinkPurpose(String(id)), 'sensitive')) {
+      res.status(403).json({ error: '링크가 유효하지 않거나 만료되었습니다. 담당자에게 계약서 링크 재발송을 요청해주세요.' });
+      return;
+    }
+    const contract = await dbGet(
+      `SELECT id, worker_name, worker_type, contract_start, contract_end, address, phone,
+              signature_data, created_at, store_name, work_time_start, work_time_end, work_days, hourly_rate, status
+         FROM labor_contracts WHERE id = ?`, id) as any;
     if (!contract) {
       res.status(404).json({ error: '계약서를 찾을 수 없습니다.' });
       return;
@@ -455,6 +466,11 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
 router.get('/dashboard-report/:date', async (req: Request, res: Response) => {
   try {
     const { date } = req.params;
+    // 2026-10-24: 날짜만 알면 전 근무자 이름·전화번호가 보이던 구멍 차단 — 문자 링크 서명 또는 로그인 필요.
+    if (!linkOrRoleAllowed(req, reportLinkPurpose('survey', String(date)), 'basic')) {
+      res.status(403).json({ error: '링크가 유효하지 않습니다. 최신 현황 문자의 링크로 다시 열어주세요.' });
+      return;
+    }
 
     const byWorkplace = await dbAll(`
       SELECT sw.id as workplace_id, sw.name as workplace_name,

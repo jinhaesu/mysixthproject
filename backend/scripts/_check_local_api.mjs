@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'attendance-management-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET; if (!JWT_SECRET) { console.error('JWT_SECRET env 필요'); process.exit(1); }
 const token = jwt.sign({ type: 'auth', id: 1, email: 'ceo@joinandjoin.com', role: 'admin', name: 'CEO' }, JWT_SECRET, { expiresIn: '10m' });
 
 const API = 'http://localhost:3099';

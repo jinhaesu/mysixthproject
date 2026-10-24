@@ -1,4 +1,5 @@
 import { dbAll, dbRun, dbGet, getKSTDate, getFrontendUrl } from '../db';
+import { linkSig, reportLinkPurpose } from '../lib/secrets';
 import { sendSurveyMessage, sendGeneralSms } from './smsService';
 import { Resend } from 'resend';
 
@@ -124,7 +125,7 @@ async function checkAndSendReports() {
 
       if (!stats || stats.total === 0) continue;
 
-      const detailLink = getFrontendUrl(`/report?date=${today}`);
+      const detailLink = getFrontendUrl(`/report?date=${today}&sig=${linkSig(reportLinkPurpose('survey', today))}`);
       const message = `[조인앤조인 알바/파견 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats.total}명\n출근완료: ${stats.clocked_in || 0}명\n미출근: ${stats.not_clocked_in || 0}명\n퇴근완료: ${stats.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
       const phones = JSON.parse(schedule.phones);
@@ -240,7 +241,7 @@ async function checkAndSendRegularReports() {
 
       if (!stats || stats.total === 0) continue;
 
-      const detailLink = getFrontendUrl(`/report-regular?date=${today}`);
+      const detailLink = getFrontendUrl(`/report-regular?date=${today}&sig=${linkSig(reportLinkPurpose('regular', today))}`);
       const message = `[조인앤조인 정규직 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats.total}명\n출근중: ${stats.clocked_in || 0}명\n미출근: ${stats.not_clocked_in || 0}명\n퇴근완료: ${stats.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
       const phones = JSON.parse(schedule.phones);

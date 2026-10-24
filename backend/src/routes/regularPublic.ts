@@ -11,6 +11,8 @@ import { stampInline } from '../lib/tsa';
 import { buildRegularCafeContractPage, STAMP_KEYS, type StampKey } from '../templates/regular-cafe-contract';
 import { COMPANY_STAMP_DATA_URL } from '../assets/companyStamp';
 import { autoEmployerSign } from '../lib/autoEmployerSign';
+import { reportLinkPurpose } from '../lib/secrets';
+import { linkOrRoleAllowed } from '../middleware/auth';
 
 const router = Router();
 
@@ -1212,6 +1214,11 @@ router.post('/:token/clock-out', async (req: Request, res: Response) => {
 router.get('/dashboard-report/:date', async (req: Request, res: Response) => {
   try {
     const { date } = req.params;
+    // 2026-10-24: 날짜만 알면 정규직 전원 이름·전화·휴가가 보이던 구멍 차단 — 문자 링크 서명 또는 로그인 필요.
+    if (!linkOrRoleAllowed(req, reportLinkPurpose('regular', String(date)), 'basic')) {
+      res.status(403).json({ error: '링크가 유효하지 않습니다. 최신 현황 문자의 링크로 다시 열어주세요.' });
+      return;
+    }
 
     const workers = await dbAll(`
       SELECT re.id, re.phone, re.name, re.department, re.team, re.role,

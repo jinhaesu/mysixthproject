@@ -2,14 +2,24 @@ import { Express, Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
 import { dbAll, dbGet, dbRun } from '../db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'attendance-management-secret-key';
-const MCP_API_KEY = process.env.MCP_API_KEY || 'joinandjoin-mcp-2026';
+import crypto from 'crypto';
+import { getMcpApiKey } from '../lib/secrets';
+import { resolveAuthToken, roleAllows } from '../middleware/auth';
 
+// 2026-10-24: 공개 기본키('joinandjoin-mcp-2026') 폴백 제거. MCP_API_KEY env 가 없으면 키 접속은 꺼진다.
+// MCP 도구에 급여 조회·수정이 있으므로 토큰 접속도 급여·개인정보 권한(sensitive) 역할만 허용.
 function verifyToken(token: string): boolean {
-  try { return (jwt.verify(token, JWT_SECRET) as any).type === 'auth'; } catch { return false; }
+  const r = resolveAuthToken(token);
+  return !!r && roleAllows(r.role, 'sensitive', 'GET');
+}
+
+function keyMatches(given: unknown): boolean {
+  const expected = getMcpApiKey();
+  if (!expected || typeof given !== 'string' || !given) return false;
+  const a = Buffer.from(expected), b = Buffer.from(given);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 async function verifyPassword(pw: string): Promise<boolean> {
@@ -203,7 +213,7 @@ export function setupMcpRoutes(app: Express) {
   app.get('/mcp/sse', async (req: Request, res: Response) => {
     const key = (req.query.key as string) || req.headers['x-api-key'] as string;
     const token = (req.query.token as string) || req.headers.authorization?.replace('Bearer ', '');
-    if (key !== MCP_API_KEY && (!token || !verifyToken(token))) { res.status(401).json({ error: 'Unauthorized' }); return; }
+    if (!keyMatches(key) && (!token || !verifyToken(token))) { res.status(401).json({ error: 'Unauthorized' }); return; }
     const transport = new SSEServerTransport('/mcp/messages', res);
     transports[transport.sessionId] = transport;
     const server = createMcpServer();

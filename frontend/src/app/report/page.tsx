@@ -29,6 +29,7 @@ function formatPlannedTime(time: string | null): string {
 
 function ReportContent() {
   const searchParams = useSearchParams();
+  const sig = searchParams.get("sig") || "";
   const initialDate = searchParams.get("date") || new Date().toLocaleDateString('sv-SE');
   const [dateParam, setDateParam] = useState(initialDate);
   const [data, setData] = useState<any>(null);
@@ -40,7 +41,15 @@ function ReportContent() {
   const load = useCallback(async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
-      const res = await fetch(`${API_URL}/api/survey-public/dashboard-report/${dateParam}`);
+      // 문자 링크 서명(sig, 해당 날짜 전용) 또는 로그인 토큰으로 인증
+      const authToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch(`${API_URL}/api/survey-public/dashboard-report/${dateParam}${sig ? `?sig=${encodeURIComponent(sig)}` : ""}`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
+      if (res.status === 403) {
+        setData({ __forbidden: true });
+        return;
+      }
       const json = await res.json();
       setData(json);
       const now = new Date();
@@ -49,7 +58,7 @@ function ReportContent() {
     } finally {
       setLoading(false);
     }
-  }, [dateParam]);
+  }, [dateParam, sig]);
 
   useEffect(() => {
     load();
@@ -60,6 +69,15 @@ function ReportContent() {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">
       <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-400)]" />
+    </div>
+  );
+
+  if (data && data.__forbidden) return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)] p-4">
+      <div className="text-center">
+        <p className="text-[var(--fs-lg)] font-semibold text-[var(--text-2)]">링크가 유효하지 않습니다</p>
+        <p className="text-[var(--fs-body)] text-[var(--text-3)] mt-1">문자로 받은 최신 링크로 열거나, 시스템에 로그인한 뒤 다시 열어주세요. (링크는 해당 날짜만 볼 수 있습니다)</p>
+      </div>
     </div>
   );
 

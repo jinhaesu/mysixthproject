@@ -3,10 +3,13 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { Resend } from 'resend';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { getJwtSecret } from '../lib/secrets';
+import { resolveAuthToken, Role } from '../middleware/auth';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'attendance-management-secret-key';
+// 폴백 상수 제거 — env 없으면 기동 실패 (lib/secrets.ts)
+const JWT_SECRET = getJwtSecret();
 
 // ============================================================================
 // 회사 계정 SSO (중앙 인증 허브) — 기존 OTP 로그인과 완전히 독립적으로 동작(ADDITIVE).
@@ -289,43 +292,38 @@ router.get('/me', (req: Request, res: Response) => {
     res.status(401).json({ error: '인증이 필요합니다.' });
     return;
   }
-
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    if (decoded.type !== 'auth') {
-      res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
-      return;
-    }
-    res.json({ user: { email: decoded.email } });
-  } catch {
+  const resolved = resolveAuthToken(authHeader.split(' ')[1]);
+  if (!resolved) {
     res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+    return;
   }
+  res.json({ user: { email: resolved.email, role: resolved.role } });
 });
 
-// POST /api/auth/mcp-token - Generate long-lived token for MCP integration
+// POST /api/auth/mcp-token - MCP 연동용 장기 토큰 (관리자 전용, 90일)
+// 예전: 로그인만 하면 누구나 1년짜리 토큰을 발급받아, 허브에서 권한을 회수해도 계속 접근할 수 있었다.
 router.post('/mcp-token', (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     res.status(401).json({ error: '인증이 필요합니다.' });
     return;
   }
-  try {
-    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET) as any;
-    if (decoded.type !== 'auth') {
-      res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
-      return;
-    }
-    // Generate 1-year token for MCP
-    const mcpToken = jwt.sign(
-      { email: decoded.email, type: 'auth', mcp: true },
-      JWT_SECRET,
-      { expiresIn: '365d' }
-    );
-    res.json({ token: mcpToken, expires: '365 days' });
-  } catch {
+  const resolved = resolveAuthToken(authHeader.split(' ')[1]);
+  if (!resolved) {
     res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+    return;
   }
+  if (resolved.role !== 'admin') {
+    res.status(403).json({ error: '시스템 관리자만 MCP 토큰을 발급할 수 있습니다.' });
+    return;
+  }
+  const mcpToken = jwt.sign(
+    { email: resolved.email, type: 'auth', mcp: true, role: 'admin' },
+    JWT_SECRET,
+    { expiresIn: '90d' }
+  );
+  console.log(`[auth.mcp-token] issued email=${resolved.email}`);
+  res.json({ token: mcpToken, expires: '90 days' });
 });
 
 // POST /api/auth/sso - 회사 계정 SSO 로그인 (허브 발급 RS256 JWT 검증)
@@ -359,7 +357,8 @@ router.post('/sso', async (req: Request, res: Response) => {
     // 접근 권한 게이트 — 허브 관리자 콘솔에서 aisystem 'access' 메뉴 권한을 부여받은
     // 사용자(레벨 무관) 또는 super-admin(super===true)만 진입 허용. 그 외에는 403 으로 차단.
     const isSuper = payload.super === true;
-    const hasAccess = !!(payload.perms && payload.perms.access);
+    const accessLevel = payload.perms && typeof payload.perms.access === 'string' ? payload.perms.access : '';
+    const hasAccess = !!accessLevel && accessLevel !== 'none';
     if (!isSuper && !hasAccess) {
       console.warn(`[auth.sso] DENY email=${email} (aisystem access 권한 없음)`);
       res.status(403).json({ error: '이 시스템에 대한 접근 권한이 없습니다. 관리자에게 문의하세요.' });
@@ -368,16 +367,20 @@ router.post('/sso', async (req: Request, res: Response) => {
 
     // 이 백엔드는 stateless (user 테이블 없음) — OTP verify 와 동일하게 자체 auth 토큰 재발급.
     // type:'auth' 필수 (requireAuth / /me 가 이 값을 검사).
+    // 역할 — 허브 '전체 접근' 레벨을 앱 역할로 매핑 (middleware/auth.ts 참고).
+    // admin(슈퍼/admin) = 전체, manager(edit) = 급여·개인정보 포함 업무 전체(관리 유지보수 제외),
+    // viewer(view) = 일반 화면 조회만.
+    const role: Role = isSuper || accessLevel === 'admin' ? 'admin' : accessLevel === 'view' ? 'viewer' : 'manager';
     const appToken = jwt.sign(
-      { email, type: 'auth' },
+      { email, type: 'auth', role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    console.log(`[auth.sso] OK email=${email}`);
+    console.log(`[auth.sso] OK email=${email} role=${role}`);
     res.json({
       token: appToken,
-      user: { email },
+      user: { email, role },
     });
   } catch (error: any) {
     console.error('SSO error:', error);

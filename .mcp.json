@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "attendance": {
-      "url": "https://mysixthproject-production.up.railway.app/mcp/sse?key=joinandjoin-mcp-2026"
+      "url": "https://mysixthproject-557811875995.asia-northeast3.run.app/mcp/sse?key=${AISYSTEM_MCP_KEY}"
     }
   }
 }

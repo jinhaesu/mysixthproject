@@ -12,7 +12,7 @@ import express from "express";
 import { z } from "zod";
 
 const BACKEND_URL = process.env.ATTENDANCE_API_URL || process.env.BACKEND_URL || "https://mysixthproject-production.up.railway.app";
-const MCP_API_KEY = process.env.MCP_API_KEY || "joinandjoin-mcp-2026";
+const MCP_API_KEY = process.env.MCP_API_KEY; if (!MCP_API_KEY || MCP_API_KEY.length < 24) { console.error("MCP_API_KEY env(24자 이상) 필요 — 공개 기본키 폴백 제거됨"); process.exit(1); }
 const PORT = parseInt(process.env.MCP_PORT || process.env.PORT || "3001");
 
 // API helper - uses the requesting user's token or a default service token

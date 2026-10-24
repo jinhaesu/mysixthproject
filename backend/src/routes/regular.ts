@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { dbGet, dbAll, dbRun, getKSTDate, getKSTTimestamp, isHolidayOrWeekend, leaveWorkdays, eachDateInRange, normalizePhone, getRegularUrl, getFrontendUrl } from '../db';
 import { AuthRequest } from '../middleware/auth';
+import { linkSig, reportLinkPurpose } from '../lib/secrets';
 import { sendGeneralSms } from '../services/smsService';
 import { logAudit, clientIp, userAgent, sha256, canonicalizeContract, renderSnapshotHtml } from '../lib/contractAudit';
 import { stampInline } from '../lib/tsa';
@@ -607,7 +608,7 @@ router.post('/report-schedules/:id/send-now', async (req: AuthRequest, res: Resp
       WHERE re.is_active = 1
     `, today) as any;
 
-    const detailLink = getFrontendUrl(`/report-regular?date=${today}`);
+    const detailLink = getFrontendUrl(`/report-regular?date=${today}&sig=${linkSig(reportLinkPurpose('regular', today))}`);
     const message = `[조인앤조인 정규직 출퇴근 현황]\n${today} ${currentTime} 기준\n\n전체: ${stats?.total || 0}명\n출근중: ${stats?.clocked_in || 0}명\n미출근: ${stats?.not_clocked_in || 0}명\n퇴근완료: ${stats?.completed || 0}명\n\n상세 현황: ${detailLink}`;
 
     const phones = JSON.parse(schedule.phones);

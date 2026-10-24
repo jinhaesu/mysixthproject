@@ -8,6 +8,7 @@ import { AlertTriangle } from "lucide-react";
 function ContractContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
+  const sig = searchParams.get("sig") || "";
   const [contract, setContract] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -15,12 +16,20 @@ function ContractContent() {
   useEffect(() => {
     if (!id) { setError("유효하지 않은 링크입니다."); setLoading(false); return; }
     const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
-    fetch(`${API_URL}/api/survey-public/contract/${id}`)
-      .then(res => { if (!res.ok) throw new Error("계약서를 찾을 수 없습니다."); return res.json(); })
+    // 문자 링크의 서명(sig) 또는 로그인 토큰(관리자 화면에서 연 경우)으로 인증
+    const authToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    fetch(`${API_URL}/api/survey-public/contract/${id}${sig ? `?sig=${encodeURIComponent(sig)}` : ""}`, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+    })
+      .then(res => {
+        if (res.status === 403) throw new Error("링크가 유효하지 않거나 만료되었습니다. 담당자에게 계약서 링크 재발송을 요청해주세요.");
+        if (!res.ok) throw new Error("계약서를 찾을 수 없습니다.");
+        return res.json();
+      })
       .then(data => setContract(data))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, sig]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg-canvas)]">

@@ -42,8 +42,12 @@ import contractorRoutes from './routes/contractor';
 import policyManagerRoutes from './routes/policyManager';
 import policyPublicRoutes from './routes/policyPublic';
 import settlementAlbaRoutes from './routes/settlementAlba';
-import { requireAuth } from './middleware/auth';
+import { requireAuth, requireTier, classifyRegular, classifySurvey } from './middleware/auth';
+import { getJwtSecret } from './lib/secrets';
 // reminderService 는 worker 프로세스 전용 — 여기선 import 안 함.
+
+// 시크릿 검증 — JWT_SECRET 이 없거나 공개 기본값이면 여기서 즉시 종료(fail-closed).
+getJwtSecret();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -87,67 +91,67 @@ app.use((req, _res, next) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/upload', requireAuth, uploadRoutes);
-app.use('/api/attendance', requireAuth, attendanceRoutes);
-app.use('/api/org-chart', requireAuth, orgChartRoutes);
-app.use('/api/workforce-plan', requireAuth, workforcePlanRoutes);
-app.use('/api/survey', requireAuth, surveyRoutes);
+app.use('/api/upload', requireAuth, requireTier('basic'), uploadRoutes);
+app.use('/api/attendance', requireAuth, requireTier('basic'), attendanceRoutes);
+app.use('/api/org-chart', requireAuth, requireTier('basic'), orgChartRoutes);
+app.use('/api/workforce-plan', requireAuth, requireTier('basic'), workforcePlanRoutes);
+app.use('/api/survey', requireAuth, requireTier(classifySurvey), surveyRoutes);
 app.use('/api/survey-public', surveyPublicRoutes);
-app.use('/api/payroll', requireAuth, payrollRoutes);
-app.use('/api/workers', requireAuth, workersRoutes);
-app.use('/api/regular', requireAuth, regularRoutes);
+app.use('/api/payroll', requireAuth, requireTier('sensitive'), payrollRoutes);
+app.use('/api/workers', requireAuth, requireTier('sensitive'), workersRoutes);  // 시급·계좌·주민번호
+app.use('/api/regular', requireAuth, requireTier(classifyRegular), regularRoutes);
 app.use('/api/regular-public', regularPublicRoutes);
-app.use('/api/dashboard', requireAuth, dashboardRoutes);
-app.use('/api/contracts', requireAuth, contractsRoutes);
-app.use('/api/offboarding', requireAuth, offboardingRoutes);
+app.use('/api/dashboard', requireAuth, requireTier('basic'), dashboardRoutes);
+app.use('/api/contracts', requireAuth, requireTier('sensitive'), contractsRoutes);
+app.use('/api/offboarding', requireAuth, requireTier('sensitive'), offboardingRoutes);
 app.use('/api/offboarding-public', offboardingPublicRoutes);  // no auth
-app.use('/api/onboarding', requireAuth, onboardingRoutes);
-app.use('/api/cafe-contract', requireAuth, cafeContractRoutes);
+app.use('/api/onboarding', requireAuth, requireTier('sensitive'), onboardingRoutes);
+app.use('/api/cafe-contract', requireAuth, requireTier('sensitive'), cafeContractRoutes);
 app.use('/api/cafe-contract-public', cafeContractPublicRoutes);  // no auth
 
 // 안전보건 시스템 P1 — 근로자 문자 웹링크 재활용 (safetyPublic은 /api/regular-public 하위에 마운트)
 app.use('/api/regular-public', safetyPublicRoutes);  // no auth
 // 안전보건 P2 — 근로자 아차사고·위험요인 신고 (동일하게 regular-public 하위)
 app.use('/api/regular-public', safetyHazardPublicRoutes);  // no auth
-app.use('/api/safety-manager', requireAuth, safetyManagerRoutes);
+app.use('/api/safety-manager', requireAuth, requireTier('basic'), safetyManagerRoutes);
 
 // 보건 P3 — 근로자 보건증/건강진단 (regular-public 하위, no auth)
 app.use('/api/regular-public', healthPublicRoutes);  // no auth
-app.use('/api/health-manager', requireAuth, healthManagerRoutes);
+app.use('/api/health-manager', requireAuth, requireTier('basic'), healthManagerRoutes);
 
 // 안전보건 P4 — 반기 정기교육 + 근골격계·의견 설문
 app.use('/api/regular-public', trainingPublicRoutes);  // no auth
 // P4 관리자 API — /training-master, /training-status, /survey-status
 // safety-manager 하위에 마운트 (Sidebar 안전관리자 점검 그룹에 편입)
-app.use('/api/safety-manager', requireAuth, trainingManagerRoutes);
-app.use('/api/admin', requireAuth, trainingManagerRoutes);
+app.use('/api/safety-manager', requireAuth, requireTier('basic'), trainingManagerRoutes);
+app.use('/api/admin', requireAuth, requireTier('basic'), trainingManagerRoutes);
 
 // 안전보건 P5 — 위험성평가 + LOTO + 산업재해 + 산업안전보건위원회
-app.use('/api/safety-manager', requireAuth, safetyGovernanceRoutes);
+app.use('/api/safety-manager', requireAuth, requireTier('basic'), safetyGovernanceRoutes);
 
 // 안전보건 P6 — 대표이사 대시보드 + 중처법 반기 이행점검 + 겸직 관리자 시간 결산
-app.use('/api/ceo', requireAuth, ceoRoutes);
+app.use('/api/ceo', requireAuth, requireTier('basic'), ceoRoutes);
 
 // 안전보건 P7B — 안전보건 조직도·선임계 (§4-2 + §4-6)
-app.use('/api/safety-org', requireAuth, safetyOrgRoutes);
+app.use('/api/safety-org', requireAuth, requireTier('basic'), safetyOrgRoutes);
 
 // 안전보건 P7C — 예산 편성·집행 (§4-4)
-app.use('/api/safety-budget', requireAuth, safetyBudgetRoutes);
+app.use('/api/safety-budget', requireAuth, requireTier('basic'), safetyBudgetRoutes);
 
 // 안전보건 P7D — 매뉴얼·훈련·도급업체 관리 (§4-8, §4-9)
-app.use('/api/emergency-manual', requireAuth, emergencyManualRoutes);
-app.use('/api/emergency-drill', requireAuth, emergencyDrillRoutes);
-app.use('/api/contractor', requireAuth, contractorRoutes);
+app.use('/api/emergency-manual', requireAuth, requireTier('basic'), emergencyManualRoutes);
+app.use('/api/emergency-drill', requireAuth, requireTier('basic'), emergencyDrillRoutes);
+app.use('/api/contractor', requireAuth, requireTier('basic'), contractorRoutes);
 
 // 안전보건 P7A — 방침·규정 문서 관리 (§4-1)
-app.use('/api/policy-manager', requireAuth, policyManagerRoutes);
+app.use('/api/policy-manager', requireAuth, requireTier('basic'), policyManagerRoutes);
 app.use('/api/regular-public', policyPublicRoutes);  // no auth (근로자 token)
 // 취업규칙 공개 조회용 별칭 마운트 — GET /api/policy-public/rulebook(/history) 는
 // 토큰이 필요 없는 전사 공개 문서이므로 policyPublicRoutes 를 이 접두사로도 노출한다.
 app.use('/api/policy-public', policyPublicRoutes);  // no auth
 
 // 알바(사업소득) 정산 서버 영속 + 월 마감
-app.use('/api/settlement', requireAuth, settlementAlbaRoutes);
+app.use('/api/settlement', requireAuth, requireTier('sensitive'), settlementAlbaRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

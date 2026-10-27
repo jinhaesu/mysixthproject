@@ -2,14 +2,20 @@ import { Express, Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
-import { dbAll, dbGet, dbRun } from '../db';
+import { dbAll, dbGet } from '../db';
 
 import crypto from 'crypto';
 import { getMcpApiKey } from '../lib/secrets';
 import { resolveAuthToken, roleAllows } from '../middleware/auth';
 
 // 2026-10-24: 공개 기본키('joinandjoin-mcp-2026') 폴백 제거. MCP_API_KEY env 가 없으면 키 접속은 꺼진다.
-// MCP 도구에 급여 조회·수정이 있으므로 토큰 접속도 급여·개인정보 권한(sensitive) 역할만 허용.
+// MCP 도구에 급여 조회가 있으므로 토큰 접속도 급여·개인정보 권한(sensitive) 역할만 허용.
+//
+// 2026-10-27: MCP 는 조회 전용.
+// - 키 하나로 접속하므로 누가 호출했는지 남지 않는다. 그래서 남의 기록을 바꾸는 도구
+//   (배치 생성·배정, 기본급 수정, 휴가 승인·반려)를 모두 뺐다. 변경은 로그인한 화면에서만 한다.
+// - 휴가 신청 조회의 status 를 SQL 문자열에 이어 붙이던 구멍(SQL 주입)을 막았다.
+// - 급여 조회 비밀번호는 미설정이면 거부(fail-closed), 비교는 시간차가 새지 않게 한다.
 function verifyToken(token: string): boolean {
   const r = resolveAuthToken(token);
   return !!r && roleAllows(r.role, 'sensitive', 'GET');
@@ -22,15 +28,44 @@ function keyMatches(given: unknown): boolean {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-async function verifyPassword(pw: string): Promise<boolean> {
-  const setting = await dbGet("SELECT value FROM admin_settings WHERE key = 'contract_password'") as any;
-  if (!setting?.value) return true; // 비밀번호 미설정 시 허용
-  return setting.value === pw;
+// MCP 가 실행하는 SQL 은 SELECT 한 문장만 허용한다(쓰기·여러 문장 방어선).
+// 사용자 값은 언제나 ? 바인딩 파라미터로만 넘긴다.
+function readOnly(sql: string): string {
+  if (!/^\s*SELECT\s/i.test(sql) || sql.includes(';')) throw new Error('MCP는 조회 전용입니다.');
+  return sql;
+}
+const q = (sql: string, ...params: any[]) => dbAll(readOnly(sql), ...params);
+const q1 = (sql: string, ...params: any[]) => dbGet(readOnly(sql), ...params);
+
+// regular_vacation_requests.status 에 쓰이는 값: 신청=pending, 승인=approved, 반려=rejected.
+const VACATION_STATUSES = ['pending', 'approved', 'rejected'] as const;
+
+// 급여 조회 비밀번호(admin_settings.contract_password) 비교.
+// 저장값이 없거나 공백뿐이면 무조건 불일치. 두 값을 SHA-256(항상 32바이트)으로 바꿔
+// timingSafeEqual 로 비교하므로 길이도 내용도 응답 시간으로 새지 않는다.
+export function passwordMatches(stored: unknown, given: unknown): boolean {
+  if (typeof stored !== 'string' || stored.trim() === '') return false;
+  if (typeof given !== 'string' || given === '') return false;
+  const a = crypto.createHash('sha256').update(stored, 'utf8').digest();
+  const b = crypto.createHash('sha256').update(given, 'utf8').digest();
+  return crypto.timingSafeEqual(a, b);
 }
 
+// 예전에는 비밀번호가 설정 안 돼 있으면 그냥 통과시켰다. 이제는 거부한다(fail-closed).
+type PasswordCheck = 'ok' | 'not_configured' | 'mismatch';
+async function verifyPassword(pw: unknown): Promise<PasswordCheck> {
+  const setting = await q1("SELECT value FROM admin_settings WHERE key = 'contract_password'") as any;
+  const stored = setting?.value;
+  if (typeof stored !== 'string' || stored.trim() === '') return 'not_configured';
+  return passwordMatches(stored, pw) ? 'ok' : 'mismatch';
+}
+const PASSWORD_REFUSAL: Record<Exclude<PasswordCheck, 'ok'>, string> = {
+  not_configured: '❌ 급여 조회 비밀번호가 설정되지 않아 조회할 수 없습니다. 근태 시스템 관리자 설정에서 비밀번호를 먼저 정해 주세요.',
+  mismatch: '❌ 비밀번호 불일치',
+};
+
 function createMcpServer() {
-  const server = new McpServer({ name: 'attendance-system', version: '1.0.0' });
-  const q = dbAll, q1 = dbGet;
+  const server = new McpServer({ name: 'attendance-system', version: '1.1.0' });
 
   // ===== 검색 (간결 응답) =====
   server.tool('search_employees', '직원 검색 (정규직+파견 통합)', { query: z.string(), limit: z.number().optional() }, async ({ query, limit }) => {
@@ -73,9 +108,11 @@ function createMcpServer() {
     return { content: [{ type: 'text' as const, text: `${y}년 ${d.length}명:\n${d.map((b: any) => `${b.name}(${b.department||'-'}) ${(+b.t).toFixed(1)}/${(+b.u).toFixed(1)}/${(+b.t - +b.u).toFixed(1)}일`).join('\n')}\n(보유/사용/잔여)` }] };
   });
 
-  server.tool('get_vacation_requests', '휴가 신청 목록', { status: z.string().optional().describe('pending/approved/rejected') }, async ({ status }) => {
-    const w = status ? `AND vr.status='${status}'` : '';
-    const d = await q(`SELECT vr.id,re.name,vr.type,vr.start_date as s,vr.end_date as e,vr.days,vr.status FROM regular_vacation_requests vr JOIN regular_employees re ON vr.employee_id=re.id WHERE 1=1 ${w} ORDER BY vr.created_at DESC LIMIT 20`) as any[];
+  server.tool('get_vacation_requests', '휴가 신청 목록', { status: z.enum(VACATION_STATUSES).optional().describe('pending=대기 / approved=승인 / rejected=반려 (비우면 전체)') }, async ({ status }) => {
+    // status 는 허용값만 받고, SQL 에는 바인딩 파라미터로만 넣는다(문자열 이어 붙이기 금지).
+    if (status !== undefined && !VACATION_STATUSES.includes(status)) return { content: [{ type: 'text' as const, text: '❌ status 는 pending/approved/rejected 중 하나' }] };
+    const where = status ? 'WHERE vr.status=?' : '';
+    const d = await q(`SELECT vr.id,re.name,vr.type,vr.start_date as s,vr.end_date as e,vr.days,vr.status FROM regular_vacation_requests vr JOIN regular_employees re ON vr.employee_id=re.id ${where} ORDER BY vr.created_at DESC LIMIT 20`, ...(status ? [status] : [])) as any[];
     if (!d.length) return { content: [{ type: 'text' as const, text: '없음' }] };
     return { content: [{ type: 'text' as const, text: `${d.length}건:\n${d.map((r: any) => `#${r.id} ${r.name} ${r.type||'연차'} ${r.s}~${r.e}(${r.days}일) ${r.status==='approved'?'✅승인':r.status==='rejected'?'❌반려':'⏳대기'}`).join('\n')}` }] };
   });
@@ -127,24 +164,12 @@ function createMcpServer() {
     return { content: [{ type: 'text' as const, text: `${date} 배치${aids.size} 휴가${vids.size} 미배치${un.length}${un.length > 0 ? '\n' + un.map((e: any) => `${e.name}(${e.department||''})`).join(', ') : ''}` }] };
   });
 
-  // ===== 쓰기 =====
-  server.tool('create_shift', '배치 생성', { name: z.string(), month: z.number(), week_number: z.number(), days_of_week: z.string().describe('0=일~6=토 쉼표구분'), planned_clock_in: z.string(), planned_clock_out: z.string() },
-    async ({ name, month, week_number, days_of_week, planned_clock_in, planned_clock_out }) => {
-      const r = await dbRun('INSERT INTO regular_shifts (name,month,week_number,day_of_week,days_of_week,planned_clock_in,planned_clock_out) VALUES(?,?,?,?,?,?,?)', name, month, week_number, parseInt(days_of_week.split(',')[0]), days_of_week, planned_clock_in, planned_clock_out);
-      return { content: [{ type: 'text' as const, text: `생성: ${name} ID:${r.lastInsertRowid}` }] };
-    });
+  // (쓰기 도구 create_shift·assign_employees 는 2026-10-27 삭제 — 배치는 화면에서만 변경)
 
-  server.tool('assign_employees', '배치에 직원 배정', { shift_id: z.number(), employee_names: z.string().describe('쉼표구분') }, async ({ shift_id, employee_names }) => {
-    const names = employee_names.split(',').map(n => n.trim());
-    const emps = await q('SELECT id,name FROM regular_employees WHERE is_active=1') as any[];
-    let ok = 0; const nf: string[] = [];
-    for (const n of names) { const e = emps.find((x: any) => x.name === n); if (e) { try { await dbRun('INSERT INTO regular_shift_assignments(shift_id,employee_id) VALUES(?,?)', shift_id, e.id); ok++; } catch {} } else nf.push(n); }
-    return { content: [{ type: 'text' as const, text: `#${shift_id}에 ${ok}명 배정${nf.length ? ` 못찾음:${nf.join(',')}` : ''}` }] };
-  });
-
-  // ===== 비밀번호 필요 도구 (정산/급여/기본급) =====
+  // ===== 비밀번호 필요 도구 (정산/급여/기본급 조회) =====
   server.tool('get_settlement', '파견/알바 정산 조회 (비밀번호 필요)', { year_month: z.string(), type: z.string().optional().describe('dispatch/alba'), password: z.string().describe('접근 비밀번호') }, async ({ year_month, type, password }) => {
-    if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
+    const pw = await verifyPassword(password);
+    if (pw !== 'ok') return { content: [{ type: 'text' as const, text: PASSWORD_REFUSAL[pw] }] };
     const confirmed = await q(`SELECT employee_name,employee_type,SUM(regular_hours) as r,SUM(overtime_hours) as o,SUM(night_hours) as n,COUNT(*) as days FROM confirmed_attendance WHERE year_month=? AND employee_type!=? GROUP BY employee_name,employee_type`, year_month, '정규직') as any[];
     const f = type ? confirmed.filter((e: any) => type === 'alba' ? e.employee_type === '알바' : e.employee_type === '파견') : confirmed;
     if (!f.length) return { content: [{ type: 'text' as const, text: `${year_month} 정산 데이터 없음` }] };
@@ -152,14 +177,16 @@ function createMcpServer() {
   });
 
   server.tool('get_salary_settings', '정규직 기본급 설정 조회 (비밀번호 필요)', { password: z.string().describe('접근 비밀번호') }, async ({ password }) => {
-    if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
+    const pw = await verifyPassword(password);
+    if (pw !== 'ok') return { content: [{ type: 'text' as const, text: PASSWORD_REFUSAL[pw] }] };
     const data = await q(`SELECT ss.*,re.name,re.department FROM regular_salary_settings ss JOIN regular_employees re ON ss.employee_id=re.id ORDER BY re.name`) as any[];
     if (!data.length) return { content: [{ type: 'text' as const, text: '기본급 설정 없음' }] };
     return { content: [{ type: 'text' as const, text: `기본급 ${data.length}명:\n${data.map((s: any) => `${s.name}(${s.department||'-'}) 기본${s.base_pay||0} 식대${s.meal_allowance||0} 상여${s.bonus||0} 직책${s.position_allowance||0} 기타${s.other_allowance||0}`).join('\n')}` }] };
   });
 
   server.tool('get_payroll_calc', '정규직 급여 계산 조회 (비밀번호 필요)', { year_month: z.string(), password: z.string().describe('접근 비밀번호') }, async ({ year_month, password }) => {
-    if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
+    const pw = await verifyPassword(password);
+    if (pw !== 'ok') return { content: [{ type: 'text' as const, text: PASSWORD_REFUSAL[pw] }] };
     // 확정 데이터 + 급여 설정 조합
     const confirmed = await q(`SELECT employee_name,SUM(regular_hours) as r,SUM(overtime_hours) as o,SUM(night_hours) as n,SUM(break_hours) as b,COUNT(*) as days FROM confirmed_attendance WHERE year_month=? AND employee_type='정규직' GROUP BY employee_name`, year_month) as any[];
     const salaries = await q(`SELECT ss.*,re.name FROM regular_salary_settings ss JOIN regular_employees re ON ss.employee_id=re.id`) as any[];
@@ -174,35 +201,7 @@ function createMcpServer() {
     return { content: [{ type: 'text' as const, text: `${year_month} 급여 ${confirmed.length}명:\n${lines.join('\n')}` }] };
   });
 
-  server.tool('update_salary', '정규직 기본급 수정 (비밀번호 필요)', { employee_name: z.string(), base_pay: z.number().optional(), meal_allowance: z.number().optional(), bonus: z.number().optional(), position_allowance: z.number().optional(), other_allowance: z.number().optional(), password: z.string().describe('접근 비밀번호') },
-    async ({ employee_name, base_pay, meal_allowance, bonus, position_allowance, other_allowance, password }) => {
-      if (!await verifyPassword(password)) return { content: [{ type: 'text' as const, text: '❌ 비밀번호 불일치' }] };
-      const emp = await q1('SELECT id FROM regular_employees WHERE name=? AND is_active=1', employee_name) as any;
-      if (!emp) return { content: [{ type: 'text' as const, text: `${employee_name} 찾을 수 없음` }] };
-      const existing = await q1('SELECT id FROM regular_salary_settings WHERE employee_id=?', emp.id) as any;
-      if (existing) {
-        const sets: string[] = []; const params: any[] = [];
-        if (base_pay !== undefined) { sets.push('base_pay=?'); params.push(base_pay); }
-        if (meal_allowance !== undefined) { sets.push('meal_allowance=?'); params.push(meal_allowance); }
-        if (bonus !== undefined) { sets.push('bonus=?'); params.push(bonus); }
-        if (position_allowance !== undefined) { sets.push('position_allowance=?'); params.push(position_allowance); }
-        if (other_allowance !== undefined) { sets.push('other_allowance=?'); params.push(other_allowance); }
-        if (sets.length) { sets.push('updated_at=NOW()'); await dbRun(`UPDATE regular_salary_settings SET ${sets.join(',')} WHERE employee_id=?`, ...params, emp.id); }
-      } else {
-        await dbRun('INSERT INTO regular_salary_settings (employee_id,base_pay,meal_allowance,bonus,position_allowance,other_allowance) VALUES(?,?,?,?,?,?)', emp.id, base_pay || 0, meal_allowance || 0, bonus || 0, position_allowance || 0, other_allowance || 0);
-      }
-      return { content: [{ type: 'text' as const, text: `${employee_name} 급여 설정 완료` }] };
-    });
-
-  server.tool('approve_vacation', '휴가 승인', { request_id: z.number(), memo: z.string().optional() }, async ({ request_id, memo }) => {
-    await dbRun("UPDATE regular_vacation_requests SET status='approved',admin_memo=?,updated_at=NOW() WHERE id=?", memo || '', request_id);
-    return { content: [{ type: 'text' as const, text: `#${request_id} 승인` }] };
-  });
-
-  server.tool('reject_vacation', '휴가 반려', { request_id: z.number(), reason: z.string() }, async ({ request_id, reason }) => {
-    await dbRun("UPDATE regular_vacation_requests SET status='rejected',admin_memo=?,updated_at=NOW() WHERE id=?", reason, request_id);
-    return { content: [{ type: 'text' as const, text: `#${request_id} 반려` }] };
-  });
+  // (쓰기 도구 update_salary·approve_vacation·reject_vacation 은 2026-10-27 삭제 — 급여·휴가 처리는 화면에서만)
 
   return server;
 }

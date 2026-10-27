@@ -33,7 +33,7 @@ echo       "command": "node",
 echo       "args": ["proxy.mjs"],
 echo       "env": {
 echo         "ATTENDANCE_API_URL": "https://mysixthproject-production.up.railway.app",
-echo         "ATTENDANCE_API_TOKEN": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Imxpb245MDgwQGpvaW5hbmRqb2luLmNvbSIsInR5cGUiOiJhdXRoIiwibWNwIjp0cnVlLCJpYXQiOjE3NzUxOTEyNjIsImV4cCI6MTgwNjcyNzI2Mn0.4KPWDP9SS9NmiDQAIvsSi9_fC91-NR--whUCoa59XIA"
+echo         "ATTENDANCE_API_TOKEN": "PASTE_ISSUED_TOKEN_HERE"
 echo       }
 echo     }
 echo   }
